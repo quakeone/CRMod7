@@ -1580,8 +1580,11 @@ void() WaterMove =
 
     if (!self.waterlevel)
     {
-        sound (self, CHAN_BODY, "misc/outwater.wav", 1, ATTN_NORM);
+        if (self.flags & FL_INWATER)
+            sound (self, CHAN_BODY, "misc/outwater.wav", 1, ATTN_NORM);
         self.flags = self.flags - (self.flags & FL_INWATER);
+        if ((self.flags & FL_WATERJUMP) && (self.velocity_z == 0))
+            self.flags = self.flags - (self.flags & FL_WATERJUMP);
         return;
     }
     // END_MOD
@@ -1658,7 +1661,9 @@ void() WaterMove =
     }
     // ELOHIM_MOD - rearranged expression for efficiency
     if (! (self.flags & FL_WATERJUMP) )
-    self.velocity = (1 - 0.8*self.waterlevel*frametime)*self.velocity;
+        self.velocity = (1 - 0.8*self.waterlevel*frametime)*self.velocity;
+    else if (self.velocity_z == 0)
+        self.flags = self.flags - (self.flags & FL_WATERJUMP);
     // END_MOD
     // ELOHIM_MOD - moved here from PlayerPreThink
     if (self.waterlevel == 2)
@@ -1952,7 +1957,7 @@ void() PlayerPreThink =
 
         if (self.deadflag == DEAD_NO)
         {
-            if (self.waterlevel || (self.flags & FL_INWATER))
+            if (self.waterlevel || (self.flags & (FL_INWATER | FL_WATERJUMP)))
                 WaterMove ();
         }
         return;
@@ -2001,7 +2006,7 @@ void() PlayerPreThink =
 
     self.deathtype = "";	//R00k - wrong obituary messages fix by Zoid
 
-    if (self.waterlevel || (self.flags & FL_INWATER))
+    if (self.waterlevel || (self.flags & (FL_INWATER | FL_WATERJUMP)))
         WaterMove ();
 
     if (self.deadflag == DEAD_DYING) return;	// dying, so do nothing
