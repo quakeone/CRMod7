@@ -25,7 +25,17 @@ void() HookPull2 =
 //local float vpn,vpnmin,xn,xnmin,acc,tmp, 
 	local float v, dorg;
 	local float a , b , c;
-	
+
+	if ( (!(self.owner.hook2 & HOOK_OUT))
+			|| (self.owner.teleport_time > time)
+			|| (self.owner.deadflag)
+			|| (gameover)
+			|| (intermission_running))
+	{
+		HookVanish2 ();
+		return;
+	}
+
 	if (self.enemy.takedamage)
 	{
 		if (!teamplay || self.enemy.team != self.owner.team)
@@ -84,12 +94,6 @@ void() HookPull2 =
 	else
 	{
 		self.velocity = self.enemy.velocity;
-	}
-
-	if ( (!(self.owner.hook2 & HOOK_OUT)) || (self.owner.teleport_time > time ) || (self.owner.deadflag) || (gameover))
-	{
-		HookVanish2 ();
-		return;
 	}
 
 	makevectors (self.owner.angles);
@@ -214,7 +218,7 @@ void() HookPull2 =
 
 void() T_ChainTouch2 =
 {
-	if ((!(self.owner.hook2 & HOOK_OUT)) || (gameover))
+	if ((!(self.owner.hook2 & HOOK_OUT)) || (gameover) || (intermission_running))
 	{
 		HookVanish2 ();
 		return;
@@ -278,7 +282,7 @@ void() Hook_Check2 =
 	local	vector 	chainvec;
 	local 	float	chainlength;
 
-	if ( (!(self.owner.hook2 & HOOK_OUT)) || (self.owner.deadflag) || (gameover))
+	if ( (!(self.owner.hook2 & HOOK_OUT)) || (self.owner.deadflag) || (gameover) || (intermission_running))
 	{
 		HookVanish2 ();
 		return;
@@ -399,7 +403,7 @@ void() HookFire2 =
 		return;
 	}
 
-	if (gameover)
+	if (gameover || intermission_running)
 		return;
 		
 	if (clanring_playmode & CLANRING_MATCH_MODE)

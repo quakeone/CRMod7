@@ -72,7 +72,13 @@ void() HookPull =
         return;
     }
 
-	if ((!self.owner.button0 && self.owner.weapon == IT_HOOK) || (self.owner.deadflag) || (gameover))
+	if (gameover || intermission_running)
+	{
+		HookVanish();
+		return;
+	}
+
+	if ((!self.owner.button0 && self.owner.weapon == IT_HOOK) || (self.owner.deadflag))
 	{
 		if (!(self.owner.flags & FL_WATERJUMP))	// R00k: hooking out of water near a wall cancels the hook when waterjump is activated because it sets the teleport_time + 2...
 		{
@@ -208,7 +214,7 @@ void() T_HookTouch =
 
 	if (other != self.owner)
 	{
-		if ((pointcontents(self.origin) == CONTENT_SKY) || (gameover))
+		if ((pointcontents(self.origin) == CONTENT_SKY) || (gameover) || (intermission_running))
 		{
 			HookVanish ();
 			return;
@@ -288,7 +294,7 @@ void() T_HookTouch =
 
 void() Hook_Check =
 {
-	if ((!self.owner.button0 && self.owner.weapon == IT_HOOK) || (self.owner.deadflag) || (gameover))
+	if ((!self.owner.button0 && self.owner.weapon == IT_HOOK) || (self.owner.deadflag) || (gameover) || (intermission_running))
 	{
 		HookVanish ();
 		return;
