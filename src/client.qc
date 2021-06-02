@@ -512,6 +512,7 @@ void() execute_changelevel =
         other.movetype 		= MOVETYPE_NONE;
         other.finaldest_y 	= MOVETYPE_NONE;
         other.modelindex 	= 0;
+        other.punchangle 	= '0 0 0';
         other.model 		= "";
         other.weaponmodel 	= "";
         other.weapon 		= 0;
@@ -1048,6 +1049,7 @@ void(entity e) move_to_intermission =
     e.movetype 		= MOVETYPE_NONE;
     e.finaldest_y 	= MOVETYPE_NONE;
     e.modelindex 	= 0;
+    e.punchangle 	= '0 0 0';
     e.weaponmodel 	= string_null;
 };
 
