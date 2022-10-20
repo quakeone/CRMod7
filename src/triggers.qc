@@ -705,6 +705,9 @@ Pushes the player
 */
 void() trigger_push =
 {
+	if (self.angles == '0 0 0')
+		self.angles = '0 360 0';
+
 	InitTrigger ();
 	precache_sound ("ambience/windfly.wav");
 	self.touch = trigger_push_touch;
