@@ -75,6 +75,8 @@ void() door_hit_top =
 	self.state = STATE_TOP;
 	if (self.spawnflags & DOOR_TOGGLE)
 		return;		// don't come down automatically
+	if (self.wait < 0)
+		return;
 	self.think = door_go_down;
 	self.nextthink = self.ltime + self.wait;
 };
@@ -128,7 +130,8 @@ void() door_go_up =
 
 	if (self.state == STATE_TOP)
 	{	// reset top wait time
-		self.nextthink = self.ltime + self.wait;
+		if (self.wait >= 0)
+			self.nextthink = self.ltime + self.wait;
 		return;
 	}
 	
