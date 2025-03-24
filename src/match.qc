@@ -2836,3 +2836,22 @@ void() match_list_ghosts =
     }
     sprint(self, "\n");
 };
+
+//
+//  F I N D  P L A Y E R  G H O S T
+//
+//  Finds a ghost for a player by their name; returns world if no ghost exists
+//
+entity(string name) match_find_player_ghost =
+{
+    local entity e;
+
+    e = find(world, classname, "clanring_ghost");
+    while (e)
+    {
+        if (e.owner.owner != e && e.owner.netname == name)
+            return e;
+        e = find(e, classname, "clanring_ghost");
+    }
+    return world;
+};

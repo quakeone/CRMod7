@@ -262,6 +262,10 @@ void () CaptureHighScores_sprint;
 void () AirshotHighScores_sprint;
 void () LongRangeGibs_sprint;
 void () Teamplay_Select_Team;
+void() match_schedule_find_player_ghost;
+void() match_process_player_ghost;
+entity(string name) match_find_player_ghost;
+void(entity ghostent) match_restore_ghost;
 //
 // C L E A R   A F K   S T A T U S
 //
@@ -1207,6 +1211,8 @@ void () clanring_client_connect =
         stats_reset_player();
 
         utils_make_scheduled_event(find_pqc_teamscore_teams, 1.25);//R00k
+
+        match_schedule_find_player_ghost();
 
         self.afk_time = time + 20;
 
@@ -2984,4 +2990,61 @@ void () clanring_start_frame =
     cvar_set("temp1", "0");
     if (command)
         console_command(command);
+};
+
+void() match_process_player_ghost =
+{
+    entity ghost;
+    entity player;
+    
+    // Find the player with the name we stored
+    player = find(world, classname, "player");
+    while (player != world && player.netname != self.netname)
+    {
+        player = find(player, classname, "player");
+    }
+    
+    if (player == world)
+    {
+        // Player no longer exists
+        remove(self);
+        return;
+    }
+    
+    // Use the original match_find_player_ghost function to find the ghost
+    ghost = match_find_player_ghost(player.netname);
+    
+    if (ghost != world)
+    {
+        // Store current self
+        entity old_self = self;
+        
+        // Change self to the player so match_restore_ghost works correctly
+        self = player;
+        
+        // Restore the player from their ghost
+        match_restore_ghost(ghost);
+        
+        // Restore self to the scheduler entity
+        self = old_self;
+    }
+    
+    // Remove the scheduled event entity
+    remove(self);
+};
+
+void() match_schedule_find_player_ghost =
+{
+    // Schedule the ghost-finding operation to run immediately
+    entity e;
+    
+    // We need to capture the player's name since 'self' will change
+    // when the scheduled event runs
+    string player_name = self.netname;
+    
+    e = utils_make_scheduled_event(match_process_player_ghost, 0);
+    
+    // Store the player name in the scheduled event entity
+    // so we can find the right player when the event triggers
+    e.netname = player_name;
 };
