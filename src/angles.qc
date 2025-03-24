@@ -72,25 +72,13 @@ vector (vector from, vector to) angles_bestaim =
 	return bestaim;
 };
 
-// CRMOD
-//  F I X A N G L E
-//    by Paul Baker
-//
-//  Sends new view angle to client and stores the value in .crmod_oldangle for use in angle smoothing
-//
-
-void(vector v) angles_fixangle =
+//Just set the angle and send it to the client
+void (vector v) angles_fixangle =
 {
-	self.clanring_oldangle = v;
-	// Set the new angles.  The 0.1 angles are subtracted to ensure
-    // that self.angles will get rounded off to angle (which was obtained
-    // by rounding off self.movetarget.v_angles).  Don't ask me why you
-    // have to subtract; logic dictates that you should be adding.  But
-    // I tried adding and it didn't work; I tried subtracting and it did.
-    // Take it up with id.
-	self.v_angle = self.angles = v - '0.1 0.1 0';
-	if (isFTEserver)
-		self.fixangle = 3;	// 3 = FTE Skip Deltas.
-	else
-		self.fixangle = TRUE;	// forces client's angle to the above, using svc_setangle.
+	self.v_angle = self.angles = v;
+	msg_entity = self;
+	WriteByte(MSG_ONE, SVC_SETANGLE);
+	WriteAngle(MSG_ONE, v_x);
+	WriteAngle(MSG_ONE, v_y);
+	WriteAngle(MSG_ONE, v_z);
 };

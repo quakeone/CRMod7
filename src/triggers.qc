@@ -451,19 +451,19 @@ void() teleport_touch =
 	}
 
 	setorigin(other, t.origin);
-	other.angles = t.mangle;
-	other.flags = other.flags - other.flags & FL_ONGROUND;	
 
 	if (other.classname == "player")
 	{
-		other.v_angle = other.angles = t.mangle;	
-		if (isFTEserver)
-			other.fixangle = 3;	// 3 = FTE Skip Deltas.
-		else
-			other.fixangle = TRUE; // turn this way immediately
 		other.teleport_time	= time + 0.7;
 		other.velocity = v_forward * 300;
+		vector tm = t.mangle;
+		tm_x = 0; tm_z = 0;
+		entity temp = self;
+		self = other;
+		angles_fixangle(tm);
+		self = temp;
 	}
+	other.flags &= ~FL_ONGROUND;
 };
 
 /*QUAKED info_teleport_destination (.5 .5 .5) (-8 -8 -8) (8 8 32)
