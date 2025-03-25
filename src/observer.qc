@@ -36,6 +36,7 @@ void () UnHookPlayer;
 void (entity player, float reset) TeamCaptureDropFlagOfPlayer;
 void () respawn;
 void () DropRune;
+void(entity observer, entity target) observer_update_target_infokey;
 
 //
 //  F I N D  T E L E P O R T
@@ -534,9 +535,16 @@ void () observer_demo_start =
 		self.oflags = self.oflags - OBSERVER_GO_AUTO;
 		self.oflags = self.oflags | OBSERVER_AUTO;
 	}
+	else if (self.oflags & OBSERVER_GO_AUTO2)
+	{
+		sprint(self, "Advanced Automatic Eyecam Enabled.\n");
+		self.oflags = self.oflags - OBSERVER_GO_AUTO2;
+		self.oflags = self.oflags | OBSERVER_AUTO2;
+	}
 	else
 	{
 		sprint(self, "type '\bautopov\b' for automatic eyecam switching\n");
+		sprint(self, "type '\bautopov2\b' for advanced automatic eyecam\n");
 	}
 
 	self.nextthink = -1;
@@ -735,6 +743,9 @@ void() observer_end =
 
 	if (!(self.style & CLANRING_OBSERVER))
 		return;
+
+	// Clear observer flags including autopov2 to prevent getting stuck in a loop
+	self.oflags = self.oflags - (self.oflags & (OBSERVER_AUTO|OBSERVER_GO_AUTO|OBSERVER_QUAKETV|OBSERVER_AUTO2|OBSERVER_GO_AUTO2));
 
 	if (mode_is_arena())
 	{
@@ -1626,6 +1637,8 @@ void () observer_impulse =
 			auto_chase_start();
 		else if (self.impulse == 157)
 			auto_pov_start();
+		else if (self.impulse == 158)
+			autopov2_start();
     }
     else
     {                                                                              // CRMOD more commands to go observer
@@ -1642,6 +1655,10 @@ void () observer_impulse =
 					self.oflags = self.oflags | OBSERVER_CHASE;
 				else if (self.impulse == 149)
 					self.oflags = self.oflags | OBSERVER_DEMO;
+				else if (self.impulse == 157)
+					self.oflags = self.oflags | OBSERVER_DEMO | OBSERVER_GO_AUTO;
+				else if (self.impulse == 158)
+					self.oflags = self.oflags | OBSERVER_DEMO | OBSERVER_GO_AUTO2;
 				// CRMOD more commands to go observer
 				else if (self.impulse == 155)
 					self.oflags = self.oflags | OBSERVER_CHASE | OBSERVER_GO_AUTO;
@@ -2177,6 +2194,11 @@ void () observer_post_think =
 		{
 			if (boss.state != CA_MATCH_CLEANUP)
 			{
+				// Clear autopov2 flag before joining team to prevent loop
+				if (self.style & CLANRING_OBSERVER)
+				{
+					self.oflags = self.oflags - (self.oflags & (OBSERVER_AUTO|OBSERVER_GO_AUTO|OBSERVER_QUAKETV|OBSERVER_AUTO2|OBSERVER_GO_AUTO2));
+				}
 				Teamplay_Select_Team ();//self.impulse is cleared in this function.
 			}
 			else
@@ -2236,4 +2258,19 @@ void () observer_heads_up =
         stuffcmd(self, "viewsize 120\n");
     }
     self.delay = 0;
+};
+
+void(entity observer, entity target) observer_update_target_infokey =
+{
+	if (observer.style & CLANRING_CONNECTED)
+	{
+		if (target != world)
+		{
+			forceinfokey(observer, "observing", target.netname);
+		}
+		else
+		{
+			forceinfokey(observer, "observing", "off");
+		}
+	}
 };

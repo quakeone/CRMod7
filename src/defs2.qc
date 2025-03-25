@@ -50,6 +50,8 @@ float OBSERVER_TOURNEY          = 64;	        // set tournement mode for chaseca
 float OBSERVER_GO_AUTO          = 128;          // player entering an auto mode
 float OBSERVER_COMMENTARY       = 256;          // see running commentary
 float OBSERVER_POP_FORWARD    	= 512;
+float OBSERVER_AUTO2            = 1024;         // autopov2 view switching
+float OBSERVER_GO_AUTO2         = 4096;         // player entering autopov2 mode
 float OBSERVER_QUAKETV 			= 2048;		    // Sputnik: added this for streaming via quaketv
 
 /*

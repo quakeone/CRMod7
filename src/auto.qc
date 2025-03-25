@@ -25,6 +25,8 @@
 void() observer_chase_start;
 void() observer_camera_start;
 void() observer_demo_start;
+void () observer_set_demo_position;
+void(entity observer, entity target) observer_update_target_infokey;
 
 // CRMOD
 // A U T O  C O M P U T E  S C O R E
@@ -256,6 +258,240 @@ void() auto_pov_start =
 	self.oflags = self.oflags | OBSERVER_QUAKETV;//R00k added OBSERVER_QUAKETV
 	self.oflags = self.oflags | OBSERVER_GO_AUTO;
 	observer_demo_start ();
+};
+
+// AUTOPOV2
+//  A U T O  P O V 2  S T A R T
+//
+// Start an advanced auto POV system with prioritized selection logic
+void() autopov2_start =
+{
+	self.oflags = self.oflags | OBSERVER_QUAKETV;
+	self.oflags = self.oflags | OBSERVER_GO_AUTO2; // New flag for autopov2
+	observer_demo_start();
+};
+
+// AUTOPOV2
+// AUTPOV2 FIND TARGET
+//
+// This function determines the best player target using a priority-based system:
+//
+// 1. Powerups Priority (Highest threat):
+//    - Pentagram of Protection (IT_INVULNERABILITY) -> Highest priority target.
+//    - Quad Damage (IT_QUAD) -> Second highest priority.
+//    - Ring of Shadows (IT_INVISIBILITY) -> Third highest priority.
+//
+// 2. Target Elimination Response:
+//    - If the current target dies, switch to the killer if they are a valid player.
+//
+// 3. Weapon and Armor Evaluation:
+//    - Players with Rocket Launcher (IT_ROCKET_LAUNCHER) or Lightning Gun (IT_LIGHTNING) are prioritized.
+//    - Players with the highest armor (Red > Yellow > Green) are preferred, using armor value as a tiebreaker.
+//    - If no armor, health is used as a tiebreaker.
+//
+// 4. Fallback Selection (Tankiest Player):
+//    - If no valid target is found from previous steps, select the player with the highest armor and health.
+//
+// Returns the most dangerous or durable player as the new target.
+
+entity() autopov2_find_target =
+{
+	local entity player, best_player, killer;
+	local float best_score, score;
+	local entity current_target;
+	
+	current_target = self.movetarget;
+	
+	// Make sure current_target is valid
+	if (current_target != world && 
+	    ((current_target.style & CLANRING_CONNECTED) == 0 || 
+	     current_target.classname != "player"))
+	{
+		current_target = world;
+	}
+	
+	// Direct scan for players with powerups
+	player = find(world, classname, "player");
+	while (player)
+	{
+		if (player.deadflag == DEAD_NO && 
+		    (player.style & CLANRING_CONNECTED) && 
+		    !(player.style & CLANRING_OBSERVER))
+		{
+			// Check for powerups in priority order: pent, quad, ring/eyes
+			if (player.items & IT_INVULNERABILITY)
+			{
+				// Only print message if it's a new target
+				if (player != current_target)
+					bprint(player.netname, " has pent - switching to them\n");
+				return player; // Pentagram has highest priority
+			}
+			
+			if (player.items & IT_QUAD)
+			{
+				// Only print message if it's a new target
+				if (player != current_target)
+					bprint(player.netname, " has quad - switching to them\n");
+				return player; // Quad has second highest priority
+			}
+			
+			if (player.items & IT_INVISIBILITY)
+			{
+				// Only print message if it's a new target
+				if (player != current_target)
+					bprint(player.netname, " has ring - switching to them\n");
+				return player; // Ring/eyes has third priority
+			}
+		}
+		player = find(player, classname, "player");
+	}
+	
+	// If current target died, check for killer
+	if (current_target != world && current_target.deadflag != DEAD_NO)
+	{
+		killer = current_target.dmg_inflictor;
+		if (killer != world && 
+		    killer.classname == "player" && 
+		    killer.deadflag == DEAD_NO && 
+		    (killer.style & CLANRING_CONNECTED) && 
+		    !(killer.style & CLANRING_OBSERVER))
+		{
+			bprint(killer.netname, " killed current target - switching to them\n");
+			return killer; // Player who killed current target gets priority
+		}
+	}
+	
+	// Otherwise, find player with RL/LG and most armor (or health if no armor)
+	best_player = world;
+	best_score = -999999;
+	
+	player = find(world, classname, "player");
+	while (player)
+	{
+		if (player.deadflag == DEAD_NO && 
+		    (player.style & CLANRING_CONNECTED) && 
+		    !(player.style & CLANRING_OBSERVER))
+		{
+			// Check if player has rocket launcher or lightning gun
+			if (player.items & (IT_ROCKET_LAUNCHER | IT_LIGHTNING))
+			{
+				// Start with armor score
+				score = 0;
+				
+				// Red armor > Yellow armor > Green armor > No armor
+				if (player.items & IT_ARMOR3)
+					score = 300 + player.armorvalue;
+				else if (player.items & IT_ARMOR2)
+					score = 200 + player.armorvalue;
+				else if (player.items & IT_ARMOR1)
+					score = 100 + player.armorvalue;
+				
+				// If no armor, use health as tiebreaker
+				if (score == 0)
+					score = player.health;
+					
+				// Prioritize RL+LG > RL > LG
+				if (player.items & IT_ROCKET_LAUNCHER)
+					score += 1000;
+				if (player.items & IT_LIGHTNING)
+					score += 500;
+					
+				if (score > best_score)
+				{
+					best_score = score;
+					best_player = player;
+				}
+			}
+		}
+		player = find(player, classname, "player");
+	}
+	
+	// If no player with RL/LG found, find player with highest armor and health
+	if (best_player == world)
+	{
+		player = find(world, classname, "player");
+		while (player)
+		{
+			if (player.deadflag == DEAD_NO && 
+			    (player.style & CLANRING_CONNECTED) && 
+			    !(player.style & CLANRING_OBSERVER))
+			{
+				// Score based on armor type and value
+				score = 0;
+				
+				if (player.items & IT_ARMOR3)
+					score = 300 + player.armorvalue;
+				else if (player.items & IT_ARMOR2)
+					score = 200 + player.armorvalue;
+				else if (player.items & IT_ARMOR1)
+					score = 100 + player.armorvalue;
+					
+				// Add health as tiebreaker
+				score += player.health;
+				
+				if (score > best_score)
+				{
+					best_score = score;
+					best_player = player;
+				}
+			}
+			player = find(player, classname, "player");
+		}
+	}
+	
+	return best_player;
+};
+
+// AUTOPOV2
+// A U T O P O V 2
+//
+// Main function for autopov2 logic, called from elohim_start_frame
+void() autopov2 =
+{
+	local entity target;
+	local entity old_self;
+	local entity current_player;
+	
+	// We need to remove the scheduled event entity
+	remove(self);
+	
+	// Iterate through all players and find those with OBSERVER_AUTO2 flag
+	current_player = find(world, classname, "player");
+	while (current_player)
+	{
+		if ((current_player.style & CLANRING_OBSERVER) && (current_player.oflags & OBSERVER_AUTO2))
+		{
+			// Found an observer with autopov2 enabled
+			old_self = self;
+			self = current_player;
+			
+			// Find the best target for this observer
+			target = autopov2_find_target();
+			
+			// More safety checks
+			if (target != world && self.movetarget != target)
+			{
+				// Switch to the new target
+				self.movetarget = target;
+				
+				// This is the critical part - ensure we properly set the viewport
+				msg_entity = self;
+				WriteByte(MSG_ONE, SVC_SETVIEWPORT);
+				WriteEntity(MSG_ONE, target);
+				
+				// Also call observer_set_demo_position for proper positioning
+				observer_set_demo_position();
+				
+				// Update the observing target infokey
+				observer_update_target_infokey(self, target);
+				
+				// Display autopov2 message
+				centerprint(self, sprintf("autopov2 \[%s\]", self.movetarget.netname));
+			}
+		}
+		
+		current_player = find(current_player, classname, "player");
+	}
 };
 
 // CRMOD

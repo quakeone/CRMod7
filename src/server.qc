@@ -819,6 +819,7 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias autochase impulse 155\n");
     stuffcmd(self, "alias help-camera impulse 156\n");
     stuffcmd(self, "alias autopov impulse 157\n");
+    stuffcmd(self, "alias autopov2 impulse 158\n");
     stuffcmd(self, "alias pentstats impulse 169\n");
     stuffcmd(self, "alias killstats impulse 170\n");
     stuffcmd(self, "alias efficiency impulse 171\n");
@@ -2881,6 +2882,7 @@ void () clanring_start_frame =
                         auto_schedule_cameras();
                         utils_make_scheduled_event(auto_chase, 0.3);
                         utils_make_scheduled_event(auto_camera, 0.6);
+                        utils_make_scheduled_event(autopov2, 0.5);  // Slight delay to reduce spam
                         break;
                     }
                 }
