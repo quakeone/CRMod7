@@ -2039,15 +2039,19 @@ void() match_countdown_pause =
 //  R E Q U E S T  P A U S E
 //
 void() match_request_pause =
-{
-    if (!(mode_is_arena()))
+{    
+    if ((boss.state == CA_MATCH_WAITING)&&(mode_is_arena()))
     {
-        if (!(clanring_state & CLANRING_MATCH_STARTED))
-        {
-            sprint(self, "No match in progress\n");
-            return;
-        }
+        sprint(self, "\bNo match in progress\n");
+        return;
     }
+
+    if (!(clanring_state & CLANRING_MATCH_STARTED))
+    {
+        sprint(self, "No match in progress\n");
+        return;
+    }
+    
     if (clanring_state & CLANRING_MATCH_PAUSED)
     {
         sprint(self, "Match is already paused\n");
