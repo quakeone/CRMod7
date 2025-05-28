@@ -618,13 +618,14 @@ void () observer_start =
 			stuffcmd(self,",0;\n");
 		}
 		else
-		{
-			setcolour (self, 0, 0);
 			stuffcmd (self, ";color 0;\n");
-		}
+				
 		self.team2 	= TEAM_SPECTATOR;//dont allow dead teammates to talk to playing teammates
 		self.team 	= ((self.team2) + 1);
 	}
+	else
+		stuffcmd (self, ";color 0;\n");
+
 	self.takedamage = DAMAGE_NO;
 	self.solid = SOLID_NOT;
 
@@ -674,10 +675,7 @@ void () observer_start =
     // update display immediately
 	self.delay = 0;
 	// reset display hold time	
-	self.lip = 0;
-	//setcolor (self, 0,0);
-	if (mode_is_arena() == FALSE)
-		stuffcmd(self, ";color 0;\n");
+	self.lip = 0;	
 	self.height = TEAM_SPECTATOR;// fixed observer color cheat?
 
 	if (self.oflags & OBSERVER_FLY)
@@ -911,13 +909,13 @@ entity (entity e) observer_find_team_target =
 {
 	local entity p;
 
-	p = e.chain_gang;
+	p = e.next_player;
 
 	while (p)
 	{
         if ((p.deadflag == DEAD_NO) && (IS_CA_OBSERVER(p) == FALSE) && ((p.style & CLANRING_CONNECTED)))
 			return p;
-		p = p.chain_gang;
+		p = p.next_player;
 	}
 	
 	if (p == world)
@@ -933,21 +931,56 @@ entity (entity e) observer_find_team_target =
 //
 //  Get the next target to watch.
 //
-void () observer_next_target =
-{
+void () observer_arena_next_target =
+{	
 	if (mode_is_arena() && (boss.state != CA_MATCH_PLAYING && boss.state != CA_MATCH_ROUNDSTART))
 	{
 		observer_fly_start();
 		return;
 	}
 
-	if ((mode_is_arena()) && (boss.state == CA_MATCH_PLAYING) && (self.next_team != world))
+    entity newt;
+
+    // With cam lock a player can only track his teammates.
+    if (self.next_team != world)
+        newt = observer_find_team_target(self.movetarget);
+    else
+         newt = observer_find_target(self.movetarget);
+
+    if (newt == world)
+    {
+        observer_fly_start ();
+        return;
+    }
+
+    if (self.movetarget != newt)    // If it's not the same target, then notify
+    {
+        self.movetarget = newt;
+        sprint (self, "Tracking ", self.movetarget.netname, "\n");
+        centerprint (self,self.movetarget.netname);
+    }
+
+    self.delay = 0;
+
+    if (((self.oflags & OBSERVER_DEMO) && (self.movetarget != world)) && (self.movetarget.player_flag == PF_PLAYING))
+    {
+        msg_entity = self;
+        WriteByte(MSG_ONE, SVC_SETVIEWPORT);
+        WriteEntity(MSG_ONE, self.movetarget);
+        observer_set_demo_position();
+    }    
+	observer_update_player_observer_key(self);
+};
+
+void () observer_next_target =
+{
+	if (mode_is_arena())
 	{
-		if (self.movetarget.ca_player_flag != PF_PLAYING) // Re-Affirm why we are here finding another team-mate...
-			self.movetarget = observer_find_team_target (self.next_team);
+		observer_arena_next_target();
+		return;
 	}
-	else
-		self.movetarget = observer_find_target (self.movetarget);
+
+	self.movetarget = observer_find_target (self.movetarget);
 	
 	if (self.movetarget == world)
 	{	
@@ -958,20 +991,12 @@ void () observer_next_target =
     // Force an immediate update of the heads-up display
     self.delay = 0;
     
-	if ((mode_is_arena() == FALSE) || (mode_is_arena() && (self.movetarget.ca_player_flag == PF_PLAYING)))
+	if ((self.oflags & OBSERVER_DEMO) && (self.movetarget != world))
 	{
-		if ((self.oflags & OBSERVER_DEMO) && (self.movetarget != world))
-		{
-			msg_entity = self;
-			WriteByte(MSG_ONE, SVC_SETVIEWPORT);
-			WriteEntity(MSG_ONE, self.movetarget);
-			observer_set_demo_position();
-		}
-	}
-
-	if (mode_is_arena())
-	{
-		sprint (self, "Tracking ", self.movetarget.netname, "\n");
+		msg_entity = self;
+		WriteByte(MSG_ONE, SVC_SETVIEWPORT);
+		WriteEntity(MSG_ONE, self.movetarget);
+		observer_set_demo_position();
 	}
 
 	if ((((clanring_playmode & CLANRING_MATCH_MODE)&&(!(clanring_state & CLANRING_MATCH_STARTED)))||(clanring_playmode & CLANRING_NORMAL_MODE))||(self.statstate <0))
@@ -998,8 +1023,7 @@ void () observer_prev_target =
     }
 
     curr = self.movetarget;
-    if (curr.style & CLANRING_OBSERVER || curr.classname != "player" ||
-        !(curr.style & CLANRING_CONNECTED))
+    if (curr.style & CLANRING_OBSERVER || curr.classname != "player" || !(curr.style & CLANRING_CONNECTED))
     {
         self.movetarget = curr = observer_find_target(curr);
     }
@@ -2004,6 +2028,13 @@ void () observer_pre_think =
     {
         if (jump)
 		{
+			// Only try to switch targets if we're in an active round
+			if (mode_is_arena() && boss.state != CA_MATCH_PLAYING)
+			{
+				observer_fly_start();
+				return;
+			}
+
 			if (self.movetarget.classname == "player")
 			{
 				// if (self.button0)
@@ -2023,17 +2054,28 @@ void () observer_pre_think =
 
 		if (clanring_playmode & CLANRING_CA_MODE)
 		{
-			if ((self.movetarget.ca_player_flag == PF_DEAD) || (IS_CA_OBSERVER(self.movetarget)))
+			if (boss.state == CA_MATCH_PLAYING)
 			{
-				if (boss.state == CA_MATCH_PLAYING) // Dont switch between rounds.
-					observer_next_target ();
+				if (self.movetarget == world)
+				{
+					observer_fly_start ();
+					return;
+				}
 				else
-					observer_walk_start();
+				{
+					if (IS_CA_OBSERVER(self.movetarget))
+					{					
+						observer_next_target ();
+					}	
+				}
 			}
-			if (self.movetarget == world)
-				observer_walk_start();
-		}
-    }
+			else if (self.movetarget == world)
+			{
+				observer_fly_start();
+				return;
+			}
+    	}   
+ 	}
     else
     {
         if (self.oflags & OBSERVER_WALK)// && !self.button0)
@@ -2057,7 +2099,7 @@ void () observer_pre_think =
 
 		// check for player in sight every frame
 		if (!(mode_is_arena()))
-			observer_get_target(); //WTF is this used for?
+			observer_get_target(); //tourneycam
     }
 
 	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (self.next_team != world) && (boss.state == CA_MATCH_PLAYING) && (boss.wait == 0))
@@ -2114,7 +2156,7 @@ void () observer_post_think =
 			}			
 			self.attack_finished = time + 0.8;	
 		}
-	
+
 		if ((mode_is_arena() == FALSE) || (mode_is_arena() && self.movetarget.ca_player_flag == PF_PLAYING))
 		{
 			if (self.oflags & OBSERVER_CHASE)
