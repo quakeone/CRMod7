@@ -655,7 +655,7 @@ void(float dm) ThrowHead =
 	self.takedamage = DAMAGE_NO;
 	self.solid 	= SOLID_NOT;
 	self.view_ofs 	= '0 0 8';
-	setsize (self, '-16 -16 0', '16 16 56');
+	setsize (self, '0 0 0 ', '0 0 0');
 	self.velocity 	= VelocityForDamage (dm);
 	self.origin_z 	= self.origin_z - 24;
 	self.flags 	= self.flags - (self.flags & FL_ONGROUND);

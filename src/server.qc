@@ -1442,7 +1442,11 @@ void () clanring_put_client_in_server =
         }
 
         UnHookPlayer();
-
+        string temp = ftos(self.height);
+        stuffcmd(self, "color ");
+        stuffcmd(self, temp);
+        stuffcmd(self, "\n");
+        temp = "";
         player_stand1();
         spawn_tdeath(self.origin, self);
         makevectors(self.angles);
@@ -2189,6 +2193,7 @@ void () TossWeapon;
 void () TossRune;
 void () HookOff;
 void () votables_request_set_faststarts;
+void () votables_force_start;
 
 //
 //  I M P U L S E
@@ -2349,7 +2354,9 @@ void () clanring_impulse =
                 vote_impulse ();
         }
     }
-    else
+    else if (self.impulse == 217)
+		votables_force_start();
+	else
         sprint(self, "type 'help-server' in console for help\n");
     self.impulse = 0;
 };

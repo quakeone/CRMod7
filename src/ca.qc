@@ -251,11 +251,10 @@ void () arena_main_loop =
 			{
 				announce ("\bResetting \brally\b timer.");
 				sound (world, CHAN_VOICE, "doors/drclos4.wav", 1, ATTN_NONE);
-
+				boss.wait = 0;
 				if (number_teams () >= 2)
 				bprint("Use \bforce\b to start the match.\n");
 			}
-			boss.wait = 0;
 		}
 		boss.allready = TRUE;
 	}
