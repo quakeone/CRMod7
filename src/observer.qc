@@ -609,21 +609,27 @@ void () observer_start =
 	
 	if (mode_is_arena())
 	{
-		if (self.next_team != world)
+		// Add check for match end state
+		if (boss.state == CA_MATCH_CLEANUP || boss.state == CA_MATCH_OVER)
 		{
-			setcolour(self,self.team2,0);
+			// Reset everyone to white when match ends
+			setcolour(self, 0, 0);
+			stuffcmd(self, ";color 0;\n");
+		}
+		else if (self.next_team != world)
+		{
+			setcolour(self, self.team2, 0);
 			tmp = ftos(self.team2);
-			stuffcmd(self,";color ");
-			stuffcmd(self,tmp);
-			stuffcmd(self,",0;\n");
+			stuffcmd(self, "color ");
+			stuffcmd(self, tmp);
+			stuffcmd(self, ",0;\n");
 		}
 		else
 		{
-			setcolour (self, 0, 0);
-			stuffcmd (self, ";color 0;\n");
+			setcolour(self, 0, 0);
+			stuffcmd(self, "color 0;\n");
 		}
-		self.team2 	= TEAM_SPECTATOR;//dont allow dead teammates to talk to playing teammates
-		self.team 	= ((self.team2) + 1);
+		self.team2 = TEAM_SPECTATOR;//dont allow dead teammates to talk to playing teammates
 	}
 	self.takedamage = DAMAGE_NO;
 	self.solid = SOLID_NOT;
