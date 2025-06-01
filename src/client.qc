@@ -1448,7 +1448,7 @@ void() PlayerPreThink =
         return;		// intermission or finale
     }
 
-    if (!(mode_is_arena))
+    if (!(clanring_playmode & CLANRING_PRACTICE_MODE) && !(mode_is_arena()))
     if (self.height != self.team - 1)
         match_verify_team ();
 
