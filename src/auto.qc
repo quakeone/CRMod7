@@ -274,26 +274,8 @@ void() autopov2_start =
 // AUTOPOV2
 // AUTPOV2 FIND TARGET
 //
-// This function determines the best player target using a priority-based system:
-//
-// 1. Powerups Priority (Highest threat):
-//    - Pentagram of Protection (IT_INVULNERABILITY) -> Highest priority target.
-//    - Quad Damage (IT_QUAD) -> Second highest priority.
-//    - Ring of Shadows (IT_INVISIBILITY) -> Third highest priority.
-//
-// 2. Target Elimination Response:
-//    - If the current target dies, switch to the killer if they are a valid player.
-//
-// 3. Weapon and Armor Evaluation:
-//    - Players with Rocket Launcher (IT_ROCKET_LAUNCHER) or Lightning Gun (IT_LIGHTNING) are prioritized.
-//    - Players with the highest armor (Red > Yellow > Green) are preferred, using armor value as a tiebreaker.
-//    - If no armor, health is used as a tiebreaker.
-//
-// 4. Fallback Selection (Tankiest Player):
-//    - If no valid target is found from previous steps, select the player with the highest armor and health.
-//
-// Returns the most dangerous or durable player as the new target.
-
+// This function determines the best player target using the auto_compute_score system with
+// additional prioritization for powerup holders and killers of the current target.
 entity() autopov2_find_target =
 {
 	local entity player, best_player, killer;
@@ -310,7 +292,7 @@ entity() autopov2_find_target =
 		current_target = world;
 	}
 	
-	// Direct scan for players with powerups
+	// Powerup priority scan - these override normal scoring
 	player = find(world, classname, "player");
 	while (player)
 	{
@@ -361,7 +343,7 @@ entity() autopov2_find_target =
 		}
 	}
 	
-	// Otherwise, find player with RL/LG and most armor (or health if no armor)
+	// Use the existing auto_compute_score system for normal scoring
 	best_player = world;
 	best_score = -999999;
 	
@@ -372,71 +354,30 @@ entity() autopov2_find_target =
 		    (player.style & CLANRING_CONNECTED) && 
 		    !(player.style & CLANRING_OBSERVER))
 		{
-			// Check if player has rocket launcher or lightning gun
-			if (player.items & (IT_ROCKET_LAUNCHER | IT_LIGHTNING))
+			// Use their clanring_chase_score which is set by auto_compute_score
+			score = player.clanring_chase_score;
+			
+			// Prioritize players with RL and LG
+			if (player.items & IT_ROCKET_LAUNCHER)
+				score += 200;
+			if (player.items & IT_LIGHTNING)
+				score += 150;
+				
+			// Prioritize armor types
+			if (player.items & IT_ARMOR3)
+				score += 100;
+			else if (player.items & IT_ARMOR2)
+				score += 50;
+			else if (player.items & IT_ARMOR1)
+				score += 25;
+				
+			if (score > best_score)
 			{
-				// Start with armor score
-				score = 0;
-				
-				// Red armor > Yellow armor > Green armor > No armor
-				if (player.items & IT_ARMOR3)
-					score = 300 + player.armorvalue;
-				else if (player.items & IT_ARMOR2)
-					score = 200 + player.armorvalue;
-				else if (player.items & IT_ARMOR1)
-					score = 100 + player.armorvalue;
-				
-				// If no armor, use health as tiebreaker
-				if (score == 0)
-					score = player.health;
-					
-				// Prioritize RL+LG > RL > LG
-				if (player.items & IT_ROCKET_LAUNCHER)
-					score += 1000;
-				if (player.items & IT_LIGHTNING)
-					score += 500;
-					
-				if (score > best_score)
-				{
-					best_score = score;
-					best_player = player;
-				}
+				best_score = score;
+				best_player = player;
 			}
 		}
 		player = find(player, classname, "player");
-	}
-	
-	// If no player with RL/LG found, find player with highest armor and health
-	if (best_player == world)
-	{
-		player = find(world, classname, "player");
-		while (player)
-		{
-			if (player.deadflag == DEAD_NO && 
-			    (player.style & CLANRING_CONNECTED) && 
-			    !(player.style & CLANRING_OBSERVER))
-			{
-				// Score based on armor type and value
-				score = 0;
-				
-				if (player.items & IT_ARMOR3)
-					score = 300 + player.armorvalue;
-				else if (player.items & IT_ARMOR2)
-					score = 200 + player.armorvalue;
-				else if (player.items & IT_ARMOR1)
-					score = 100 + player.armorvalue;
-					
-				// Add health as tiebreaker
-				score += player.health;
-				
-				if (score > best_score)
-				{
-					best_score = score;
-					best_player = player;
-				}
-			}
-			player = find(player, classname, "player");
-		}
 	}
 	
 	return best_player;
@@ -492,6 +433,60 @@ void() autopov2 =
 		
 		current_player = find(current_player, classname, "player");
 	}
+};
+
+// AUTOPOV2 
+// Event-based score update functions to optimize performance
+// To be called when players pick up items, take damage, or kill someone
+//
+// INTEGRATION POINTS:
+// - Add a call to autopov2_update_player_score when a player picks up a powerup in powerup_touch
+// - Add a call to autopov2_update_player_score when a player gets a weapon in weapon_touch 
+// - Add a call to autopov2_handle_kill in T_Damage when a player's health drops below 0
+// - Add a call to autopov2_update_player_score when a player's state changes (respawn, etc)
+
+// Call this when a player gets a powerup or important weapon/item
+void(entity player) autopov2_update_player_score =
+{
+	// Update their score using the existing system
+	local entity old_self = self;
+	self = player;
+	auto_compute_score();
+	self = old_self;
+};
+
+// Call this when a player kills the current target
+void(entity killer, entity victim) autopov2_handle_kill =
+{
+	// Boost the killer's score temporarily
+	if (killer != world && killer.classname == "player")
+	{
+		// Give them a temporary score boost
+		killer.clanring_chase_score += 400;
+		
+		// Create an event to reset the score boost after 5 seconds
+		entity reset_event = spawn();
+		reset_event.owner = killer;
+		reset_event.think = autopov2_reset_kill_boost;
+		reset_event.nextthink = time + 5;
+	}
+};
+
+// Reset the kill score boost after a delay
+void() autopov2_reset_kill_boost =
+{
+	if (self.owner != world)
+	{
+		self.owner.clanring_chase_score -= 400;
+		
+		// Recalculate their score to ensure it's correct
+		entity old_self = self;
+		self = self.owner;
+		auto_compute_score();
+		self = old_self;
+	}
+	
+	remove(self);
 };
 
 // CRMOD

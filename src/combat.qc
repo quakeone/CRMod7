@@ -309,12 +309,12 @@ void(entity targ, entity attacker) Killed =
 
 					if (targ.airborn_pos > 650)
 					{
-						bprint("\b[\bDEEPˆ‰SPACE\b]\b\n");
+						bprint("\b[\bDEEPSPACE\b]\b\n");
 						as_sound = 2;
 					}
 					else if (targ.airborn_pos > 500)
 					{
-						bprint("\b[\b…Moon…Shot…\b]\b\n");
+						bprint("\b[\bMoon Shot\b]\b\n");
 						as_sound = 3;
 					}
 					else if (targ.airborn_pos > 300)
@@ -492,7 +492,7 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 
 	if ((targ.plag)&&(attacker.classname=="player"))
 	{
-		centerprint(attacker,"\bClanring\b Lag Protection \bActivated");
+		centerprint(attacker,"\bClanring\bLag Protection\bActivated");
 		return;
 	}
 	
@@ -899,6 +899,10 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 			CheckDefenseBonus(targ, attacker); 
 
 		Killed (targ, attacker);
+		
+		// AUTOPOV2 - Update killer's score when they get a kill
+		if (targ.classname == "player" && attacker.classname == "player" && targ != attacker)
+			autopov2_handle_kill(attacker, targ);
 
 		if (!(clanring_playmode & CLANRING_AIRSHOT_MODE))
 		{

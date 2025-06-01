@@ -703,6 +703,8 @@ void () observer_start =
 		// This is necessary to prevent the other player's model from being drawn. Don't fucking ask me why!!!
 		if (self.oflags & OBSERVER_AUTO)//R00k added autopov
 			self.oflags = self.oflags | OBSERVER_GO_AUTO;
+		else if (self.oflags & OBSERVER_AUTO2)
+			self.oflags = self.oflags | OBSERVER_GO_AUTO2;
 		self.nextthink = time + 0.1;
 		self.think = observer_demo_start;
 	}
@@ -1656,9 +1658,9 @@ void () observer_impulse =
 				else if (self.impulse == 149)
 					self.oflags = self.oflags | OBSERVER_DEMO;
 				else if (self.impulse == 157)
-					self.oflags = self.oflags | OBSERVER_DEMO | OBSERVER_GO_AUTO;
+					self.oflags = self.oflags | OBSERVER_DEMO | OBSERVER_AUTO;
 				else if (self.impulse == 158)
-					self.oflags = self.oflags | OBSERVER_DEMO | OBSERVER_GO_AUTO2;
+					self.oflags = self.oflags | OBSERVER_DEMO | OBSERVER_AUTO2;
 				// CRMOD more commands to go observer
 				else if (self.impulse == 155)
 					self.oflags = self.oflags | OBSERVER_CHASE | OBSERVER_GO_AUTO;

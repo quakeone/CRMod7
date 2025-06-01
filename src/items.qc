@@ -866,6 +866,9 @@ void() weapon_touch =
 		sound (other, CHAN_ITEM, "weapons/pkup.wav", 1, ATTN_NORM);
 //		stuffcmd(other, "bf\n");
 
+		// AUTOPOV2 - Update player score when they get a weapon
+		autopov2_update_player_score(other);
+		
 		bound_other_ammo ();
 
 		other.items = other.items | self.weapon;
@@ -1661,106 +1664,71 @@ void() powerup_touch =
 	sprint(other, self.netname);
 	sprint(other,"\n");
 	stuffcmd(other, "bf\n");
-
-	if (deathmatch != 2 && deathmatch != 4 && deathmatch != 5)	// R00k
+    
+    // AUTOPOV2 - Update player score when they get a powerup
+    autopov2_update_player_score(other);
+    
+	// 1998-12-24 Improved weapon and powerup touch functions by Maddes/Smagol  start
+	if (self.items == IT_INVISIBILITY)
 	{
-		self.mdl = self.model;
-
-		if ((self.items == IT_INVULNERABILITY) || (self.items == IT_INVISIBILITY))
-        	self.nextthink = time + 300;
-		else
-			self.nextthink = time + 60;
-
-		self.think = SUB_regen;
-	}
-
-// do the apropriate action
-	if (self.items == IT_SUIT)
-	{
-		sound (other, CHAN_VOICE, self.noise, 1, ATTN_NORM);
-		self.solid = SOLID_NOT;
-		other.items = other.items | self.items;
-		self.model = string_null;
-		self.stats_item_biosuit += 1;
-//		other.effects = other.effects | EF_GREEN;
-		other.rad_time = 1;
-		other.radsuit_finished = time + 30;
-        SendObserverItemTimer(self, "suit", 60); // woods
-	}
-	else
-		quaketv_powerup_obtained();// CRMOD
-
-	if (self.items == IT_INVULNERABILITY)
-	{
-		if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-			sound (other, CHAN_VOICE, self.noise, 1, ATTN_NORM);
-		else
-			sound (other, CHAN_VOICE, self.noise, 1, ATTN_NONE);
-
-		self.solid = SOLID_NOT;
-		other.items = other.items | self.items;
-		self.model = string_null;
-
+		other.invisible_time = 1;
+		other.invisible_finished = (other.invisible_finished <= time) ? (self.nextthink) : (min((other.invisible_finished + timeleft), time + 30));
+		other.effects = other.effects | EF_DIMLIGHT;
+		other.effects = other.effects | EF_RED;
 		other.invincible_time = 1;
 		other.invincible_finished = time + 30;
-		other.effects = other.effects | EF_DIMLIGHT;	// 1998-07-23 Better performance in handling of powerups by Maddes
-		other.effects = other.effects | EF_RED;
-        SendObserverItemTimer(self, "pent", 300); // woods
+		other.rad_time = 1;
+		other.radsuit_finished = time + 30;
+		SendObserverItemTimer(self, "ring", 300); // woods
+		SendObserverItemTimer(self, "pent", 300); // woods
+		SendObserverItemTimer(self, "suit", 60); // woods
 		other.clanring_ptwep_z = other.clanring_ptwep_z + 1; //pent stats
 		if (other.next_team != world)
 		{
 			other.next_team.dest2_y = other.next_team.dest2_y + 1;
 		}
 	}
-
-	if (self.items == IT_INVISIBILITY)
+	else if (self.items == IT_SUIT)
 	{
-		sound (other, CHAN_VOICE, self.noise, 1, ATTN_NORM);
-		self.solid = SOLID_NOT;
-		other.items = other.items | self.items;
-		self.model = string_null;
-		other.invisible_time = 1;
-		other.invisible_finished = time + 30;
-
-		// 1998-07-23 Better performance in handling of powerups by Maddes  start
-		other.frame = 0;
-		//other.modelindex = modelindex_eyes;
-		// 1998-07-23 Better performance in handling of powerups by Maddes  end
-        SendObserverItemTimer(self, "ring", 300); // woods
+		other.rad_time = 1;
+		other.radsuit_finished = time + 30;
+		SendObserverItemTimer(self, "suit", 60); // woods
+		other.clanring_ptwep_z = other.clanring_ptwep_z + 1; //pent stats
 		if (other.next_team != world)
 		{
-			other.next_team.dest2_z = other.next_team.dest2_z + 1;
+			other.next_team.dest2_y = other.next_team.dest2_y + 1;
 		}
 	}
-
-	// 1998-12-24 Improved weapon and powerup touch functions by Maddes/Sm�agol  start
-	if (self.items == IT_QUAD)
-	{	// R00k: TODO: count number of quads on the map; if only one then use global attenuation.
-		if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
-			sound (other, CHAN_VOICE, self.noise, 1, ATTN_NORM);
-		else
-			sound (other, CHAN_VOICE, self.noise, 1, ATTN_NONE);//R00k: most dm maps only have one quad, so announce it globally
-
-		self.solid = SOLID_NOT;
-		other.items = other.items | self.items;
-		self.model = string_null;
-
+	else if (self.items == IT_INVULNERABILITY)
+	{
+		other.invincible_time = 1;
+		other.invincible_finished = time + 30;
+		other.effects = other.effects | EF_DIMLIGHT;
+		other.effects = other.effects | EF_RED;
+		SendObserverItemTimer(self, "pent", 300); // woods
+		other.clanring_ptwep_z = other.clanring_ptwep_z + 1; //pent stats
+		if (other.next_team != world)
+		{
+			other.next_team.dest2_y = other.next_team.dest2_y + 1;
+		}
+	}
+	else if (self.items == IT_QUAD)
+	{
 		other.super_time = 1;
 		other.super_damage_finished = time + 30;
-		other.effects = other.effects | EF_DIMLIGHT;	// 1998-07-23 Better performance in handling of powerups by Maddes
+		other.effects = other.effects | EF_DIMLIGHT;
 		other.effects = other.effects | EF_BLUE;
-
-		// CRMOD - stats
+		SendObserverItemTimer(self, "quad", 60); // woods
 		other.clanring_qdwep_z = other.clanring_qdwep_z + 1;
-		other.quadtime = time;
-        SendObserverItemTimer(self, "quad", 60); // woods
 		if (other.next_team != world)
 		{
 			other.next_team.dest2_x = other.next_team.dest2_x + 1;
 		}
 	}
+	// 1998-12-24 Improved weapon and powerup touch functions by Maddes/Smagol  end
+
 	activator = other;
-	SUB_UseTargets();// fire all targets / killtargets
+	SUB_UseTargets();
 };
 
 /*QUAKED item_artifact_invulnerability (0 .5 .8) (-16 -16 -24) (16 16 32)
@@ -2910,3 +2878,4 @@ void() DropStuff =
 	}
 	return;
 };
+
