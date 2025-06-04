@@ -1323,7 +1323,7 @@ void () Teamplay_Select_Team =
 		}
 
 		//allow player to leave team when they are waiting or between rounds
-		if ((self.ca_player_flag == PF_WAITING) || (boss.state == CA_MATCH_ROUNDSTART))
+		if ((self.ca_player_flag == PF_WAITING) || (boss.timetofight == FALSE))
 		{
 			if (self.next_team != world)
 			RemoveFromTeam ();
