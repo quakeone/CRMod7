@@ -2594,6 +2594,14 @@ void () clanring_periodic_checks =
 
     if (self.style & CLANRING_OBSERVER)
     {
+        if (self.style & CLANRING_MOTD) // asap
+        {
+            if (self.plag == FALSE)
+            {
+                motd_print ();
+            }
+        }
+
         observer_find_teleport();
         observer_check_size();
 
@@ -2767,14 +2775,6 @@ void () clanring_periodic_checks =
                         self.takedamage = DAMAGE_AIM;
                     }
                 }
-            }
-        }
-
-        if (self.style & CLANRING_MOTD)
-        {
-            if (self.plag == FALSE)
-            {
-                motd_print ();
             }
         }
     }

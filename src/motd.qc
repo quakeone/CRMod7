@@ -108,17 +108,21 @@ void ()motd_print =
 	if (intermission_running)
 		return;
 
-	if (self.ca_player_flag == PF_PLAYING) //R00k: 6/12/2017 9:50AM (airshot practice)
-		return;
-
 	if ((!(self.oflags & OBSERVER_FLY))&&(!(self.oflags & OBSERVER_WALK)))
-	{
-		self.style = self.style - (self.style & CLANRING_MOTD);
+	{		
+		if ((mode_is_arena()) == FALSE) //in arena modes keep the menu
+			self.style = self.style - (self.style & CLANRING_MOTD);
 		return;
 	}
 
+	if (self.ca_player_flag == PF_PLAYING) //R00k: 6/12/2017 9:50AM (airshot practice)
+		return;
+
 	if (mode_is_arena())
 	{
+		if (boss.state != CA_MATCH_WAITING) //R00k: drop the menu during the match
+			return;
+
 		string ts = "choose a team\n\n";
 		
 		if (self.next_team.team2)
