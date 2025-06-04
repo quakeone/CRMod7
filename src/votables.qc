@@ -1308,16 +1308,19 @@ void () votables_force_start =
 {
 	if (mode_is_arena() == FALSE)
 		return;
-		
-	if (boss.state != CA_MATCH_WAITING || boss.allready == TRUE)
+
+	if (boss.state != CA_MATCH_WAITING)
 		return;
-	
+
 	if (number_teams () < 2)
 	{
 		sprint(self, "Match requires at least \btwo teams\b to force start.\n");
 		return;
 	}
-	
+
+	if (boss.allready == TRUE)
+		return;
+
 	if (self.style & CLANRING_ADMINISTRATOR)
 	{
 		arena_force_start ();

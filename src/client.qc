@@ -946,7 +946,7 @@ void() PutClientInServer =
     self.punchangle		= '0 0 0';
          
     self.origin = self.oldorigin = spot.origin; //R00k: update oldorigin so we dont respawn where we died.
-    setorigin(self, spot.origin + '0 0 1');	    //R00k: change our origin and relink our edict.
+    setorigin(self, spot.origin);	    //R00k: change our origin and relink our edict.
     
     self.lefty 		= 0;
     self.jump_flag 	= 0; // clear jump velocity to prevent falling damage
@@ -1448,6 +1448,7 @@ void() PlayerPreThink =
         return;		// intermission or finale
     }
 
+    if (!(clanring_playmode & CLANRING_PRACTICE_MODE) && !(mode_is_arena()))
     if (self.height != self.team - 1)
         match_verify_team ();
 
@@ -1858,6 +1859,7 @@ void() PlayerPostThink =
                         boss.allready = FALSE;
                 }
             }
+            else boss.allready = TRUE;
         }
     }
 

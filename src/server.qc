@@ -261,7 +261,7 @@ void () arena_client_disconnect;
 void () CaptureHighScores_sprint;
 void () AirshotHighScores_sprint;
 void () LongRangeGibs_sprint;
-void () Teamplay_Select_Team;
+//void () Teamplay_Select_Team;
 //
 // C L E A R   A F K   S T A T U S
 //
@@ -1442,7 +1442,11 @@ void () clanring_put_client_in_server =
         }
 
         UnHookPlayer();
-
+        string temp = ftos(self.height);
+        stuffcmd(self, "color ");
+        stuffcmd(self, temp);
+        stuffcmd(self, "\n");
+        temp = "";
         player_stand1();
         spawn_tdeath(self.origin, self);
         makevectors(self.angles);
@@ -2189,6 +2193,7 @@ void () TossWeapon;
 void () TossRune;
 void () HookOff;
 void () votables_request_set_faststarts;
+void () votables_force_start;
 
 //
 //  I M P U L S E
@@ -2349,7 +2354,9 @@ void () clanring_impulse =
                 vote_impulse ();
         }
     }
-    else
+    else if (self.impulse == 217)
+		votables_force_start();
+	else
         sprint(self, "type 'help-server' in console for help\n");
     self.impulse = 0;
 };
@@ -2724,22 +2731,22 @@ void () clanring_periodic_checks =
             {
                 if (self.team != (self.team2 + 1))
                 {
-                    if (self.next_team == world)
-                    {
-                        if (self.team == 14)
-                            self.impulse = 1;
-                        else if (self.team == 5)
-                            self.impulse = 2;
-                        else if (self.team == 13)
-                            self.impulse = 3;
-                        else if (self.team == 3)
-                            self.impulse = 4;
+                    // if (self.next_team == world)
+                    // {
+                    //     if (self.team == 14)
+                    //         self.impulse = 1;
+                    //     else if (self.team == 5)
+                    //         self.impulse = 2;
+                    //     else if (self.team == 13)
+                    //         self.impulse = 3;
+                    //     else if (self.team == 3)
+                    //         self.impulse = 4;
 
-                        Teamplay_Select_Team();
-                        self.impulse = 0;
-                    }
-                    else
-                    {
+                    //     Teamplay_Select_Team();
+                    //     self.impulse = 0;
+                    // }
+                    // else
+                    // {
                         if (self.health > 0)
                         {
                             self.team2 = self.next_team.team2;
@@ -2750,7 +2757,7 @@ void () clanring_periodic_checks =
                             }
                             self.team = (self.team2 + 1);
                         }
-                    }
+                    // }
                 }
 
                 if (boss.timetofight == TRUE)
