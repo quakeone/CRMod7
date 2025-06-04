@@ -1442,11 +1442,14 @@ void () clanring_put_client_in_server =
         }
 
         UnHookPlayer();
-        string temp = ftos(self.height);
+    if (!(clanring_playmode & CLANRING_PRACTICE_MODE))
+    {
+        string temp = ftos(self.height);   // top & bottom both = self.height
         stuffcmd(self, "color ");
         stuffcmd(self, temp);
         stuffcmd(self, "\n");
-        temp = "";
+        temp = "";                         // avoid dangling references
+    }
         player_stand1();
         spawn_tdeath(self.origin, self);
         makevectors(self.angles);

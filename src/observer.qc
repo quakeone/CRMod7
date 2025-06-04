@@ -563,6 +563,9 @@ void () observer_start =
 
 	self.style = self.style | CLANRING_OBSERVER;
 
+	setcolour(self, 0, 0);
+	stuffcmd(self, "color 0\n");
+
   	// Notify the match module that this player has become an observer
 	// Must do this before calling chase_start etc.. since we need to
 	// remove the player from the list before messing with next_player
