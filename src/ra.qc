@@ -552,6 +552,34 @@ float () ra_number_teams =
 	return n;
 };
 
+string (string msg) ra_countdown_message =
+{
+	local entity t1, team1, team2;
+	local string line;
+
+	t1 = boss.next_team;
+	if (t1 == world)
+		return msg;
+	if (t1.next_team == world)
+		return msg;
+
+	team1 = t1.chain_gang;
+	team2 = t1.next_team.chain_gang;
+
+	if (team1 == world || team2 == world)
+		return msg;
+
+	// Determine which team is NOT mine
+	if (team1.team == self.team)
+		line = team2.netname;
+	else
+		line = team1.netname;
+
+	line = strcat(line, "\n\n");
+	line = strcat(line, msg);
+	return line;
+};
+
 void () rocket_arena_main_loop =
 {
 	if ((clanring_state & CLANRING_MATCH_PAUSED) && (!boss.unpausing))
@@ -621,30 +649,30 @@ void () rocket_arena_main_loop =
 			
 
 			if (boss.count == 0)
-			{					
-				ctprint ("\bFIGHT!");
+            {
+				ctprint (ra_countdown_message("\bFIGHT!"));
 				sound (world, CHAN_ITEM, "crx/fight.wav", 1, ATTN_NONE);
 				utils_do_arena_players(arena_fight_and_shoot);
 				boss.timetofight = TRUE;
-				boss.state = CA_MATCH_PLAYING;	
+				boss.state = CA_MATCH_PLAYING;
 				if (boss.round == 1)
 					announce("The match has begun!");
-			}
-			else if (boss.count == 1)
-			{
-				if (boss.round > 1) ctprint ("1");
+            }
+            else if (boss.count == 1)
+            {
+				if (boss.round > 1) ctprint (ra_countdown_message("1"));
 				sound (world, CHAN_ITEM, "crx/one.wav",1, ATTN_NONE);
-			}
-			else if (boss.count == 2)
-			{
-				if (boss.round > 1) ctprint ("2");
+            }
+            else if (boss.count == 2)
+            {
+				if (boss.round > 1) ctprint (ra_countdown_message("2"));
 				sound (world, CHAN_ITEM, "crx/two.wav", 1, ATTN_NONE);
-			}
-			else if (boss.count == 3)
-			{
-				if (boss.round > 1) ctprint ("3");
+            }
+            else if (boss.count == 3)
+            {
+				if (boss.round > 1) ctprint (ra_countdown_message("3"));
 				sound(world, CHAN_ITEM, "crx/three.wav", 1, ATTN_NONE);
-			}
+            }
 			else if (boss.count == 4)
 			{
 				ra_spawn_players ();
