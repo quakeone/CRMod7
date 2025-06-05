@@ -722,7 +722,7 @@ void () observer_start =
 		if (((self.ca_player_flag == PF_DEAD)||(self.ca_player_flag == PF_WAITING))&&(boss.state == CA_MATCH_PLAYING))
 		{
 			observer_next_target();
-			observer_chase_start();
+			observer_demo_start();
 		}
 	}
 
