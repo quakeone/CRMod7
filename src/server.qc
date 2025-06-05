@@ -1442,7 +1442,7 @@ void () clanring_put_client_in_server =
         }
 
         UnHookPlayer();
-        if (!(clanring_playmode & CLANRING_PRACTICE_MODE))
+        if (!((clanring_playmode & CLANRING_PRACTICE_MODE) || ((clanring_playmode & CLANRING_NORMAL_MODE) && !teamplay)))
         {
             string temp = ftos(self.height);
             stuffcmd(self, "color ");
