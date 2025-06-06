@@ -25,6 +25,7 @@ void () airshot_init_world =
 	boss.aborted 		= FALSE;
 	boss.suddendeath 	= FALSE;
 	ca_mvp_entity		= world;
+	default_timelimit    = cvar("timelimit");
 };
 
 float (entity targ, float damage) airshot_damage_z =

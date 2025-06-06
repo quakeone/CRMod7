@@ -413,7 +413,7 @@ void() votables_set_gametype_mode_map =
 		{
 			votables_clear_playmode_flags();
 			clanring_playmode = (clanring_playmode | CLANRING_AIRSHOT_MODE | CLANRING_NO_HOOK);
-			cvar_set("timelimit", "0");
+			cvar_set("timelimit", "3");
 			cvar_set("fraglimit", "10");
 			cvar_set("teamplay", "0");
 			cvar_set("deathmatch", "4");
