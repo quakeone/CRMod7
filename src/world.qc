@@ -434,7 +434,27 @@ void() StartFrame =
     
     if (framecount == 1)	
     {
-        if ((cvar("gamecfg")) & CLANRING_ALTERNATIVE_ENTS)
+        // Check if we have a custom ents_dir set from warp.cfg
+        string current_ents_dir = cvar_string("external_ents_dir");
+        float found_custom_ents = FALSE;
+        
+        // Search warpmap array to see if current ents_dir matches any custom setting
+        for (float i = 1; i < (WARP_CATEGORY_SIZE * WARP_MAPLIST_SIZE); i++)
+        {
+            if (warpmap[i].ents_dir != "" && 
+                warpmap[i].ents_dir == current_ents_dir)
+            {
+                found_custom_ents = TRUE;
+                break;
+            }
+        }
+        
+        if (found_custom_ents)
+        {
+            // Keep the custom external_ents_dir
+            // Don't change it
+        }
+        else if ((cvar("gamecfg")) & CLANRING_ALTERNATIVE_ENTS)
         {
             if ((cvar("samelevel")) & CLANRING_CAPTURE_THE_FLAG)
                 cvar_set("external_ents_dir", "ctf_alt");

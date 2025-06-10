@@ -186,6 +186,7 @@ void() votables_request_set_hook =
 void () votables_change_level =
 {
 	local string request_mapname = warpmap[request_mapnum].name;
+	local string custom_ents_dir = warpmap[request_mapnum].ents_dir;
 
 	if (clanring_state & CLANRING_MATCH_STARTED)
 	return;
@@ -194,7 +195,28 @@ void () votables_change_level =
 
 	observer_clear_players_infokeys();
 	
-	if (request_mapname == "start0")
+	// Check for custom ents_dir from warp.cfg
+	if (custom_ents_dir != "")
+	{
+		cvar_set("external_ents_dir", custom_ents_dir);
+		
+		// Strip trailing numbers from map name to get base map
+		string base_mapname = request_mapname;
+		float len = strlen(request_mapname);
+		if (len > 0)
+		{
+			string last_char = substring(request_mapname, len-1, 1);
+			if (last_char == "0" || last_char == "1" || last_char == "2" || last_char == "3" || 
+			    last_char == "4" || last_char == "5" || last_char == "6" || last_char == "7" || 
+			    last_char == "8" || last_char == "9")
+			{
+				base_mapname = substring(request_mapname, 0, len-1);
+			}
+		}
+		
+		changelevel(base_mapname);
+	}
+	else if (request_mapname == "start0")
 	{
 		serverflags = 0;
 		changelevel("start");
@@ -530,10 +552,32 @@ void() votables_set_gametype_mode_map =
 	if (request_mapnum)
 	{
 		request_mapname = warpmap[request_mapnum].name;
+		local string custom_ents_dir = warpmap[request_mapnum].ents_dir;
 
 		utils_set_cvar("timelimit", clanring_timelimit);
 
-		if (request_mapname == "start0")
+		// Check for custom ents_dir from warp.cfg
+		if (custom_ents_dir != "")
+		{
+			cvar_set("external_ents_dir", custom_ents_dir);
+			
+			// Strip trailing numbers from map name to get base map
+			string base_mapname = request_mapname;
+			float len = strlen(request_mapname);
+			if (len > 0)
+			{
+				string last_char = substring(request_mapname, len-1, 1);
+				if (last_char == "0" || last_char == "1" || last_char == "2" || last_char == "3" || 
+				    last_char == "4" || last_char == "5" || last_char == "6" || last_char == "7" || 
+				    last_char == "8" || last_char == "9")
+				{
+					base_mapname = substring(request_mapname, 0, len-1);
+				}
+			}
+			
+			newmapname = base_mapname;
+		}
+		else if (request_mapname == "start0")
 		{
 			serverflags = 0;
 			newmapname = "start";

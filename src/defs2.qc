@@ -516,6 +516,7 @@ typedef struct
 	string	name;	// filename WITHOUT '.bsp'
 	string	title;	// Welcome to Quake
 	string	author; // John Romero
+	string	ents_dir; // custom external_ents_dir (optional)
 	// string	type;	// CTF, DM, CA, RA, DMM4
 	// string	image;  // 'data/mapshots/mymap.tga'
 	// float	size;	// 1v1, 2v2, 4v4, 8v8

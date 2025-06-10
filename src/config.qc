@@ -593,8 +593,21 @@ void() exec_warp_cfg =
 			warpmap[mapnum].name = strzone(mapfile);
 			warpmap[mapnum].title = strzone(fgets(f));
 			warpmap[mapnum].author = strzone(fgets(f));
-			//warpmap[mapnum].type = strzone(fgets(f));
-			//print(sprintf("%02g (%s) (%s) (%s)\n", mapnum, (warpmap[mapnum].name), (warpmap[mapnum].title), (warpmap[mapnum].author)));
+			
+			// Try to read optional 4th line for custom ents_dir
+			string next_line = fgets(f);
+			if (next_line && next_line != "" && 
+			    strstrofs(next_line, "//") != 0 && 
+			    strstrofs(next_line, "#") != 0 &&
+			    strstrofs(next_line, "****") != 0)
+			{
+				warpmap[mapnum].ents_dir = strzone(next_line);
+			}
+			else
+			{
+				warpmap[mapnum].ents_dir = "";
+			}
+			//print(sprintf("%02g (%s) (%s) (%s) [%s]\n", mapnum, (warpmap[mapnum].name), (warpmap[mapnum].title), (warpmap[mapnum].author), (warpmap[mapnum].ents_dir)));
 		}
 		else print((sprintf("**ERROR: mapnum > WARP_MAPLIST_SIZE (Too many [%s] warp menus/maps)(1024 maps 32 categories maximum)",ftos(mapnum)),"\n"));//todo remove limits
 	}
