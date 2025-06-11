@@ -1176,6 +1176,31 @@ string() server_find_myClient =
     }
     return text;
  }
+
+//
+// R E S E N D  T E A M S
+//
+// send updates to new clients of players' team-colors
+//
+void () clanring_resend_teams =
+{
+	entity 	pteam, player;
+
+	pteam = boss.next_team;
+	player = pteam.chain_gang;
+
+	while (pteam != world)
+	{
+		while (player != world)
+		{
+            setcolour(player, player.team2, player.team2);
+			player = player.chain_gang;
+	    }            
+        pteam = pteam.next_team;
+        player = pteam.chain_gang;
+	}	
+};
+
 //
 //  C L I E N T  C O N N E C T
 //
@@ -1200,13 +1225,20 @@ void () clanring_client_connect =
         parm10 |= CLANRING_CONNECTED;
 
         // Set default observer flags
-        parm12 = OBSERVER_FLY |  OBSERVER_COMMENTARY;
+        parm12 = OBSERVER_DEMO | OBSERVER_COMMENTARY;   // Default eyes, fallback to flymode
 
         parm13 = 0;
 
         stats_reset_player();
+        if (mode_is_arena())
+            clanring_resend_teams();
 
-        utils_make_scheduled_event(find_pqc_teamscore_teams, 1.25);//R00k
+        if (
+            ((clanring_playmode & CLANRING_MATCH_MODE) && (clanring_state & CLANRING_MATCH_STARTED)) 
+            || 
+            ((mode_is_arena()) && (boss.state == CA_MATCH_PLAYING))
+           )
+            utils_make_scheduled_event(find_pqc_teamscore_teams, 1.25);//R00k
 
         self.afk_time = time + 20;
 
@@ -2635,7 +2667,10 @@ void () clanring_periodic_checks =
                     if (self.movetarget)
                     {
                         self.oflags = self.oflags | OBSERVER_GO_AUTO;
-                        observer_chase_start();
+                        if (self.oflags & OBSERVER_DEMO) //AutoEyecam Default
+                            observer_demo_start();
+                        else
+                            observer_chase_start();
                     }
                 }
             }
