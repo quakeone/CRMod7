@@ -1945,6 +1945,26 @@ void() PlayerPostThink =
         if (((clanring_playmode & CLANRING_MATCH_MODE)&&(clanring_state & CLANRING_MATCH_STARTED))||(clanring_playmode & CLANRING_NORMAL_MODE))
         {
             TeamCapturePlayerUpdate();
+
+             // Check if player is carrying enemy flag
+            if (self.flag_carrier && self.flag_carry_start > 0)
+            {
+                // Check for movement every second to detect camping
+                if (time >= self.last_pos_check + 1)
+                {
+                    local float distance_moved = vlen(self.origin - self.last_carry_pos);
+                
+                    // If moved more than 64 units in last second, count as active carry time
+                    if (distance_moved > 64)
+                    {
+                        self.fcarries_time += 1;
+                    }
+                
+                    self.last_carry_pos = self.origin;
+                    self.last_pos_check = time;
+        }
+    }
+
         }
     }
     else if (clanring_playmode & CLANRING_WIPEOUT_MODE)
@@ -2458,6 +2478,10 @@ void(entity targ, entity attacker) ClientObituary =
                     if (attacker.invincible_finished > time)
                         attacker.clanring_ptkill_y = attacker.clanring_ptkill_y + 1;
 
+                    // NEW: Track when killing a teammate who had quad damage
+                    if (targ.super_damage_finished > time)
+                        attacker.stats_teamkill_quad = attacker.stats_teamkill_quad + 1;
+
                     if (rnum < 0.25)
                     {
                         deathstring = " teamkills ";
@@ -2601,6 +2625,10 @@ void(entity targ, entity attacker) ClientObituary =
                         attacker.clanring_qdkill_x = attacker.clanring_qdkill_x + 1;
                     if (attacker.invincible_finished > time)
                         attacker.clanring_ptkill_x = attacker.clanring_ptkill_x + 1;
+
+                    // NEW: Track powerup denial - killing enemy who had powerups
+                    if (targ.super_damage_finished > time)
+                        attacker.stats_powerup_denial_quad = attacker.stats_powerup_denial_quad + 1; 
 
                     targ.mangle_z = targ.mangle_z + 1;//STATS
                     client_frag (attacker, 1);

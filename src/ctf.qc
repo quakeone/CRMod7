@@ -202,6 +202,9 @@ void(entity player, float reset) TeamCaptureDropFlagOfPlayer =
 	player.flag_carrier = FALSE;		
 	player.items = player.items - (player.items & (IT_KEY1 | IT_KEY2));
 	
+	// Reset flag carry tracking when flag is dropped
+	player.flag_carry_start = 0;
+
 	if (reset) 
 	{
 		RegenFlag(e);
@@ -339,6 +342,18 @@ void() TeamCaptureFlagTouch =
 					client_frag(other, TEAM_CAPTURE_CAPTURE_BONUS);//score for capture
 					other.fcaptures = (other.fcaptures + 1);//fstats
 
+					// Check if there was a recent strategic return by a teammate
+					local entity returner;
+					if (other.team == RED)
+						returner = last_red_returner;
+					else
+						returner = last_blue_returner;
+
+					if (returner && returner != other && (time - last_return_time < 5)) // 5 second window
+					{
+						returner.strategic_returns = returner.strategic_returns + 1;
+					}
+
 					// R00k: update scores for console and infokeys
 					if (clanring_playmode & CLANRING_MATCH_MODE)
 						match_bprint_score();
@@ -401,6 +416,10 @@ void() TeamCaptureFlagTouch =
 				}
 
 				other.flag_carrier = FALSE;// doesnt have a flag anymore.
+
+				// Reset flag carry tracking when flag is captured
+				other.flag_carry_start = 0;
+
 				TeamCaptureRegenFlags ();// respawn flags
 				return;
 			}
@@ -418,6 +437,15 @@ void() TeamCaptureFlagTouch =
 			client_frag(other, TEAM_CAPTURE_RECOVERY_BONUS);		
 			other.freturns = (other.freturns + 1);//fstats		
 			other.last_returned_flag = time;
+
+			// Store who returned the flag for strategic return tracking
+			if (other.team == RED)
+				last_red_returner = other;
+			else
+				last_blue_returner = other;
+    
+			last_return_time = time;
+
 		}
 		TeamCaptureReturnFlag (self);//send it back home
 		return;
@@ -446,6 +474,11 @@ void() TeamCaptureFlagTouch =
 		sound (world, CHAN_AUTO, self.noise, 1, ATTN_NONE);
 		other.fpickups	= (other.fpickups + 1);//fstat
 	}
+
+	// Start tracking flag carry time for non-camping measurement
+	other.flag_carry_start = time;
+	other.last_carry_pos = other.origin;
+	other.last_pos_check = time;
 
 	other.flag_carrier	= TRUE;
 	other.items        	= (other.items | self.items);

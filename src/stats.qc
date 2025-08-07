@@ -64,6 +64,19 @@ void() stats_reset_player =
 	self.stats_defense_armor = 0;
 	self.stats_discharge_kills = 0;
 	self.stats_avenge_teammate = 0;
+	self.stats_defense_powerup = 0;
+	self.stats_defense_weapon = 0;
+	self.stats_defense_armor = 0;
+	self.stats_discharge_kills = 0;
+	self.stats_avenge_teammate = 0;
+	self.stats_teamkill_quad = 0;
+	self.stats_powerup_denial_quad = 0;
+	self.strategic_returns = 0;
+	self.fcarries_time = 0;
+	self.flag_carry_start = 0;
+	self.last_carry_pos = '0 0 0';
+	self.last_pos_check = 0;
+	self.q1_per = 0;
 };
 
 //
@@ -1027,6 +1040,117 @@ void() stats_show_defense_stats =
 };
 
 //
+// P L A Y E R   E F F I C I E N C Y   R A T I N G
+//
+float (entity p) Q1_PER_Calc_Raw =
+{
+    local float eff_raw;
+
+    // Return 0 if no kills or deaths (no combat engagement)
+    if (p.true_kills == 0 && p.mangle_z == 0)
+        return 0;
+
+    // Kills / Deaths
+    eff_raw = eff_raw + (1.00 * p.true_kills);
+    eff_raw = eff_raw - (1.00 * p.mangle_z);
+
+	// Teamkills
+
+	if (deathmatch == 3)
+		eff_raw = eff_raw - (0.50 * p.mangle_y); // Reduced teamkill penalty for non-team modes
+	else
+		eff_raw = eff_raw - (2.00 * p.mangle_y); // Full teamkill penalty for team modes
+
+	eff_raw = eff_raw - (3.00 * p.stats_teamkill_quad); // Penalty for killing quadded teammate
+
+	// Resilience (average damage taken per death)
+	if (p.mangle_z > 0)
+    	eff_raw = eff_raw + (0.01 * (p.dmg_taken / p.mangle_z)); // harder to finish off
+	else
+    	eff_raw += 6; // flat reward for flawless run (never dying)
+
+    // Power-ups
+    eff_raw = eff_raw + (0.50 * p.totalquad);
+    eff_raw = eff_raw + (0.90 * p.clanring_ptwep_z); // Pent pickups
+
+    // Item Pickups
+    eff_raw = eff_raw + (0.30 * p.stats_item_redarmor) + (0.20 * p.stats_item_yellowarmor);
+	eff_raw = eff_raw + (0.30 * p.stats_item_mega);
+
+    // CTF Objectives
+    if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+    {
+        eff_raw = eff_raw + (3.0 * p.fcaptures); // Flag captures - primary objective
+        eff_raw = eff_raw + (0.2 * p.freturns); // Regular flag returns - basic defensive play
+		eff_raw = eff_raw + (2.5 * p.strategic_returns); // Strategic returns - returns followed by team capture within 5s
+        eff_raw = eff_raw + (1.0 * p.fdefenses); // Flag defenses - protecting home base
+        eff_raw = eff_raw + (1.0 * p.fcdefenses); // Flag carrier defenses - protecting teammate
+		eff_raw = eff_raw + (1.5 * p.fcfrags);  // Flag carrier kills
+		eff_raw = eff_raw + (0.01 * p.fcarries_time); // Active flag carry time - distance/time control
+    }
+
+    // Weapon Losses (not applicable in dmm3)
+    if (deathmatch != 3)
+    {
+        eff_raw = eff_raw - (0.50 * p.clanring_badstats_x);   // RL Paks lost
+        eff_raw = eff_raw - (0.50 * p.clanring_badstats2_x);  // LG Paks lost
+    }
+
+	// Team Damage (non-CTF modes)
+    if (teamplay && !(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
+        eff_raw = eff_raw - (0.0020 * p.clanring_badstats_z);
+
+	eff_raw = eff_raw + (3.0 * p.stats_powerup_denial_quad); // Bonus for denying enemy quad
+
+    return eff_raw;
+};
+
+void() stats_show_per =
+{
+    local entity p;
+    local float match_secs;
+
+    // Display the PER for each player
+    sprint(self, "\bplayer efficiency rating (PER)\b\n");
+    sprint(self, "\n");
+    sprint(self, "  PER       name\n");
+    sprint(self, "\n\n");
+
+	if (clanring_playmode & CLANRING_MATCH_MODE)
+		p = clanring_sentinel.next_player;
+	else	
+		p = find(world,classname, "player");
+        
+    while(p)
+    {
+        if (!(p.style & CLANRING_OBSERVER) && p.join_time > 0)
+        {
+            local float final_per;
+            
+            match_secs = time - p.join_time;
+            if (match_secs > 1)
+            {
+                final_per = Q1_PER_Calc_Raw(p) / (match_secs / 60); // Direct efficiency per minute
+            }
+            else
+            {
+                final_per = 0;
+            }
+
+            if (p == self)
+                sprint(self, sprintf("\x90%5.1f\x91 ü %s\n", final_per, p.netname));
+            else
+                sprint(self, sprintf(" %5.1f  ü %s\n", final_per, p.netname));
+        }
+		if (clanring_playmode & CLANRING_MATCH_MODE)
+			p = p.next_player;
+		else
+			p = find(p,classname, "player");			
+    }
+    sprint(self, "\n");
+};
+
+//
 //  A U T O D U M P
 //
 //  Dump statistics if player has autostats enabled.
@@ -1094,6 +1218,11 @@ void() stats_autodump =
 			//sprint(self, "\n");
 		}
 		sprint(self, "\n");
+
+		if (!(mode_is_arena()))
+		{
+			stats_show_per();
+		}
 };
 
 //

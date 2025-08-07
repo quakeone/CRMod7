@@ -579,6 +579,20 @@ entity boss;
 .float combo_time;
 .float combo_frags;
 
+//PER stats
+.float q1_per;
+.float stats_teamkill_quad;
+.float stats_powerup_denial_quad;
+.float strategic_returns;  // Flag returns that lead to team captures
+entity last_red_returner;
+entity last_blue_returner;
+float last_return_time;
+
+.float fcarries_time;        // Seconds spent carrying enemy flag (non-camping)
+.float flag_carry_start;     // When current carry started
+.vector last_carry_pos;      // Last position while carrying (for camping detection)
+.float last_pos_check;       // When we last checked position
+
 .float busy;
 .float aborted;
 .float forced;
