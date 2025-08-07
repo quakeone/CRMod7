@@ -271,7 +271,7 @@ void (entity client) clear_afk_status =
 {
     client.afk_time = time; // Reset AFK time regardless of current status
     
-    if (client.style & CLANRING_AFK_CLIENT && (client.style & CLANRING_CONNECTED))
+if (client.style & CLANRING_AFK_CLIENT && (client.style & CLANRING_CONNECTED))
     {
         local entity oldself = self;
         self = client;
@@ -1215,7 +1215,7 @@ void () clanring_client_connect =
 
         stats_reset_player();
 
-            utils_make_scheduled_event(find_pqc_teamscore_teams, 1.25);//R00k
+        utils_make_scheduled_event(find_pqc_teamscore_teams, 1.25);//R00k
 
         self.afk_time = time + 20;
 
@@ -2640,15 +2640,12 @@ void () clanring_periodic_checks =
                     observer_camera_start();
                 }
                 else
-                {
+                                {
                     self.movetarget = observer_find_target(world);// see if we can find a player
                     if (self.movetarget)
                     {
                         self.oflags = self.oflags | OBSERVER_GO_AUTO;
-                        if (self.oflags & OBSERVER_DEMO) //AutoEyecam Default
-                            observer_demo_start();
-                        else
-                            observer_chase_start();
+                        observer_chase_start();
                     }
                 }
             }
