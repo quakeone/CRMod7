@@ -553,9 +553,43 @@ void() match_end =
         match_postgame_sound((clanring_first_place.frags - clanring_second_place.frags));
     }
 
+    local string record_time, team_letter;
+    
     if (new_player_record_match == 1)
     {
-        bprint("\bNew match captime record was set!\b\n");
+        bprint("\n\bNew 1st place match captime record was set!\b\n");
+        if (playerrecord2[0].statvalue > 0)
+        {
+            record_time = utils_get_time(playerrecord2[0].statvalue);
+            team_letter = get_team_letter(playerrecord2[0].teamcolor);
+            bprint4(playerrecord2[0].player, " - ", record_time, " ");
+            bprint2(team_letter, "\n");
+        }
+        sound(world, CHAN_AUTO, "crx/congrats.wav", 1, ATTN_NONE);
+    }
+    else if (new_player_record_match == 2)
+    {
+        bprint("\n\bNew 2nd place match captime!\b\n");
+        if (playerrecord2[1].statvalue > 0)
+        {
+            record_time = utils_get_time(playerrecord2[1].statvalue);
+            team_letter = get_team_letter(playerrecord2[1].teamcolor);
+            bprint4(playerrecord2[1].player, " - ", record_time, " ");
+            bprint2(team_letter, "\n");
+        }
+        sound(world, CHAN_AUTO, "crx/goodstat.wav", 1, ATTN_NONE);
+    }
+    else if (new_player_record_match == 3)
+    {
+        bprint("\n\bNew 3rd place match captime!\b\n");
+        if (playerrecord2[2].statvalue > 0)
+        {
+            record_time = utils_get_time(playerrecord2[2].statvalue);
+            team_letter = get_team_letter(playerrecord2[2].teamcolor);
+            bprint4(playerrecord2[2].player, " - ", record_time, " ");
+            bprint2(team_letter, "\n");
+    }
+        sound(world, CHAN_AUTO, "crx/goodstat.wav", 1, ATTN_NONE);
     }
 
     console_show_score();
