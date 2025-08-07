@@ -485,6 +485,7 @@ void () ra_spawn_players =
 				player.health = boss.health;
 				player.armorvalue = boss.armorvalue;
 				player.armortype = (boss.armortype * 0.01);
+				player.items = boss.items; // woods for ra showing in ra
 				player.ammo_shells = boss.ammo_shells;
 				player.ammo_nails = boss.ammo_nails;
 				player.ammo_rockets = boss.ammo_rockets;
