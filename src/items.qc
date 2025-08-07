@@ -21,6 +21,7 @@
 BE .8 .3 .4 IN COLOR */
 
 float ITEM_RESPAWNDM = 16384;
+float ITEM_SUSPENDED = 128;    // Don't drop to floor - stay suspended in air
 
 .vector particles_offset;
 
@@ -70,6 +71,16 @@ void() PlaceItem =
 	self.origin_z = self.origin_z + 6;
 	oldz = self.origin_z;
 
+	// Check for suspended in air spawnflag
+	if (self.spawnflags & ITEM_SUSPENDED)
+	{
+		self.movetype = MOVETYPE_FLY;  // Float in air, don't drop
+		// Reset origin since we don't want the +6 offset for suspended items
+		self.origin_z = oldz - 6;
+		setorigin(self, self.origin);
+	}
+	else
+	{
 	// Transparent weapons and ammo spawns in practice mode
 	if (clanring_playmode & CLANRING_PRACTICE_MODE)
 	{
@@ -88,6 +99,7 @@ void() PlaceItem =
 		dprint ("\n");
 		remove(self);
 		return;
+	}
 	}
 
     // ELOHIM_MOD - check for noquad, nopent, and noring
