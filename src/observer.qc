@@ -454,6 +454,8 @@ void () observer_chase_start =
 //
 void () observer_demo_start =
 {
+	observer_check_demo_end();
+
 	// If a player number was provided, try to find that specific player
 	if (self.observer_number)
 	{
@@ -466,28 +468,25 @@ void () observer_demo_start =
 				if ((target.style & CLANRING_CONNECTED) && !(target.style & CLANRING_OBSERVER))
 				{
 					self.movetarget = target;
-					self.observer_number = 0;  // Clear the number
 					break;
 				}
 			}
 			target = find(target, classname, "player");
 		}
-    
+
+    	self.observer_number = 0;  // Clear the number here?
+
 		if (!self.movetarget)
 		{
 			sprint(self, "Player number not found or is an observer\n");
+
 			observer_fly_start();
 			return;
 		}
 	}
-	
+
 	if (mode_is_arena())
 	{
-		if (boss.state != CA_MATCH_PLAYING && boss.state != CA_MATCH_ROUNDSTART)
-		{		
-			return;
-		}
-
 		if ((self.movetarget == world) || (self.movetarget.ca_player_flag == PF_DEAD))
 		{
 			observer_next_target();
@@ -506,6 +505,7 @@ void () observer_demo_start =
         }
         self.delay = 0;
     }
+
     observer_clear_flags();
     self.oflags = self.oflags | OBSERVER_DEMO;
     self.finaldest_y = self.movetype = MOVETYPE_FLY;
@@ -719,10 +719,9 @@ void () observer_start =
 
 	if (clanring_playmode & CLANRING_CA_MODE)
 	{
-		if (((self.ca_player_flag == PF_DEAD)||(self.ca_player_flag == PF_WAITING))&&(boss.state == CA_MATCH_PLAYING))
+		if (boss.state == CA_MATCH_PLAYING)
 		{
-			observer_next_target();
-			observer_demo_start();
+			observer_demo_start(); //force observer mode during matches; this will call observer_next_target 
 		}
 	}
 
@@ -911,6 +910,29 @@ entity (entity e) observer_find_target =
 };
 
 //
+//  F I N D  B E S T  T A R G E T
+//
+//  Returns the player with the best score
+//	Arena mode only.
+
+void () observer_find_best_target =
+{
+    local entity targ;
+    
+    targ = find (world, classname, "player");
+
+    while (targ != world)
+    {
+        if ((IS_CA_OBSERVER(targ) == FALSE) && (targ.style & CLANRING_CONNECTED))
+        {
+            if ((targ.frags > self.movetarget.frags))
+                self.movetarget = targ;
+        }
+        targ = find (targ, classname, "player");
+    }
+};
+
+//
 //  F I N D  T E A M T A R G E T
 //
 //  Returns the next teammate to watch
@@ -964,12 +986,13 @@ void () observer_arena_next_target =
         return;
     }
 
-    if (self.movetarget != newt)    // If it's not the same target, then notify
+	if (self.movetarget != newt)    // If it's not the same target, then notify
     {
-        self.movetarget = newt;
         sprint (self, "Tracking ", self.movetarget.netname, "\n");
         centerprint (self,self.movetarget.netname);
     }
+
+	self.movetarget = newt;
 
     self.delay = 0;
 
@@ -2039,19 +2062,12 @@ void () observer_pre_think =
     {
         if (jump)
 		{
-			// Only try to switch targets if we're in an active round
-			if (mode_is_arena() && boss.state != CA_MATCH_PLAYING)
-			{
-				observer_fly_start();
-				return;
-			}
-
 			if (self.movetarget.classname == "player")
 			{
 				// if (self.button0)
 				// 	observer_prev_target();
 				// else
-					observer_next_target();
+				observer_next_target();
 			}
 			else
 			{
@@ -2060,32 +2076,8 @@ void () observer_pre_think =
     			// else
     				observer_next_camera();
 			}
-			self.clanring_cam_delay = time + 6;
+			self.clanring_cam_delay = time + 0.2;
 		}
-
-		if (clanring_playmode & CLANRING_CA_MODE)
-		{
-			if (boss.state == CA_MATCH_PLAYING)
-			{
-				if (self.movetarget == world)
-				{
-					observer_fly_start ();
-					return;
-				}
-				else
-				{
-					if (IS_CA_OBSERVER(self.movetarget))
-					{					
-						observer_next_target ();
-					}	
-				}
-			}
-			else if (self.movetarget == world)
-			{
-				observer_fly_start();
-				return;
-			}
-    	}   
  	}
     else
     {
@@ -2112,6 +2104,26 @@ void () observer_pre_think =
 		if (!(mode_is_arena()))
 			observer_get_target(); //tourneycam
     }
+
+	if (clanring_playmode & CLANRING_CA_MODE)
+	{
+		if (
+			((boss.state == CA_MATCH_ROUNDSTART)&&(boss.count == 7))
+			|| 
+		    ((boss.state == CA_MATCH_PLAYING)&&(((self.movetarget == world) || (IS_CA_OBSERVER(self.movetarget))) && (time < self.clanring_cam_delay)))
+		   )
+		{			
+			if (self.next_team == world)
+			{				
+				if (self.movetarget == world)
+				{
+					observer_find_best_target();    // find the best player, if no one is cammed.
+					self.clanring_cam_delay = time + 0.1;
+				}
+				observer_demo_start();
+			}
+		}
+	}   
 
 	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (self.next_team != world) && (boss.state == CA_MATCH_PLAYING) && (boss.wait == 0))
 	{
