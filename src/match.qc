@@ -1435,16 +1435,16 @@ void(entity ghostent) match_restore_ghost =
     local string temp;
     local string plural;
 
+    local float col = bound(0, ghostent.height, 13);
     local entity pteam;
 
-    self.team = ghostent.height + 1;
+    self.team = col + 1;
     self.style = self.style | ghostent.style | CLANRING_READY;
     
-    temp = ftos(ghostent.height);
+    temp = ftos(col);
     stuffcmd(self, "color ");
     stuffcmd(self, temp);
     stuffcmd(self, "\n");
-    temp = "";
     
     if (!match_put_player_in_team())    // self.height is set in here
     {
@@ -1456,6 +1456,10 @@ void(entity ghostent) match_restore_ghost =
     // Must ready before observer_end, or will be made observer again
     // Must observer_end before setting frags, or frags will be set to 0
     observer_end();
+
+    // Force server-side colours immediately (shirt & pants)
+    setcolour(self, col, col);
+    self.height = col;  // keep server bookkeeping consistent
 
     // copy always data
     self.frags = ghostent.frags;
