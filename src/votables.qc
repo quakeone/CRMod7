@@ -805,12 +805,23 @@ void() votables_set_weaponstay =
 		deathmatch = 3;
 		utils_do_weapons(SUB_regen);
 		bprint("Deathmatch set to \3 [weaponstay \bon\b]\n");
+
+		// Clean up weapon animations when weaponstay is turned on
+		utils_do_weapons(weapon_prewar_cleanup);
 	}
 	else
 	{
 		cvar_set("deathmatch", "1");
 		deathmatch = 1;
 		bprint("Deathmatch set to \1 [weaponstay \boff\b]\n");
+
+		// Set up weapon animations when weaponstay is turned off in DM mode
+		if ((clanring_playmode & CLANRING_MATCH_MODE) &&
+			!(clanring_state & CLANRING_MATCH_STARTED) &&
+			!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
+		{
+			utils_do_weapons(weapon_prewar_setup);
+		}
 	}
 };
 

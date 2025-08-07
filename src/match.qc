@@ -45,6 +45,9 @@ void() admin_dm3_screenshot_setup;
 void() StartRuneSpawn;
 void() GibPlayer;
 void() PlayerDead;
+void() weapon_prewar_cleanup;
+void() weapon_prewar_animate_think;
+void() weapon_prewar_setup;
 
 //TODO: Make this dynamic
 static string pausehint[6] =
@@ -197,6 +200,9 @@ void() match_reset =
 
     // prevent items from respawning
     utils_do_items(match_item_reset);
+
+    // stop weapon animations
+    utils_do_weapons(weapon_prewar_cleanup);
 
     // remove all backpacks
     utils_do_item(SUB_Remove, "item_backpack");
@@ -608,6 +614,12 @@ void() match_end =
     utils_do_match_spawns(spawns_restore_model);
     utils_do_items(SUB_regen);// respawn all items (R00k:9/1/2024)
 
+    // Start weapon animations again if in match mode and weaponstay is off
+    if ((clanring_playmode & CLANRING_MATCH_MODE) && deathmatch < 3)
+    {
+        utils_do_weapons(weapon_prewar_setup);
+    }
+
 };
 
 //
@@ -823,6 +835,10 @@ void() match_begin =
         Request_Poll_Cleanup();
 
     clanring_state = clanring_state | CLANRING_MATCH_STARTED;
+
+    // Stop weapon animations now that match has started
+    utils_do_weapons(weapon_prewar_cleanup);
+
     announce("The match has begun!");//Moved up here for autodemo
     utils_do_players(match_gib_player);//r00k after additional spawns...
 
@@ -941,6 +957,10 @@ void() match_timer_think1 =
         utils_do_items(SUB_regen);
         utils_do_item(match_reset_powerup, "item_artifact_invulnerability");
         utils_do_item(match_reset_powerup, "item_artifact_super_damage");
+
+        // Setup weapon animations if weaponstay is off
+        utils_do_weapons(weapon_prewar_setup);
+
         //announce("All items have respawned");
 
         if (clanring_playmode & CLANRING_NO_QUAD)
@@ -1648,6 +1668,13 @@ void() match_ready =
             match_show_timelimit();
         }
         match_no_ring_check();												// R00k: disable invisibility for smaller games automatically.
+
+        // Start weapon animations when in prewar with weaponstay off
+        if (!(clanring_state & CLANRING_TIMER_STARTED) && deathmatch < 3)
+        {
+            utils_do_weapons(weapon_prewar_setup);
+    }
+    
     }
     
     // check to see if we need to start the timer
@@ -1790,6 +1817,13 @@ void() match_notready =
         clanring_state = clanring_state - (clanring_state & CLANRING_NULL_FLAG);
         match_show_timelimit();
     }
+
+    // Stop weapon animations if not enough players/teams ready
+    if (clanring_numteams < 2 && !(clanring_state & CLANRING_TIMER_STARTED))
+    {
+        utils_do_weapons(weapon_prewar_cleanup);
+    }
+
 };
 
 //
@@ -2889,4 +2923,84 @@ void() match_list_ghosts =
         e = find(e, classname, "clanring_ghost");
     }
     sprint(self, "\n");
+};
+
+//
+//  W E A P O N  P R E W A R  A N I M A T E  T H I N K
+//
+//  Think function for weapons during prewar when weaponstay is off.
+//  Smoothly fades weapon opacity from 1.0 to 0.0 and back to indicate no weaponstay.
+//  Active during entire prewar period (before timer starts and during countdown).
+//
+void() weapon_prewar_animate_think =
+{
+    // Only animate in DM prewar (match mode, before match starts, not CTF, weaponstay off)
+    if ((clanring_playmode & CLANRING_MATCH_MODE) && 
+        (!(clanring_state & CLANRING_MATCH_STARTED)) &&
+        (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG)) &&
+        deathmatch < 3)
+    {
+        // We're in DM prewar with weaponstay off - do the animation
+    }
+    else
+    {
+        // All other cases - clean up and exit
+        weapon_prewar_cleanup();
+        return;
+    }
+
+    // Calculate fade direction and alpha value
+    // Use a sine wave for smooth fading: sin((time * speed) * 2 * PI)
+    local float fade_speed = 0.1; // Controls animation speed
+    local float alpha_value = (sin(time * fade_speed * 2 * 3.14159) + 1) * 0.5;
+    
+    // Set alpha (0.1 minimum so weapons don't completely disappear, 0.99 maximum)
+    self.alpha = 0.1 + (alpha_value * 0.89);
+    
+    self.nextthink = time + 0.05; // Update 20 times per second for smooth animation
+};
+
+//
+//  W E A P O N  P R E W A R  S E T U P
+//
+//  Sets up weapon animation for all weapons when entering prewar with weaponstay off.
+//
+void() weapon_prewar_setup =
+{
+    // Only setup if weaponstay is off (deathmatch < 3)
+    if (deathmatch >= 3)
+        return;
+        
+    if (self.classname == "weapon_supershotgun" ||
+        self.classname == "weapon_nailgun" ||
+        self.classname == "weapon_supernailgun" ||
+        self.classname == "weapon_grenadelauncher" ||
+        self.classname == "weapon_rocketlauncher" ||
+        self.classname == "weapon_lightning")
+    {
+        // Start the animation
+        self.think = weapon_prewar_animate_think;
+        self.nextthink = time + random() * 0.5; // Stagger start times slightly
+        self.alpha = 1.0; // Start fully visible
+    }
+};
+
+//
+//  W E A P O N  P R E W A R  C L E A N U P
+//
+//  Stops weapon animation and restores normal appearance.
+//
+void() weapon_prewar_cleanup =
+{
+    if (self.classname == "weapon_supershotgun" ||
+        self.classname == "weapon_nailgun" ||
+        self.classname == "weapon_supernailgun" ||
+        self.classname == "weapon_grenadelauncher" ||
+        self.classname == "weapon_rocketlauncher" ||
+        self.classname == "weapon_lightning")
+    {
+        self.alpha = 1.0; // Restore full opacity
+        self.think = SUB_regen; // Restore normal weapon think function
+        self.nextthink = time + self.delay; // Restore normal respawn timing
+    }
 };
