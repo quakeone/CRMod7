@@ -555,30 +555,44 @@ float () ra_number_teams =
 
 string (string msg) ra_countdown_message =
 {
-	local entity t1, team1, team2;
+	local entity myteam, e, p, oppteam;
 	local string line;
 
-	t1 = boss.next_team;
-	if (t1 == world)
-		return msg;
-	if (t1.next_team == world)
+	// Spectators or no team: no opponent label
+	if (self == world)
 		return msg;
 
-	team1 = t1.chain_gang;
-	team2 = t1.next_team.chain_gang;
-
-	if (team1 == world || team2 == world)
+	myteam = self.next_team;
+	if (myteam == world)
 		return msg;
 
-	// Determine which team is NOT mine
-    if (team1 == self)              // I'm first in the pair
-		line = team2.netname;   // show second = opponent
-    else if (team2 == self)         // I'm second in the pair
-		line = team1.netname;   // show first  = opponent
-    else                            // should never happen, fallback
-		line = team2.netname;
+	// Find the other team that is actually active (PF_READY or PF_PLAYING)
+	oppteam = world;
+	e = boss.next_team;
+	while (e != world)
+	{
+		if (e != myteam)
+		{
+			p = e.chain_gang;
+			while (p != world)
+			{
+				if ((p.ca_player_flag == PF_READY) || (p.ca_player_flag == PF_PLAYING))
+				{
+					oppteam = e;
+					break;
+				}
+				p = p.chain_gang;
+			}
+			if (oppteam != world)
+				break;
+		}
+		e = e.next_team;
+	}
 
-	line = strcat(line, "\n\n");
+	if (oppteam == world || oppteam.chain_gang == world)
+		return msg;
+
+	line = strcat(oppteam.chain_gang.netname, "\n\n");
 	line = strcat(line, msg);
 	return line;
 };
