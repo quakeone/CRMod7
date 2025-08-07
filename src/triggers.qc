@@ -339,21 +339,33 @@ void() tdeath_touch =
 	if (other == self.owner)
 		return;
 
-// frag anyone who teleports in on top of an invincible player
-	if (other.classname == "player")
+    /* -------- player-vs-player telefrag logic -------- */
+    if (other.classname == "player" && self.owner.classname == "player")
 	{
-		if (other.invincible_finished > time)
-			self.classname = "teledeath2";
-		if (self.owner.classname != "player")
-		{	// other monsters explode themselves
-			T_Damage (self.owner, self, self, 50000);
-			return;
+        /* Who arrived later?  (tp_time is 0 for campers who never teleported) */
+        float other_is_later = (other.tp_time > self.tfrag_time);
+
+        entity victim = other_is_later ? self.owner : other;
+        entity killer = other_is_later ? other       : self.owner;
+
+        /* Pentagram check – if the intended victim is invulnerable,
+           swap roles so the invulnerable player survives. */
+        if (victim.invincible_finished > time)
+        {
+            entity tmp = victim;
+            victim = killer;
+            killer = tmp;
 		}
 		
+        self.owner = killer;              /* <-- make obituary show right name */
+        T_Damage (victim, self, self, 50000);
+        return;
 	}
 
-	if (other.health)
+    /* -------- anything else (monsters, etc.) -------- */
+    if (other.health > 0)
 	{
+        self.owner = other;              /* so print shows who got the frag   */
 		T_Damage (other, self, self, 50000);
 	}
 };
@@ -373,6 +385,7 @@ void(vector org, entity death_owner) spawn_tdeath =
 	death.nextthink = (time + 0.2);
 	death.think = SUB_Remove;
 	death.owner = death_owner;
+	death.tfrag_time = time;         //  NEW: record spawn/arrival time
 	force_retouch = 2;		// make sure even still objects get hit
 };
 
@@ -451,6 +464,7 @@ void() teleport_touch =
 	}
 
 	setorigin(other, t.origin);
+	other.tp_time = time;
 	other.angles = t.mangle;
 	other.flags = other.flags - other.flags & FL_ONGROUND;	
 

@@ -246,6 +246,9 @@ float intermission_exittime;        // moved here from Client.qc
 .float quadtime;
 .float totalquad;
 
+.float tp_time;     // last time the player teleported
+.float tfrag_time;  // spawn time for a tele-death trigger
+
 entity 	clanring_best_chase_target;		// calculated every second who is the best target to chase // CRMOD - auto
 entity 	clanring_current_chase_target;
 float 	clanring_chase_delay;
