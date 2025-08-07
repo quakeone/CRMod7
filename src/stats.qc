@@ -1173,8 +1173,13 @@ void() stats_autodump =
 		stats_show_efficiency();
 		//sprint(self, "\n");
 
-		stats_show_killstats();
-		//sprint(self, "\n");
+		if (!(mode_is_arena()) || 
+			(clanring_playmode & CLANRING_CA_MODE) || 
+			(clanring_playmode & CLANRING_WIPEOUT_MODE))
+		{
+			stats_show_killstats();
+			//sprint(self, "\n");
+		}
 
 		if (!(clanring_playmode & CLANRING_NO_QUAD) && !(mode_is_arena()))//R00k -added-
 		{
@@ -1190,7 +1195,12 @@ void() stats_autodump =
 			//sprint(self, "\n");
 		}
 
-		stats_show_badstats();
+		if (!(mode_is_arena()) || 
+			(clanring_playmode & CLANRING_CA_MODE) || 
+			(clanring_playmode & CLANRING_WIPEOUT_MODE))
+		{
+			stats_show_badstats();
+		}
 
 		if (teamplay)
 		{
