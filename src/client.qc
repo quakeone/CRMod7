@@ -1811,6 +1811,67 @@ void () CheckCombos =
 float FL_BHOP	= 8192; // R00k: flag when the player bunnyhops (basically 200ms between off-ground -> on-ground -> off-ground)
 
 /*
+===============================================================
+TeamsBalancedWithMinimum
+
+Returns TRUE when the two active teams have an equal number
+of non-observer players and that number is >= minplayers.
+===============================================================
+*/
+float(float minplayers) TeamsBalancedWithMinimum =
+{
+    local float redcount, bluecount;
+    local entity p;
+
+    redcount  = 0;
+    bluecount = 0;
+
+    for (p = world; (p = find(p, classname, "player")); )
+    {
+        // skip dead bodies and spectators
+        if (p.health <= 0 || (p.style & CLANRING_OBSERVER))
+            continue;
+
+        if (p.team == RED)
+            redcount = redcount + 1;
+        else if (p.team == BLUE)
+            bluecount = bluecount + 1;
+    }
+
+    if ((redcount >= minplayers) && (bluecount >= minplayers) && (redcount == bluecount))
+        return TRUE;
+
+    return FALSE;
+};
+
+/*
+===============================================================
+CountUnreadyPlayers
+
+Returns the number of non-observer players who are not ready.
+===============================================================
+*/
+float() CountUnreadyPlayers =
+{
+    local float unreadycount;
+    local entity p;
+
+    unreadycount = 0;
+
+    for (p = world; (p = find(p, classname, "player")); )
+    {
+        // skip dead bodies and spectators
+        if (p.health <= 0 || (p.style & CLANRING_OBSERVER))
+            continue;
+
+        if (!(p.style & CLANRING_READY))
+            unreadycount = unreadycount + 1;
+    }
+
+    return unreadycount;
+};
+
+/*
 ================
 PlayerPostThink
 
@@ -1945,10 +2006,17 @@ void() PlayerPostThink =
         {
             if (!(self.style & CLANRING_READY))
             {
-                if (clanring_numteams > 0) //Woods: "can we disable red glow if you are the only player not ready? so it only activates if >= 1 people ready"
+                // Only show red glow when teams are balanced AND this is the last unready player
+                if (TeamsBalancedWithMinimum(2) && CountUnreadyPlayers() == 1)
                 {
                     if (!(self.effects & EF_RED))
                         self.effects |= EF_RED;
+                }
+                else
+                {
+                    // Either teams not balanced, insufficient players, or multiple unready - turn off glow
+                    if (self.effects & EF_RED)
+                        self.effects = self.effects - (self.effects & EF_RED);
                 }
             }
             else
