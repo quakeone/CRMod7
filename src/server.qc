@@ -1254,6 +1254,7 @@ void () clanring_client_connect =
     self.name_ready = string_null;
     self.wait = time + 1;
     self.hack_timeout = 0;//Timer for bot scan
+    self.ready_check_time = 0; //Initialize ready? command cooldown
     self.join_time = time;
 
     parm10 = parm10 - (parm10 & (CLANRING_READY | CLANRING_KICK_CONFIRM | CLANRING_MOTD | CLANRING_SETTING_OPTIONS | CLANRING_SCOREBOARD | CLANRING_CONFIRM_LEAVE));

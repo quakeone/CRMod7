@@ -1933,6 +1933,18 @@ void() match_help =
 //
 void() match_show_not_ready =
 {
+    // Check cooldown (5 seconds)
+    if (time - self.ready_check_time < 5)
+    {
+        sprint(self, "You must wait ");
+        sprint(self, ftos(ceil(5 - (time - self.ready_check_time))));
+        sprint(self, " seconds before using ready? again\n");
+        return;
+    }
+    
+    // Update the timestamp
+    self.ready_check_time = time;
+    
     if (match_all_ready())
     {
         if (!clanring_numteams)
@@ -1947,12 +1959,17 @@ void() match_show_not_ready =
     else
     {
         local entity player;
-        bprint("The following players are not ready:\n");
+        bprint("The following players are \bnot\b ready:\n");
         player = find(world, classname, "player");
         while (player)
         {
             if (!(player.style & (CLANRING_OBSERVER | CLANRING_READY)) && (player.style & CLANRING_CONNECTED))
-                bprint3(" ", player.netname, "\n");
+            {
+                if (player == self)
+                    bprint3("‹ ", player.netname, "\n");
+                else
+                    bprint3("  ", player.netname, "\n");
+            }
             player = find(player, classname, "player");
         }
     }
