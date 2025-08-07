@@ -571,15 +571,39 @@ string (string msg) ra_countdown_message =
 		return msg;
 
 	// Determine which team is NOT mine
-	if (team1.team == self.team)
+    if (team1 == self)              // I'm first in the pair
+		line = team2.netname;   // show second = opponent
+    else if (team2 == self)         // I'm second in the pair
+		line = team1.netname;   // show first  = opponent
+    else                            // should never happen, fallback
 		line = team2.netname;
-	else
-		line = team1.netname;
 
 	line = strcat(line, "\n\n");
 	line = strcat(line, msg);
 	return line;
 };
+
+void RA_CenterprintToAll (string msg)
+{
+    local entity pl, save;
+
+    pl = nextent(world);          // first client entity
+    while (pl != world)
+    {
+        if (pl.style & CLANRING_CONNECTED)
+        {
+            save = self;          // remember caller
+            self = pl;            // personalise `self`
+
+            msg_entity = pl;      // make sure engine sends to this client
+            WriteByte  (MSG_ONE, SVC_CENTERPRINT);
+            WriteString(MSG_ONE, ra_countdown_message(msg));
+
+            self = save;          // restore for next loop
+        }
+        pl = nextent(pl);
+    }
+}
 
 void () rocket_arena_main_loop =
 {
@@ -651,7 +675,7 @@ void () rocket_arena_main_loop =
 
 			if (boss.count == 0)
             {
-				ctprint (ra_countdown_message("\bFIGHT!"));
+				RA_CenterprintToAll("\bFIGHT!");
 				sound (world, CHAN_ITEM, "crx/fight.wav", 1, ATTN_NONE);
 				utils_do_arena_players(arena_fight_and_shoot);
 				boss.timetofight = TRUE;
@@ -661,17 +685,17 @@ void () rocket_arena_main_loop =
             }
             else if (boss.count == 1)
             {
-				if (boss.round > 1) ctprint (ra_countdown_message("1"));
+				if (boss.round > 1) RA_CenterprintToAll("1");
 				sound (world, CHAN_ITEM, "crx/one.wav",1, ATTN_NONE);
             }
             else if (boss.count == 2)
             {
-				if (boss.round > 1) ctprint (ra_countdown_message("2"));
+				if (boss.round > 1) RA_CenterprintToAll("2");
 				sound (world, CHAN_ITEM, "crx/two.wav", 1, ATTN_NONE);
             }
             else if (boss.count == 3)
             {
-				if (boss.round > 1) ctprint (ra_countdown_message("3"));
+				if (boss.round > 1) RA_CenterprintToAll("3");
 				sound(world, CHAN_ITEM, "crx/three.wav", 1, ATTN_NONE);
             }
 			else if (boss.count == 4)
