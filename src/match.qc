@@ -1102,13 +1102,19 @@ float () match_put_player_in_team =
         if (pteam.height == self.height)
         {
             // can we add to the team?
-            if ((clanring_state & CLANRING_MATCH_STARTED) && (pteam.count == clanring_maxsize))
+            if (clanring_state & CLANRING_MATCH_STARTED)
             {
-                sprint(self, "Team full.  A player must enter\n");
-                sprint(self, "'unlock' in console to let you join\n");
-                return FALSE;
+                if (clanring_maxsize != 16) // if locked
+                    match_get_maxsize();    // update to current max size
+
+                if (pteam.count == clanring_maxsize)
+                {
+                    sprint(self, "Team full.  A player must enter\n");
+                    sprint(self, "'unlock' in console to let you join\n");
+                    return FALSE;
+                }
             }
-            
+
             // add to the team
             pteam.count = pteam.count + 1;
             
@@ -1673,8 +1679,8 @@ void() match_ready =
         if (!(clanring_state & CLANRING_TIMER_STARTED) && deathmatch < 3)
         {
             utils_do_weapons(weapon_prewar_setup);
-    }
-    
+        }
+
     }
     
     // check to see if we need to start the timer
@@ -1700,8 +1706,7 @@ void(entity player) match_remove_player =
     if (player.next_team == world)
         return;
 
-    announce4(player.netname, " left the ", player.next_team.netname, ".");
-
+        announce4(player.netname, " left the ", player.next_team.netname, ".");
     // remove from team & linked list
     plast = clanring_sentinel;
     while (plast.next_player != player) // findprevious player in list
@@ -1995,7 +2000,7 @@ void() match_show_not_ready =
         local entity player;
         bprint("The following players are \bnot\b ready:\n");
         player = find(world, classname, "player");
-        while (player)
+while (player)
         {
             if (!(player.style & (CLANRING_OBSERVER | CLANRING_READY)) && (player.style & CLANRING_CONNECTED))
             {
