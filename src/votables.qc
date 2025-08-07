@@ -388,6 +388,7 @@ void() votables_set_gametype_mode_map =
 			cvar_set("teamplay", "1");
 			cvar_set("deathmatch", "1");
 			bprint("gametype set to Clan Arena\n");
+			newmapname = "dm3";
 		}
 		else if (request_gametype == 3)
 		{
@@ -396,6 +397,8 @@ void() votables_set_gametype_mode_map =
 			cvar_set("teamplay", "0");
 			cvar_set("deathmatch", "1");
 			bprint("gametype set to Rocket Arena\n");
+			if (!ra_map())
+				newmapname = "arenax";
 		}
 		else if (request_gametype == 4)
 		{
@@ -430,7 +433,7 @@ void() votables_set_gametype_mode_map =
 			cvar_set("teamplay", "1");
 			cvar_set("deathmatch", "1");
 			bprint("gametype set to Clan Arena Wipeout\n");
-			newmapname = mapname;
+			newmapname = "dm3";
 		}
 		else if (request_gametype == 7)
 		{
