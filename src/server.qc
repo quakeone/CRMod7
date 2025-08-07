@@ -261,6 +261,7 @@ void () arena_client_disconnect;
 void () CaptureHighScores_sprint;
 void () AirshotHighScores_sprint;
 void () LongRangeGibs_sprint;
+void () check_client_status;
 //void () Teamplay_Select_Team;
 //
 // C L E A R   A F K   S T A T U S
@@ -268,13 +269,20 @@ void () LongRangeGibs_sprint;
 
 void (entity client) clear_afk_status =
 {
+    client.afk_time = time; // Reset AFK time regardless of current status
+    
     if (client.style & CLANRING_AFK_CLIENT && (client.style & CLANRING_CONNECTED))
     {
-        updatename(client, client.netname);
-        client.style = client.style - (client.style & CLANRING_AFK_CLIENT);
+        local entity oldself = self;
+        self = client;
+
+        clear_name();
+        self.style &= ~CLANRING_AFK_CLIENT;
         forceinfokey(self, "afk","no");// woods
+        forceinfokey(self, "chat", "0");  // Set chat status to normal
+        
+        self = oldself;
     }
-    client.afk_time = time;
 }
 //woods —
 /*
@@ -2692,13 +2700,15 @@ void () clanring_periodic_checks =
             {
                 if (self.style & CLANRING_AFK_CLIENT)
                     afk_name();
-                else
+                else if (!(self.style & CLANRING_TYPING_CLIENT))
                     ready_name();
             }
         }
     }
 
     self.ping_time = client_ping(self);
+
+    check_client_status();
 
     inactive = time - self.afk_time;//Seconds of inactivity
 

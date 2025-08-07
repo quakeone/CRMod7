@@ -28,6 +28,7 @@ void() player_pain;
 void() PlayerDead;
 void(entity client, float fragval) client_frag;
 void(entity client) clear_afk_status;
+void () client_afk_off;
 
 /*
 =============================================================================
@@ -316,7 +317,7 @@ void() IntermissionThink =
     VoteMenu_Print();
 
     if (self.button0 || self.button2) 								//Jump or fire to wake up
-        self.style -= (self.style & CLANRING_AFK_CLIENT);
+        client_afk_off();
 
     if ((self.impulse > 0) && (self.impulse < 6))
     {
@@ -2816,9 +2817,14 @@ void () client_afk_on =
 {
     if (!(self.style & CLANRING_AFK_CLIENT))
     {
+        // Turn off typing if it's on
+        if (self.style & CLANRING_TYPING_CLIENT)
+            self.style &= ~CLANRING_TYPING_CLIENT;
+        
         afk_name();
         forceinfokey(self, "afk", "yes");// woods
-        self.style = self.style | CLANRING_AFK_CLIENT;
+        forceinfokey(self, "chat", "2");  // New chat status key - 2 means AFK
+        self.style |= CLANRING_AFK_CLIENT;
         self.afk_time = time;
     }
 };
@@ -2828,6 +2834,66 @@ void () client_afk_off =
     if (self.style & CLANRING_AFK_CLIENT)
     {
         clear_afk_status(self);
+    }
+};
+
+void () typing_name =
+{
+    local string text = "\btyping\b";
+    updatenameoverload(text);
+    updatename(self, self.name_ready);
+};
+
+void () client_typing_on =
+{
+    if (!(self.style & CLANRING_AFK_CLIENT) && !(self.style & CLANRING_TYPING_CLIENT))
+    {
+        typing_name();
+        self.style |= CLANRING_TYPING_CLIENT;
+        forceinfokey(self, "chat", "1"); // Set typing status
+    }
+};
+
+void () client_typing_off =
+{
+    if (self.style & CLANRING_TYPING_CLIENT)
+    {
+        clear_name();
+        self.style &= ~CLANRING_TYPING_CLIENT;
+        forceinfokey(self, "chat", "0"); // Set to active
+    }
+};
+
+void () check_client_status =
+{
+    if (!(self.style & CLANRING_CONNECTED))
+        return;
+        
+    local string chat_status = infokey(self, "chat");
+    
+    if (chat_status == "2") // AFK
+    {
+        if (!(self.style & CLANRING_AFK_CLIENT))
+            client_afk_on();
+            
+        if (self.style & CLANRING_TYPING_CLIENT)
+            self.style &= ~CLANRING_TYPING_CLIENT;
+    }
+    else if (chat_status == "1") // Typing
+    {
+        if (self.style & CLANRING_AFK_CLIENT)
+            client_afk_off();
+            
+        if (!(self.style & CLANRING_TYPING_CLIENT))
+            client_typing_on();
+    }
+    else if (chat_status == "0") // Active
+    {
+        if (self.style & CLANRING_AFK_CLIENT)
+            client_afk_off();
+            
+        if (self.style & CLANRING_TYPING_CLIENT)
+            client_typing_off();
     }
 };
 
@@ -2928,6 +2994,14 @@ void(string cmd) SV_ParseClientCommand =
 
         case "afkoff":
             client_afk_off();
+            return;
+
+        case "typingon":
+            client_typing_on();
+            return;
+            
+        case "typingoff":
+            client_typing_off();
             return;
 
         case "wtstats":
