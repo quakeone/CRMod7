@@ -2986,32 +2986,45 @@ void () clanring_start_frame =
 
                 // V O T E M E N U   C H E C K   M A J O R I T Y -- start
                 string temp = "";
-                float c = 0;
+                float winner = 1;            // default to slot 1 ("nextmap")
+                float best = -1;             // reset every round
 
-                // Count the votes and store the best one in temp (by name) and map_choices[0] (by number of votes).
-                for (float i = 1; i < 6; i++)
+                for (float i = 1; i <= 5; i++)
                 {
-                    if (map_choices[i] >= map_choices[0]) //if a tie then the last one voted for wins... :|
+                    if (map_choices[i] >= best)  // >= maintains "last wins" tie behavior
                     {
-                        temp = vote_map_choices[i];
-                        map_choices[0] = map_choices[i];
-                        c = i;
+                        best = map_choices[i];
+                        winner = i;
                     }
                 }
 
-                if (map_choices[0] == 0) 			// no one voted.
-                    temp = vote_map_choices[1];		// Default 'nextmap' filename from levels.cfg
+                // No votes? fall back to 1
+                if (best <= 0)
+                    winner = 1;
+
+                temp = vote_map_choices[winner];
+
+                // Fallback chain
+                if (!temp || temp == "")
+                    temp = vote_map_choices[1];
+                if (!temp || temp == "")
+                    temp = default_nextmap;
 
                 tokenize(temp);
 
                 if (nextmap != "")
                     strunzone(nextmap);
 
-                if (!(found_in_warp_list(argv(0))))	// in case the tempstring gets garbled
+                // Validate against your warp list
+                if (!(found_in_warp_list(argv(0))))
                     nextmap = default_nextmap;
                 else
                     nextmap = strzone(argv(0));
 
+                // Final safety + optional file existence guard
+                if (!nextmap || nextmap == "")
+                    nextmap = default_nextmap;
+    
                 VoteMenu_Cleanup();
                 // V O T E M E N U   C H E C K   M A J O R I T Y -- end
 

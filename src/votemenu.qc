@@ -26,7 +26,6 @@ string VoteMenu_get_map_by_name(string maparg) =
 
 void() VoteMenu_Cleanup =
 {
-	strunzone(vote_map_choices[0]);
 	strunzone(vote_map_choices[1]);
 	strunzone(vote_map_choices[2]);
 	strunzone(vote_map_choices[3]);
