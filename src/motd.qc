@@ -25,7 +25,7 @@ string motd_top7;
 
 void() motd_init_world =
 {
-	motd_top1   = "\n\n\n\n\x80\x81\x81\x81\x81\x81 \bc\blan\br\bing\bx\b \x81\x81\x81\x81\x81\x82\n\n\nClanRing Multiplayer Server\n\n\noriginal works by \nJ.P. Grossman & Dave 'Zoid' Kirsch";
+	motd_top1   = "\n\n\n\n\x80\x81\x81\x81\x81\x81 \bCRMod\b \x19 \x81\x81\x81\x81\x81\x82\n\n\nClanRing Multiplayer Server\n\n\noriginal works by \nJ.P. Grossman & Dave 'Zoid' Kirsch";
 	motd_top2   = "\n\n\n\x80\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x82\n\n\n\n\n\n\n\n";
 };
 
