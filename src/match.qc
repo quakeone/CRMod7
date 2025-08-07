@@ -1702,11 +1702,49 @@ void() match_ready =
 void(entity player) match_remove_player =
 {
     local entity plast;
+    local string teamname;
+    local entity pteam;
+    local float player_still_on_team;
 
     if (player.next_team == world)
         return;
 
-        announce4(player.netname, " left the ", player.next_team.netname, ".");
+    teamname = player.next_team.netname;
+
+   // Check if player is becoming an observer or disconnecting
+   if ((player.style & CLANRING_OBSERVER) || (player.team == 0))
+   {
+       // Player is becoming observer or disconnecting - print leaving message
+       if (teamname == "")          // ---- player had no team ----
+           announce2(player.netname, " left the game.");   // 2-piece print
+       else                         // ---- normal team message ----
+           announce4(player.netname, " left the ", teamname, ".");
+   }
+   else
+   {
+       // Check if player is still using a color that matches an active team
+       player_still_on_team = FALSE;
+       pteam = clanring_sentinel.next_team;
+       while (pteam)
+       {
+           if (pteam.height == player.height)
+           {
+               player_still_on_team = TRUE;
+               break;
+           }
+           pteam = pteam.next_team;
+       }
+
+       // Only print leaving message if player is not staying on a team
+       if (!player_still_on_team)
+       {
+           if (teamname == "")          // ---- player had no team ----
+               announce2(player.netname, " left the game.");   // 2-piece print
+           else                         // ---- normal team message ----
+               announce4(player.netname, " left the ", teamname, ".");
+       }
+   }
+
     // remove from team & linked list
     plast = clanring_sentinel;
     while (plast.next_player != player) // findprevious player in list
