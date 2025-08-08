@@ -1954,10 +1954,15 @@ void() BackpackTouch =
 						self.owner.clanring_badstats_x = self.owner.clanring_badstats_x + 1;
 						if (other.next_team != world)
 						{
-							other.next_team.mangle_y = other.next_team.mangle_y + 1;
+							other.next_team.mangle_y = other.next_team.mangle_y + 1;	
 						}
 					}
 				}
+				if (self.items == IT_ROCKET_LAUNCHER)
+					other.stats_item_rl += 1;
+				else
+				if (self.items == IT_LIGHTNING)
+					other.stats_item_lg += 1;
 			}
 		}
 	}
