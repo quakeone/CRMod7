@@ -29,6 +29,7 @@ void () rocket_arena_init_world =
 	boss.busy			= FALSE;
 	boss.aborted 		= FALSE;
 
+	ra_initial_rules_shown = FALSE;
 	ra_wins = 10;
 };
 
@@ -699,17 +700,17 @@ void () rocket_arena_main_loop =
             }
             else if (boss.count == 1)
             {
-				if (boss.round > 1) RA_CenterprintToAll("1");
+                if ((boss.round > 1) || ra_initial_rules_shown) RA_CenterprintToAll("1");
 				sound (world, CHAN_ITEM, "crx/one.wav",1, ATTN_NONE);
             }
             else if (boss.count == 2)
             {
-				if (boss.round > 1) RA_CenterprintToAll("2");
+                if ((boss.round > 1) || ra_initial_rules_shown) RA_CenterprintToAll("2");
 				sound (world, CHAN_ITEM, "crx/two.wav", 1, ATTN_NONE);
             }
             else if (boss.count == 3)
             {
-				if (boss.round > 1) RA_CenterprintToAll("3");
+                if ((boss.round > 1) || ra_initial_rules_shown) RA_CenterprintToAll("3");
 				sound(world, CHAN_ITEM, "crx/three.wav", 1, ATTN_NONE);
             }
 			else if (boss.count == 4)
@@ -758,6 +759,7 @@ void () rocket_arena_main_loop =
 				utils_do_players(reset_frags);
 				Practice_Object_Remove();
 				boss.state = CA_MATCH_ROUNDSTART;
+				ra_initial_rules_shown = TRUE;
 				ra_next_player_ready(COLOR_BLUE);
 				ra_next_player_ready(COLOR_RED);
 				//pqc_match_reset();

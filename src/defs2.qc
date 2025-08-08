@@ -762,6 +762,7 @@ float STATE_INVISIBLE = 8;
 
 float isFTEserver; //Is the server running on FTE or QSS/M?
 string clanring_new_record_player;
+float ra_initial_rules_shown; // RA: track if round-1 rules were already shown
 
 .entity enemy_target;
 #define INSTALLED_NEXTMAPS_LIMIT 200

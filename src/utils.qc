@@ -1828,9 +1828,10 @@ float () match_in_progress =
 
 float () prematch_rules =
 {
-	if ((clanring_state & CLANRING_TIMER_STARTED) && !(clanring_state & CLANRING_MATCH_STARTED))
+    // Only honor the global match timer countdown in non-arena modes
+    if (!mode_is_arena() && (clanring_state & CLANRING_TIMER_STARTED) && !(clanring_state & CLANRING_MATCH_STARTED))
 		return TRUE;
-	if (mode_is_arena() && (boss.state == CA_MATCH_ROUNDSTART) && (boss.round == 1))
+    if (mode_is_arena() && (boss.state == CA_MATCH_ROUNDSTART) && (boss.round == 1) && (!ra_initial_rules_shown))
 		return TRUE;
 	return FALSE;
 }

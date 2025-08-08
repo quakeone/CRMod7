@@ -1689,6 +1689,9 @@ void () arena_match_end =
 	boss.aborted = FALSE;
 	boss.draw = FALSE;
 
+	if (clanring_playmode & CLANRING_RA_MODE)
+		ra_initial_rules_shown = FALSE;
+
 	temp = ftos(boss.round);
 	localcmd("skill \"", temp, "\"\n");//this still used?    TODO: Replace with infokey
 
