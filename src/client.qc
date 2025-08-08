@@ -2944,6 +2944,12 @@ void () client_typing_on =
 {
     if (!(self.style & CLANRING_AFK_CLIENT) && !(self.style & CLANRING_TYPING_CLIENT))
     {
+        // Remember what was being displayed before switching to typing
+        if (self.name_ready)
+            self.name_before_typing = self.name_ready;
+        else
+            self.name_before_typing = self.netname;
+
         typing_name();
         self.style |= CLANRING_TYPING_CLIENT;
         forceinfokey(self, "chat", "1"); // Set typing status
@@ -2954,7 +2960,21 @@ void () client_typing_off =
 {
     if (self.style & CLANRING_TYPING_CLIENT)
     {
+        if (self.name_before_typing)
+        {
+            // Restore the previous displayed name/status immediately
+            updatename(self, self.name_before_typing);
+            // Also keep name_ready in sync if we restored a formatted status
+            if (self.name_before_typing != self.netname)
+                self.name_ready = self.name_before_typing;
+            else
+                self.name_ready = string_null;
+            self.name_before_typing = string_null;
+        }
+        else
+        {
         clear_name();
+        }
         self.style &= ~CLANRING_TYPING_CLIENT;
         forceinfokey(self, "chat", "0"); // Set to active
     }
