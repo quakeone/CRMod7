@@ -284,6 +284,30 @@ if (client.style & CLANRING_AFK_CLIENT && (client.style & CLANRING_CONNECTED))
         self = oldself;
     }
 }
+
+// Restore AFK status after level change
+void () restore_afk_status =
+{
+    local entity player = self.owner;
+    
+    if (player == world || !player.netname)
+    {
+        remove(self);
+        return;
+    }
+    
+    local entity oldself = self;
+    self = player;
+    
+    // Restore AFK status
+    self.style = self.style | CLANRING_AFK_CLIENT;
+    afk_name();
+    forceinfokey(self, "afk", "yes");
+    
+    self = oldself;
+    remove(self); // Clean up the scheduled event entity
+}
+
 //woods —
 /*
 mode: dm, ctf, ra, ca, wipeout, airshot, dmm4
@@ -1222,7 +1246,17 @@ void () clanring_client_connect =
         text = server_find_myClient();  //This also sets self.client
         bprint (self.netname," has connected", text);
     }
-    else self.afk_time = time;
+    else 
+    {
+        self.afk_time = time;
+        
+        // Level change - check client's chat status to restore AFK if needed
+        local string chat_status = infokey(self, "chat");
+        if (chat_status == "2" && !(self.style & CLANRING_AFK_CLIENT)) // Client is AFK but not flagged yet
+        {
+            utils_make_scheduled_event(restore_afk_status, 1.0);
+        }
+    }
 
     // send aliases if necessary
     utils_make_scheduled_event(clanring_send_ignore_this, 1);
