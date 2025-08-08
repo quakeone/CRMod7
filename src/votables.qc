@@ -17,6 +17,8 @@ float request_gametype;		// Used to request a new game type
 float request_weaponstay;   // Used to request weaponstay
 
 void() UnHookPlayer;
+void() utils_update_server_time;
+void() utils_save_disconnect_log;
 
 //
 //  S E N D  A L I A S E S
@@ -197,15 +199,21 @@ void () votables_change_level =
 	if (request_mapname == "start0")
 	{
 		serverflags = 0;
+		utils_update_server_time();  // Update persistent time
+		utils_save_disconnect_log();  // Save to file before map change
 		changelevel("start");
 	}
 	else if (request_mapname == "start1")
 	{
 		serverflags = 15;
+		utils_update_server_time();  // Update persistent time
+		utils_save_disconnect_log();  // Save to file before map change
 		changelevel("start");
 	}
 	else
 	{
+		utils_update_server_time();  // Update persistent time
+		utils_save_disconnect_log();  // Save to file before map change
 		changelevel (request_mapname);
 	}	
 };
@@ -894,6 +902,8 @@ void() votables_set_altents =
     }
     
     utils_set_cvar("gamecfg", clanring_gameconfig);
+	utils_update_server_time();  // Update persistent time
+	utils_save_disconnect_log();  // Save to file before map change
 	changelevel(mapname);
 };
 

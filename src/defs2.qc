@@ -616,6 +616,20 @@ float last_return_time;
 .float cc_queue;
 .float cc_queue_vote;
 
+// Last command data structures
+#define MAX_CLIENT_DISCONNECT_LOG 10  // Maximum number of disconnections to track
+typedef struct
+{
+    string player_name;
+    float disconnect_time;
+} disconnect_entry_t;
+
+disconnect_entry_t disconnect_log[MAX_CLIENT_DISCONNECT_LOG];
+float disconnect_log_count;
+// Persistent time tracking system (similar to hunk storage)
+float server_persistent_time;     // Stores the accumulated server time
+float last_time_update;           // Tracks when persistent time was last updated
+
 entity team_first_place;
 entity team_second_place;
 entity team_third_place;

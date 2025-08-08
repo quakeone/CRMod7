@@ -201,6 +201,14 @@ void (float value) clanring_set_teamplay;
 void (float value) clanring_set_fraglimit;
 void () stats_reset_player;
 void () stats_impulse;
+string(string s) utils_strip_newline;
+string(float seconds) utils_format_time;
+void(string player_name, float disconnect_time) utils_log_disconnect;
+void() utils_show_last_disconnects;
+void() utils_save_disconnect_log;
+void() utils_load_disconnect_log;
+float() utils_server_time;
+void() utils_update_server_time;
 void () score_init_world;
 void (float command) console_command;
 void () console_set_aliases;
@@ -428,6 +436,12 @@ void () clanring_init_world =
     motd_init_world();
     score_init_world();
     match_init_world();
+    
+    // Load disconnect log from persistent storage
+    utils_load_disconnect_log();
+    
+    // Set the server time offset to maintain continuity across map changes
+    // The offset should already be loaded from the file, no need to modify it here
     //quaketag_init_world();
     if (isFTEserver)
         autocvar(nqfriction, "1");	//Set this to 1 if using FTE as a server with sv_nqplayerphysics 0 to simulate NQ bunnyhopping but allowing QW clients to use prediction.
@@ -895,6 +909,8 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias wtstats cmd wtstats\n");
     stuffcmd(self, "alias itstats cmd itstats\n");
     stuffcmd(self, "alias altents cmd altents\n");
+    stuffcmd(self, "alias last cmd last\n");
+    stuffcmd(self, "alias lastplayers impulse 188\n");
     
     self.style = self.style | CLANRING_FOUND_BINDINGS;
 
@@ -1579,6 +1595,7 @@ void () clanring_help_misc =
     sprint(self, " shownick   - teammate identifier\n");
     sprint(self, " autoweapon - toggle smartweapon\n");
     sprint(self, " autopause  - toggle auto pausing\n");
+    sprint(self, " last       - show recently disconnected players\n");
 };
 
 //
@@ -1698,6 +1715,7 @@ void () misc_commands =
         sprint(self, " \bdropammo\b\n");
         sprint(self, " \bdropweapon\b\n");
         sprint(self, " \bhighscores\b\n");
+        sprint(self, " \blast\b\n");
         sprint(self, " \bmotd\b\n");
         sprint(self, " \brules\b\n");
         sprint(self, "\n");
@@ -2379,6 +2397,8 @@ void () clanring_impulse =
         modhelp_commands ();
     else if (self.impulse == 187)
         shortcuts_commands ();
+    else if (self.impulse == 188)
+        utils_show_last_disconnects ();
     else if (self.impulse >= 115 && self.impulse <= 116)
     {
         if (self.style & CLANRING_KICK_CONFIRM)
@@ -2929,6 +2949,8 @@ void () clanring_start_frame =
             
             if (time >= clanring_nextcheck2)                // CLANRING_NEXTCHECK2 every second...
             {
+                // Update persistent server time every second
+                utils_update_server_time();
                 for (entity e = world; (e = find(e, classname, "player")) != world;)    // Check if there is even an observer
                 {
                     if (e.style & CLANRING_OBSERVER)
@@ -3039,6 +3061,8 @@ void () clanring_start_frame =
                 VoteMenu_Cleanup();
                 // V O T E M E N U   C H E C K   M A J O R I T Y -- end
 
+                utils_update_server_time();  // Update persistent time
+                utils_save_disconnect_log();  // Save to file before map change
                 changelevel(nextmap);
                 strunzone(nextmap); // zoned mem carries over, over changelevels, so we need to free it now.
                 nextmap = "";

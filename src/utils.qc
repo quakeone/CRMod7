@@ -7,6 +7,8 @@
 //
 float () match_prewar;
 float () mode_is_arena;
+void() utils_update_server_time;
+void() utils_save_disconnect_log;
 //(FIXME: replace with just centerprint or bprint)
 // Overloaded centerprints
 void (entity client, string s, ...) centerprint2 = #73; 
@@ -387,6 +389,9 @@ void (string s) changelevel =
 		print("changelevel: still checking levels.cfg\n");
 		return;
 	}
+
+	utils_update_server_time();  // Update persistent time
+	utils_save_disconnect_log();  // Save to file before map change
 
 	if (s == "")
 	{
@@ -1836,3 +1841,266 @@ float () prematch_rules =
 	return FALSE;
 }
 
+//
+// Format time duration for display (e.g., "1:23:45" or "0:05:32")
+//
+string(float seconds) utils_format_time =
+{
+    local float hours, minutes, secs;
+    local string result;
+    
+    if (seconds < 0)
+        seconds = 0;
+    
+    secs = floor(seconds);
+    minutes = floor(secs / 60);
+    hours = floor(minutes / 60);
+    secs = secs - (minutes * 60);
+    minutes = minutes - (hours * 60);
+    
+    if (hours > 0)
+    {
+        if (minutes < 10 && secs < 10)
+            result = sprintf("%g:0%g:0%g", hours, minutes, secs);
+        else if (minutes < 10)
+            result = sprintf("%g:0%g:%g", hours, minutes, secs);
+        else if (secs < 10)
+            result = sprintf("%g:%g:0%g", hours, minutes, secs);
+        else
+            result = sprintf("%g:%g:%g", hours, minutes, secs);
+    }
+    else
+    {
+        if (minutes < 10 && secs < 10)
+            result = sprintf("0%g:0%g", minutes, secs);
+        else if (secs < 10)
+            result = sprintf("%g:0%g", minutes, secs);
+        else
+            result = sprintf("%g:%g", minutes, secs);
+    }
+    
+    return result;
+}
+
+//
+// Strip newline character from end of string
+//
+string(string s) utils_strip_newline =
+{
+    local float L = strlen(s);
+    if (L > 0 && substring(s, L - 1, 1) == "\n")
+        return substring(s, 0, L - 1);
+    return s;
+}
+
+//
+// Get persistent server time that continues across map changes
+//
+// Persistent server time system (similar to hunk storage)
+float() utils_server_time =
+{
+    return server_persistent_time + time - last_time_update;
+}
+
+void() utils_update_server_time =
+{
+    server_persistent_time = utils_server_time();
+    last_time_update = time;
+}
+
+//
+// Display the list of recently disconnected players
+//
+void() utils_show_last_disconnects =
+{
+    local float i;
+    local string time_str;
+    local float time_since;
+    local float name_len, time_len;
+    local float name_padding, p;
+    local float NAME_COL;
+    
+    sprint(self, "\n");
+    sprint(self, "Name                    Time\n");
+    sprint(self, "----                    ----\n\n");
+    
+    if (disconnect_log_count == 0)
+    {
+        sprint(self, "No entries found.\n");
+        return;
+    }
+    
+    for (i = 0; i < disconnect_log_count && i < MAX_CLIENT_DISCONNECT_LOG; i++)
+    {
+        if (disconnect_log[i].player_name != "" && disconnect_log[i].disconnect_time > 0)
+        {
+            time_since = utils_server_time() - disconnect_log[i].disconnect_time;
+            if (time_since < 0)
+                time_since = 0;  // Clamp negative times
+            time_str = utils_format_time(time_since);
+            
+            // Right-justify time at consistent column position
+            name_len = strlen(disconnect_log[i].player_name);
+            time_len = strlen(time_str);
+            
+            // Calculate total padding needed to right-justify time at position 28
+            NAME_COL = 28;
+            name_padding = NAME_COL - name_len - time_len;
+            
+            if (name_padding < 2)  // Minimum 2 spaces between name and time
+                name_padding = 2;
+            
+            sprint(self, disconnect_log[i].player_name);
+            
+            // Add padding to right-justify the time
+            for (p = 0; p < name_padding; p++)
+                sprint(self, " ");
+                
+            sprint(self, time_str);
+            sprint(self, "\n");
+        }
+    }
+}
+
+//
+// Save disconnect log to file
+//
+void() utils_save_disconnect_log =
+{
+    local float i;
+    local filestream f;
+    
+    f = fopen("disconnect_log.txt", FILE_WRITE);
+    if (f < 0)
+    {
+        dprint("WARNING: Could not write to disconnect_log.txt\n");
+        return;
+    }
+    
+    // Update persistent time before saving
+    utils_update_server_time();
+    
+    // Write the count and persistent time (only the total, not last_time_update)
+    fputs(f, ftos(disconnect_log_count));
+    fputs(f, "\n");
+    fputs(f, ftos(server_persistent_time));
+    fputs(f, "\n");
+    
+    // Write each entry
+    for (i = 0; i < disconnect_log_count && i < MAX_CLIENT_DISCONNECT_LOG; i++)
+    {
+        if (disconnect_log[i].player_name != "" && disconnect_log[i].disconnect_time > 0)
+        {
+            fputs(f, disconnect_log[i].player_name);
+            fputs(f, "\n");
+            fputs(f, ftos(disconnect_log[i].disconnect_time));
+            fputs(f, "\n");
+        }
+    }
+    
+    fclose(f);
+}
+
+//
+// Log a player disconnect for the 'last' command
+//
+void(string player_name, float disconnect_time) utils_log_disconnect =
+{
+    local float i;
+    
+    // Always add new entry (accept duplicates for same named players)
+    // This avoids string comparison issues with pointer identity vs content
+    {
+        // Shift entries down to make room at the beginning
+        if (disconnect_log_count < MAX_CLIENT_DISCONNECT_LOG)
+        {
+            disconnect_log_count = disconnect_log_count + 1;
+        }
+        
+        for (i = disconnect_log_count - 1; i > 0; i--)
+        {
+            disconnect_log[i].player_name = disconnect_log[i-1].player_name;
+            disconnect_log[i].disconnect_time = disconnect_log[i-1].disconnect_time;
+        }
+        
+        // Add new entry at the beginning
+        disconnect_log[0].player_name = strzone(player_name);
+        disconnect_log[0].disconnect_time = disconnect_time;
+    }
+    
+    // Save to persistent storage
+    utils_save_disconnect_log();
+}
+
+//
+// Load disconnect log from file
+//
+void() utils_load_disconnect_log =
+{
+    local float i;
+    local filestream f;
+    local string line;
+    local float count;
+    
+    f = fopen("disconnect_log.txt", FILE_READ);
+    if (f < 0)
+    {
+        // File doesn't exist yet, start with empty log and fresh time
+        disconnect_log_count = 0;
+        server_persistent_time = 0;
+        last_time_update = time;
+        return;
+    }
+    
+    // Read the count
+    line = fgets(f);
+    if (line == "")
+    {
+        fclose(f);
+        disconnect_log_count = 0;
+        server_persistent_time = 0;
+        last_time_update = time;
+        return;
+    }
+    
+    count = stof(line);
+    if (count > MAX_CLIENT_DISCONNECT_LOG)
+        count = MAX_CLIENT_DISCONNECT_LOG;
+    
+    // Read the persistent time total
+    line = fgets(f);
+    if (line == "")
+    {
+        fclose(f);
+        disconnect_log_count = 0;
+        server_persistent_time = 0;
+        last_time_update = time;
+        return;
+    }
+    server_persistent_time = stof(line);
+    
+    // Read each entry
+    disconnect_log_count = 0;
+    for (i = 0; i < count; i++)
+    {
+        // Read player name
+        line = fgets(f);
+        if (line == "")
+            break;
+            
+        disconnect_log[i].player_name = strzone(utils_strip_newline(line));
+        
+        // Read disconnect time
+        line = fgets(f);
+        if (line == "")
+            break;
+            
+        disconnect_log[i].disconnect_time = stof(line);
+        disconnect_log_count = disconnect_log_count + 1;
+    }
+    
+    fclose(f);
+    
+    // Critical: anchor delta to this map's clock
+    last_time_update = time;
+}

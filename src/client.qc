@@ -2228,6 +2228,13 @@ void() ClientDisconnect =
 //	}
 
     clanring_client_disconnect ();
+    
+    // Log the disconnect for the 'last' command
+    if (self.netname != "")
+    {
+        utils_log_disconnect(self.netname, utils_server_time());
+    }
+    
     set_suicide_frame ();
 
     // ghost eyes and hovering bodies fix
@@ -3136,6 +3143,10 @@ void(string cmd) SV_ParseClientCommand =
 
         case "dstats":
                 stats_show_defense_stats();
+                return;
+
+        case "last":
+                utils_show_last_disconnects();
                 return;
 
         case "powerupdrop":
