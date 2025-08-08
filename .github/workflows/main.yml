@@ -1,4 +1,4 @@
-name: crx
+name: crmod7
 
 on: [push]
 
@@ -23,7 +23,7 @@ jobs:
           tar -xf fteqcc_win64.zip --include=fteqcc64.exe
         if: steps.cache-dependencies.outputs.cache-hit != 'true'
 
-      - name: Compile CRx
+      - name: Compile CRMod7
         run: .\fteqcc64.exe -src src
 
       - name: Ensure release directory exists
@@ -38,6 +38,6 @@ jobs:
           move src\csprogs.dat release\
       - uses: actions/upload-artifact@v4
         with:
-          name: CRx
+          name: CRMod7
           path: |
             release\*
