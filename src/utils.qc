@@ -278,9 +278,10 @@ void (entity ent, float clientshirt, float clientpants) setcolour =
 
 void (string status) updatenameoverload =
 {
-	self.name_ready = strpad(16, substring(self.netname, 0, 15));
-	self.name_ready = strcat(self.name_ready, status);	
-
+	local string temp = strpad(16, substring(self.netname, 0, 15));
+	temp = strcat(temp, status);
+	if (self.name_ready) strunzone(self.name_ready);
+	self.name_ready = strzone(temp);
 }
 
 void (entity ent, string c_name) updatename =
@@ -312,10 +313,13 @@ void () clear_name =
 void (entity who) wait_name =
 {
 	local string text;
+	local string temp;
 
 	text = " \bwaiting\b";
-	who.name_ready = strpad(16, who.netname);
-	who.name_ready = strcat (who.name_ready, text);
+	temp = strpad(16, who.netname);
+	temp = strcat(temp, text);
+	if (who.name_ready) strunzone(who.name_ready);
+	who.name_ready = strzone(temp);
 	updatename(who,who.name_ready);
 };
 

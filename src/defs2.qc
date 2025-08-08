@@ -311,6 +311,7 @@ void(string s1, string s2, string s3, string s4) cprint4;
 .string name_ready;
 .string oldname;
 .string name_before_typing; // stores previous display name while typing is active
+.float  had_ready_before_typing; // 1 if a formatted status (name_ready) was shown when typing began
 .string trueip;
 
 .float 	plag;

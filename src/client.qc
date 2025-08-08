@@ -2247,7 +2247,10 @@ void() ClientDisconnect =
     self.health 	= 0;
     self.team 		= 0;
     self.height 	= 0;
-//	strunzone(self.name_ready);
+    // Clean up zoned strings to prevent memory leaks
+    if (self.name_ready) { strunzone(self.name_ready); self.name_ready = string_null; }
+    if (self.name_before_typing) { strunzone(self.name_before_typing); self.name_before_typing = string_null; }
+    self.had_ready_before_typing = 0;
     self.netname	= string_null;
 };
 
@@ -2951,11 +2954,17 @@ void () client_typing_on =
 {
     if (!(self.style & CLANRING_AFK_CLIENT) && !(self.style & CLANRING_TYPING_CLIENT))
     {
-        // Remember what was being displayed before switching to typing
-        if (self.name_ready)
-            self.name_before_typing = self.name_ready;
+        // Remember what was being displayed before switching to typing (make a stable copy)
+        if (self.name_before_typing) {
+            strunzone(self.name_before_typing);
+            self.name_before_typing = string_null;
+        }
+        // Track whether we were showing a formatted overlay or plain netname
+        self.had_ready_before_typing = (self.name_ready != string_null);
+        if (self.had_ready_before_typing)
+            self.name_before_typing = strzone(self.name_ready);
         else
-            self.name_before_typing = self.netname;
+            self.name_before_typing = strzone(self.netname);
 
         typing_name();
         self.style |= CLANRING_TYPING_CLIENT;
@@ -2971,12 +2980,20 @@ void () client_typing_off =
         {
             // Restore the previous displayed name/status immediately
             updatename(self, self.name_before_typing);
-            // Also keep name_ready in sync if we restored a formatted status
-            if (self.name_before_typing != self.netname)
-                self.name_ready = self.name_before_typing;
+            // Keep name_ready in sync and ensure we own the memory
+            if (self.had_ready_before_typing)
+            {
+                if (self.name_ready) strunzone(self.name_ready);
+                self.name_ready = strzone(self.name_before_typing);
+            }
             else
-                self.name_ready = string_null;
+            {
+                if (self.name_ready) strunzone(self.name_ready);
+                self.name_ready = string_null; // we were showing raw netname
+            }
+            strunzone(self.name_before_typing);
             self.name_before_typing = string_null;
+            self.had_ready_before_typing = 0;
         }
         else
         {
