@@ -17,6 +17,8 @@ string motd_top5;
 string motd_top6;
 string motd_top7;
 
+void ()motd_arena_start;
+
 //
 //  I N I T  W O R L D
 //
@@ -50,6 +52,20 @@ void() motd_think =
 
 	if (intermission_running)
 		bail = TRUE;
+
+	if (mode_is_arena())
+	{
+		// Set up arena menu strings first
+		local entity oldself = self;
+		self = self.owner;  // Switch context to player for motd_arena_start
+		motd_arena_start();
+		self = oldself;     // Switch back to motd entity
+		
+		// Set the flag and bail - don't clear the flag for arena modes
+		self.owner.style = self.owner.style | CLANRING_MOTD;
+		remove(self);
+		return;
+	}
 
 	if (bail)
 	{
