@@ -980,7 +980,7 @@ void () observer_arena_next_target =
     else
          newt = observer_find_target(self.movetarget);
 
-    if (newt == world)
+    if ((newt == world)||(newt == self))
     {
         observer_fly_start ();
         return;
@@ -996,7 +996,7 @@ void () observer_arena_next_target =
 
     self.delay = 0;
 
-    if (((self.oflags & OBSERVER_DEMO) && (self.movetarget != world)) && (self.movetarget.player_flag == PF_PLAYING))
+    if ((self.oflags & OBSERVER_DEMO) && (self.movetarget != world))
     {
         msg_entity = self;
         WriteByte(MSG_ONE, SVC_SETVIEWPORT);
