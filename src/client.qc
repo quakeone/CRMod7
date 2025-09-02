@@ -1411,6 +1411,8 @@ void() CheckWaterJump =
     }
 };
 
+void() ra_roundstart_proximity_check;
+
 /*
 ================
 PlayerPreThink
@@ -1521,6 +1523,11 @@ void() PlayerPreThink =
             }
         }
     }*/
+    if (clanring_playmode & CLANRING_RA_MODE)
+    {
+        if ((self.ca_player_flag == PF_PLAYING) && ((boss.count > 0) && (boss.count < 8)))
+            ra_roundstart_proximity_check();
+    }
 };
 
 //R00k: Silly function for practice mode when an admin get pent

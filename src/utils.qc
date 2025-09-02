@@ -2108,3 +2108,16 @@ void() utils_load_disconnect_log =
     // Critical: anchor delta to this map's clock
     last_time_update = time;
 }
+
+void (entity e, void() func) call =
+{
+   local entity oself;
+
+   oself = self;
+
+   self = e;
+
+   func();
+
+   self = oself;
+};

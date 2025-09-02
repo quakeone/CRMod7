@@ -499,6 +499,7 @@ void () ra_spawn_players =
 	}
 };
 
+
 void() ra_reset_draw_player =
 {
 	if (self.ca_player_flag == PF_DEAD)
@@ -619,6 +620,30 @@ void RA_CenterprintToAll (string msg)
         pl = nextent(pl);
     }
 }
+
+//
+//  R O U N D S T A R T  P R O X I M I T Y  C H E C K 
+//
+void() ra_roundstart_proximity_check =
+{
+    if (boss.count > 0)
+    {
+        // Only check if both players are in the arena
+        if (boss.next_team.chain_gang && boss.next_team.next_team.chain_gang)
+        {
+            float dist = vlen(boss.next_team.next_team.chain_gang.origin - boss.next_team.chain_gang.origin);
+            
+            //respawn one of them randomly
+            if (dist < 200)
+            {
+                if ((random() > 0.5))
+                    call(boss.next_team.chain_gang, respawn);
+                else
+                    call(boss.next_team.next_team.chain_gang, respawn);
+            }
+        }
+    }
+};
 
 void () rocket_arena_main_loop =
 {
