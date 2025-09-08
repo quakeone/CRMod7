@@ -73,10 +73,6 @@ void() motd_think =
 		{
 			centerprint (self.owner, "\btype \bred\b or \bblue\b in console to join");
 		}
-		else if (!(mode_is_arena()))
-		{
-			centerprint (self.owner, "\btype \bready\b in console to join");
-		}
 
 		self.owner.style = self.owner.style - (self.owner.style & CLANRING_MOTD);
 		remove(self);
@@ -115,7 +111,8 @@ void () motd_end =
 
 void ()motd_print =
 {	
-	if (self.style & CLANRING_AFK_CLIENT)
+	// Allow AFK clients to still see arena join menus; otherwise suppress
+	if ((self.style & CLANRING_AFK_CLIENT) && !(mode_is_arena()))
 		return;//R00k v1.95 save some bandwidth...
 
 	if ((!(self.style & CLANRING_CONNECTED)) || (clanring_state & CLANRING_MATCH_PAUSED))//this deters overflow buffer errors
@@ -229,7 +226,8 @@ void () motd_playercount =
 
 void ()motd_arena_start =
 {
-	if (self.style & CLANRING_AFK_CLIENT)
+	// Allow AFK clients to still receive arena join menu setup
+	if ((self.style & CLANRING_AFK_CLIENT) && !(mode_is_arena()))
 		return;//R00k v1.95 save some bandwidth...
 		
 	if (self.style & CLANRING_MOTD || (!(self.style & CLANRING_CONNECTED)) || clanring_state & CLANRING_MATCH_PAUSED)
@@ -238,24 +236,14 @@ void ()motd_arena_start =
 	motd_top1 = "\x80\x81\x81\x81\x81\x81 ClanRing Mod \x81\x81\x81\x81\x81\x82\n";
 	motd_top7 = "\n\n\n\n";
 
-	if (clanring_playmode & CLANRING_CA_MODE)
+	// Prefer specific arena sub-modes over generic CA so the correct join menu shows
+	if (clanring_playmode & CLANRING_DMM4_MODE)
 	{
-		if (clanring_playmode & CLANRING_WIPEOUT_MODE)
-			motd_top2 = "\n\x85Clan Arena (Wipeout)\x85\n\n";
-		else
-			motd_top2 = "\n\x85Clan Arena\x85\n\n";
-		motd_top3 = "\nchoose a team\n\n";
-		motd_top4 = "\x13 blue   \n\x14 red    \n\x15 yellow \n\x16 green  \n\npress \x17 to uncommit from team\n";
-		motd_playercount();
-	}
-	else if (clanring_playmode & CLANRING_RA_MODE)
-	{
-		motd_top2 = "\n\x85Rocket Arena\x85\n\n";
-		motd_top3 = "\n1 to join\n\n";
-		motd_top4 = "\n2 to leave\n\n";
-	}
-	else if (clanring_playmode & CLANRING_DMM4_MODE)
-	{
+		// Clear any dynamic lines from other modes
+		strunzone(motd_top5);
+		strunzone(motd_top6);
+		motd_top5 = string_null;
+		motd_top6 = string_null;
 		motd_top2 = "\n\x851v1 Duel\x85\n\n";
 		motd_top3 = "\n1 to join\n\n";
 		motd_top4 = "\n2 to leave\n\n";
@@ -265,12 +253,39 @@ void ()motd_arena_start =
 		motd_top2 = "\n\x85Airshot Mode\x85\n\n";
 		motd_top3 = "You can only be damaged while in the air.\nThe higher off the ground, the more\ndamage you will take.\n";
 		motd_top4 = "\n1 to join\n\n\n2 to leave\n\n";
-
+		// Safely zone dynamic lines to avoid corruption from later temp-string use
+		strunzone(motd_top5);
+		strunzone(motd_top6);
 		if (playerrecord[0].statvalue > 0)
-		motd_top5 =	sprintf("\nAir Gib Streak: %s %s", ftos(rint(playerrecord[0].statvalue)), playerrecord[0].player);
+			motd_top5 = strzone(sprintf("\nAir Gib Streak: %s %s", ftos(rint(playerrecord[0].statvalue)), playerrecord[0].player));
+		else
+			motd_top5 = string_null;
 		
 		if (playerrecord2[0].statvalue > 0)
-		motd_top6 = sprintf("\nHighest Gib: %s %s", ftos(rint(playerrecord2[0].statvalue)), playerrecord2[0].player);
+			motd_top6 = strzone(sprintf("\nHighest Gib: %s %s", ftos(rint(playerrecord2[0].statvalue)), playerrecord2[0].player));
+		else
+			motd_top6 = string_null;
+	}
+	else if (clanring_playmode & CLANRING_RA_MODE)
+	{
+		// Clear any dynamic lines from other modes
+		strunzone(motd_top5);
+		strunzone(motd_top6);
+		motd_top5 = string_null;
+		motd_top6 = string_null;
+		motd_top2 = "\n\x85Rocket Arena\x85\n\n";
+		motd_top3 = "\n1 to join\n\n";
+		motd_top4 = "\n2 to leave\n\n";
+	}
+	else if (clanring_playmode & CLANRING_CA_MODE)
+	{
+		if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+			motd_top2 = "\n\x85Clan Arena (Wipeout)\x85\n\n";
+		else
+			motd_top2 = "\n\x85Clan Arena\x85\n\n";
+		motd_top3 = "\nchoose a team\n\n";
+		motd_top4 = "\x13 blue   \n\x14 red    \n\x15 yellow \n\x16 green  \n\npress \x17 to uncommit from team\n";
+		motd_playercount();
 	}
 	else
 		return;

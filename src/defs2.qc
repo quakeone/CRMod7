@@ -48,6 +48,10 @@ float OBSERVER_CAMERA           = 16;		    // set to camera mode
 float OBSERVER_AUTO             = 32;	        // view autoswitching
 float OBSERVER_TOURNEY          = 64;	        // set tournement mode for chasecam
 float OBSERVER_GO_AUTO          = 128;          // player entering an auto mode
+
+// QuakeTag feature toggles (persisted via cvars)
+float clanring_allow_qwsucks;  // 0 = disabled, 1 = enabled (regular Tag)
+float clanring_allow_q14ever;  // 0 = disabled, 1 = enabled (special 14-mode)
 float OBSERVER_COMMENTARY       = 256;          // see running commentary
 float OBSERVER_POP_FORWARD    	= 512;
 float OBSERVER_QUAKETV 			= 2048;		    // Sputnik: added this for streaming via quaketv
@@ -94,22 +98,22 @@ float CLANRING_RA_MODE				= 8388608;
 	clanring_playmode - stored in cvar 'samelevel' and preserved across levels
 	eg. (clanring_playmode & CLANRING_PRACTICE_MODE)
 
-float CLANRING_FREEFORALL_MODE    = 1;        // teamplay 0 dm; normal mode
-float CLANRING_PICKUP_DM_MODE     = 2;        // teamplay 1 dm; no friendly fire; normal mode
-float CLANRING_MATCH_TDM_MODE     = 4;        // teamplay 2 dm; friendlyfire; match mode
-float CLANRING_PRACTICE_DM_MODE   = 8;        // teamplay 0 dm; self damage; practice full inventory
-float CLANRING_PICKUP_CTF_MODE    = 16;       // teamplay 1 ctf; no friendly fire; normal mode
-float CLANRING_MATCH_CTF_MODE     = 32;       // teamplay 1 ctf; match timer
-float CLANRING_PRACTICE_CTF_MODE  = 64;       // teamplay 0 ctf; hook enabled; practice full inventory
-float CLANRING_CLAN_ARENA_MODE    = 128;      // Clan Arena
-float CLANRING_FREEZETAG_MODE     = 256;      // sub mode of ClanArena, you respawn by teammate intervention.
-float CLANRING_WIPEOUT_MODE       = 512;      // sub mode of ClanArena, you respawn at set time intervals.
-float CLANRING_ELIMINATION_MODE   = 1024;     // Sub mode of ClanArena, you respawn when your killer dies.
-float CLANRING_AIRSHOT_MODE       = 2048;     //
-float CLANRING_DMM4_MODE          = 4096;     //
-float CLANRING_ROCKET_ARENA_MODE  = 8192;     //
-float CLANRING_SPEEDBALL_MODE     = 16384;    //
-float CLANRING_INSTAGIB_MODE      = 32768;    //
+float CLANRING_FREEFORALL_MODE Â  Â = 1; Â  Â  Â  Â // teamplay 0 dm; normal mode
+float CLANRING_PICKUP_DM_MODE Â  Â  = 2; Â  Â  Â  Â // teamplay 1 dm; no friendly fire; normal mode
+float CLANRING_MATCH_TDM_MODE     = 4; Â  Â  Â  Â // teamplay 2 dm; friendlyfire; match mode
+float CLANRING_PRACTICE_DM_MODE Â  = 8; Â  Â  Â  Â // teamplay 0 dm; self damage; practice full inventory
+float CLANRING_PICKUP_CTF_MODE  Â  = 16; Â  Â  Â  // teamplay 1 ctf; no friendly fire; normal mode
+float CLANRING_MATCH_CTF_MODE Â   Â = 32; Â  Â  Â  // teamplay 1 ctf; match timer
+float CLANRING_PRACTICE_CTF_MODE Â = 64; Â  Â  Â  // teamplay 0 ctf; hook enabled; practice full inventory
+float CLANRING_CLAN_ARENA_MODE Â  Â = 128; Â  Â  Â // Clan Arena
+float CLANRING_FREEZETAG_MODE Â  Â Â = 256; Â  Â  Â // sub mode of ClanArena, you respawn by teammate intervention.
+float CLANRING_WIPEOUT_MODE Â  Â  Â  = 512; Â  Â  Â // sub mode of ClanArena, you respawn at set time intervals.
+float CLANRING_ELIMINATION_MODE Â  = 1024; Â  Â  // Sub mode of ClanArena, you respawn when your killer dies.
+float CLANRING_AIRSHOT_MODE Â  Â  Â  = 2048; Â  Â  //
+float CLANRING_DMM4_MODE Â  Â  Â  Â  Â = 4096; Â  Â  //
+float CLANRING_ROCKET_ARENA_MODE Â = 8192; Â  Â  //
+float CLANRING_SPEEDBALL_MODE Â  Â  = 16384; Â  Â //
+float CLANRING_INSTAGIB_MODE Â     = 32768; Â  Â //
 float CLANRING_SERVER_INITIALIZED = 0;
 */
 /*
@@ -162,6 +166,12 @@ float CLANRING_DELAYED_AUTOSS    	= 2097152;
 float CLANRING_TAKING_AUTOSS    	= 4194304;
 float CLANRING_NULL_FLAG		    = 8388608;//R00k: added, used to make the flags untouchable during match start countdown, ie "Match begins in T minus"...
 
+// --- Auto-ghost Quad (1v1 in DM normal) state ---
+float g1v1_in_effect;       // 1 while the special 1v1 window is active
+float g1v1_quad_ghosted;    // 1 if quad is ghosted (blocked) during 1v1
+float g1v1_saved_no_quad;   // remembers (clanring_playmode & CLANRING_NO_QUAD) when entering 1v1
+float g1v1_next_check_time; // next time to recheck counts in StartFrame
+
 // admin constants
 float ADMIN_NORMAL_MODE    	= 0;
 float ADMIN_PRACTICE_MODE   = 1;
@@ -191,6 +201,8 @@ entity  clanring_request;           // used to control voting
 float   clanring_level;             // number of current level in user level order
 float   clanring_levelcount;        // used to scan through list in levels.cfg
 float   clanring_lastcount;         // used to detect end-of-file in levels.cfg
+float   clanring_force_ring;        // 1 = force ring on, -1 = force ring off, 0 = no force (auto)
+float   clanring_force_timelimit;   // 1 = force timelimit from cfg, 0 = auto
 
 float   dm_num_spawns;              // number of deathmatch spawn points (as opposed to ctf spawn points)
 float   clanring_num_starts;        // number of match extra start points
@@ -208,6 +220,10 @@ float   clanring_maxteams;			// maximum number of teams
 float   clanring_numteams;			// number of teams
 float   clanring_maxsize;           // maximum allowed team size
 entity  clanring_match_timer;       // used to time match
+// --- Quad control observer announcements ---
+float QUAD_RESPAWN_TIME = 60;     // seconds between quad respawns (standard QW)
+float g_quad_spawner_count;       // number of Quad spawners on the map (cached)
+       // used to time match
 entity  clanring_sentinel;			// head of linked lists
 string  clanring_szthe;			    // hack - = "The " for teamplay, "" for individual
 string  clanring_szteam;			// hack - = "team" for teamplay, "player" for individual
@@ -245,6 +261,8 @@ float intermission_exittime;        // moved here from Client.qc
 .float teamtotal;
 .float quadtime;
 .float totalquad;
+.float quad_majority_announced;    // per-player: have we announced >50% quad control this match?
+.float matchTime;   // current match time tracker
 
 .float tp_time;     // last time the player teleported
 .float tfrag_time;  // spawn time for a tele-death trigger
@@ -285,6 +303,14 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .entity next_camera;		        // used to point to next camera
 .vector clanring_old_velocity;      // used for pausing/unpausing
 .float  clanring_hack_count;	    // used to count admin hacking attempts
+.float  quadDisabledMsgShown;     // 0=not shown yet this map, 1=shown (for 1v1 quad disabled message)
+
+// Saved position support (prewar practice)
+.vector saved_pos_origin;
+.vector saved_pos_angles;
+.vector saved_pos_velocity;
+.float  saved_pos_valid;
+.float  saved_pos_last_move_time;
 
 float 	CLANRING_ANGLE_SMOOTHING    = 0.6; // CRMOD use this instead of typing the number a billion times (actually 6 times in observer.qc ;) )
 
@@ -447,6 +473,7 @@ float 	debug = 0;
 //string	clanring_version_red;
 .entity hookentity;
 .string client;
+.float  client_ver_code; // encoded as (major*10000 + minor*100 + patch)
 
 //---custom 'server modules' off-hand hook added for pub mode. (FIXME: remove this shit)
 .float 	hook_out;
@@ -463,6 +490,8 @@ float 	hookspeedpull;
 
 .float 	alpha;//server must support this.
 .float	ping_time;//client pings
+.float	packet_loss;//client packet loss percentage
+.float	has_userinfo; // tracks if client has provided userinfo
 
 .float 	hack_timeout;
 
@@ -554,6 +583,10 @@ typedef struct
 	//string date;
 	float teamcolor;
 	float statvalue;
+	// --- CRX v2 optional metadata (empty / -1 for legacy rows) ---
+	string rec_date;        // wall-clock timestamp when record was set (ISO-like)
+	float  rec_mt_remain;   // match seconds remaining when set (or -1 if N/A)
+	string rec_mt_str;      // pretty "M:SS" (or "H:MM:SS") remaining (or "")
 }playerrecord_t;
 
 float PLAYER_RECORDS_MAX_COUNT = 3;
@@ -563,6 +596,10 @@ float new_player_record;
 float new_player_record_match;
 float RECORD_LOW = 0;
 float RECORD_HIGH = 1;
+
+// Time-trial top record scratch (used by ctf_trial_get_top_record)
+float tt_top_time;      // seconds
+string tt_top_player;   // netname
 
 //Arena
 entity boss;
@@ -611,6 +648,7 @@ float last_return_time;
 .entity next_queue;
 .float next_color;
 
+.float last_lastscores_time;  // Per-client anti-spam for "lastscores" (3s throttle)
 .float team2;
 .float wins;
 .float losses;
@@ -627,6 +665,23 @@ typedef struct
 
 disconnect_entry_t disconnect_log[MAX_CLIENT_DISCONNECT_LOG];
 float disconnect_log_count;
+
+// lastscores (disk-only); declare cross-unit functions
+void() match_log_score;                        // from match.qc
+void(string entry) json_append_lastscores;     // from json.qc
+void() utils_show_last_scores;                 // from utils.qc
+string(string s) utils_rstrip;                 // from utils.qc (trim trailing spaces)
+
+// Persistent clock helpers (defined in utils.qc / used across units)
+float() utils_server_time;
+void()  utils_update_server_time;
+
+// JSON helpers used by utils_show_last_scores (from json.qc)
+string(string)              json_minify;
+string(string, float)       json_array_next_object;
+float                       json__it_next;  // iterator's next position
+string(string, string, string) json_obj_get_string;
+float(string, string, float)   json_obj_get_float;
 // Persistent time tracking system (similar to hunk storage)
 float server_persistent_time;     // Stores the accumulated server time
 float last_time_update;           // Tracks when persistent time was last updated
@@ -668,6 +723,7 @@ float CA_MATCH_CLEANUP = 5;
 .float ca_deathcamtime;
 .float arena_packs;
 .float color2; //since we already have .vector color
+.float pauseblink; // next time to blink PAUSED centerprint without corrupting boss.lip
 
 // worldtype values
 float	WORLDTYPE_MEDIEVAL		= 0;
@@ -717,6 +773,7 @@ void() misc_shadowcontroller;
 void() misc_shadowcontroller_use;
 void() shadow_fade_in;
 void() shadow_fade_out;
+void() match_clear_leavemealone;
 
 // from Custents
 // variable for healing trigger
@@ -779,7 +836,37 @@ float isFTEserver; //Is the server running on FTE or QSS/M?
 string clanring_new_record_player;
 float ra_initial_rules_shown; // RA: track if round-1 rules were already shown
 
+// --- CRX v2: metadata scratch + read-ahead cache for stats reader ---
+string _crx_peek_line;
+string crx_meta_date;
+float  crx_meta_mt_remain;
+string crx_meta_mt_str;
+
+// --- leave-me-alone (prewar) ---
+.float leavemealone;       // 0/1 flag
+.float next_lma_toggle;    // cooldown timestamp
+
+// Utility: fast proximity check to avoid re-solidifying inside others
+float(entity center, float rad) AnySolidPlayerInRadius =
+{
+    local entity e;
+    e = findradius(center.origin, rad);
+    while (e)
+    {
+        if (e != center && e.classname == "player" && e.solid == SOLID_SLIDEBOX)
+            return TRUE;
+        e = e.chain;
+    }
+    return FALSE;
+};
+
 .entity enemy_target;
 #define INSTALLED_NEXTMAPS_LIMIT 200
 string levels[INSTALLED_NEXTMAPS_LIMIT];//levels.cfg
 //eof
+
+entity red_flag_ghost;
+entity blue_flag_ghost;
+void(entity baseflag) CTF_SpawnGhostFlag;
+void(entity ghost) CTF_RemoveGhostFlag;
+void() CTF_GhostFlagTouch;

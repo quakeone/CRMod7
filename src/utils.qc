@@ -9,6 +9,13 @@ float () match_prewar;
 float () mode_is_arena;
 void() utils_update_server_time;
 void() utils_save_disconnect_log;
+// from strings.qc
+string(float v) strings_ftos_gold;
+// --- prototypes needed by name overlay watcher ---
+float (string a, string b) utils_str_eq;
+void  (entity ent, string c_name) updatename;
+void  (void () dofunc) utils_do_players;
+void  () utils_refresh_overlay_if_renamed;   // <-- updated
 //(FIXME: replace with just centerprint or bprint)
 // Overloaded centerprints
 void (entity client, string s, ...) centerprint2 = #73; 
@@ -284,6 +291,46 @@ void (string status) updatenameoverload =
 	self.name_ready = strzone(temp);
 }
 
+// --- Name overlay maintenance -----------------------------------------
+// If a player renamed after we applied an overlay (AFK/Ready/Dead/etc),
+// rebuild name_ready so the base name matches the new netname, but
+// keep the existing status suffix intact. Uses 'self' (for utils_do_players).
+void() utils_refresh_overlay_if_renamed =
+{
+    local string oldprefix, newprefix, suffix;
+    local float L;
+
+    if (self == world) return;
+    if (!self.name_ready) return;                // no overlay active
+
+    // oldprefix = the first 16 chars we originally padded from the old name
+    L = strlen(self.name_ready);
+    if (L < 16) return;                          // malformed / nothing to do
+    oldprefix = substring(self.name_ready, 0, 16);
+
+    // recompute what the prefix *should* be for the current netname
+    newprefix = strpad(16, substring(self.netname, 0, 15));
+
+    // if they match, nothing changed
+    if (utils_str_eq(oldprefix, newprefix)) return;
+
+    // carry over whatever suffix we previously appended (status text)
+    suffix = substring(self.name_ready, 16, L - 16);
+
+    // rebuild overlay and push it
+    strunzone(self.name_ready);
+    self.name_ready = strzone(strcat(newprefix, suffix));
+    updatename(self, self.name_ready);
+};
+
+// Thinker that keeps overlays in sync with renames.
+void() utils_namewatch_think =
+{
+    utils_do_players(utils_refresh_overlay_if_renamed);
+    self.nextthink = time + 1;        // tick once per second
+    self.think = utils_namewatch_think;
+};
+
 void (entity ent, string c_name) updatename =
 {
 	local float client;
@@ -306,8 +353,9 @@ void (entity ent, string c_name) updatename =
 
 void () clear_name =
 {			
-	if (self.style & CLANRING_CONNECTED)
-		updatename(self,self.netname);		
+    if (self.name_ready) { strunzone(self.name_ready); self.name_ready = string_null; }
+    if (self.style & CLANRING_CONNECTED)
+        updatename(self,self.netname);		
 };
 
 void (entity who) wait_name =
@@ -475,9 +523,9 @@ void (float f) utils_cprint_int2 =
 
 	n = rint (f);
 	if (n < 10)
-		localcmd("0");
+		cprint("0");
 	s = ftos(n);
-	localcmd(s);
+	cprint(s);
 };
 void (float t) utils_cprint_time =
 {
@@ -491,11 +539,11 @@ void (float t) utils_cprint_time =
 	//--------------------
 	utils_cprint_int2 (minutes);
 	//--------------------
-	localcmd(":");
+	cprint(":");
 	//--------------------
 	utils_cprint_int2 (seconds);
 	//--------------------
-	localcmd(":");
+	cprint(":");
 	//--------------------
 	utils_cprint_int2 (csec);
 	//--------------------
@@ -645,9 +693,115 @@ string (float t) utils_get_time =
 	else
 		tcsec = temp;
 
-	return sprintf("%s:%s.%s",tmin,tsec,tcsec);
+		return sprintf("%s:%s.%s",tmin,tsec,tcsec);
 };
 
+// Print time with minimal leading zeros for diffs (e.g., "2.50" or "1:23.45")
+// Uses strings_ftos_gold() for consistent gold coloring.
+void(float t) utils_bprint_time_splitcolor =
+{
+    local float total, mins, secs, cs;
+    local float tens, ones;
+
+    if (t < 0) t = 0;
+
+    // round to centiseconds
+    total = floor(t * 100 + 0.5);
+    mins  = floor(total / 6000);
+    secs  = floor((total - mins * 6000) / 100);
+    cs    = total - mins * 6000 - secs * 100;
+
+    // Only show minutes if non-zero
+    if (mins > 0)
+    {
+        // minutes (no leading zero for tens) - all gold
+        tens = floor(mins / 10);
+        ones = mins - tens * 10;
+
+        if (tens > 0) bprint(strings_ftos_gold(tens));
+        bprint(strings_ftos_gold(ones));
+
+        // punctuation stays white
+        bprint(":");
+    }
+
+    // seconds (with leading zero only if minutes are showing) - all gold
+    tens = floor(secs / 10);
+    ones = secs - tens * 10;
+
+    if (mins > 0 || tens > 0)
+    {
+        bprint(strings_ftos_gold(tens));
+    }
+    bprint(strings_ftos_gold(ones));
+
+    // punctuation stays white
+    bprint(".");
+
+    // centiseconds (no leading zero) - all gold
+    tens = floor(cs / 10);
+    ones = cs - tens * 10;
+
+    if (tens > 0)
+    {
+        bprint(strings_ftos_gold(tens));
+    }
+    bprint(strings_ftos_gold(ones));
+};
+
+// Print MM:SS.CS with all digits in white (for capture times and records).
+// No color codes, plain white text.
+void(float t) utils_bprint_time_plain =
+{
+    local float total, mins, secs, cs;
+    local float tens, ones;
+
+    if (t < 0) t = 0;
+
+    // round to centiseconds
+    total = floor(t * 100 + 0.5);
+    mins  = floor(total / 6000);
+    secs  = floor((total - mins * 6000) / 100);
+    cs    = total - mins * 6000 - secs * 100;
+
+    // minutes (two digits) - all white
+    tens = floor(mins / 10);
+    ones = mins - tens * 10;
+    bprint(ftos(tens));
+    bprint(ftos(ones));
+
+    // punctuation stays white
+    bprint(":");
+
+    // seconds (two digits) - all white
+    tens = floor(secs / 10);
+    ones = secs - tens * 10;
+    bprint(ftos(tens));
+    bprint(ftos(ones));
+
+    // punctuation stays white
+    bprint(".");
+
+    // centiseconds (two digits) - all white
+    tens = floor(cs / 10);
+    ones = cs - tens * 10;
+    bprint(ftos(tens));
+    bprint(ftos(ones));
+};
+
+// Prints a signed delta with red sign and gold numbers (e.g., " +00:02.11" or " -00:00.45")
+void (float dt) utils_bprint_signed_time_diff =
+{
+    if (dt >= 0)
+        bprint(redify("+"));  // Red plus sign
+    else {
+        bprint(redify("-"));  // Red minus sign
+        dt = 0 - dt;
+    }
+    utils_bprint_time_splitcolor(dt);  // Gold numbers
+};
+
+// ----------------------------------------------------------------------
 //
 //  B P R I N T  F L O A T
 //
@@ -900,7 +1054,7 @@ void (float f) utils_cprint_damage =
    	if (d) s = ftos(d);
         else if (f >= 10000)  s="0";
 	n = n - (d * 10000);
-  	localcmd(s);
+  	cprint(s);
 
 //-- f>1000
 	d = floor(n / 1000);
@@ -909,7 +1063,7 @@ void (float f) utils_cprint_damage =
    	if (d) s = ftos(d);
            else if (f >= 1000) s="0";
      	n = n - (d * 1000);
-  	localcmd(s);
+  	cprint(s);
   	
 //-- f>100
    	d = floor(n / 100);
@@ -918,7 +1072,7 @@ void (float f) utils_cprint_damage =
    	if (d) s = ftos(d);
            else if (f >= 100)  s="0";
    	n = n - (d * 100);
-  	localcmd(s);
+  	cprint(s);
   	
 //-- f>10
    	d = floor(n / 10);
@@ -926,11 +1080,11 @@ void (float f) utils_cprint_damage =
    	if (temp || d) s = ftos(d);
    	else if (f >= 10) s="0";
            n = n - (d * 10);     
-  	localcmd(s);
+  	cprint(s);
    	
 // < 10   	
    	s = ftos(d);
-  	localcmd(s);
+  	cprint(s);
 };
 
 //
@@ -947,19 +1101,19 @@ void (float f) utils_cprint_int3 =
     if (n < 0)
     {
         if (n < -99)
-            localcmd("-99");
+            cprint("-99");
         else if (n > -10)
-            localcmd(" ");
+            cprint(" ");
     }
     else
     {
         if (n < 100)
-            localcmd(" ");
+            cprint(" ");
         if (n < 10)
-            localcmd(" ");
+            cprint(" ");
     }
     s = ftos(n);
-    localcmd(s);
+    cprint(s);
 };
 
 //
@@ -1236,6 +1390,15 @@ void () reset_frags =
 		self.frags = -99;
 	else
 		self.frags = 0;
+};
+
+void () reset_color_white =
+{
+	if (self.style & CLANRING_CONNECTED)
+	{
+		setcolour(self, 0, 0);
+		stuffcmd(self, ";color 0;\n");
+	}
 };
 
 void (void () dofunc) utils_do_arena_players =
@@ -1741,6 +1904,10 @@ void ()pqc_match_reset =
 {	
 	local entity oldself;
 
+	// Keep HUD teamscores visible after match end; defer clearing until players ready up
+	if (clanring_state & CLANRING_MATCH_OVER)
+		return;
+
     oldself = self;
     self = find(world, classname, "player");
     while (self)
@@ -1846,6 +2013,39 @@ float () prematch_rules =
 }
 
 //
+// Get match seconds remaining with fallback logic for robustness
+//
+float () crx_get_match_secs_remaining =
+{
+    local float secs;
+    local float tl;
+
+    secs = -1;
+
+    if ((clanring_playmode & CLANRING_MATCH_MODE) && (clanring_state & CLANRING_MATCH_STARTED))
+    {
+        // 1) Primary: use clanring_sentinel.matchTime (authoritative match time tracker)
+        tl = cvar("timelimit"); // minutes
+        if (tl > 0 && clanring_sentinel.matchTime > 0)
+        {
+            // matchTime tracks current time during match
+            // Calculate remaining from timelimit
+            local float total_secs = tl * 60;
+            local float elapsed = clanring_sentinel.matchTime;
+            secs = total_secs - elapsed;
+            if (secs < 0) secs = 0; // clamp to zero
+        }
+        
+        // 2) Fallback: use boss countdown if matchTime is not available
+        if (secs <= 0 && boss != world && boss.lip >= 0)
+            secs = (boss.lip * 60) + boss.count;
+    }
+
+    if (secs < 0) return -1;
+    return secs;
+};
+
+//
 // Format time duration for display (e.g., "1:23:45" or "0:05:32")
 //
 string(float seconds) utils_format_time =
@@ -1897,6 +2097,43 @@ string(string s) utils_strip_newline =
     return s;
 }
 
+// Content-based string equality (case-sensitive).
+// Use !strcasecmp(a,b) if you prefer case-insensitive and your compiler supports it.
+float(string a, string b) utils_str_eq =
+{
+    return !strcmp(a, b);
+};
+
+// Return TRUE if 'player_name' contains "player" anywhere (case-insensitive-ish).
+// Note: If your QC supports strtolower(), replace the three checks with:
+//   if (strstrofs(strtolower(player_name), "player", 0) >= 0) return TRUE;
+float(string player_name) utils_name_has_player =
+{
+    if (player_name == "")
+        return FALSE;
+
+    // Best-effort case-insensitive substring checks for common casings
+    if (strstrofs(player_name, "player", 0) >= 0) return TRUE;
+    if (strstrofs(player_name, "Player", 0) >= 0) return TRUE;
+    if (strstrofs(player_name, "PLAYER", 0) >= 0) return TRUE;
+    return FALSE;
+};
+
+// Returns TRUE if 'player_name' matches any entry in the recent disconnect log
+float(string player_name) utils_is_in_last_disconnects =
+{
+    local float i;
+    if (player_name == "")
+        return FALSE;
+
+    for (i = 0; i < disconnect_log_count && i < MAX_CLIENT_DISCONNECT_LOG; i = i + 1)
+    {
+        if (disconnect_log[i].player_name != "" && utils_str_eq(disconnect_log[i].player_name, player_name))
+            return TRUE;
+    }
+    return FALSE;
+};
+
 //
 // Get persistent server time that continues across map changes
 //
@@ -1911,6 +2148,36 @@ void() utils_update_server_time =
     server_persistent_time = utils_server_time();
     last_time_update = time;
 }
+
+// Remove older duplicates in-place (keep the most recent instance for each name).
+void() utils_dedupe_disconnect_log =
+{
+    local float i, j, k;
+    for (i = 0; i < disconnect_log_count; i = i + 1)
+    {
+        for (j = i + 1; j < disconnect_log_count; )
+        {
+            if (disconnect_log[j].player_name != "" &&
+                utils_str_eq(disconnect_log[j].player_name, disconnect_log[i].player_name))
+            {
+                // Drop entry j (older duplicate) and free its zoned string
+                if (disconnect_log[j].player_name != "")
+                    strunzone(disconnect_log[j].player_name);
+                for (k = j; k < disconnect_log_count - 1; k = k + 1)
+                {
+                    disconnect_log[k].player_name     = disconnect_log[k + 1].player_name;
+                    disconnect_log[k].disconnect_time = disconnect_log[k + 1].disconnect_time;
+                }
+                disconnect_log_count = disconnect_log_count - 1;
+                // don't increment j; we just shifted a new thing into j
+            }
+            else
+            {
+                j = j + 1;
+            }
+        }
+    }
+};
 
 //
 // Display the list of recently disconnected players
@@ -2006,33 +2273,59 @@ void() utils_save_disconnect_log =
 }
 
 //
-// Log a player disconnect for the 'last' command
+// Log a player disconnect for the 'last' command (de-duped, MRU-at-0).
 //
 void(string player_name, float disconnect_time) utils_log_disconnect =
 {
     local float i;
-    
-    // Always add new entry (accept duplicates for same named players)
-    // This avoids string comparison issues with pointer identity vs content
+
+    // 1) If name already exists, move it to front and update time (no new alloc).
+    for (i = 0; i < disconnect_log_count; i = i + 1)
     {
-        // Shift entries down to make room at the beginning
-        if (disconnect_log_count < MAX_CLIENT_DISCONNECT_LOG)
+        if (disconnect_log[i].player_name != "" &&
+            utils_str_eq(disconnect_log[i].player_name, player_name))
         {
-            disconnect_log_count = disconnect_log_count + 1;
+            local string keep_name = disconnect_log[i].player_name; // already strzone'd
+            local float  keep_time = disconnect_time;               // override with latest
+
+            // Shift [i-1..0] down by one
+            for ( ; i > 0; i = i - 1)
+            {
+                disconnect_log[i].player_name     = disconnect_log[i - 1].player_name;
+                disconnect_log[i].disconnect_time = disconnect_log[i - 1].disconnect_time;
+            }
+            // Place updated record at 0
+            disconnect_log[0].player_name     = keep_name;
+            disconnect_log[0].disconnect_time = keep_time;
+
+            utils_save_disconnect_log();
+            return;
         }
-        
-        for (i = disconnect_log_count - 1; i > 0; i--)
-        {
-            disconnect_log[i].player_name = disconnect_log[i-1].player_name;
-            disconnect_log[i].disconnect_time = disconnect_log[i-1].disconnect_time;
-        }
-        
-        // Add new entry at the beginning
-        disconnect_log[0].player_name = strzone(player_name);
-        disconnect_log[0].disconnect_time = disconnect_time;
     }
-    
-    // Save to persistent storage
+
+    // 2) Not found: insert a new record at the front.
+    if (disconnect_log_count == MAX_CLIENT_DISCONNECT_LOG)
+    {
+        // Evict last; free its zoned string to avoid leaks.
+        if (disconnect_log[disconnect_log_count - 1].player_name != "")
+            strunzone(disconnect_log[disconnect_log_count - 1].player_name);
+    }
+    else
+    {
+        disconnect_log_count = disconnect_log_count + 1;
+    }
+
+    // Make room at [0] by shifting down
+    for (i = disconnect_log_count - 1; i > 0; i = i - 1)
+    {
+        disconnect_log[i].player_name     = disconnect_log[i - 1].player_name;
+        disconnect_log[i].disconnect_time = disconnect_log[i - 1].disconnect_time;
+    }
+
+    // Insert new at front (take a fresh zoned copy)
+    disconnect_log[0].player_name     = strzone(player_name);
+    disconnect_log[0].disconnect_time = disconnect_time;
+
     utils_save_disconnect_log();
 }
 
@@ -2107,4 +2400,413 @@ void() utils_load_disconnect_log =
     
     // Critical: anchor delta to this map's clock
     last_time_update = time;
+
+    // Clean any legacy duplicates loaded from disk
+    utils_dedupe_disconnect_log();
 }
+
+// ------------------------------------------------------------
+// Discord webhook helper
+// ------------------------------------------------------------
+
+// Private, non-serverinfo storage for webhook URL configured via clanring.cfg
+string clanring_captimesdiscordurl;
+float webhook_seq;
+
+string(string s) discord_escape =
+{
+    // Discord/JSON-safe escaping for content strings
+
+    // 1) Strip control bytes that can break JSON/UTF-8 or cause weirdness
+    //    - ESC (0x1B), DEL (0x7F), and C1 controls (0x80–0x9F)
+    s = strreplace("\x1B", "", s); // ESC
+    s = strreplace("\x7F", "", s); // DEL
+    s = strreplace("\x80", "", s);
+    s = strreplace("\x81", "", s);
+    s = strreplace("\x82", "", s);
+    s = strreplace("\x83", "", s);
+    s = strreplace("\x84", "", s);
+    s = strreplace("\x85", "", s);
+    s = strreplace("\x86", "", s);
+    s = strreplace("\x87", "", s);
+    s = strreplace("\x88", "", s);
+    s = strreplace("\x89", "", s);
+    s = strreplace("\x8A", "", s);
+    s = strreplace("\x8B", "", s);
+    s = strreplace("\x8C", "", s);
+    s = strreplace("\x8D", "", s);
+    s = strreplace("\x8E", "", s);
+    s = strreplace("\x8F", "", s);
+    s = strreplace("\x90", "", s);
+    s = strreplace("\x91", "", s);
+    s = strreplace("\x92", "", s);
+    s = strreplace("\x93", "", s);
+    s = strreplace("\x94", "", s);
+    s = strreplace("\x95", "", s);
+    s = strreplace("\x96", "", s);
+    s = strreplace("\x97", "", s);
+    s = strreplace("\x98", "", s);
+    s = strreplace("\x99", "", s);
+    s = strreplace("\x9A", "", s);
+    s = strreplace("\x9B", "", s);
+    s = strreplace("\x9C", "", s);
+    s = strreplace("\x9D", "", s);
+    s = strreplace("\x9E", "", s);
+    s = strreplace("\x9F", "", s);
+
+    // 2) Normalize newlines
+    s = strreplace("\r", "\n", s);
+
+    // 3) JSON-escape special characters
+    s = strreplace("\\", "\\\\", s);
+    s = strreplace("\"", "\\\"", s);
+    s = strreplace("\n", "\\n", s);
+    s = strreplace("\t", "\\t", s);
+
+    return s;
+};
+
+void(string content) webhook_post =
+{
+    local string url, body, payload;
+    local float ok, id;
+
+    // Prefer private configured value from clanring.cfg; fallback to legacy cvar
+    url = clanring_captimesdiscordurl;
+    if (url == "")
+        url = cvar_string("webhook_url");
+
+    // Sanitize accidental leading '@' and trim simple whitespace
+    if (substring(url, 0, 1) == "@")
+        url = substring(url, 1, strlen(url) - 1);
+    while (strlen(url) > 0 && substring(url, 0, 1) == " ")
+        url = substring(url, 1, strlen(url) - 1);
+    while (strlen(url) > 0 && substring(url, strlen(url) - 1, 1) == " ")
+        url = substring(url, 0, strlen(url) - 1);
+
+    // Abort cleanly if no URL configured
+    if (url == "")
+    {
+        if (cvar("webhook_debug") > 0)
+            dprint("webhook: no URL set (set 'captimesdiscordurl' in configs/clanring.cfg or cvar \"webhook_url\"). Skipping send.\n");
+        return;
+    }
+
+    // Basic schema sanity check
+    if (!(substring(url, 0, 8) == "https://" || substring(url, 0, 7) == "http://"))
+    {
+        dprint("webhook: invalid URL scheme; must start with http:// or https://\n");
+        return;
+    }
+
+    // Ensure wait=true for Discord to return a payload reliably
+    if (strstrofs(url, "?", 0) < 0)
+        url = strcat(url, "?wait=true");
+    else if (strstrofs(url, "wait=", 0) < 0)
+        url = strcat(url, "&wait=true");
+
+    // Build minimal payload first; some Discord setups reject extra fields
+    body = discord_escape(content);
+    payload = sprintf("{\"content\":\"%s\"}", body);
+
+    webhook_seq = webhook_seq + 1;
+    id = 9100 + webhook_seq;
+
+    if (cvar("webhook_debug") > 0)
+    {
+        dprint(sprintf("Discord webhook POST id=%g, len=%g\n", id, strlen(payload)));
+        if (cvar("webhook_debug") > 1)
+        {
+            // Do not print full URL to keep webhook private
+            dprint("URL: [hidden]\n");
+            dprint(sprintf("Payload: %s\n", substring(payload, 0, min(strlen(payload), 200))));
+        }
+    }
+
+    ok = uri_get(url, id, "application/json", payload);
+    if (!ok)
+        dprint("webhook POST not accepted\n");
+};
+
+void() webhook_do_post =
+{
+	local entity ev;
+	local string payload;
+
+	ev = self;
+	payload = ev.message;
+	if (payload != "")
+	{
+        // Send and avoid spamming repeated posts if many records happen quickly
+        if (cvar("webhook_debug") > 0)
+        {
+            dprint(sprintf("Deferred Discord webhook len=%g\n", strlen(payload)));
+        }
+        webhook_post(payload);
+		strunzone(ev.message);
+	}
+	remove(ev);
+};
+
+void(string content) webhook_post_deferred =
+{
+	local entity ev;
+	ev = spawn();
+    ev.classname = "webhook_event";
+	ev.message = strzone(content);
+    ev.nextthink = time + 0.5;
+    ev.think = webhook_do_post;
+};
+
+
+// Engine callback for all uri_get requests from this VM
+
+void(float reqid, float responsecode, string resourcebody, int resourcebytes) URI_Get_Callback =
+{
+    local float L, bytes, dp_style;
+
+    // Transport failure (socket, DNS, etc.)
+    if (responsecode < 0)
+    {
+        bprint(sprintf("URI %f transport failure (code=%g)\n", reqid, responsecode));
+        return;
+    }
+
+    // Detect DP-style callback routed through FTE-style declaration:
+    // resourcebytes often 0/garbage and resourcebody contains content-type.
+    dp_style = 0;
+    if (resourcebytes <= 0 && (resourcebody == "application/json"
+                            || resourcebody == "text/plain"
+                            || resourcebody == "application/json; charset=UTF-8"))
+        dp_style = 1;
+
+    // Compute bytes from what we actually have (safe even if dp_style)
+    bytes = strlen(resourcebody);
+
+    // --- Test GET (9001) ----------------------------------------------------
+    if (reqid == 9001)
+    {
+        if (dp_style)
+        {
+            bprint(sprintf("GET %f OK, type=%s\n", reqid, resourcebody));
+        }
+        else
+        {
+            bprint(sprintf("GET %f OK, bytes=%g\n", reqid, bytes));
+            L = strlen(resourcebody);
+            if (L > 200) L = 200;
+            bprint(substring(resourcebody, 0, L));
+            bprint("\n");
+        }
+        return;
+    }
+
+    // --- Test POST (9002) ---------------------------------------------------
+    if (reqid == 9002)
+    {
+        if (dp_style)
+        {
+            bprint(sprintf("POST %f OK, type=%s\n", reqid, resourcebody));
+        }
+        else
+        {
+            bprint(sprintf("POST %f OK, bytes=%g\n", reqid, bytes));
+            L = strlen(resourcebody);
+            if (L > 200) L = 200;
+            bprint(substring(resourcebody, 0, L));
+            bprint("\n");
+        }
+        return;
+    }
+
+    // --- Webhook posts (9100–9199) -----------------------------------------
+    if (reqid >= 9100 && reqid < 9200)
+    {
+        if (responsecode >= 200 && responsecode < 300)
+        {
+            dprint(sprintf("WEBHOOK %f OK (%g)\n", reqid, responsecode));
+        }
+        else if (responsecode == 429)
+        {
+            bprint(sprintf("WEBHOOK %f rate-limited (429). Consider slowing or batching.\n", reqid));
+        }
+        else
+        {
+            dprint(sprintf("WEBHOOK %f HTTP %g (bytes=%g)\n", reqid, responsecode, bytes));
+            if (!dp_style)
+            {
+                L = strlen(resourcebody);
+                if (L > 200) L = 200;
+                dprint(substring(resourcebody, 0, L));
+                dprint("\n");
+            }
+        }
+        return;
+    }
+
+    // --- Default path -------------------------------------------------------
+    if (dp_style)
+    {
+        dprint(sprintf("URI %f OK, type=%s, status=%g\n", reqid, resourcebody, responsecode));
+    }
+    else
+    {
+        dprint(sprintf("URI %f status=%g, bytes=%g\n", reqid, responsecode, bytes));
+        L = strlen(resourcebody);
+        if (L > 200) L = 200;
+        dprint(substring(resourcebody, 0, L));
+        dprint("\n");
+    }
+};
+
+// Trim trailing spaces/tabs from a string (ASCII-safe)
+string(string s) utils_rstrip =
+{
+    if (!s) return "";
+    float n = strlen(s);
+    if (n <= 0) return s;
+    float i = n - 1;
+    while (i >= 0)
+    {
+        string ch = substring(s, i, 1);
+        if (!(ch == " " || ch == "\t"))
+            break;
+        i = i - 1;
+    }
+    return substring(s, 0, i + 1);
+};
+
+// Helpers: format a delta (in seconds) as a friendly "ago" string.
+// Examples: "1 Minute Ago", "12 Minutes Ago", "2 Hours Ago", "1 Day Ago"
+string(float dt) utils_fmt_ago =
+{
+    // ----- Smart "Ago" string: clamp tiny deltas to 1 minute -----
+    string ago;
+    if (dt < 60)
+    {
+        ago = "1 Minute Ago";
+    }
+    else if (dt < 3600)
+    {
+        float mins = floor(dt / 60);
+        if (mins < 1) mins = 1;
+        ago = (mins == 1) ? "1 Minute Ago" : strcat(ftos(mins), " Minutes Ago");
+    }
+    else if (dt < 86400)
+    {
+        float hours = floor(dt / 3600);
+        ago = (hours == 1) ? "1 Hour Ago" : strcat(ftos(hours), " Hours Ago");
+    }
+    else if (dt < 604800)
+    {
+        float days = floor(dt / 86400);
+        ago = (days == 1) ? "1 Day Ago" : strcat(ftos(days), " Days Ago");
+    }
+    else
+    {
+        float weeks = floor(dt / 604800);
+        ago = (weeks == 1) ? "1 Week Ago" : strcat(ftos(weeks), " Weeks Ago");
+    }
+    return ago;
+};
+
+// Truncate helper for neat headers (UTF-8 naive, fine for ASCII names)
+string(string s, float maxlen) utils_trunc =
+{
+    if (!s) return "";
+    if (strlen(s) <= maxlen) return s;
+    return sprintf("%s...", substring(s, 0, maxlen - 3));
+};
+
+// --- Mode normalization ------------------------------------------------
+string(string mode) normalize_mode =
+{
+    if (!mode)                         return "DM";
+    if (mode == "dm")                  return "DM";
+    if (mode == "ctf")                 return "CTF";
+    if (mode == "rocketarena" || mode == "rocket_arena" || mode == "ra")
+        return "RA";
+    if (mode == "clanarena" || mode == "clan_arena" || mode == "ca")
+        return "CA";
+    if (mode == "wipeout" || mode == "wipe")
+        return "WIPEOUT";
+    if (mode == "dmm4")                return "DMM4";
+    if (mode == "airshot")             return "AIRSHOT";
+    return mode; // Unknown: return as-is
+};
+
+float() utils_ui_supported_now
+{
+    if (self.has_userinfo) return 1;
+    if (infokey(self, "name") != "") 
+    {
+        self.has_userinfo = 1;
+        return 1;
+    }
+    return 0;
+};
+
+// Return a single Quake font glyph by numeric code (0..255).
+string(float code) utils_qf_chr =
+{
+    return sprintf("%c", code);
+};
+
+// Quake "dot" separator (0x9C = 156). Safer than relying on "\x9C".
+string() utils_qf_dot =
+{
+    return utils_qf_chr(156); // ·
+};
+
+// Quake-font brackets (code 16 = left, 17 = right)
+string() utils_qf_lbrack =
+{
+    return utils_qf_chr(16);
+};
+string() utils_qf_rbrack =
+{
+    return utils_qf_chr(17);
+};
+
+// Result (no spaces touching brackets): [when_ago · MODE · map_name]
+string(string when_ago, string map_name, string raw_mode) format_match_header =
+{
+    string sep = strcat(" ", utils_qf_dot(), " "); // " · "
+    string mid = strcat(when_ago, sep, normalize_mode(raw_mode), sep, map_name);
+    return strcat(utils_qf_lbrack(), mid, utils_qf_rbrack());
+};
+
+// https://quakewiki.org/wiki/Quake_font hex codes cheatsheet to print unicode characters
+
+//   0=0x00    1=0x01    2=0x02    3=0x03    4=0x04    5=0x05    6=0x06    7=0x07
+//   8=0x08    9=0x09   10=0x0A   11=0x0B   12=0x0C   13=0x0D   14=0x0E   15=0x0F
+//  16=0x10   17=0x11   18=0x12   19=0x13   20=0x14   21=0x15   22=0x16   23=0x17
+//  24=0x18   25=0x19   26=0x1A   27=0x1B   28=0x1C   29=0x1D   30=0x1E   31=0x1F
+//  32=0x20   33=0x21   34=0x22   35=0x23   36=0x24   37=0x25   38=0x26   39=0x27
+//  40=0x28   41=0x29   42=0x2A   43=0x2B   44=0x2C   45=0x2D   46=0x2E   47=0x2F
+//  48=0x30   49=0x31   50=0x32   51=0x33   52=0x34   53=0x35   54=0x36   55=0x37
+//  56=0x38   57=0x39   58=0x3A   59=0x3B   60=0x3C   61=0x3D   62=0x3E   63=0x3F
+//  64=0x40   65=0x41   66=0x42   67=0x43   68=0x44   69=0x45   70=0x46   71=0x47
+//  72=0x48   73=0x49   74=0x4A   75=0x4B   76=0x4C   77=0x4D   78=0x4E   79=0x4F
+//  80=0x50   81=0x51   82=0x52   83=0x53   84=0x54   85=0x55   86=0x56   87=0x57
+//  88=0x58   89=0x59   90=0x5A   91=0x5B   92=0x5C   93=0x5D   94=0x5E   95=0x5F
+//  96=0x60   97=0x61   98=0x62   99=0x63  100=0x64  101=0x65  102=0x66  103=0x67
+// 104=0x68  105=0x69  106=0x6A  107=0x6B  108=0x6C  109=0x6D  110=0x6E  111=0x6F
+// 112=0x70  113=0x71  114=0x72  115=0x73  116=0x74  117=0x75  118=0x76  119=0x77
+// 120=0x78  121=0x79  122=0x7A  123=0x7B  124=0x7C  125=0x7D  126=0x7E  127=0x7F
+// 128=0x80  129=0x81  130=0x82  131=0x83  132=0x84  133=0x85  134=0x86  135=0x87
+// 136=0x88  137=0x89  138=0x8A  139=0x8B  140=0x8C  141=0x8D  142=0x8E  143=0x8F
+// 144=0x90  145=0x91  146=0x92  147=0x93  148=0x94  149=0x95  150=0x96  151=0x97
+// 152=0x98  153=0x99  154=0x9A  155=0x9B  156=0x9C  157=0x9D  158=0x9E  159=0x9F
+// 160=0xA0  161=0xA1  162=0xA2  163=0xA3  164=0xA4  165=0xA5  166=0xA6  167=0xA7
+// 168=0xA8  169=0xA9  170=0xAA  171=0xAB  172=0xAC  173=0xAD  174=0xAE  175=0xAF
+// 176=0xB0  177=0xB1  178=0xB2  179=0xB3  180=0xB4  181=0xB5  182=0xB6  183=0xB7
+// 184=0xB8  185=0xB9  186=0xBA  187=0xBB  188=0xBC  189=0xBD  190=0xBE  191=0xBF
+// 192=0xC0  193=0xC1  194=0xC2  195=0xC3  196=0xC4  197=0xC5  198=0xC6  199=0xC7
+// 200=0xC8  201=0xC9  202=0xCA  203=0xCB  204=0xCC  205=0xCD  206=0xCE  207=0xCF
+// 208=0xD0  209=0xD1  210=0xD2  211=0xD3  212=0xD4  213=0xD5  214=0xD6  215=0xD7
+// 216=0xD8  217=0xD9  218=0xDA  219=0xDB  220=0xDC  221=0xDD  222=0xDE  223=0xDF
+// 224=0xE0  225=0xE1  226=0xE2  227=0xE3  228=0xE4  229=0xE5  230=0xE6  231=0xE7
+// 232=0xE8  233=0xE9  234=0xEA  235=0xEB  236=0xEC  237=0xED  238=0xEE  239=0xEF
+// 240=0xF0  241=0xF1  242=0xF2  243=0xF3  244=0xF4  245=0xF5  246=0xF6  247=0xF7
+// 248=0xF8  249=0xF9  250=0xFA  251=0xFB  252=0xFC  253=0xFD  254=0xFE  255=0xFF

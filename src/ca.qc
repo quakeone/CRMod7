@@ -29,15 +29,115 @@ void () clan_arena_init_world =
 	ca_mvp_entity		= world;
 };
 
+float () ca_is_one_on_one =
+{
+    local float teams_with_player = 0;
+    local float players_total = 0;
+    local entity e, p;
+
+    e = boss.next_team;
+    while (e != world)
+    {
+        local float team_has = 0;
+        p = e.chain_gang;
+        while (p != world)
+        {
+            if ( (p.style & CLANRING_CONNECTED)
+              && !(p.style & CLANRING_OBSERVER)
+              && (p.ca_player_flag == PF_READY || p.ca_player_flag == PF_PLAYING) )
+            {
+                players_total += 1;
+                team_has += 1;
+            }
+            p = p.chain_gang;
+        }
+        if (team_has > 0)
+            teams_with_player += 1;
+        e = e.next_team;
+    }
+
+    return (teams_with_player == 2) && (players_total == 2);
+};
+
+string (string msg) ca_countdown_message =
+{
+    local entity myteam, e, p, oppteam;
+    local string line;
+
+    // Personalization requires a valid player context
+    if (self == world)
+        return msg;
+
+    // Only show header in true 1v1
+    if (!ca_is_one_on_one())
+        return msg;
+
+    myteam = self.next_team;
+    if (myteam == world)
+        return msg;
+
+    // Find the other team's single active opponent
+    oppteam = world;
+    e = boss.next_team;
+    while (e != world)
+    {
+        if (e != myteam)
+        {
+            p = e.chain_gang;
+            while (p != world)
+            {
+                if ( (p.style & CLANRING_CONNECTED)
+                  && !(p.style & CLANRING_OBSERVER)
+                  && (p.ca_player_flag == PF_READY || p.ca_player_flag == PF_PLAYING) )
+                {
+                    oppteam = e;
+                    break;
+                }
+                p = p.chain_gang;
+            }
+            if (oppteam != world)
+                break;
+        }
+        e = e.next_team;
+    }
+
+    if (oppteam == world || oppteam.chain_gang == world)
+        return msg;
+
+    // Prepend opponent name above the countdown
+    line = strcat(oppteam.chain_gang.netname, "\n\n");
+    line = strcat(line, msg);
+    return line;
+};
+
+void CA_CenterprintToAll (string msg)
+{
+    local entity pl, save;
+    pl = nextent(world);
+    while (pl != world)
+    {
+        if (pl.style & CLANRING_CONNECTED)
+        {
+            save = self;
+            self = pl;
+            msg_entity = pl;
+            WriteByte  (MSG_ONE, SVC_CENTERPRINT);
+            WriteString(MSG_ONE, ca_countdown_message(msg));
+            self = save;
+        }
+        pl = nextent(pl);
+    }
+}
+
 void () arena_main_loop =
 {
 	if ((clanring_state & CLANRING_MATCH_PAUSED) && (!boss.unpausing))
 	{
-		if (time > boss.lip)
+		if (time > boss.pauseblink)
 		{
 			WriteByte (MSG_ALL, SVC_CENTERPRINT);
 			WriteString (MSG_ALL, "\n\X90PAUSED\X91\n");
-			boss.lip = time + 1.5;
+			boss.pauseblink = time + 1.5;
 		}
 		return;
 	}
@@ -160,28 +260,32 @@ void () arena_main_loop =
 			{
 				if (boss.count == 0)
 				{
+					// Clear any active vote as the match starts to prevent mid-start changes
+					Request_Poll_Cleanup();
 					sound (world, CHAN_AUTO, "crx/fight.wav", 1, ATTN_NONE);
-					ctprint ("\bFIGHT!");
+					CA_CenterprintToAll("\bFIGHT!");
 					utils_do_arena_players(arena_fight_and_shoot);
 					boss.timetofight = TRUE;
 					boss.state = CA_MATCH_PLAYING;
+					// Clear leave-me-alone flags for all players
+					utils_do_players(match_clear_leavemealone);
 					if (boss.round == 1)
 						announce("The match has begun!");
 				}
 
 				if (boss.count == 1)
 				{
-					if (boss.round > 1) ctprint ("1");
+					if (boss.round > 1) CA_CenterprintToAll("1");
 					sound (world, CHAN_AUTO, "crx/one.wav",1, ATTN_NONE);
 				}
 				else if (boss.count == 2)
 				{
-					if (boss.round > 1) ctprint ("2");
+					if (boss.round > 1) CA_CenterprintToAll("2");
 					sound (world, CHAN_AUTO, "crx/two.wav", 1, ATTN_NONE);
 				}
 				else if (boss.count == 3)
 				{
-					if (boss.round > 1) ctprint("3");
+					if (boss.round > 1) CA_CenterprintToAll("3");
 					sound(world, CHAN_AUTO, "crx/three.wav", 1, ATTN_NONE);
 				}
 				else if (boss.count == 5)
@@ -270,6 +374,14 @@ void () arena_main_loop =
 			{
 				boss.wait = 0;
 				boss.state = CA_MATCH_WAITING;
+
+				// NEW: After a match ends/aborts, clear CA join menu counts
+				// so the team list shows zeros until someone actually joins.
+				if (clanring_playmode & CLANRING_CA_MODE)
+				{
+					utils_do_players(motd_arena_start);
+					utils_do_players(motd_playercount);
+				}
 			}
 		}
 	}

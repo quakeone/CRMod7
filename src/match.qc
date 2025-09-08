@@ -39,15 +39,26 @@ void() match_unpause;
 void(entity ghostent) match_restore_ghost;
 void() spawns_restore_model;
 void() votables_disable_item;
+void () votables_force_start;
 void() console_show_score;
 void() console_autodump;
 void() admin_dm3_screenshot_setup;
 void() StartRuneSpawn;
 void() GibPlayer;
+void() quaketag_clear;
+void(entity player) quaketag_disconnect_notify;
 void() PlayerDead;
 void() weapon_prewar_cleanup;
 void() weapon_prewar_animate_think;
 void() weapon_prewar_setup;
+
+void() match_clear_leavemealone =
+{
+    self.leavemealone = FALSE;
+    if (self.solid == SOLID_TRIGGER)
+        self.solid = SOLID_SLIDEBOX;
+    setorigin(self, self.origin);
+};
 
 //TODO: Make this dynamic
 static string pausehint[6] =
@@ -334,6 +345,325 @@ void() match_bprint_score =
 };
 
 //
+//  Log final scores for lastscores command (disk-only JSON)
+//
+void() match_log_score =
+{
+    // Hoisted locals to satisfy QC and avoid duplicate-definition warnings
+    local string entry, nameA, nameB, tn, pn, s;
+    local entity teamA, teamB, p, A, B, t;
+    local entity top1t, top2t, top3t, top4t;
+    local float w1, w2, w3, w4, w, len;
+
+    // --- NEW: scratch for team sorting (safe upper bound)
+    local string namesA[32], namesB[32];
+    local float  fragsA[32], fragsB[32];
+    local float  na, nb, i, j, best, tf;
+    local string ts;
+
+    // ---------- 1v1 arena summary (DMM4 & AIRSHOT) ----------
+    if (clanring_playmode & (CLANRING_DMM4_MODE | CLANRING_AIRSHOT_MODE))
+    {
+        dmm4_set_winning_team(); // populates team_first_place / team_second_place
+
+        A = team_first_place;
+        B = team_second_place;
+
+        // Fallbacks if unset
+        if (A == boss || A == world)
+        {
+            A = boss;
+            for (t = boss.next_team; t != world; t = t.next_team)
+                if (t.wins >= A.wins) A = t;
+        }
+        if (B == boss || B == world)
+        {
+            B = world;
+            for (t = boss.next_team; t != world; t = t.next_team)
+                if (t != A) { B = t; break; }
+        }
+
+        nameA = (A.chain_gang != world && A.chain_gang.netname && A.chain_gang.netname != "")
+                ? A.chain_gang.netname : A.netname;
+        nameB = (B != world && B.chain_gang != world && B.chain_gang.netname && B.chain_gang.netname != "")
+                ? B.chain_gang.netname : (B != world ? B.netname : "Opponent");
+        if (!nameA || nameA == "") nameA = "Player1";
+        if (!nameB || nameB == "") nameB = "Player2";
+
+        entry = sprintf("%s %s - %s %s", nameA, ftos(A.wins), nameB, ftos(B.wins));
+        json_append_lastscores(entry);
+        return;
+    }
+
+    // ---------- CLAN ARENA & WIPEOUT (same handling) ----------
+    if (clanring_playmode & (CLANRING_CA_MODE | CLANRING_WIPEOUT_MODE))
+    {
+        if (boss == world) return;
+        if (boss.next_team == world) return;
+
+        // Rank up to 4 teams by wins (descending)
+        top1t = top2t = top3t = top4t = world;
+        w1 = w2 = w3 = w4 = -99999;
+
+        for (t = boss.next_team; t != world; t = t.next_team)
+        {
+            w = t.wins;
+            if (w > w1) { w4 = w3; top4t = top3t; w3 = w2; top3t = top2t; w2 = w1; top2t = top1t; w1 = w; top1t = t; }
+            else if (w > w2) { w4 = w3; top4t = top3t; w3 = w2; top3t = top2t; w2 = w; top2t = t; }
+            else if (w > w3) { w4 = w3; top4t = top3t; w3 = w; top3t = t; }
+            else if (w > w4) { w4 = w; top4t = t; }
+        }
+
+        // Build headline (strip trailing " team")
+        entry = "";
+
+        if (top1t != world)
+        {
+            tn = (top1t.netname && top1t.netname != "") ? top1t.netname : utils_rstrip(strings_get_teamname2(top1t.height));
+            if (tn && tn != "") { len = strlen(tn); if (len >= 5 && substring(tn, len-5, 5) == " team") tn = substring(tn, 0, len-5); }
+            if (!tn || tn == "") tn = "Team";
+            entry = strcat(entry, tn, " ", ftos(w1));
+        }
+        if (top2t != world)
+        {
+            tn = (top2t.netname && top2t.netname != "") ? top2t.netname : utils_rstrip(strings_get_teamname2(top2t.height));
+            if (tn && tn != "") { len = strlen(tn); if (len >= 5 && substring(tn, len-5, 5) == " team") tn = substring(tn, 0, len-5); }
+            if (!tn || tn == "") tn = "Team";
+            entry = strcat(entry, " - ", tn, " ", ftos(w2));
+        }
+        if (top3t != world)
+        {
+            tn = (top3t.netname && top3t.netname != "") ? top3t.netname : utils_rstrip(strings_get_teamname2(top3t.height));
+            if (tn && tn != "") { len = strlen(tn); if (len >= 5 && substring(tn, len-5, 5) == " team") tn = substring(tn, 0, len-5); }
+            if (!tn || tn == "") tn = "Team";
+            entry = strcat(entry, " - ", tn, " ", ftos(w3));
+        }
+        if (top4t != world)
+        {
+            tn = (top4t.netname && top4t.netname != "") ? top4t.netname : utils_rstrip(strings_get_teamname2(top4t.height));
+            if (tn && tn != "") { len = strlen(tn); if (len >= 5 && substring(tn, len-5, 5) == " team") tn = substring(tn, 0, len-5); }
+            if (!tn || tn == "") tn = "Team";
+            entry = strcat(entry, " - ", tn, " ", ftos(w4));
+        }
+
+        if (entry == "") return;
+
+        // Per-team player rows (same ranked order), names from chain_gang
+        // top1
+        entry = strcat(entry, "\n");
+        if (top1t != world)
+        {
+            tn = (top1t.netname && top1t.netname != "") ? top1t.netname : utils_rstrip(strings_get_teamname2(top1t.height));
+            if (tn && tn != "") { len = strlen(tn); if (len >= 5 && substring(tn, len-5, 5) == " team") tn = substring(tn, 0, len-5); }
+            if (!tn || tn == "") tn = "Team";
+            entry = strcat(entry, tn, ": ");
+            p = top1t.chain_gang;
+            while (p != world)
+            {
+                pn = (p.netname && p.netname != "") ? p.netname : "Player";
+                entry = strcat(entry, pn, " ", ftos(p.frags));
+                p = p.chain_gang;
+                if (p != world) entry = strcat(entry, ", ");
+            }
+        }
+        // top2
+        if (top2t != world)
+        {
+            entry = strcat(entry, "\n");
+            tn = (top2t.netname && top2t.netname != "") ? top2t.netname : utils_rstrip(strings_get_teamname2(top2t.height));
+            if (tn && tn != "") { len = strlen(tn); if (len >= 5 && substring(tn, len-5, 5) == " team") tn = substring(tn, 0, len-5); }
+            if (!tn || tn == "") tn = "Team";
+            entry = strcat(entry, tn, ": ");
+            p = top2t.chain_gang;
+            while (p != world)
+            {
+                pn = (p.netname && p.netname != "") ? p.netname : "Player";
+                entry = strcat(entry, pn, " ", ftos(p.frags));
+                p = p.chain_gang;
+                if (p != world) entry = strcat(entry, ", ");
+            }
+        }
+        // top3
+        if (top3t != world)
+        {
+            entry = strcat(entry, "\n");
+            tn = (top3t.netname && top3t.netname != "") ? top3t.netname : utils_rstrip(strings_get_teamname2(top3t.height));
+            if (tn && tn != "") { len = strlen(tn); if (len >= 5 && substring(tn, len-5, 5) == " team") tn = substring(tn, 0, len-5); }
+            if (!tn || tn == "") tn = "Team";
+            entry = strcat(entry, tn, ": ");
+            p = top3t.chain_gang;
+            while (p != world)
+            {
+                pn = (p.netname && p.netname != "") ? p.netname : "Player";
+                entry = strcat(entry, pn, " ", ftos(p.frags));
+                p = p.chain_gang;
+                if (p != world) entry = strcat(entry, ", ");
+            }
+        }
+        // top4
+        if (top4t != world)
+        {
+            entry = strcat(entry, "\n");
+            tn = (top4t.netname && top4t.netname != "") ? top4t.netname : utils_rstrip(strings_get_teamname2(top4t.height));
+            if (tn && tn != "") { len = strlen(tn); if (len >= 5 && substring(tn, len-5, 5) == " team") tn = substring(tn, 0, len-5); }
+            if (!tn || tn == "") tn = "Team";
+            entry = strcat(entry, tn, ": ");
+            p = top4t.chain_gang;
+            while (p != world)
+            {
+                pn = (p.netname && p.netname != "") ? p.netname : "Player";
+                entry = strcat(entry, pn, " ", ftos(p.frags));
+                p = p.chain_gang;
+                if (p != world) entry = strcat(entry, ", ");
+            }
+        }
+
+        json_append_lastscores(entry);
+        return;
+    }
+
+    // ---------- ROCKET ARENA ----------
+    if (clanring_playmode & CLANRING_RA_MODE)
+    {
+        arena_set_winning_team(); // fills team_first_place / team_second_place
+
+        A = team_first_place; B = team_second_place;
+
+        // Fallbacks
+        if (A == boss || A == world)
+        {
+            A = boss;
+            for (t = boss.next_team; t != world; t = t.next_team)
+                if (t.wins >= A.wins) A = t;
+        }
+        if (B == boss || B == world)
+        {
+            B = world;
+            for (t = boss.next_team; t != world; t = t.next_team)
+                if (t != A) { B = t; break; }
+        }
+
+        nameA = (A.chain_gang != world && A.chain_gang.netname && A.chain_gang.netname != "")
+                ? A.chain_gang.netname : A.netname;
+        nameB = (B != world && B.chain_gang != world && B.chain_gang.netname && B.chain_gang.netname != "")
+                ? B.chain_gang.netname : (B != world ? B.netname : "Opponent");
+        if (!nameA || nameA == "") nameA = "Player1";
+        if (!nameB || nameB == "") nameB = "Player2";
+
+        entry = sprintf("%s %s - %s %s", nameA, ftos(A.wins), nameB, ftos(B.wins));
+        json_append_lastscores(entry);
+        return;
+    }
+
+    // ---------- TEAM MODES (e.g., CTF/DM) ----------
+    if (teamplay)
+    {
+        teamA = clanring_sentinel.next_team; if (!teamA) return;
+        teamB = teamA.next_team;             if (!teamB) return;
+
+        nameA = utils_rstrip(strings_get_teamname2(teamA.height));
+        nameB = utils_rstrip(strings_get_teamname2(teamB.height));
+
+        // strip trailing " team"
+        if (nameA && nameA != "") { len = strlen(nameA); if (len >= 5 && substring(nameA, len-5, 5) == " team") nameA = substring(nameA, 0, len-5); }
+        if (nameB && nameB != "") { len = strlen(nameB); if (len >= 5 && substring(nameB, len-5, 5) == " team") nameB = substring(nameB, 0, len-5); }
+        if (!nameA || nameA == "") nameA = "TeamA";
+        if (!nameB || nameB == "") nameB = "TeamB";
+
+        // Ensure the winning team (higher frags) is listed first
+        if (teamB.frags > teamA.frags)
+        {
+            // swap teams
+            t = teamA; teamA = teamB; teamB = t;
+            // swap display names to match
+            s = nameA; nameA = nameB; nameB = s;
+        }
+
+        entry = sprintf("%s %s - %s %s\n", nameA, ftos(teamA.frags), nameB, ftos(teamB.frags));
+
+        // ---- NEW: collect and sort Team A members by frags (desc)
+        na = 0;
+        p = teamA.next_player;
+        while (p && p.next_team == teamA)
+        {
+            pn = (p.netname && p.netname != "") ? p.netname : "Player";
+            if (na < 32)
+            {
+                namesA[na] = strzone(pn);
+                fragsA[na] = p.frags;
+                na = na + 1;
+            }
+            p = p.next_player;
+        }
+        // selection sort (desc by frags)
+        for (i = 0; i < na - 1; i = i + 1)
+        {
+            best = i;
+            for (j = i + 1; j < na; j = j + 1)
+                if (fragsA[j] > fragsA[best]) best = j;
+            if (best != i)
+            {
+                tf = fragsA[i]; fragsA[i] = fragsA[best]; fragsA[best] = tf;
+                ts = namesA[i]; namesA[i] = namesA[best]; namesA[best] = ts;
+            }
+        }
+        entry = strcat(entry, nameA, ": ");
+        for (i = 0; i < na; i = i + 1)
+        {
+            entry = strcat(entry, namesA[i], " ", ftos(fragsA[i]));
+            if (i + 1 < na) entry = strcat(entry, ", ");
+        }
+        for (i = 0; i < na; i = i + 1) if (namesA[i]) strunzone(namesA[i]);
+
+        // ---- NEW: collect and sort Team B members by frags (desc)
+        nb = 0;
+        p = teamB.next_player;
+        while (p && p.next_team == teamB)
+        {
+            pn = (p.netname && p.netname != "") ? p.netname : "Player";
+            if (nb < 32)
+            {
+                namesB[nb] = strzone(pn);
+                fragsB[nb] = p.frags;
+                nb = nb + 1;
+            }
+            p = p.next_player;
+        }
+        // selection sort (desc by frags)
+        for (i = 0; i < nb - 1; i = i + 1)
+        {
+            best = i;
+            for (j = i + 1; j < nb; j = j + 1)
+                if (fragsB[j] > fragsB[best]) best = j;
+            if (best != i)
+            {
+                tf = fragsB[i]; fragsB[i] = fragsB[best]; fragsB[best] = tf;
+                ts = namesB[i]; namesB[i] = namesB[best]; namesB[best] = ts;
+            }
+        }
+        entry = strcat(entry, "\n", nameB, ": ");
+        for (i = 0; i < nb; i = i + 1)
+        {
+            entry = strcat(entry, namesB[i], " ", ftos(fragsB[i]));
+            if (i + 1 < nb) entry = strcat(entry, ", ");
+        }
+        for (i = 0; i < nb; i = i + 1) if (namesB[i]) strunzone(namesB[i]);
+
+        json_append_lastscores(entry);
+        return;
+    }
+
+    // ---------- FFA ----------
+    if (clanring_second_place == clanring_sentinel) return;
+
+    entry = sprintf("%s %s - %s %s",
+        clanring_first_place.netname, ftos(clanring_first_place.frags),
+        clanring_second_place.netname, ftos(clanring_second_place.frags));
+
+    json_append_lastscores(entry);
+};
+
+//
 //  M A T C H  B P R I N T  T I M E
 //
 void() match_bprint_time =
@@ -611,6 +941,7 @@ void() match_end =
     // Backup all statistics so that they don't go away
     //stats_copy_statistics();
     match_bprint_score();//R00k adding here again, this will be closest to their cursor so it will be the first thing they want to read.
+    match_log_score();   // persist a compact summary for /lastscores
     utils_do_match_spawns(spawns_restore_model);
     utils_do_items(SUB_regen);// respawn all items (R00k:9/1/2024)
 
@@ -836,6 +1167,9 @@ void() match_begin =
 
     clanring_state = clanring_state | CLANRING_MATCH_STARTED;
 
+    // Clear leave-me-alone flags for all players
+    utils_do_players(match_clear_leavemealone);
+
     // Stop weapon animations now that match has started
     utils_do_weapons(weapon_prewar_cleanup);
 
@@ -875,6 +1209,15 @@ void() match_begin =
     // reset quad, pent counts
     utils_do_item(match_reset_owner, "item_artifact_invulnerability");
     utils_do_item(match_reset_owner, "item_artifact_super_damage");
+    // Reset per-player quad control announcement flag and cached spawner count
+    local entity pl;
+    g_quad_spawner_count = 0;
+    pl = find(world, classname, "player");
+    while (pl)
+    {
+        pl.quad_majority_announced = 0;
+        pl = find(pl, classname, "player");
+    }
 
     // Temporarily turn the extra start points into spawn points if necessary
     if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
@@ -1006,7 +1349,7 @@ void() match_timer_think1 =
                     {
                         //announce("Match begins in T minus");
                         sound (world, CHAN_AUTO, "items/protect2.wav", 1, ATTN_NONE);
-                        //quaketag_clear();
+                        quaketag_clear();
                         if (clanring_playmode & CLANRING_RUNES)
                         {
                             utils_do_item(SUB_Remove, "item_rune");
@@ -1088,6 +1431,8 @@ float () match_put_player_in_team =
         clanring_state = clanring_state - (clanring_state & CLANRING_MATCH_OVER);
         match_delete_teams();
         match_update_score_info();
+        // Now that MATCH_OVER is cleared, reset HUD teamscores
+        pqc_match_reset();
     }
 
     self.height = self.team - 1;
@@ -1606,6 +1951,30 @@ void(entity ghostent) match_restore_ghost =
 
 void() match_no_ring_check = 
 {
+    // Honor forced ring state from config
+    if (clanring_force_ring == 1)
+    {
+        if (clanring_playmode & CLANRING_NO_RING)
+        {
+            utils_do_item(SUB_regen, "item_artifact_invisibility");
+            announce("Ring of shadows enabled (forced)");
+            clanring_playmode = clanring_playmode - CLANRING_NO_RING;
+            utils_set_cvar("samelevel", clanring_playmode);
+        }
+        return;
+    }
+    if (clanring_force_ring == -1)
+    {
+        if (!(clanring_playmode & CLANRING_NO_RING))
+        {
+            utils_do_item(votables_disable_item, "item_artifact_invisibility");
+            announce("Ring of shadows disabled (forced)");
+            clanring_playmode = clanring_playmode | CLANRING_NO_RING;
+            utils_set_cvar("samelevel", clanring_playmode);
+        }
+        return;
+    }
+
     if (clanring_maxsize < 3) // if less than 3 members per team...
     {
         if (!(clanring_playmode & CLANRING_NO_RING)) // If ring is on...	disable now.
@@ -1671,11 +2040,15 @@ void() match_ready =
     if (!(clanring_state & CLANRING_MATCH_STARTED))
     {
         match_get_maxsize();
-        if (clanring_timelimit != request_timelimit)						// hack to see if we already voted
-        {			
-            clanring_timelimit = (clanring_maxsize > 2) ? 20 : 10;			// R00k: adjust timelimit based on team size automatically.
-            forceinfokey(world, "matchtime", ftos(clanring_timelimit));		// R00k: update infokey 'matchtime'; requested by Woods.
-            match_show_timelimit();
+        // If a map cfg forced a timelimit, keep it; else apply auto based on team size
+        if (!clanring_force_timelimit)
+        {
+            if (clanring_timelimit != request_timelimit)
+            {
+                clanring_timelimit = (clanring_maxsize > 2) ? 20 : 10;
+                forceinfokey(world, "matchtime", ftos(clanring_timelimit));
+                match_show_timelimit();
+            }
         }
         match_no_ring_check();												// R00k: disable invisibility for smaller games automatically.
 
@@ -1779,10 +2152,14 @@ void(entity player) match_remove_player =
     {		
         match_get_maxsize();
 
-        if (clanring_timelimit != request_timelimit)				// hack to see if we already voted
+        // If a map cfg forced a timelimit, keep it; else apply auto based on team size
+        if (!clanring_force_timelimit)
         {
-            clanring_timelimit = (clanring_maxsize > 2) ? 20 : 10;	// R00k: adjust timelimit based on team size automatically.
-            match_show_timelimit();
+            if (clanring_timelimit != request_timelimit)
+            {
+                clanring_timelimit = (clanring_maxsize > 2) ? 20 : 10;
+                match_show_timelimit();
+            }
         }
         match_no_ring_check();										// R00k: disable invisibility for smaller games automatically.
     }
@@ -2047,7 +2424,7 @@ while (player)
             if (!(player.style & (CLANRING_OBSERVER | CLANRING_READY)) && (player.style & CLANRING_CONNECTED))
             {
                 if (player == self)
-                    bprint3("â€¹ ", player.netname, "\n");
+                    bprint3("‹ ", player.netname, "\n");
                 else
                     bprint3("  ", player.netname, "\n");
             }
@@ -2169,6 +2546,8 @@ void() match_countdown_pause =
         return;
     }
     bprint(sprintf("\[%g\]\n", (4 - self.owner.next_team.pausetime)));
+    if ((4 - self.owner.next_team.pausetime) <= 3)
+        sound (world, CHAN_AUTO, "buttons/switch04.wav", 1, ATTN_NONE);
     self.owner.next_team.pausetime += 1;
     self.nextthink = time + 1;
 };
@@ -2183,6 +2562,16 @@ void() match_request_pause =
         if (!(clanring_state & CLANRING_MATCH_STARTED))
         {
             sprint(self, "No match in progress\n");
+            return;
+        }
+    }
+    else
+    {
+        // In Clan Arena modes, block pausing during countdown phases
+        // Allow pause only once the round is actively playing
+        if (boss.state != CA_MATCH_PLAYING)
+        {
+            sprint(self, "Cannot pause during countdown\n");
             return;
         }
     }
@@ -2549,7 +2938,11 @@ void() match_impulse =
             }
             case (125):
             {
-                match_request_unpause();
+                // In Clan Arena: if still waiting (no round timer), use force start; else unpause
+                if ((clanring_playmode & CLANRING_CA_MODE) && (boss.state == CA_MATCH_WAITING))
+                    votables_force_start();
+                else
+                    match_request_unpause();
                 break;
             }
         }
@@ -2614,7 +3007,11 @@ void() match_impulse =
         }
         case (125):
         {
-            match_request_unpause();
+            // In Clan Arena: if still waiting (no round timer), use force start; else unpause
+            if ((clanring_playmode & CLANRING_CA_MODE) && (boss.state == CA_MATCH_WAITING))
+                votables_force_start();
+            else
+                match_request_unpause();
             break;
         }
         case (126):
@@ -2712,7 +3109,7 @@ void() match_verify_team =
 //
 void(entity player) match_disconnect_notify =
 {
-//	quaketag_disconnect_notify (player);
+    quaketag_disconnect_notify (player);
 
     if (!(player.style & CLANRING_OBSERVER))
         match_remove_player (player);

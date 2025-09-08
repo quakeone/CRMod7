@@ -257,11 +257,8 @@ void() ra_join_queue =
 		return;//already on a team
 	}
 
-	if (self.lip > time)//R00k: FIXed?
-	{
-		sprint(self,"\bYou may not join at this time.\n");
+	if (self.lip > time) // Silent guard: avoid noisy message after a Leave->auto re-join bounce
 		return;
-	}
 
 	self.lip = time + 2; //R00k: two seconds between team choice will stop script spam
 
@@ -284,7 +281,54 @@ void() ra_join_queue =
 	pteam.next_team   	= boss.next_team;
 	boss.next_team    	= pteam;
 
-	announce2 (self.netname, " has joined the queue");
+	// Join message behavior:
+	// - First two committed players -> "X has joined the match"
+	// - Everyone after -> "X has joined the queue (Nth)"
+	{
+		local float teams_before, pos, last_two, last;
+		local string ordsuffix, ordnum;
+		local entity t;
+
+		// Count how many teams existed BEFORE this insert:
+		// (we just inserted at head, so the prior list starts at pteam.next_team)
+		teams_before = 0;
+		t = pteam.next_team;
+		while (t != world)
+		{
+			teams_before = teams_before + 1;
+			t = t.next_team;
+		}
+
+		if (teams_before < 2)
+		{
+			// First two players go straight into the match
+			announce2 (self.netname, " has joined the match");
+		}
+		else
+		{
+			// Exclude the two players currently playing from the ordinal.
+			// If 2 are playing and N are already queued, teams_before == 2 + N.
+			// New joiner's queue position = (teams_before - 2) + 1.
+			pos = (teams_before - 2) + 1;
+
+			// Ordinal suffix (1st, 2nd, 3rd, 4th, with 11th/12th/13th exceptions)
+			last_two = pos - (floor(pos / 100) * 100);
+			if ((last_two >= 11) && (last_two <= 13))
+				ordsuffix = "th";
+			else
+			{
+				last = pos - (floor(pos / 10) * 10);
+				if (last == 1)      ordsuffix = "st";
+				else if (last == 2) ordsuffix = "nd";
+				else if (last == 3) ordsuffix = "rd";
+				else                ordsuffix = "th";
+			}
+			ordnum = ftos(pos);
+
+			// Example: "woods has joined the queue (1st)"
+			announce2 (strcat(self.netname, " has joined the queue ("), strcat(ordnum, ordsuffix, ")"));
+		}
+	}
 	//pqc_new_team (pteam.team2);
 
 	self.team2  	= whichteam;
@@ -337,7 +381,16 @@ void () ra_leave_queue =
 	if (self.next_team == self)
 	return;
 
-	bprint2 (self.netname, "\b has left the queue\n");
+	// If it's effectively a 1v1 (only two teams total), say "left the match".
+	// Otherwise, keep "left the queue".
+	// (We check before removing them so the count still includes this player.)
+	if (number_teams() <= 2)
+		bprint2 (self.netname, "\b has left the match\n");
+	else
+		bprint2 (self.netname, "\b has left the queue\n");
+
+	// Anti-bounce: throttle immediate re-join attempts (reuses join's lip guard)
+	self.lip = time + 1; // 1s is enough to avoid same-tick/menu re-join
 
 	remove_player_from_chain(self.next_team, self);
 	remove_player_from_stat_list(self.next_team, self);
@@ -380,14 +433,14 @@ void () ra_select_team =
 		ra_join_queue ();
 	}
 
-	if (self.impulse == 2)
+	else if (self.impulse == 2)
 	{
 		if ((self.ca_player_flag == PF_WAITING) && (self.next_team != world))
 		{
 			ra_leave_queue ();
-				
+
 			if ((self.next_team == world) && (self.style & CLANRING_CONNECTED))
-			{		
+			{
 				stuffcmd(self,";color 0;\n");
 			}
 		}
@@ -436,7 +489,55 @@ void (float nextcolor) ra_next_player_ready =
 				//player_ready = 1;
 				if (boss.round != 1)
 				{
-					bprint2 (player.netname, " is the next challenger\n");
+					// Only print next challenger when more than two non-observer players are connected
+					local float connected_players;
+					local entity cp;
+					connected_players = 0;
+					cp = find(world, classname, "player");
+					while (cp)
+					{
+						if (cp.style & CLANRING_CONNECTED)
+							connected_players = connected_players + 1;
+						cp = find(cp, classname, "player");
+					}
+					if (connected_players > 2)
+					{
+						// Build: "woods, smith, riley are the next challengers"
+						local string msg;
+						local float count;
+						local entity q, pl;
+
+						msg = "";
+						count = 0;
+
+						// 1) The player we just marked READY (the immediate next challenger)
+						msg = player.netname;
+						count = 1;
+
+						// 2) Peek up to two more teams from the remaining queue
+						q = boss.next_queue;
+						while (q != world && count < 3)
+						{
+							pl = q.chain_gang;
+							while (pl != world)
+							{
+								if (pl.style & CLANRING_CONNECTED)
+								{
+									msg = strcat(msg, ", ", pl.netname);
+									count = count + 1;
+									break;
+								}
+								pl = pl.chain_gang;
+							}
+							q = q.next_queue;
+						}
+
+						// Singular vs plural
+						if (count == 1)
+							bprint2 (msg, " is the next challenger\n");
+						else
+							bprint2 (msg, " are the next challengers\n");
+					}
 				}
 			}
 			player = player.chain_gang;
@@ -472,9 +573,23 @@ void () ra_spawn_players =
 					tmp = self;
 					self = player;
 					respawn();
+					// Ensure team color is set (fallback to assigned RA colors if missing)
+					if (self.team2 == 0)
+					{
+						if ((self.next_team != world) && (self.next_team.team2 != 0))
+							self.team2 = self.next_team.team2;
+						else if (self.next_team != world)
+						{
+							// Fallback: first ready is blue, second is red
+							if (self.next_team == boss.next_team)
+								self.team2 = COLOR_BLUE;
+							else
+								self.team2 = COLOR_RED;
+						}
+					}
 					setcolour(self,self.team2,self.team2);
 					tmpc = ftos(self.team2);
-					stuffcmd(self,"color ");
+					stuffcmd(self,";color ");
 					stuffcmd(self,tmpc);
 					stuffcmd(self,";\n");
 					self = tmp;
@@ -491,6 +606,35 @@ void () ra_spawn_players =
 				player.ammo_nails = boss.ammo_nails;
 				player.ammo_rockets = boss.ammo_rockets;
 				player.ammo_cells = boss.ammo_cells;
+
+				// --- Sync HUD ammo icon & count with selected weapon ---
+				local float ammoMask;
+				ammoMask = (IT_SHELLS | IT_NAILS | IT_ROCKETS | IT_CELLS);
+				player.items = player.items - (player.items & ammoMask);
+			
+				if (player.weapon & (IT_ROCKET_LAUNCHER | IT_GRENADE_LAUNCHER))
+				{
+					player.items     = player.items | IT_ROCKETS;
+					player.currentammo = player.ammo_rockets;
+				}
+				else if (player.weapon & IT_LIGHTNING)
+				{
+					player.items     = player.items | IT_CELLS;
+					player.currentammo = player.ammo_cells;
+				}
+				else if (player.weapon & (IT_SUPER_NAILGUN | IT_NAILGUN))
+				{
+					player.items     = player.items | IT_NAILS;
+					player.currentammo = player.ammo_nails;
+				}
+				else
+				{
+					// SG/SSG or fallback
+					player.items     = player.items | IT_SHELLS;
+					player.currentammo = player.ammo_shells;
+				}
+
+
 			}
 			player = player.chain_gang;
 		}
@@ -563,6 +707,14 @@ string (string msg) ra_countdown_message =
 	if (self == world)
 		return msg;
 
+	// If observing but not in chase/camera, don't show opponent label
+	if ((self.style & CLANRING_OBSERVER))
+	{
+		// Show plain countdown for fly/walk/other non-chase modes
+		if (!(self.oflags & OBSERVER_CHASE) && !(self.oflags & OBSERVER_CAMERA))
+			return msg;
+	}
+
 	myteam = self.next_team;
 	if (myteam == world)
 		return msg;
@@ -624,11 +776,11 @@ void () rocket_arena_main_loop =
 {
 	if ((clanring_state & CLANRING_MATCH_PAUSED) && (!boss.unpausing))
 	{
-		if (time > boss.lip)
+		if (time > boss.pauseblink)
 		{
 			WriteByte (MSG_ALL, SVC_CENTERPRINT);
 			WriteString (MSG_ALL, "\n\X90PAUSED\X91\n");
-			boss.lip = time + 1.5;
+			boss.pauseblink = time + 1.5;
 		}
 		return;
 	}
@@ -675,7 +827,7 @@ void () rocket_arena_main_loop =
 	}
 	else if ((boss.state == CA_MATCH_ROUNDSTART))
 	{
-		local string temp;
+		// removed unused local 'temp'
 		
 		motd_top5 = string_null;
 		motd_top6 = string_null;
@@ -690,11 +842,14 @@ void () rocket_arena_main_loop =
 
 			if (boss.count == 0)
             {
+                Request_Poll_Cleanup();
 				RA_CenterprintToAll("\bFIGHT!");
 				sound (world, CHAN_ITEM, "crx/fight.wav", 1, ATTN_NONE);
 				utils_do_arena_players(arena_fight_and_shoot);
 				boss.timetofight = TRUE;
 				boss.state = CA_MATCH_PLAYING;
+				// Clear leave-me-alone flags for all players
+				utils_do_players(match_clear_leavemealone);
 				if (boss.round == 1)
 					announce("The match has begun!");
             }
@@ -716,10 +871,7 @@ void () rocket_arena_main_loop =
 			else if (boss.count == 4)
 			{
 				ra_spawn_players ();
-				bprint ("\bround:\b ");
-				temp = ftos (boss.round);
-				bprint2 (temp,"\n");
-					
+				// Suppress round number print between rounds in Rocket Arena
 				local string stmp;
 				stmp = (report_winning_team());
 				bprint2 (stmp, "\n");
@@ -764,7 +916,7 @@ void () rocket_arena_main_loop =
 				ra_next_player_ready(COLOR_RED);
 				//pqc_match_reset();
 				//find_pqc_teamscore_teams();
-				announce("prepare to fight");		
+				// Removed prepare to fight print between rounds for RA
 			}
 		}
 		else if (number_teams () < 2)

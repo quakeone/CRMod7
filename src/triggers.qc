@@ -425,7 +425,11 @@ void() teleport_touch =
     // END_MOD
 
 // only teleport living creatures
-	if (other.health <= 0 || other.solid != SOLID_SLIDEBOX)
+	if (other.health <= 0)
+		return;
+
+	// Default code typically insists on SOLID_SLIDEBOX. Allow SOLID_TRIGGER if LMA (prewar).
+	if (other.solid != SOLID_SLIDEBOX && !other.leavemealone)
 		return;
 
 	SUB_UseTargets ();

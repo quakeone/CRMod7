@@ -199,16 +199,16 @@ void() console_show_time =
     if (h > 0)
     {
         temp = ftos(h);
-        localcmd2(temp, ":");
+        cprint2(temp, ":");
         if (m < 10)
-            localcmd("0");
+            cprint("0");
     }
     temp = ftos(m);
-    localcmd2(temp, ":");
+    cprint2(temp, ":");
     if (s < 10)
-        localcmd("0");
+        cprint("0");
     temp = ftos(s);
-    localcmd2(temp, "\"\n");
+    cprint2(temp, "\"\n");
 };
 
 //
@@ -293,12 +293,12 @@ void() console_show_score =
 //			 string temp;
 			temp = ftos(clanring_match_timer.lip);
 			cprint3("\"Time remaining:  ", temp, ":");
-			temp = ftos(clanring_match_timer.count);
-			if (clanring_match_timer.count < 10)
-			{
-				localcmd("0");
-			}
-			localcmd2(temp, "\"\n");
+			        temp = ftos(clanring_match_timer.count);
+        if (clanring_match_timer.count < 10)
+        {
+            cprint("0");
+        }
+        cprint2(temp, "\"\n");
 		}
 	}
 
@@ -362,9 +362,9 @@ void() console_list_ghosts =
             pad = " |  ";
         num = ftos(frag);
         if (e.owner.owner == e)
-            localcmd6(szTeam, pad, num, "  | ", e.owner.netname, "\"\n");
+            cprint6(szTeam, pad, num, "  | ", e.owner.netname, "\"\n");
         else
-            localcmd4(szTeam, pad, num, "  | Disconnected\"\n");
+            cprint4(szTeam, pad, num, "  | Disconnected\"\n");
     
         e = find(e, classname, "clanring_ghost");
     }
@@ -405,19 +405,19 @@ void() console_show_killstats =
 			break;
 		cprint("\"  ");
 		utils_cprint_int3(player.frags);
-		localcmd("  |   ");
+		cprint("  |   ");
 		utils_cprint_int3(((player.true_kills + player.mangle_x) + player.mangle_y));
-		localcmd("   | ");
+		cprint("   | ");
 		utils_cprint_int3(player.mangle_x);
-		localcmd("  |    ");
+		cprint("  |    ");
 		utils_cprint_int3(player.mangle_y);
-		localcmd("    |  ");
+		cprint("    |  ");
 		utils_cprint_int3(player.mangle_z);
-		localcmd("   |");
+		cprint("   |");
 		utils_cprint_damage(player.dmg_taken);   
-		localcmd("|");
+		cprint("|");
 		utils_cprint_damage(player.dmg_given);      		
-		localcmd3("| ", player.netname, "\"\n");
+		cprint3("| ", player.netname, "\"\n");
 
 		if (mode_is_arena())
 		{
@@ -453,14 +453,14 @@ void(float frac, float tot) console_print_percent4 =
 
         n = floor(100 * frac / tot);
         if (n < 100)
-            localcmd(" ");
+            cprint(" ");
         if (n < 10)
-            localcmd(" ");
+            cprint(" ");
         temp = ftos(n);
-        localcmd2(temp, "%");
+        cprint2(temp, "%");
     }
     else
-        localcmd("N/A ");
+        cprint("N/A ");
 };
 
 //
@@ -492,21 +492,21 @@ void() console_show_quadstats =
 	{
 		cprint("\"  ");
 		utils_cprint_int3 (player.clanring_qdwep_z);
-		localcmd("  |    ");
+		cprint("  |    ");
 		console_print_percent4 (player.clanring_qdwep_x, player.clanring_qdwep_y);
-		localcmd("    |  ");
+		cprint("    |  ");
 		utils_cprint_int3 (player.clanring_qdkill_x);
-		localcmd("  |  ");
+		cprint("  |  ");
 		utils_cprint_int3 (player.clanring_qdkill_z);
-		localcmd("  |    ");
+		cprint("  |    ");
 		utils_cprint_int3 (player.clanring_qdkill_y);
-		localcmd3("    | ", player.netname, "\"\n");
+		cprint3("    | ", player.netname, "\"\n");
 		player = player.next_player;
 		if ((useteams && (player.next_team != pteam)))
 		{
 			cprint("\" [");
 			utils_cprint_int3 (pteam.dest2_x);
-			localcmd3("] |            |       |       |           | ", pteam.netname, "\"\n");
+			cprint3("] |            |       |       |           | ", pteam.netname, "\"\n");
 			pteam = player.next_team;
 		}
 	}
@@ -536,19 +536,19 @@ void() console_show_pentstats =
 	{
 		cprint("\"  ");
 		utils_cprint_int3 (player.clanring_ptwep_z);
-		localcmd("  |    ");
+		cprint("  |    ");
 		console_print_percent4 (player.clanring_ptwep_x, player.clanring_ptwep_y);
-		localcmd("    |  ");
+		cprint("    |  ");
 		utils_cprint_int3 (player.clanring_ptkill_x);
-		localcmd("  |    ");
+		cprint("  |    ");
 		utils_cprint_int3 (player.clanring_ptkill_y);
-		localcmd3("    | ", player.netname, "\"\n");
+		cprint3("    | ", player.netname, "\"\n");
 		player = player.next_player;
 		if ((useteams && (player.next_team != pteam)))
 		{
 			cprint("\" [");
 			utils_cprint_int3 (pteam.dest2_y);
-			localcmd3("] |            |       |           | ", pteam.netname, "\"\n");
+			cprint3("] |            |       |           | ", pteam.netname, "\"\n");
 			pteam = player.next_team;
 		}
 	}
@@ -577,18 +577,18 @@ void() console_show_badstats =
 		tot_done = tot_enemy + player.clanring_badstats_y + player.clanring_badstats_z;
 		cprint("\"  ");
 		utils_cprint_int3(player.clanring_badstats_x);
-		localcmd(" | ");
+		cprint(" | ");
 		console_print_percent4(player.clanring_badstats_y, tot_done);
-		localcmd(" | ");
+		cprint(" | ");
 		console_print_percent4(player.clanring_badstats_z, tot_done);
-		localcmd(" | ");
+		cprint(" | ");
 		utils_cprint_int3(player.clanring_badstats2_x);  // lava deaths
-		localcmd(" | ");
+		cprint(" | ");
 		utils_cprint_int3(player.clanring_badstats2_y);  // axe deaths
-		localcmd(" | ");
+		cprint(" | ");
 		utils_cprint_int3(player.clanring_badstats2_z);  // fall deaths
-		localcmd(" | ");
-		localcmd2(player.netname, "\"\n");
+		cprint(" | ");
+		cprint2(player.netname, "\"\n");
 		player = player.next_player;
 	}
 	cprint("\n");
@@ -614,13 +614,13 @@ void() console_show_efficiency =
 	{
 		cprint("\"   ");
 		console_print_percent4(player.dest2_x, player.dest1_x);
-		localcmd("  |  ");
+		cprint("  |  ");
 		console_print_percent4(player.dest2_y, player.dest1_y);
-		localcmd(" |   ");
+		cprint(" |   ");
 		console_print_percent4(player.dest_y, player.dest_x);
-		localcmd("  |    ");
+		cprint("  |    ");
 		console_print_percent4(player.dest2_z, player.dest1_z);
-		localcmd("   |  ");
+		cprint("   |  ");
 		tot_fired = player.dest1_x + player.dest1_y + player.dest1_z + player.dest_x;
 		tot_done = player.dest2_x + player.dest2_y + player.dest2_z + player.dest_y;
 		console_print_percent4(tot_done, tot_fired);
@@ -631,11 +631,11 @@ void() console_show_efficiency =
 		else
 			fpm = 0;
 			
-		localcmd(" | ");
+		cprint(" | ");
 		if (fpm < 10)
-			localcmd(" ");
-		localcmd(sprintf("%.1f", fpm));
-		localcmd3(" | ", player.netname, "\"\n");
+			cprint(" ");
+		cprint(sprintf("%.1f", fpm));
+		cprint3(" | ", player.netname, "\"\n");
 		player = player.next_player;
 	}
 	cprint("\n");
@@ -662,13 +662,13 @@ void() console_show_fstats =
 		{
 			cprint("\"  ");
 			utils_cprint_int3(player.fpickups);
-			localcmd("|");
+			cprint("|");
 			utils_cprint_time(player.fctime);
-			localcmd("|");
+			cprint("|");
 			utils_cprint_int3(player.fcaptures);
-			localcmd("|");
+			cprint("|");
 			utils_cprint_time(player.captime);
-			localcmd3("| ", player.netname, "\"\n");
+			cprint3("| ", player.netname, "\"\n");
 		}
 		player = find(player, classname, "player");
 	}
@@ -682,17 +682,17 @@ void() console_show_fstats =
 		if (!(player.style & CLANRING_OBSERVER))
 		{
 			cprint("\" ");
-			localcmd("|");
+			cprint("|");
 			utils_cprint_int3(player.fdefenses);
-			localcmd("|");
+			cprint("|");
 			utils_cprint_int3(player.freturns);
-			localcmd("|");
+			cprint("|");
 			utils_cprint_int3(player.fcdefenses);
-			localcmd("|");
+			cprint("|");
 			utils_cprint_int3(player.fcassists);
-			localcmd("|");
+			cprint("|");
 			utils_cprint_int3(player.fcfrags);
-			localcmd3("| ", player.netname, "\"\n");
+			cprint3("| ", player.netname, "\"\n");
 		}
 		player = find(player, classname, "player");
 	}
@@ -746,9 +746,9 @@ void() console_show_stats =
 		wtot = player.dest1_x + player.dest1_y + player.dest1_z + player.dest_x;
 		wfrac = player.dest2_x + player.dest2_y + player.dest2_z + player.dest_y;
 		console_print_percent4(kfrac, ktot);
-		localcmd(" |  ");
+		cprint(" |  ");
 		console_print_percent4(wfrac, wtot);
-		localcmd3("  | ", player.netname, "\"\n");
+		cprint3("  | ", player.netname, "\"\n");
 		player = player.next_player;
 	}
 	cprint("\n");
@@ -763,19 +763,19 @@ void(vector v) console_format_vector =
 {
 	 string s;
 
-	localcmd("| ");
+	cprint("| ");
 	if (v_x < 10)
-		localcmd(" ");
+		cprint(" ");
 	s = ftos(v_x);
-	localcmd2(s, " : ");
+	cprint2(s, " : ");
 	if (v_y < 10)
-		localcmd(" ");
+		cprint(" ");
 	s = ftos(v_y);
-	localcmd2(s, " : ");
+	cprint2(s, " : ");
 	if (v_z < 10)
-		localcmd(" ");
+		cprint(" ");
 	s = ftos(v_z);
-	localcmd2(s, " ");
+	cprint2(s, " ");
 };
 
 //
@@ -806,18 +806,18 @@ void() console_show_teamstats =
 	while (pteam)
 	{
 		s = strings_get_teamname2(pteam.height);
-		localcmd3("|  ", s, "  ");
+		cprint3("|  ", s, "  ");
 		pteam = pteam.next_team;
 	}
-	localcmd("\"\n");
+	cprint("\"\n");
 	cprint("\"---------------");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
 	{
-		localcmd("+--------------");
+		cprint("+--------------");
 		pteam = pteam.next_team;
 	}
-	localcmd("\"\n");
+	cprint("\"\n");
 	cprint("\"Q : 666 : Ring ");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
@@ -825,7 +825,7 @@ void() console_show_teamstats =
 		console_format_vector(pteam.dest2);
 		pteam = pteam.next_team;
 	}
-	localcmd("\"\n");
+	cprint("\"\n");
 	cprint("\"RL : LG : GL   ");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
@@ -833,7 +833,7 @@ void() console_show_teamstats =
 		console_format_vector (pteam.dest1);
 		pteam = pteam.next_team;
 	}
-	localcmd("\"\n");
+	cprint("\"\n");
 	cprint("\"SNG : NG : MH  ");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
@@ -841,7 +841,7 @@ void() console_show_teamstats =
 		console_format_vector(pteam.pos1);
 		pteam = pteam.next_team;
 	}
-	localcmd("\"\n");
+	cprint("\"\n");
 	cprint("\"RA : YA : GA   ");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
@@ -849,23 +849,23 @@ void() console_show_teamstats =
 		console_format_vector(pteam.dest);
 		pteam = pteam.next_team;
 	}
-	localcmd("\"\n");
+	cprint("\"\n");
 	cprint("\"+RLPak : -RLPak");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
 	{
-		localcmd("|  ");
+		cprint("|  ");
 		s = ftos(pteam.mangle_y);
 		if (pteam.mangle_y < 10)
-			localcmd(" ");
-		localcmd3("+", s, "   ");
+			cprint(" ");
+		cprint3("+", s, "   ");
 		s = ftos(pteam.mangle_z);
 		if (pteam.mangle_z < 10)
-			localcmd(" ");
-		localcmd3("-", s, "   ");
+			cprint(" ");
+		cprint3("-", s, "   ");
 		pteam = pteam.next_team;
 	}
-	localcmd("\"\n");
+	cprint("\"\n");
 	cprint("\"Control        ");
 	pteam = clanring_sentinel.next_team;
 
@@ -876,16 +876,16 @@ void() console_show_teamstats =
 		control = 100 * pteam.mangle_x / clanring_sentinel.cnt;
 		f = floor(control);
 		s = ftos(f);
-		localcmd2("ü  %", s);
+		cprint2("ü  %", s);
 		f = floor((control - f) * 10);
 		s = ftos(f);
-		localcmd3(".", s, " ");
+		cprint3(".", s, " ");
 		if (control < 10)
-			localcmd(" ");
+			cprint(" ");
 		pteam = pteam.next_team;
 	}
 
-	localcmd("\"\n");
+	cprint("\"\n");
 	cprint("\n");
 };
 
@@ -938,7 +938,7 @@ void() console_autodump =
 		if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
 			console_show_fstats ();
 		
-		json_encode_players();//R00k: dump player stat values to file
+			json_export_match_to_file();//R00k: dump player stat values to file
 	}
 };
 
@@ -1299,7 +1299,7 @@ void(string name, float angleflags) console_make_entity =
     temp = vtos(newent.origin);
     cprint4(name, " created at ", temp, ", ");
     temp = vtos(newent.angles);
-    localcmd2(temp, "\n");
+    cprint2(temp, "\n");
     if (name == "clanring_camera")
     {
     	newent.nextthink = CLANRING_NEGINF;
@@ -1333,9 +1333,9 @@ void(string name) console_kill_entity =
 			v = e.origin - location;
 			if (vlen(v) < 20)
 			{
-				cprint5("removed ", name, " at ", temp, ", ");
-				temp = vtos(e.angles);
-				localcmd2(temp, "\n");
+				                cprint5("removed ", name, " at ", temp, ", ");
+                temp = vtos(e.angles);
+                cprint2(temp, "\n");
 				remove(e);
 				return;
 			}
@@ -2038,39 +2038,185 @@ void(float command) console_command =
 	}
 };
 
+// Helper: format ISO8601 -> "MM-DD-YYYY HH:MMAM -0700"
+// - replaces 'T' with space
+// - removes seconds
+// - converts 24h -> 12h with AM/PM (no space before AM/PM)
+// - adds a space before timezone
+string format_rec_date(string d)
+{
+    local float tpos, start, pos, lastsign, firstspace, colon1, colon2, hour;
+    local string date_iso, timeplus, tz, timepart, ampm;
+    local string yyyy, mm, dd;
+
+    if (!d || d == "")
+        return d;
+
+    // 1) Split date and the rest (time+tz)
+    tpos = strstrofs(d, "T", 0);
+    if (tpos >= 0) {
+        date_iso = substring(d, 0, 10); // YYYY-MM-DD
+        timeplus = substring(d, tpos + 1, strlen(d) - (tpos + 1));
+    } else {
+        // Fallback: split on first space
+        firstspace = strstrofs(d, " ", 0);
+        if (firstspace >= 0) {
+            date_iso = substring(d, 0, 10);
+            timeplus = substring(d, firstspace + 1, strlen(d) - (firstspace + 1));
+        } else {
+            // Not an ISO-like string; return as-is
+            return d;
+        }
+    }
+
+    // 2) Extract timezone at the end (supports -0700 or -07:00). Prefer last '-' then '+'.
+    lastsign = -1;
+    start = 0;
+    while (1) {
+        pos = strstrofs(timeplus, "-", start);
+        if (pos < 0) break;
+        lastsign = pos;
+        start = pos + 1;
+    }
+    if (lastsign < 0) {
+        start = 0;
+        while (1) {
+            pos = strstrofs(timeplus, "+", start);
+            if (pos < 0) break;
+            lastsign = pos;
+            start = pos + 1;
+        }
+    }
+
+    if (lastsign >= 0) {
+        tz = substring(timeplus, lastsign, strlen(timeplus) - lastsign);
+        timepart = substring(timeplus, 0, lastsign);
+    } else {
+        // No explicit TZ (e.g., ends with 'Z' or nothing). Handle 'Z'.
+        pos = strstrofs(timeplus, "Z", 0);
+        if (pos >= 0 && pos == strlen(timeplus) - 1) {
+            tz = "Z";
+            timepart = substring(timeplus, 0, pos);
+        } else {
+            tz = "";
+            timepart = timeplus;
+        }
+    }
+
+    // Trim seconds from time (drop the second colon and following 2 digits if present)
+    colon1 = strstrofs(timepart, ":", 0);
+    if (colon1 >= 0) {
+        colon2 = strstrofs(timepart, ":", colon1 + 1);
+        if (colon2 >= 0 && colon2 + 3 <= strlen(timepart)) {
+            timepart = strcat(substring(timepart, 0, colon2),
+                              substring(timepart, colon2 + 3, strlen(timepart) - (colon2 + 3)));
+        }
+    }
+
+    // Convert HH:MM -> 12-hour with AM/PM (no space before AM/PM)
+    // Expect timepart like "HH:MM"
+    if (strlen(timepart) >= 5) {
+        hour = stof(substring(timepart, 0, 2));
+        ampm = "AM";
+        if (hour == 0) {
+            hour = 12;
+        } else if (hour == 12) {
+            ampm = "PM";
+        } else if (hour > 12) {
+            hour -= 12;
+            ampm = "PM";
+        }
+        // Keep ":MM"
+        timepart = sprintf("%g%s%s", hour, substring(timepart, 2, strlen(timepart) - 2), ampm);
+    }
+
+    // Rearrange date YYYY-MM-DD -> MM-DD-YYYY
+    if (strlen(date_iso) >= 10) {
+        yyyy = substring(date_iso, 0, 4);
+        mm   = substring(date_iso, 5, 2);
+        dd   = substring(date_iso, 8, 2);
+    } else {
+        // Fallback if date not as expected
+        return strcat(date_iso, " ", timepart, (tz != "" ? strcat(" ", tz) : ""));
+    }
+
+    // Rebuild with a space before timezone (if present)
+    return strcat(mm, "-", dd, "-", yyyy, " ", timepart, (tz != "" ? strcat(" ", tz) : ""));
+}
+
 void () CaptureHighScores_sprint =
 {
-	string s1="",s2="",s3="",s4="",ts1="",ts2="",ts3="";
-	if (playerrecord[0].statvalue > 0)
-	{
-		s1 = sprintf("\1  %s %s %-16s\n", utils_get_time(playerrecord[0].statvalue), get_team_letter(playerrecord[0].teamcolor), playerrecord[0].player);
-		if (playerrecord[1].statvalue > 0)
-		{
-			s2 = sprintf("\2  %s %s %-16s\n", utils_get_time(playerrecord[1].statvalue), get_team_letter(playerrecord[1].teamcolor), playerrecord[1].player);
-			if (playerrecord[2].statvalue > 0)
-			{
-				s3 = sprintf("\3  %s %s %-16s\n", utils_get_time(playerrecord[2].statvalue), get_team_letter(playerrecord[2].teamcolor), playerrecord[2].player);
-			}
-		}
-	}
-	else
-	{
-		s1 = "No capture times set\n";
-	}
-	if (playerrecord2[0].statvalue > 0)
-	{
-		ts1 = sprintf("\1  %s %s %-16s\n", utils_get_time(playerrecord2[0].statvalue), get_team_letter(playerrecord2[0].teamcolor), playerrecord2[0].player);
-		if (playerrecord2[1].statvalue > 0)
-		{
-			ts2 = sprintf("\2  %s %s %-16s\n", utils_get_time(playerrecord2[1].statvalue), get_team_letter(playerrecord2[1].teamcolor), playerrecord2[1].player);
-			if (playerrecord2[2].statvalue > 0)
-			{
-				ts3 = sprintf("\3  %s %s %-16s\n", utils_get_time(playerrecord2[2].statvalue), get_team_letter(playerrecord2[2].teamcolor), playerrecord2[2].player);
-			}
-		}
-		s4 = sprintf("%s%s%s",ts1,ts2,ts3);
-	}
-	else
+    string s1 = "", s2 = "", s3 = "", s4 = "", ts1 = "", ts2 = "", ts3 = "";
+
+    if (playerrecord[0].statvalue > 0)
+    {
+        s1 = sprintf("\1  %s %s %-16s", utils_get_time(playerrecord[0].statvalue), get_team_letter(playerrecord[0].teamcolor), playerrecord[0].player);
+        // CRX v2: Add metadata if available (trial record: date only)
+        if (playerrecord[0].rec_date != "")
+            s1 = sprintf("%s  (%s)", s1, format_rec_date(playerrecord[0].rec_date));
+        s1 = strcat(s1, "\n");
+        
+        if (playerrecord[1].statvalue > 0)
+        {
+            s2 = sprintf("\2  %s %s %-16s", utils_get_time(playerrecord[1].statvalue), get_team_letter(playerrecord[1].teamcolor), playerrecord[1].player);
+            if (playerrecord[1].rec_date != "")
+                s2 = sprintf("%s  (%s)", s2, format_rec_date(playerrecord[1].rec_date));
+            s2 = strcat(s2, "\n");
+            
+            if (playerrecord[2].statvalue > 0)
+            {
+                s3 = sprintf("\3  %s %s %-16s", utils_get_time(playerrecord[2].statvalue), get_team_letter(playerrecord[2].teamcolor), playerrecord[2].player);
+                if (playerrecord[2].rec_date != "")
+                    s3 = sprintf("%s  (%s)", s3, format_rec_date(playerrecord[2].rec_date));
+                s3 = strcat(s3, "\n");
+            }
+        }
+    }
+    else
+    {
+        s1 = "No capture times set\n";
+    }
+
+    if (playerrecord2[0].statvalue > 0)
+    {
+        ts1 = sprintf("\1  %s %s %-16s", utils_get_time(playerrecord2[0].statvalue), get_team_letter(playerrecord2[0].teamcolor), playerrecord2[0].player);
+        // CRX v2: Add metadata if available (match record: date + match time remaining)
+        if (playerrecord2[0].rec_date != "" || playerrecord2[0].rec_mt_str != "")
+        {
+            ts1 = sprintf("%s  (%s", ts1, format_rec_date(playerrecord2[0].rec_date));
+            if (playerrecord2[0].rec_mt_str != "")
+                ts1 = sprintf("%s, at %s remaining", ts1, playerrecord2[0].rec_mt_str);
+            ts1 = strcat(ts1, ")");
+        }
+        ts1 = strcat(ts1, "\n");
+        
+        if (playerrecord2[1].statvalue > 0)
+        {
+            ts2 = sprintf("\2  %s %s %-16s", utils_get_time(playerrecord2[1].statvalue), get_team_letter(playerrecord2[1].teamcolor), playerrecord2[1].player);
+            if (playerrecord2[1].rec_date != "" || playerrecord2[1].rec_mt_str != "")
+            {
+                ts2 = sprintf("%s  (%s", ts2, format_rec_date(playerrecord2[1].rec_date));
+                if (playerrecord2[1].rec_mt_str != "")
+                    ts2 = sprintf("%s, at %s remaining", ts2, playerrecord2[1].rec_mt_str);
+                ts2 = strcat(ts2, ")");
+            }
+            ts2 = strcat(ts2, "\n");
+            
+            if (playerrecord2[2].statvalue > 0)
+            {
+                ts3 = sprintf("\3  %s %s %-16s", utils_get_time(playerrecord2[2].statvalue), get_team_letter(playerrecord2[2].teamcolor), playerrecord2[2].player);
+                if (playerrecord2[2].rec_date != "" || playerrecord2[2].rec_mt_str != "")
+                {
+                    ts3 = sprintf("%s  (%s", ts3, format_rec_date(playerrecord2[2].rec_date));
+                    if (playerrecord2[2].rec_mt_str != "")
+                        ts3 = sprintf("%s, at %s remaining", ts3, playerrecord2[2].rec_mt_str);
+                    ts3 = strcat(ts3, ")");
+                }
+                ts3 = strcat(ts3, "\n");
+            }
+        }
+        s4 = sprintf("%s%s%s", ts1, ts2, ts3);
+    }	else
 	{
 		s4 = "No match capture times set\n";
 	}

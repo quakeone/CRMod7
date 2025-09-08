@@ -25,11 +25,19 @@ float ITEM_SUSPENDED = 128;    // Don't drop to floor - stay suspended in air
 
 .vector particles_offset;
 
+void(float ghost) G1v1_UpdateQuadAlpha;
+
 void() SUB_regen =
 {
 	self.model = self.mdl;		// restore original model
 	self.solid = SOLID_TRIGGER;	// allow it to be touched again
-    self.alpha = 1;
+
+	// Set correct alpha for 1v1 ghosting
+	if (self.items == IT_QUAD && g1v1_in_effect && g1v1_quad_ghosted)
+		self.alpha = 0.5;
+	else
+		self.alpha = 1.0;
+
 	sound (self, CHAN_VOICE, "items/itembk2.wav", 1, ATTN_NORM);	// play respawn sound
 	if (!(deathmatch || (self.spawnflags & ITEM_RESPAWNDM)))
 		spawn_tfog (self.origin + self.particles_offset);
@@ -179,6 +187,10 @@ This allows observers to see visual indicators for item respawn timing.
 */
 void(entity item, string itemname, float timeleft) SendObserverItemTimer
 {
+    // Do not send item timers in arena modes (players have all weapons/items)
+    if (mode_is_arena())
+        return;
+
     // Loop through all clients with player classname
     entity player;
     player = find(world, classname, "player");
@@ -208,6 +220,118 @@ void(entity item, string itemname, float timeleft) SendObserverItemTimer
         player = find(player, classname, "player");
     }
 }
+
+// ------------------------------------------------------------
+// Quad Control -> Observer/QTV announcements (majority / 60%+)
+// ------------------------------------------------------------
+
+// Count Quad spawners in the current level (cached)
+float() QuadControl_CountSpawners =
+{
+    if (g_quad_spawner_count > 0)
+        return g_quad_spawner_count;
+
+    local entity e;
+    g_quad_spawner_count = 0;
+    e = find(world, classname, "item_artifact_super_damage");
+    while (e)
+    {
+        g_quad_spawner_count = g_quad_spawner_count + 1;
+        e = find(e, classname, "item_artifact_super_damage");
+    }
+    return g_quad_spawner_count;
+};
+
+// Compute how many Quad pickups have been possible so far in this match
+float() QuadControl_PossibleSoFar =
+{
+    // Arena modes or no-quad servers: nothing to do
+    if (mode_is_arena())
+        return 0;
+    if (clanring_playmode & CLANRING_NO_QUAD)
+        return 0;
+    // Must have an active timer
+    if (!(clanring_state & CLANRING_TIMER_STARTED))
+        return 0;
+
+    local float spawners, total_secs, secs_left, secs_elapsed, slots;
+    spawners    = QuadControl_CountSpawners();
+    if (spawners <= 0)
+        return 0;
+
+    total_secs  = clanring_timelimit * 60;
+    secs_left   = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
+    secs_elapsed = total_secs - secs_left;
+    if (secs_elapsed < 0) secs_elapsed = 0;
+
+    // Each spawner provides one available Quad at t=0 and one per minute thereafter.
+    slots = 1 + floor(secs_elapsed / QUAD_RESPAWN_TIME);
+    return spawners * slots;
+};
+
+// Return ordinal suffix ("st","nd","rd","th") for an integer n.
+string(float n) QuadControl_OrdinalSuffix =
+{
+    local float last2, last;
+    last2 = n - 100 * floor(n * 0.01); // last two digits
+    if ((last2 >= 11) && (last2 <= 13))
+        return "th";
+    last = n - 10 * floor(n * 0.1);    // last digit
+    if (last == 1) return "st";
+    if (last == 2) return "nd";
+    if (last == 3) return "rd";
+    return "th";
+};
+
+// Announce to QTV and in-game observers.
+void(string msg, entity subject) QuadControl_AnnounceObservers =
+{
+    // QTV (if available) – match style used elsewhere in items.qc
+    quaketv_announce4(subject.netname, " ", msg, "");
+
+    // In-game observers only (don't spam active players)
+    local entity p;
+    p = find(world, classname, "player");
+    while (p)
+    {
+        if (p.style & CLANRING_OBSERVER)
+        {
+            sprint(p, subject.netname);
+            sprint(p, " ");
+            sprint(p, msg);
+            sprint(p, "\n");
+        }
+        p = find(p, classname, "player");
+    }
+};
+
+// Called on each Quad pickup to maybe announce milestones.
+void(entity picker) QuadControl_MaybeAnnounce =
+{
+    local float possible, taken, share;
+    possible = QuadControl_PossibleSoFar();
+    if (possible <= 0)
+        return;
+
+    taken = picker.clanring_qdwep_z;
+    share = taken / possible;
+
+    // One-time "majority" milestone (>50%)
+    if ((share > 0.5) && (!picker.quad_majority_announced))
+    {
+        local string msg = sprintf("has the majority of Quads so far (%g/%g)", taken, possible);
+        QuadControl_AnnounceObservers(msg, picker);
+        picker.quad_majority_announced = 1;
+    }
+
+    // Per-pickup callout at or after 60%
+    if (share >= 0.6)
+    {
+        local string nth = sprintf("%s%s", ftos(taken), QuadControl_OrdinalSuffix(taken));
+        local string msg2 = sprintf("got their %s Quad", nth);
+        QuadControl_AnnounceObservers(msg2, picker);
+    }
+};
 
 /*
 =========================================================================
@@ -375,7 +499,7 @@ void() health_touch =
 		//sprint(other, s);
 		//sprint(other, " health\n");
 		sound (other, CHAN_ITEM, self.noise, 1, ATTN_NORM);
-	//	stuffcmd(other, "bf\n");
+		stuffcmd(other, "bf\n");
 		self.model = string_null;
 		self.solid = SOLID_NOT;
 		self.owner = other;
@@ -615,7 +739,7 @@ void() armor_touch =
 //		sprint(other, "You got armor\n");
 // armor touch sound
 		sound (other, CHAN_ITEM, "items/armor1.wav", 1, ATTN_NORM);
-//		stuffcmd(other, "bf\n");
+		stuffcmd(other, "bf\n");
 	}
 	activator = other;
 	SUB_UseTargets();
@@ -876,7 +1000,7 @@ void() weapon_touch =
 		SendObserverItemTimer(self, itname, 30); // woods
 // weapon touch sound
 		sound (other, CHAN_ITEM, "weapons/pkup.wav", 1, ATTN_NORM);
-//		stuffcmd(other, "bf\n");
+		stuffcmd(other, "bf\n");
 
 		bound_other_ammo ();
 
@@ -1079,7 +1203,7 @@ void() ammo_touch =
 //		sprint(other, "\n");
 // ammo touch sound
 		sound (other, CHAN_ITEM, "weapons/lock4.wav", 1, ATTN_NORM);
-//		stuffcmd(other, "bf\n");
+		stuffcmd(other, "bf\n");
 
 // change to a better weapon if appropriate
 		stemp = self;
@@ -1669,6 +1793,22 @@ void() powerup_touch =
 	if (other.health <= 0)
 		return;
 
+    // --- 1v1 DM normal auto-ghost: block Quad pickup and centerprint (once per client per map) ---
+    if (self.items == IT_QUAD)
+    {
+        if (g1v1_in_effect && g1v1_quad_ghosted)
+        {
+            // Only show the message once per client per map to avoid spam
+            if (!other.quadDisabledMsgShown)
+            {
+                other.quadDisabledMsgShown = 1;
+                centerprint(other, "quad disabled for 1 on 1");
+            }
+            return;
+        }
+    }
+    // --------------------------------------------------------------------
+
 	sprint(other, "You got the ");
 	sprint(other, self.netname);
 	sprint(other,"\n");
@@ -1764,6 +1904,7 @@ void() powerup_touch =
 
 		// CRMOD - stats
 		other.clanring_qdwep_z = other.clanring_qdwep_z + 1;
+        QuadControl_MaybeAnnounce(other);
 		other.quadtime = time;
         SendObserverItemTimer(self, "quad", 60); // woods
 		if (other.next_team != world)
@@ -1863,6 +2004,12 @@ void() item_artifact_super_damage =
 	self.height = 0;
 	// END_MOD
 	StartItem ();
+
+	// If 1v1 ghosting is active at spawn time, show as half-opaque
+	if (g1v1_in_effect && g1v1_quad_ghosted)
+		self.alpha = 0.5;
+	else
+		self.alpha = 1.0;
 };
 
 /*
@@ -1949,8 +2096,11 @@ void() BackpackTouch =
 					quaketv_obtained_rl (other);// ELOHIM_MOD - keep track of rocket launchers
 					if (other.team != self.owner.team)
 					{
-						quaketv_announce4(other.netname, " got ", self.owner.netname, "'s RL");
-						quaketv_sound ("misc/talk.wav");
+						if (deathmatch != 3)
+						{
+							quaketv_announce4(other.netname, " got ", self.owner.netname, "'s RL");
+							quaketv_sound ("misc/talk.wav");
+						}
 						self.owner.clanring_badstats_x = self.owner.clanring_badstats_x + 1;
 						if (other.next_team != world)
 						{

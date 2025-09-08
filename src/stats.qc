@@ -1399,6 +1399,23 @@ void() stats_delete_copies =
 //	clanring_sentinel.owner = clanring_sentinel;
 };
 
+void reset_records(float which) {
+	float i;
+	if (which == 2) for (i=0;i<PLAYER_RECORDS_MAX_COUNT;i++){
+		if (playerrecord2[i].player!="")     strunzone(playerrecord2[i].player);
+		if (playerrecord2[i].rec_date!="")   strunzone(playerrecord2[i].rec_date);
+		if (playerrecord2[i].rec_mt_str!="") strunzone(playerrecord2[i].rec_mt_str);
+		playerrecord2[i].player=playerrecord2[i].rec_date=playerrecord2[i].rec_mt_str="";
+		playerrecord2[i].statvalue=0; playerrecord2[i].teamcolor=0; playerrecord2[i].rec_mt_remain=-1;
+	} else for (i=0;i<PLAYER_RECORDS_MAX_COUNT;i++){
+		if (playerrecord[i].player!="")   strunzone(playerrecord[i].player);
+		if (playerrecord[i].rec_date!="") strunzone(playerrecord[i].rec_date);
+		if (playerrecord[i].rec_mt_str!="") strunzone(playerrecord[i].rec_mt_str);
+		playerrecord[i].player=playerrecord[i].rec_date=playerrecord[i].rec_mt_str="";
+		playerrecord[i].statvalue=0; playerrecord[i].teamcolor=0; playerrecord[i].rec_mt_remain=-1;
+	}
+}
+
 //Check if a cap time is in the top records, then set it and return the rank or return 0 if not
 //TODO:refactor all these into one, just check high/low and pass struct array? 
 void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_record =
@@ -1408,9 +1425,18 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 	{
 		if (playerrecord[i].statvalue == 0)
 		{
+			// before writing into slot i, free old strings (if any)
+			if (playerrecord[i].player     != "") strunzone(playerrecord[i].player);
+			if (playerrecord[i].rec_date   != "") strunzone(playerrecord[i].rec_date);
+			if (playerrecord[i].rec_mt_str != "") strunzone(playerrecord[i].rec_mt_str);
+
 			playerrecord[i].statvalue = t_statvalue;
 			playerrecord[i].teamcolor = t_teamcolor;
 			playerrecord[i].player = strzone(t_player);
+			// CRX v2: attach metadata from globals (trial record: date only)
+			playerrecord[i].rec_date  = (crx_meta_date != "") ? strzone(crx_meta_date) : "";
+			playerrecord[i].rec_mt_remain = -1;
+			playerrecord[i].rec_mt_str = "";
 			tmp = (i+1);
 			break;
 		}
@@ -1421,12 +1447,29 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 			{
 				playerrecord[j].statvalue = playerrecord[(j-1)].statvalue;
 				playerrecord[j].teamcolor = playerrecord[(j-1)].teamcolor;
-				playerrecord[j].player = playerrecord[(j-1)].player;
+
+				if (playerrecord[j].player     != "") strunzone(playerrecord[j].player);
+				if (playerrecord[j].rec_date   != "") strunzone(playerrecord[j].rec_date);
+				if (playerrecord[j].rec_mt_str != "") strunzone(playerrecord[j].rec_mt_str);
+
+				playerrecord[j].player      = (playerrecord[j-1].player   != "") ? strzone(playerrecord[j-1].player)   : "";
+				playerrecord[j].rec_date    = (playerrecord[j-1].rec_date != "") ? strzone(playerrecord[j-1].rec_date) : "";
+				playerrecord[j].rec_mt_str  = "";
+				playerrecord[j].rec_mt_remain = -1;
+
 				j -= 1;
 			}
+			// before writing into slot i, free old strings (if any)
+			if (playerrecord[i].player     != "") strunzone(playerrecord[i].player);
+			if (playerrecord[i].rec_date   != "") strunzone(playerrecord[i].rec_date);
+			if (playerrecord[i].rec_mt_str != "") strunzone(playerrecord[i].rec_mt_str);
+
 			playerrecord[i].statvalue = t_statvalue;
 			playerrecord[i].teamcolor = t_teamcolor;
 			playerrecord[i].player = strzone(t_player);
+			playerrecord[i].rec_date  = (crx_meta_date != "") ? strzone(crx_meta_date) : "";
+			playerrecord[i].rec_mt_remain = -1;
+			playerrecord[i].rec_mt_str = "";
 			tmp = (i+1);
 			break;
 		}
@@ -1446,9 +1489,18 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 	{
 		if (playerrecord2[i].statvalue == 0)
 		{
+			// before writing into slot i, free old strings (if any)
+			if (playerrecord2[i].player     != "") strunzone(playerrecord2[i].player);
+			if (playerrecord2[i].rec_date   != "") strunzone(playerrecord2[i].rec_date);
+			if (playerrecord2[i].rec_mt_str != "") strunzone(playerrecord2[i].rec_mt_str);
+
 			playerrecord2[i].statvalue = t_statvalue;
 			playerrecord2[i].teamcolor = t_teamcolor;
 			playerrecord2[i].player = strzone(t_player);
+			// CRX v2: match metadata (date + match time remaining)
+			playerrecord2[i].rec_date      = (crx_meta_date != "")   ? strzone(crx_meta_date)   : "";
+			playerrecord2[i].rec_mt_remain = crx_meta_mt_remain;
+			playerrecord2[i].rec_mt_str    = (crx_meta_mt_str != "") ? strzone(crx_meta_mt_str) : "";
 			tmp = (i+1);
 			break;
 		}
@@ -1459,12 +1511,29 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 			{
 				playerrecord2[j].statvalue = playerrecord2[(j-1)].statvalue;
 				playerrecord2[j].teamcolor = playerrecord2[(j-1)].teamcolor;
-				playerrecord2[j].player = playerrecord2[(j-1)].player;
+
+				if (playerrecord2[j].player     != "") strunzone(playerrecord2[j].player);
+				if (playerrecord2[j].rec_date   != "") strunzone(playerrecord2[j].rec_date);
+				if (playerrecord2[j].rec_mt_str != "") strunzone(playerrecord2[j].rec_mt_str);
+
+				playerrecord2[j].player      = (playerrecord2[j-1].player   != "") ? strzone(playerrecord2[j-1].player)   : "";
+				playerrecord2[j].rec_date    = (playerrecord2[j-1].rec_date != "") ? strzone(playerrecord2[j-1].rec_date) : "";
+				playerrecord2[j].rec_mt_remain = playerrecord2[(j-1)].rec_mt_remain;
+				playerrecord2[j].rec_mt_str  = (playerrecord2[j-1].rec_mt_str != "") ? strzone(playerrecord2[j-1].rec_mt_str) : "";
+
 				j -= 1;
 			}
+			// before writing into slot i, free old strings (if any)
+			if (playerrecord2[i].player     != "") strunzone(playerrecord2[i].player);
+			if (playerrecord2[i].rec_date   != "") strunzone(playerrecord2[i].rec_date);
+			if (playerrecord2[i].rec_mt_str != "") strunzone(playerrecord2[i].rec_mt_str);
+
 			playerrecord2[i].statvalue = t_statvalue;
 			playerrecord2[i].teamcolor = t_teamcolor;
 			playerrecord2[i].player = strzone(t_player);
+			playerrecord2[i].rec_date      = (crx_meta_date != "")   ? strzone(crx_meta_date)   : "";
+			playerrecord2[i].rec_mt_remain = crx_meta_mt_remain;
+			playerrecord2[i].rec_mt_str    = (crx_meta_mt_str != "") ? strzone(crx_meta_mt_str) : "";
 			tmp = (i+1);
 			break;
 		}
@@ -1484,9 +1553,17 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 	{
 		if (playerrecord[i].statvalue == 0)
 		{
+			// before writing into slot i, free old strings (if any)
+			if (playerrecord[i].player     != "") strunzone(playerrecord[i].player);
+			if (playerrecord[i].rec_date   != "") strunzone(playerrecord[i].rec_date);
+			if (playerrecord[i].rec_mt_str != "") strunzone(playerrecord[i].rec_mt_str);
+
 			playerrecord[i].statvalue = t_statvalue;
 			playerrecord[i].teamcolor = t_teamcolor;
 			playerrecord[i].player = strzone(t_player);
+			playerrecord[i].rec_date  = (crx_meta_date != "") ? strzone(crx_meta_date) : "";
+			playerrecord[i].rec_mt_remain = -1;
+			playerrecord[i].rec_mt_str = "";
 			tmp = (i+1);
 			break;
 		}
@@ -1497,12 +1574,29 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 			{
 				playerrecord[j].statvalue = playerrecord[(j-1)].statvalue;
 				playerrecord[j].teamcolor = playerrecord[(j-1)].teamcolor;
-				playerrecord[j].player = playerrecord[(j-1)].player;
+
+				if (playerrecord[j].player     != "") strunzone(playerrecord[j].player);
+				if (playerrecord[j].rec_date   != "") strunzone(playerrecord[j].rec_date);
+				if (playerrecord[j].rec_mt_str != "") strunzone(playerrecord[j].rec_mt_str);
+
+				playerrecord[j].player      = (playerrecord[j-1].player   != "") ? strzone(playerrecord[j-1].player)   : "";
+				playerrecord[j].rec_date    = (playerrecord[j-1].rec_date != "") ? strzone(playerrecord[j-1].rec_date) : "";
+				playerrecord[j].rec_mt_str  = "";
+				playerrecord[j].rec_mt_remain = -1;
+
 				j -= 1;
 			}
+			// before writing into slot i, free old strings (if any)
+			if (playerrecord[i].player     != "") strunzone(playerrecord[i].player);
+			if (playerrecord[i].rec_date   != "") strunzone(playerrecord[i].rec_date);
+			if (playerrecord[i].rec_mt_str != "") strunzone(playerrecord[i].rec_mt_str);
+
 			playerrecord[i].statvalue = t_statvalue;
 			playerrecord[i].teamcolor = t_teamcolor;
 			playerrecord[i].player = strzone(t_player);
+			playerrecord[i].rec_date  = (crx_meta_date != "") ? strzone(crx_meta_date) : "";
+			playerrecord[i].rec_mt_remain = -1;
+			playerrecord[i].rec_mt_str = "";
 			tmp = (i+1);
 			break;
 		}
@@ -1522,9 +1616,17 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 	{
 		if (playerrecord2[i].statvalue == 0)
 		{
+			// before writing into slot i, free old strings (if any)
+			if (playerrecord2[i].player     != "") strunzone(playerrecord2[i].player);
+			if (playerrecord2[i].rec_date   != "") strunzone(playerrecord2[i].rec_date);
+			if (playerrecord2[i].rec_mt_str != "") strunzone(playerrecord2[i].rec_mt_str);
+
 			playerrecord2[i].statvalue = t_statvalue;
 			playerrecord2[i].teamcolor = t_teamcolor;
 			playerrecord2[i].player = strzone(t_player);
+			playerrecord2[i].rec_date      = (crx_meta_date != "")   ? strzone(crx_meta_date)   : "";
+			playerrecord2[i].rec_mt_remain = crx_meta_mt_remain;
+			playerrecord2[i].rec_mt_str    = (crx_meta_mt_str != "") ? strzone(crx_meta_mt_str) : "";
 			tmp = (i+1);
 			break;
 		}
@@ -1535,12 +1637,29 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 			{
 				playerrecord2[j].statvalue = playerrecord2[(j-1)].statvalue;
 				playerrecord2[j].teamcolor = playerrecord2[(j-1)].teamcolor;
-				playerrecord2[j].player = playerrecord2[(j-1)].player;
+
+				if (playerrecord2[j].player     != "") strunzone(playerrecord2[j].player);
+				if (playerrecord2[j].rec_date   != "") strunzone(playerrecord2[j].rec_date);
+				if (playerrecord2[j].rec_mt_str != "") strunzone(playerrecord2[j].rec_mt_str);
+
+				playerrecord2[j].player      = (playerrecord2[j-1].player   != "") ? strzone(playerrecord2[j-1].player)   : "";
+				playerrecord2[j].rec_date    = (playerrecord2[j-1].rec_date != "") ? strzone(playerrecord2[j-1].rec_date) : "";
+				playerrecord2[j].rec_mt_remain = playerrecord2[(j-1)].rec_mt_remain;
+				playerrecord2[j].rec_mt_str  = (playerrecord2[j-1].rec_mt_str != "") ? strzone(playerrecord2[j-1].rec_mt_str) : "";
+
 				j -= 1;
 			}
+			// before writing into slot i, free old strings (if any)
+			if (playerrecord2[i].player     != "") strunzone(playerrecord2[i].player);
+			if (playerrecord2[i].rec_date   != "") strunzone(playerrecord2[i].rec_date);
+			if (playerrecord2[i].rec_mt_str != "") strunzone(playerrecord2[i].rec_mt_str);
+
 			playerrecord2[i].statvalue = t_statvalue;
 			playerrecord2[i].teamcolor = t_teamcolor;
 			playerrecord2[i].player = strzone(t_player);
+			playerrecord2[i].rec_date      = (crx_meta_date != "")   ? strzone(crx_meta_date)   : "";
+			playerrecord2[i].rec_mt_remain = crx_meta_mt_remain;
+			playerrecord2[i].rec_mt_str    = (crx_meta_mt_str != "") ? strzone(crx_meta_mt_str) : "";
 			tmp = (i+1);
 			break;
 		}

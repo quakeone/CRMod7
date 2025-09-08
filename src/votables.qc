@@ -15,16 +15,33 @@ float request_gibs;         // Used to set gib level
 float request_mode;         // Used to request a new mode
 float request_gametype;		// Used to request a new game type
 float request_weaponstay;   // Used to request weaponstay
+// q14ever overlay: remember who initiated the enable so we can attach the prop to them.
+entity q14ever_last_requester;
 
 void() UnHookPlayer;
 void() utils_update_server_time;
 void() utils_save_disconnect_log;
+void(float ghost) G1v1_UpdateQuadAlpha;
 
 //
 //  S E N D  A L I A S E S
 //
 //  Stuffs aliases for votable commands and numbers.
 //
+// Return 1 if at least one non-observer is actually in the game (spawned)
+float() votables_has_active_players =
+{
+    local entity p;
+    p = find(world, classname, "player");
+    while (p)
+    {
+        if ((p.style & CLANRING_CONNECTED) && !(p.style & CLANRING_OBSERVER))
+            return 1;
+        p = find(p, classname, "player");
+    }
+    return 0;
+};
+
 void() votables_send_aliases =
 {
 	local entity temp;
@@ -43,7 +60,7 @@ void() votables_send_aliases =
 	// toggle extended obits
 	stuffcmd(self, "alias obits impulse 211\n");
 	// timelimit aliases
-	stuffcmd(self, "alias timeset impulse 215\n");
+	stuffcmd(self, "alias timeset cmd timeset\n");
 	stuffcmd(self, "alias otset impulse 216\n");
 	stuffcmd(self, "alias fragset impulse 219\n");
 	// Quad, Pent, Ring aliases
@@ -67,6 +84,11 @@ void() votables_send_aliases =
 	stuffcmd(self, "alias ctfdmm4 cmd ctfdmm4\n");
 	stuffcmd(self, "alias airshot cmd airshot\n");
 	stuffcmd(self, "alias powerupdrop cmd powerupdrop;\n");
+	stuffcmd(self, "alias leavemealone \"cmd leavemealone\"\n");
+
+	// QuakeTag aliases (only two commands now)
+	stuffcmd(self, "alias qwsucks \"cmd qwsucks\"\n");
+	stuffcmd(self, "alias q14ever \"cmd q14ever\"\n");
 
 	// R00k: allow 0 to 50 as commands for console input for menus
 	for (float i = 50; i >= 0; i -= 1)
@@ -869,6 +891,55 @@ void () votables_request_set_weaponstay =
 	}
 };
 
+// ------------------------------------------------------------
+// Filesystem helpers (portable-ish)
+// ------------------------------------------------------------
+// NOTE: whichpack() and checkextension() are provided by fteextensions.qc.
+// Do not redeclare them here to avoid signature-mismatch warnings.
+
+// Can we probe the FS for file existence?
+float() FS_CanProbe =
+{
+    if (checkextension("DP_QC_WHICHPACK")) return TRUE;
+    if (checkextension("FTE_QC_WHICHPACK")) return TRUE;
+    return FALSE;
+};
+
+// Does <path> exist somewhere on the search path?
+float(string path) FS_FileExists =
+{
+    if (!FS_CanProbe())
+        return FALSE; // strict: if we can't probe, we treat as missing
+    return (whichpack(path) && whichpack(path) != "");
+};
+
+// Return TRUE iff an alt .ent for this map exists in the given dir.
+// We try both:
+//   1) "maps/<dir>/<map>.ent"   (your current layout)
+//   2) "<dir>/maps/<map>.ent"   (alternate layout)
+float(string target_dir) AltEntForCurrentMapExists =
+{
+    local string m, c1, c2;
+    m = mapname;
+    if (!m || m == "") return FALSE;
+    if (!FS_CanProbe())  return FALSE; // strict: require probing
+    if (!target_dir || target_dir == "") return FALSE;
+
+    c1 = strcat("maps/", target_dir, "/", m, ".ent");
+    c2 = strcat(target_dir, "/maps/", m, ".ent");
+
+    if (FS_FileExists(c1) || FS_FileExists(c2))
+    {
+        if (cvar("developer"))
+            bprint(strcat("^7[altents probe] OK: ", FS_FileExists(c1) ? c1 : c2, "\n"));
+        return TRUE;
+    }
+
+    if (cvar("developer"))
+        bprint(strcat("^7[altents probe] MISS: ", c1, " & ", c2, "\n"));
+    return FALSE;
+};
+
 //
 //  S E T  A L T E R N A T I V E  E N T I T I E S
 //
@@ -876,31 +947,35 @@ void () votables_request_set_weaponstay =
 //
 void() votables_set_altents =
 {
+    local string dir_next;
     if (clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS)
     {
         // Switching back to standard entities
         clanring_gameconfig = clanring_gameconfig - (clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS);
-        
+
         if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
             cvar_set("external_ents_dir", "ctf");
         else
             cvar_set("external_ents_dir", "");
-            
+
         bprint("Standard entity set enabled\n");
     }
     else
     {
+        // Switching TO alt: probe the *target* dir (not current external_ents_dir)
+        dir_next = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? "ctf_alt" : "dm_alt";
+        if (!AltEntForCurrentMapExists(dir_next))
+        {
+            bprint(strcat("No alternate entities available for ", mapname, "\n"));
+            return;
+        }
+
         // Switching to alternative entities
         clanring_gameconfig = clanring_gameconfig | CLANRING_ALTERNATIVE_ENTS;
-        
-        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-			cvar_set("external_ents_dir", "ctf_alt");
-        else
-			cvar_set("external_ents_dir", "dm_alt");
-            
+        cvar_set("external_ents_dir", dir_next);
         bprint("Alternative entity set enabled\n");
     }
-    
+
     utils_set_cvar("gamecfg", clanring_gameconfig);
 	utils_update_server_time();  // Update persistent time
 	utils_save_disconnect_log();  // Save to file before map change
@@ -914,26 +989,73 @@ void() votables_set_altents =
 //
 void() votables_request_set_altents =
 {
+    local string dir_next; // declare once, reuse
     // Do it right away if we're an administrator, otherwise vote
     if (self.style & CLANRING_ADMINISTRATOR)
     {
+        // Admin direct toggle: block if no alt for this map in the *target* dir
+        if (!(clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS))
+        {
+            dir_next = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? "ctf_alt" : "dm_alt";
+            if (!AltEntForCurrentMapExists(dir_next))
+            {
+                bprint(strcat("No alternate entities available for ", mapname, "\n"));
+                return;
+            }
+        }
         votables_set_altents();
     }
     else
     {
         string newstate = "";
-        
+
         if (clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS)
             newstate = "\bstandard\b";
         else
             newstate = "\balternative\b";
 
+        // If switching TO alt, ensure a .ent exists in the target dir
+        if (!(clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS))
+        {
+            dir_next = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? "ctf_alt" : "dm_alt";
+            if (!AltEntForCurrentMapExists(dir_next))
+            {
+                bprint(strcat("No alternate entities available for ", mapname, "\n"));
+                return;
+            }
+        }
         if (vote_init("switch entity set to ", newstate, votables_set_altents, "altents"))
             vote_yes();
     }
 };
 
 void() GotoNextMap;
+
+// ----------------------------
+// QuakeTag toggles (prototypes)
+// ----------------------------
+void() votables_request_qwsucks;   // NEW single-command flow
+void() votables_request_q14ever;   // NEW single-command flow
+void(float on) votables_toggle_qwsucks;
+void(float on) votables_toggle_q14ever;
+// Vote callbacks (no lambdas in QC)
+void() votables_qwsucks_enable_and_start_callback;
+void() votables_qwsucks_disable_and_clear_callback;
+void() votables_q14ever_enable_and_start_callback;
+void() votables_q14ever_disable_and_clear_callback;
+// Need QuakeTag helpers
+void() quaketag_start_regular_auto;
+void() quaketag_start_q14ever_auto;
+void() quaketag_clear;
+// q14ever presence/flag helpers (from quaketag.qc)
+float() Q14ever_AnyProps;
+void() Q14ever_SyncFlag;
+void() Q14ever_RemoveAllProps;
+void(entity player_owner) q14ever_spawn_penis;
+
+// External QuakeTag entity (defined in quaketag.qc)
+entity crmod_qtag_it;
+
 void() votables_vote_exit =
 {
 	if (clanring_levelcount == -1)
@@ -1471,19 +1593,45 @@ void () votables_disable_item =
 //
 void () votables_set_quad =
 {
-	if (clanring_playmode & CLANRING_NO_QUAD)
-	{
-		utils_do_item(SUB_regen, "item_artifact_super_damage");
-		bprint("Quad enabled\n");
-		clanring_playmode = clanring_playmode - CLANRING_NO_QUAD;
-	}
-	else
-	{
-		utils_do_item(votables_disable_item, "item_artifact_super_damage");
-		bprint("Quad disabled\n");
-		clanring_playmode = clanring_playmode | CLANRING_NO_QUAD;
-	}
-	utils_set_cvar("samelevel", clanring_playmode);
+    // Special behavior while auto-ghost is active in DM normal (1v1):
+    // - Toggle "ghost/unghost" without physically removing the item
+    if (g1v1_in_effect)
+    {
+        if (clanring_playmode & CLANRING_NO_QUAD)
+        {
+            // turn it ON within 1v1 (unghost)
+            clanring_playmode = clanring_playmode - CLANRING_NO_QUAD;
+            g1v1_quad_ghosted = FALSE;
+            utils_do_item(SUB_regen, "item_artifact_super_damage"); // ensure present
+            bprint("Quad enabled\n");
+            G1v1_UpdateQuadAlpha(FALSE); // -> 1.0
+        }
+        else
+        {
+            // turn it OFF within 1v1 (ghost, keep entity)
+            clanring_playmode = clanring_playmode | CLANRING_NO_QUAD;
+            g1v1_quad_ghosted = TRUE;
+            bprint("Quad disabled for 1 on 1\n");
+            G1v1_UpdateQuadAlpha(TRUE);  // -> 0.5
+        }
+        utils_set_cvar("samelevel", clanring_playmode);
+        return;
+    }
+
+    // Normal behavior outside 1v1: physically remove/restore items
+    if (clanring_playmode & CLANRING_NO_QUAD)
+    {
+        utils_do_item(SUB_regen, "item_artifact_super_damage");
+        bprint("Quad enabled\n");
+        clanring_playmode = clanring_playmode - CLANRING_NO_QUAD;
+    }
+    else
+    {
+        utils_do_item(votables_disable_item, "item_artifact_super_damage");
+        bprint("Quad disabled\n");
+        clanring_playmode = clanring_playmode | CLANRING_NO_QUAD;
+    }
+    utils_set_cvar("samelevel", clanring_playmode);
 };
 
 //
@@ -1860,5 +2008,227 @@ void() votables_request_set_powerupdrop =
 		if (vote_init(newstate, " \bpowerup dropping\b", votables_set_powerupdrop))
 			vote_yes();
 	}
+};
+
+// ----------------------------
+// Vote callback functions (enable+start / disable+clear)
+// ----------------------------
+void() votables_qwsucks_enable_and_start_callback =
+{
+    votables_toggle_qwsucks(1);
+    quaketag_start_regular_auto(); // auto-pick a starter and start Tag
+};
+
+void() votables_qwsucks_disable_and_clear_callback =
+{
+    if (crmod_qtag_it != world) quaketag_clear();
+    votables_toggle_qwsucks(0);
+};
+
+void() votables_q14ever_enable_and_start_callback =
+{
+    entity target, p, keepself;
+    votables_toggle_q14ever(1);
+    // Prefer the original requester if still valid
+    target = q14ever_last_requester;
+    if (!target || !(target.style & CLANRING_CONNECTED) || (target.style & CLANRING_OBSERVER))
+    {
+        // If Tag is running, prefer the current "it"
+        if (crmod_qtag_it != world)
+            target = crmod_qtag_it;
+    }
+    // Fallback: first active non-observer
+    if (!target || !(target.style & CLANRING_CONNECTED) || (target.style & CLANRING_OBSERVER))
+    {
+        p = find(world, classname, "player");
+        while (p)
+        {
+            if ((p.style & CLANRING_CONNECTED) && !(p.style & CLANRING_OBSERVER)) { target = p; break; }
+            p = find(p, classname, "player");
+        }
+    }
+    if (!target) { bprint("q14ever: no eligible player to attach.\n"); return; }
+    keepself = self; self = target;
+    Q14ever_RemoveAllProps();
+    q14ever_spawn_penis(self);
+    // Keep q14ever activation off CHAN_AUTO so it never masks qwsucks start
+    sound(self, CHAN_ITEM, "dog/dsight.wav", 1, ATTN_NONE);
+    self = keepself;
+};
+
+void() votables_q14ever_disable_and_clear_callback =
+{
+    // Remove prop(s) but do NOT touch Tag.
+    Q14ever_RemoveAllProps();
+    votables_toggle_q14ever(0);
+};
+
+// ----------------------------
+// Single-command, vote-backed toggle + auto-start/clear
+// ----------------------------
+void() votables_request_qwsucks =
+{
+    // Only allow in match modes (not CA/RA/DMM4/AIRSHOT/etc.)
+    if (!(clanring_playmode & CLANRING_MATCH_MODE))
+    {
+        sprint(self, "Command valid in match mode only (DM/CTF).\n");
+        return;
+    }
+    if (clanring_playmode & (CLANRING_CA_MODE | CLANRING_RA_MODE | CLANRING_DMM4_MODE | CLANRING_AIRSHOT_MODE |
+                             CLANRING_WIPEOUT_MODE))
+    {
+        sprint(self, "Command valid only in DM/CTF match modes.\n");
+        return;
+    }
+    // Require at least one active (non-observer) player in the level
+    if (!votables_has_active_players())
+    {
+        sprint(self, "Cannot vote: no active players have spawned (observers only).\n");
+        return;
+    }
+
+    if (!clanring_allow_qwsucks)
+    {
+        // Turn ON by vote (or admin), then auto-start
+        if (self.style & CLANRING_ADMINISTRATOR)
+        {
+            votables_toggle_qwsucks(1);
+            quaketag_start_regular_auto();
+            return;
+        }
+        if (vote_init("Enable qwsucks (regular QuakeTag)", "", votables_qwsucks_enable_and_start_callback))
+            vote_yes();
+    }
+    else
+    {
+        // Turn OFF by vote (or admin), clearing game if running
+        if (self.style & CLANRING_ADMINISTRATOR)
+        {
+            if (crmod_qtag_it != world) quaketag_clear();
+            votables_toggle_qwsucks(0);
+            return;
+        }
+        if (vote_init("Disable qwsucks", "", votables_qwsucks_disable_and_clear_callback))
+            vote_yes();
+    }
+};
+
+void() votables_request_q14ever =
+{
+    // Only allow in match modes (not CA/RA/DMM4/AIRSHOT/etc.)
+    if (!(clanring_playmode & CLANRING_MATCH_MODE))
+    {
+        sprint(self, "Command valid in match mode only (DM/CTF).\n");
+        return;
+    }
+    if (clanring_playmode & (CLANRING_CA_MODE | CLANRING_RA_MODE | CLANRING_DMM4_MODE | CLANRING_AIRSHOT_MODE |
+                             CLANRING_WIPEOUT_MODE))
+    {
+        sprint(self, "Command valid only in DM/CTF match modes.\n");
+        return;
+    }
+    // Require at least one active (non-observer) player in the level
+    if (!votables_has_active_players())
+    {
+        sprint(self, "Cannot vote: no active players have spawned (observers only).\n");
+        return;
+    }
+
+    // Remember who asked; we'll attach to them on success.
+    q14ever_last_requester = self;
+    // Normalize the toggle based on current world state (prop/flag may be out of sync)
+    Q14ever_SyncFlag();
+
+    if (!clanring_allow_q14ever)
+    {
+        // If the requester already has a prop, do NOT allow another enable vote.
+        // (Others can still enable to reattach to themselves.)
+        local entity pe;
+        pe = find(world, classname, "penis");
+        while (pe)
+        {
+            if (pe.owner == self) { sprint(self, "q14ever is already enabled for you.\n"); return; }
+            pe = find(pe, classname, "penis");
+        }
+        pe = find(world, classname, "q14ever_penis");
+        while (pe)
+        {
+            if (pe.owner == self) { sprint(self, "q14ever is already enabled for you.\n"); return; }
+            pe = find(pe, classname, "q14ever_penis");
+        }
+
+        if (self.style & CLANRING_ADMINISTRATOR)
+        {
+            // Admin enable: also block if the requester already has the prop.
+            pe = find(world, classname, "penis");
+            while (pe)
+            {
+                if (pe.owner == self) { sprint(self, "q14ever is already enabled for you.\n"); return; }
+                pe = find(pe, classname, "penis");
+            }
+            pe = find(world, classname, "q14ever_penis");
+            while (pe)
+            {
+                if (pe.owner == self) { sprint(self, "q14ever is already enabled for you.\n"); return; }
+                pe = find(pe, classname, "q14ever_penis");
+            }
+            entity keepself; votables_toggle_q14ever(1);
+            keepself = self; Q14ever_RemoveAllProps(); q14ever_spawn_penis(self);
+            sound(self, CHAN_ITEM, "dog/dsight.wav", 1, ATTN_NONE);
+            self = keepself; return;
+        }
+        if (vote_init("Enable q14ever (overlay)", "", votables_q14ever_enable_and_start_callback))
+            vote_yes();
+    }
+    else
+    {
+        if (self.style & CLANRING_ADMINISTRATOR)
+        {
+            // Admin disable removes the prop but leaves Tag alone
+            Q14ever_RemoveAllProps();
+            votables_toggle_q14ever(0);
+            return;
+        }
+        if (vote_init("Disable q14ever", "", votables_q14ever_disable_and_clear_callback))
+            vote_yes();
+    }
+};
+
+// ----------------------------
+// The actual togglers
+// ----------------------------
+void(float on) votables_toggle_qwsucks =
+{
+    if (on)
+    {
+        clanring_allow_qwsucks = 1;
+        cvar_set("cr_allow_qwsucks", "1"); // keep cvar in sync/persistent
+        bprint("\bQWSUCKS enabled\b (regular QuakeTag).\n");
+    }
+    else
+    {
+        clanring_allow_qwsucks = 0;
+        cvar_set("cr_allow_qwsucks", "0");
+        bprint("\bQWSUCKS disabled\b.\n");
+    }
+};
+
+
+void(float on) votables_toggle_q14ever =
+{
+    if (on)
+    {
+        clanring_allow_q14ever = 1;
+        cvar_set("cr_allow_q14ever", "1");
+        bprint("\bQ14EVER enabled\b (overlay).\n");
+    }
+    else
+    {
+        clanring_allow_q14ever = 0;
+        cvar_set("cr_allow_q14ever", "0");
+        bprint("\bQ14EVER disabled\b.\n");
+        // Defensive: ensure no lingering prop
+        Q14ever_RemoveAllProps();
+    }
 };
 

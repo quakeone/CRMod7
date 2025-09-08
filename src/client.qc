@@ -29,6 +29,14 @@ void() PlayerDead;
 void(entity client, float fragval) client_frag;
 void(entity client) clear_afk_status;
 void () client_afk_off;
+void() quaketag_init;
+void() votables_request_qwsucks;   // new: single-command toggle+auto-start
+void() votables_request_q14ever;   // new: single-command toggle+auto-start
+void () client_typing_on;
+void () client_typing_off;
+
+// Entity field declarations
+.float just_suicided; // set briefly when a death is a self-kill/suicide
 
 /*
 =============================================================================
@@ -316,6 +324,9 @@ void() IntermissionThink =
 {
     VoteMenu_Print();
 
+    // Keep typing/AFK status synced during intermission
+    check_client_status();
+
     if (self.button0 || self.button2) 								//Jump or fire to wake up
         client_afk_off();
 
@@ -408,6 +419,8 @@ void() execute_changelevel =
     while (other != world)
     {
 //		bcount = bcount + 1;
+        // Removed forced typing clear; allow status to persist and update during intermission
+
         setorigin(other, intermission_pos.origin);
 
         other.view_ofs 		= '0 0 0';
@@ -533,7 +546,13 @@ void() ClientKill =
 
     if (mode_is_arena())
     {
-        return;
+        // Allow kill for RA participants to escape getting stuck; keep disabled for other arena modes
+        if (!(clanring_playmode & CLANRING_RA_MODE))
+            return;
+
+        // Disallow kill during countdown (before round is actually playing or while wait > 0)
+        if ((boss.state != CA_MATCH_PLAYING) || (boss.wait > 0))
+            return;
     }
 
     if (gameover)
@@ -575,6 +594,15 @@ void() ClientKill =
 
     set_suicide_frame();
 
+    // In Rocket Arena, treat kill as a round death without auto-respawn
+    if ((mode_is_arena()) && (clanring_playmode & CLANRING_RA_MODE))
+    {
+        self.health = 0;
+        self.ca_player_flag = PF_DEAD;
+        self.nextthink = -1;
+        self.think = SUB_Null;
+    }
+
     // ELOHIM_MOD
     //
     // - use client_frag so that penalty will be added to team score
@@ -586,7 +614,9 @@ void() ClientKill =
 
     if (!(clanring_playmode & CLANRING_MATCH_MODE) || clanring_state & CLANRING_MATCH_STARTED)
     {
+        self.just_suicided = time;
         client_frag(self, -1);
+        self.just_suicided = 0;
         self.mangle_x = self.mangle_x + 1;
     }
 
@@ -837,7 +867,7 @@ void() PutClientInServer =
     if (self.style & CLANRING_CONNECTED)
     {
         if (!(self.style & CLANRING_AFK_CLIENT))
-            updatename(self,self.netname); //R00k: workaround for qss server losing userinfo
+            clear_name(); //R00k: workaround for qss server losing userinfo
         else
             afk_name();
     }
@@ -893,7 +923,11 @@ void() PutClientInServer =
     self.classname 				= "player";
     self.health 				= 100;
     self.takedamage 			= DAMAGE_AIM;
-    self.solid 					= SOLID_SLIDEBOX;
+    // Set solidity based on leavemealone flag
+    if (self.leavemealone)
+        self.solid = SOLID_TRIGGER;
+    else
+        self.solid = SOLID_SLIDEBOX;
     self.movetype 				= MOVETYPE_WALK;
     self.finaldest_y 			= MOVETYPE_WALK;
     self.show_hostile 			= 0;
@@ -1521,6 +1555,18 @@ void() PlayerPreThink =
             }
         }
     }*/
+
+    // Keep bbox and link sane while intangible
+    if (self.leavemealone)
+    {
+        if ((self.mins_x == 0) || (self.mins_y == 0))
+            setsize(self, VEC_HULL_MIN, VEC_HULL_MAX);
+
+        if (self.solid != SOLID_TRIGGER)
+            self.solid = SOLID_TRIGGER;
+
+        setorigin(self, self.origin); // relink to avoid world hull squash
+    }
 };
 
 //R00k: Silly function for practice mode when an admin get pent
@@ -1591,14 +1637,14 @@ void() CheckPowerups =
                 if (self.invisible_time == 1)
                 {
                     sprint(self, "Ring of Shadows magic is fading\n");
-                    //stuffcmd(self, "bf\n");
+                    stuffcmd(self, "bf\n");
                     sound (self, CHAN_AUTO, "items/inv2.wav", 1, ATTN_NORM);
                     self.invisible_time = time + 1;
                 }
                 if (self.invisible_time < time)
                 {
                     self.invisible_time = time + 1;
-                    //stuffcmd(self, "bf\n");
+                    stuffcmd(self, "bf\n");
                 }
             }
 
@@ -1654,14 +1700,14 @@ void() CheckPowerups =
                 {
                     if (!(clanring_playmode & CLANRING_DMM4_MODE) && !(clanring_playmode & CLANRING_AIRSHOT_MODE))
                         sprint(self, "Protection is almost burned out\n");
-                    //stuffcmd(self, "bf\n");
+                    stuffcmd(self, "bf\n");
                     sound (self, CHAN_AUTO, "items/protect2.wav", 1, ATTN_NORM);
                     self.invincible_time = time + 1;
                 }
                 if (self.invincible_time < time)
                 {
                     self.invincible_time = time + 1;
-                    //stuffcmd(self, "bf\n");
+                    stuffcmd(self, "bf\n");
                 }
             }
             if (self.invincible_finished < time)
@@ -1698,14 +1744,14 @@ void() CheckPowerups =
                 {
                     if (!(clanring_playmode & CLANRING_AIRSHOT_MODE))
                         sprint(self, "Quad Damage is wearing off\n");
-                    //stuffcmd(self, "bf\n");
+                    stuffcmd(self, "bf\n");
                     sound (self, CHAN_AUTO, "items/damage2.wav", 1, ATTN_NORM);
                     self.super_time = time + 1;
                 }
                 if (self.super_time < time)
                 {
                     self.super_time = time + 1;
-                    //stuffcmd(self, "bf\n");
+                    stuffcmd(self, "bf\n");
                 }
             }
             if (self.super_damage_finished < time)
@@ -1755,14 +1801,14 @@ void() CheckPowerups =
             if (self.rad_time == 1)
             {
                 sprint(self, "Air supply in Biosuit expiring\n");
-                //stuffcmd(self, "bf\n");
+                stuffcmd(self, "bf\n");
                 sound (self, CHAN_AUTO, "items/suit2.wav", 1, ATTN_NORM);
                 self.rad_time = time + 1;
             }
             if (self.rad_time < time)
             {
                 self.rad_time = time + 1;
-                //stuffcmd(self, "bf\n");
+                stuffcmd(self, "bf\n");
             }
         }
         if (self.radsuit_finished < time)
@@ -1927,6 +1973,12 @@ void() PlayerPostThink =
 
     if (self.style & CLANRING_OBSERVER)
     {
+        // If they switch to observer, make sure leavemealone is cleared
+        // so it doesn't persist when returning to play.
+        if (self.leavemealone)
+        {
+            self.leavemealone = 0;
+        }
         self.effects = 0;
         observer_post_think ();
         return;
@@ -2035,14 +2087,16 @@ void() PlayerPostThink =
                 else
                 {
                     // Either teams not balanced, insufficient players, or multiple unready - turn off glow
-                    if (self.effects & EF_RED)
+                    // Do NOT remove EF_RED if invulnerability is currently active (covers pent and spawn protection)
+                    if ((self.effects & EF_RED) && !(self.invincible_finished > time))
                         self.effects = self.effects - (self.effects & EF_RED);
                 }
             }
             else
             {
-                if (self.effects & EF_RED)
-                self.effects = self.effects - (self.effects & EF_RED);
+                // Player is ready; remove unready red glow but preserve invulnerability red if active
+                if ((self.effects & EF_RED) && !(self.invincible_finished > time))
+                    self.effects = self.effects - (self.effects & EF_RED);
             }
         }
     }
@@ -2154,6 +2208,11 @@ void() ClientConnect =
     {
         self.csqc_enabled = TRUE;
     }
+
+    utils_ui_supported_now();
+
+    // Reset quad disabled message flag (show once per map per client)
+    self.quadDisabledMsgShown = 0;
 };
 
 /*
@@ -2276,6 +2335,8 @@ void() ClientDisconnect =
 //
 void(entity client, float fragval) client_frag =
 {
+    local float old_frags, window, old_togo, togo; // Declare locals once to avoid duplicates
+
     if ((clanring_playmode & CLANRING_CA_MODE) || (clanring_playmode & CLANRING_RA_MODE))
         return;
 
@@ -2305,7 +2366,42 @@ void(entity client, float fragval) client_frag =
     }
     else
     {
+        // Track old frags so we can detect leaving/entering the window
+        old_frags = client.frags;
         client.frags += fragval;
+
+        // Late-game status for plain DM (not match/arena/CTF/practice)
+        if ( fraglimit
+          && !(clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+          && !(clanring_playmode & CLANRING_PRACTICE_MODE)
+          && !(mode_is_arena()) )
+        {
+            window   = 4; // announce when 1..4 remain
+            old_togo = fraglimit - old_frags;
+            togo     = fraglimit - client.frags;
+
+            if (fragval < 0)
+            {
+                // Announce if we were in the window OR still are after the loss
+                if ( ((togo >= 1) && (togo <= window)) || ((old_togo >= 1) && (old_togo <= window)) )
+                {
+                    bprint4(client.netname, " lost a frag (",
+                            strings_ftos_gold(togo),
+                            sprintf(" %s)\n", redify("to win")));
+                }
+                // no generic "has NN frags" line on a loss
+            }
+            else if ((togo >= 1) && (togo <= window))
+            {
+                if (togo == 1)
+                    bprint2(client.netname, " is on \bgame point\b!\n");
+                else
+                    bprint4(client.netname, " has ",
+                            strings_ftos_gold(client.frags),
+                            sprintf(" frags (%s %s)\n", strings_ftos_gold(togo), redify("to win")));
+            }
+        }
+
         if (client.frags >= fraglimit)
         {
             if (fraglimit && (clanring_levelcount == -1) && (!(mode_is_arena())))//bucksh0t: arena modes will handle fraglimit, stay on map)
@@ -2417,7 +2513,9 @@ void(entity targ, entity attacker) ClientObituary =
                 else
                 {
                     targ.mangle_x = targ.mangle_x + 1;
+                    targ.just_suicided = time;
                     client_frag (targ, -1);
+                    targ.just_suicided = 0;
                     announce2(targ.netname, " is now just a greasy spot on the floor");
                     return;
                 }
@@ -2431,7 +2529,9 @@ void(entity targ, entity attacker) ClientObituary =
                 attacker.mangle_x = attacker.mangle_x + 1;
                 if (attacker.super_damage_finished > time)
                     attacker.clanring_qdkill_z = (attacker.clanring_qdkill_z + 1);
+                attacker.just_suicided = time;
                 client_frag (attacker, -1);
+                attacker.just_suicided = 0;
 
                 if (targ.deathtype == "grenade")
                 {
@@ -3086,6 +3186,9 @@ void(string cmd) SV_ParseClientCommand =
 
     switch (arg0)
     {
+        // removed: webhooktest
+        // removed: urigettest / uriposttest
+
         case "altents":
             votables_request_set_altents();
             return;
@@ -3128,6 +3231,80 @@ void(string cmd) SV_ParseClientCommand =
                 votables_select_fraglimit();
             return;
 
+        case "timeset":
+            // Optional numeric argument: minutes. Without args, open the menu
+            if (arg1 != "")
+            {
+                votables_request_set_timelimit(stof(arg1));
+            }
+            else
+            {
+                votables_select_timelimit();
+            }
+            return;
+
+        case "admin":
+            // Support both interactive and direct code entry: "cmd admin 123456"
+            if (arg1 == "")
+            {
+                admin_start_code();
+                return;
+            }
+
+            // If admin codes are disabled
+            if (array_password[0] == 0)
+            {
+                sprint(self, "Administrator password disabled\n");
+                sprint(self, "Edit the 'configs/clanring.cfg' on the server.\n");
+                return;
+            }
+
+            // If already admin, do nothing
+            if (self.style & CLANRING_ADMINISTRATOR)
+            {
+                sprint(self, "You are already an administrator.\n");
+                return;
+            }
+
+            // Parse numeric code and validate reasonable length (4-7 digits)
+            local float code, len;
+            len = strlen(arg1);
+            code = stof(arg1);
+
+            if (len < 4 || len > 7 || code < 1000 || code > 9999999)
+            {
+                sprint(self, "Invalid code\n");
+                self.clanring_hack_count = self.clanring_hack_count + 1;
+                if (self.clanring_hack_count > 3)
+                {
+                    announce2(self.netname, " kicked for admin hacking");
+                    clanring_kick_player(self);
+                }
+                return;
+            }
+
+            // Check against configured admin codes
+            local float i;
+            for (i = 0; i < array_password.length; i = i + 1)
+            {
+                if (code == array_password[i])
+                {
+                    self.clanring_hack_count = i;
+                    admin_create();
+                    return;
+                }
+            }
+
+            // Not matched
+            sprint(self, "Invalid code\n");
+            self.clanring_hack_count = self.clanring_hack_count + 1;
+            if (self.clanring_hack_count > 3)
+            {
+                announce2(self.netname, " kicked for admin hacking");
+                clanring_kick_player(self);
+            }
+            return;
+
         case "afkon":
             client_afk_on();
             return;
@@ -3166,10 +3343,27 @@ void(string cmd) SV_ParseClientCommand =
                 utils_show_last_disconnects();
                 return;
 
+        case "lastscores":
+                utils_show_last_scores();
+                return;
+
         case "powerupdrop":
         case "pudrop":
                 votables_request_set_powerupdrop();
                 return;
+
+        // Back-compat alias: 'quaketag' behaves like 'qwsucks' toggle/start
+        case "quaketag":
+            votables_request_qwsucks();
+            return;
+
+        case "qwsucks":
+            votables_request_qwsucks();
+            return;
+
+        case "q14ever":
+            votables_request_q14ever();
+            return;
 
         case "dm":
             if (arg2 != "")
@@ -3371,6 +3565,252 @@ void(string cmd) SV_ParseClientCommand =
             }
             votables_request_set_gametype_mode_map(3, -1, 0);
             return;
+
+        // Position tools (prewar only; DM/CTF match mode)
+        case "pos_save":
+        {
+            if (!((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED) && !mode_is_arena()))
+            {
+                sprint(self, "Position commands only work during prewar.\n");
+                return;
+            }
+            if (self.style & CLANRING_OBSERVER)
+            {
+                sprint(self, "Observers cannot save positions.\n");
+                return;
+            }
+            self.saved_pos_origin = self.origin;
+            self.saved_pos_angles = self.v_angle;
+            self.saved_pos_velocity = self.velocity;
+            self.saved_pos_valid = 1;
+            sprint(self, "Position was saved.\n");
+            return;
+        }
+
+        case "pos_move":
+        {
+            if (!((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED) && !mode_is_arena()))
+            {
+                sprint(self, "Position commands only work during prewar.\n");
+                return;
+            }
+            if (self.style & CLANRING_OBSERVER)
+            {
+                sprint(self, "Observers cannot restore positions.\n");
+                return;
+            }
+            if (!self.saved_pos_valid)
+            {
+                sprint(self, "No saved position. Use 'pos_save' first.\n");
+                return;
+            }
+            // Rate limit to once per second
+            if (time < self.saved_pos_last_move_time + 1)
+            {
+                sprint(self, "Please wait before using pos_move again.\n");
+                return;
+            }
+            // Fail if target location is occupied
+            tracebox(self.saved_pos_origin, VEC_HULL_MIN, VEC_HULL_MAX, self.saved_pos_origin, 0, self);
+            if (trace_startsolid || trace_fraction < 1)
+            {
+                sprint(self, "Saved location is occupied.\n");
+                return;
+            }
+            // If carrying a flag, return flags to base
+            if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (self.items & (IT_KEY1 | IT_KEY2)))
+            {
+                TeamCaptureRegenFlags();
+            }
+            // Teleport effects similar to trigger_teleport
+            spawn_tfog(self.origin);
+            setorigin(self, self.saved_pos_origin);
+            self.angles = self.v_angle = self.saved_pos_angles;
+            if (isFTEserver)
+                self.fixangle = 3;
+            else
+                self.fixangle = TRUE;
+            self.flags = self.flags - (self.flags & FL_ONGROUND);
+            self.velocity = self.saved_pos_velocity;
+            spawn_tfog(self.origin);
+            self.saved_pos_last_move_time = time;
+            sprint(self, "Position was restored.\n");
+            return;
+        }
+
+        case "pos_show":
+        {
+            if (!self.saved_pos_valid)
+            {
+                sprint(self, "No saved position. Use 'pos_save' first.\n");
+                return;
+            }
+            sprint(self, sprintf("Saved origin: %s\n", vtos(self.saved_pos_origin)));
+            sprint(self, sprintf("Saved angles: %s\n", vtos(self.saved_pos_angles)));
+            sprint(self, sprintf("Saved velocity: %s\n", vtos(self.saved_pos_velocity)));
+            sprint(self, sprintf("Current origin: %s\n", vtos(self.origin)));
+            sprint(self, sprintf("Current angles: %s\n", vtos(self.v_angle)));
+            sprint(self, sprintf("Current velocity: %s\n", vtos(self.velocity)));
+            return;
+        }
+
+        case "pos_origin":
+        {
+            if (!((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED) && !mode_is_arena()))
+            {
+                sprint(self, "Position commands only work during prewar.\n");
+                return;
+            }
+            if (self.style & CLANRING_OBSERVER)
+            {
+                sprint(self, "Observers cannot set positions.\n");
+                return;
+            }
+            local string sx, sy, sz;
+            local vector base;
+            base = self.saved_pos_valid ? self.saved_pos_origin : self.origin;
+            sx = argv(1);
+            sy = argv(2);
+            sz = argv(3);
+            if (sx == "" || sy == "" || sz == "")
+            {
+                sprint(self, "Usage: pos_origin x y z (use * to keep current)\n");
+                return;
+            }
+            if (sx != "*") base_x = stof(sx);
+            if (sy != "*") base_y = stof(sy);
+            if (sz != "*") base_z = stof(sz);
+            self.saved_pos_origin = base;
+            self.saved_pos_angles = self.v_angle;
+            self.saved_pos_velocity = self.velocity;
+            self.saved_pos_valid = 1;
+            sprint(self, sprintf("Saved origin set to %s\n", vtos(self.saved_pos_origin)));
+            return;
+        }
+
+        case "pos_angles":
+        {
+            if (!((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED) && !mode_is_arena()))
+            {
+                sprint(self, "Position commands only work during prewar.\n");
+                return;
+            }
+            if (self.style & CLANRING_OBSERVER)
+            {
+                sprint(self, "Observers cannot set positions.\n");
+                return;
+            }
+            local string ax, ay, az;
+            local vector basea;
+            basea = self.saved_pos_valid ? self.saved_pos_angles : self.v_angle;
+            ax = argv(1);
+            ay = argv(2);
+            az = argv(3);
+            if (ax == "" || ay == "" || az == "")
+            {
+                sprint(self, "Usage: pos_angles pitch yaw roll (use * to keep current)\n");
+                return;
+            }
+            if (ax != "*") basea_x = stof(ax);
+            if (ay != "*") basea_y = stof(ay);
+            if (az != "*") basea_z = stof(az);
+            self.saved_pos_angles = basea;
+            self.saved_pos_origin = self.saved_pos_valid ? self.saved_pos_origin : self.origin;
+            self.saved_pos_velocity = self.velocity;
+            self.saved_pos_valid = 1;
+            sprint(self, sprintf("Saved angles set to %s\n", vtos(self.saved_pos_angles)));
+            return;
+        }
+
+        case "leavemealone":
+        {
+            // Global off switch
+            registercvar("cr_allow_leavemealone", "1");
+            local float allow_lma = cvar("cr_allow_leavemealone");
+            if (allow_lma < 1)
+            {
+                sprint(self, sprintf("Leave-me-alone command is disabled on this server (cvar value: %g)\n", allow_lma));
+                return;
+            }
+
+            // Prewar only; Rocket Arena blocked
+            if (match_in_progress())
+            {
+                sprint(self, "Cannot use leave-me-alone during a match\n");
+                return;
+            }
+            if (clanring_playmode & CLANRING_RA_MODE) // keep RA lobby logic clean
+            {
+                sprint(self, "Leave-me-alone is not available in Rocket Arena\n");
+                return;
+            }
+
+            // Observers cannot use leavemealone
+            if (self.style & CLANRING_OBSERVER)
+            {
+                sprint(self, "Observers cannot use leave-me-alone\n");
+                return;
+            }
+
+            // Per-client 5s cooldown
+            if (time < self.next_lma_toggle)
+            {
+                local float remain;
+                remain = self.next_lma_toggle - time;
+                if (remain < 0) remain = 0;
+                sprint(self, strcat("Please wait ", ftos(ceil(remain)), " seconds before using leave-me-alone again\n"));
+                return;
+            }
+
+            // Toggle OFF -> ON (become intangible)
+            if (!self.leavemealone)
+            {
+                self.leavemealone = 1;
+                self.solid = SOLID_TRIGGER; // intangible to players/projectiles; bbox maintained elsewhere
+                setorigin(self, self.origin); // relink
+                stuffcmd(self, "play buttons/switch04.wav\n");
+                sprint(self, "Leave-me-alone: \bon\b (you are intangible; no pickups/telefrags)\n");
+                // Notify everyone EXCEPT the toggling player
+                {
+                    entity p = world;
+                    while ( (p = find(p, classname, "player")) )
+                    {
+                        if (p != self)
+                        {
+                            sprint2(p, self.netname, " wants to be left alone\n");
+                        }
+                    }
+                }
+                self.next_lma_toggle = time + 5;
+                return;
+            }
+
+            // Toggle ON -> OFF (return to solid). Prevent popping inside others.
+            if (AnySolidPlayerInRadius(self, 32))
+            {
+                sprint(self, "Can't turn off leave-me-alone here, someone is too close\n");
+                return;
+            }
+
+            self.leavemealone = 0;
+            self.solid = SOLID_SLIDEBOX;
+            setorigin(self, self.origin); // relink as solid
+            stuffcmd(self, "play buttons/switch04.wav\n");
+            sprint(self, "Leave-me-alone: \boff\b (you are solid again)\n");
+            // Notify everyone EXCEPT the toggling player
+            {
+                entity other_player = world;
+                while ( (other_player = find(other_player, classname, "player")) )
+                {
+                    if (other_player != self)
+                    {
+                        sprint2(other_player, self.netname, " no longer wants to be left alone\n");
+                    }
+                }
+            }
+            self.next_lma_toggle = time + 5;
+            return;
+        }
 
         default:
             if (arg0 != "")

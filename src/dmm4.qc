@@ -119,11 +119,11 @@ void () dmm4_main_loop =
 {
 	if ((clanring_state & CLANRING_MATCH_PAUSED) && (!boss.unpausing))
 	{
-		if (time > boss.lip)
+		if (time > boss.pauseblink)
 		{
 			WriteByte (MSG_ALL, SVC_CENTERPRINT);
 			WriteString (MSG_ALL, "\n\X90PAUSED\X91\n");
-			boss.lip = time + 1.5;
+			boss.pauseblink = time + 1.5;
 		}
 		return;
 	}
@@ -210,6 +210,8 @@ void () dmm4_main_loop =
 					boss.timetofight = TRUE;
 					boss.suddendeath = FALSE;
 					boss.state = CA_MATCH_PLAYING;
+					// Clear leave-me-alone flags for all players
+					utils_do_players(match_clear_leavemealone);
                     clanring_timelimit = default_timelimit;
                     boss.lip = clanring_timelimit;
                     boss.count = 0;
@@ -409,6 +411,14 @@ void () arena_timer_think =
 	if ((!clanring_timelimit) || (boss.suddendeath))
 		return;
 
+	// Do not advance the round clock while the match is paused
+	if (clanring_state & CLANRING_MATCH_PAUSED)
+	{
+		pqc_match_time(boss.lip, boss.count);
+		arena_show_timelimit();
+		return;
+	}
+
 	boss.count -= 1;
 
 	if (boss.count < 0)
@@ -417,8 +427,7 @@ void () arena_timer_think =
 		boss.lip -= 1;
 	}
 
-	if (!(clanring_state & CLANRING_MATCH_PAUSED))
-		pqc_match_time(boss.lip, boss.count);
+	pqc_match_time(boss.lip, boss.count);
 
 	arena_show_timelimit();
 

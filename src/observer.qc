@@ -249,7 +249,7 @@ void () observer_walk_start =
 
 //	droptofloor(0, 0);
 //R00k: removing this junk (3/04/2022)
-/*	if (self.style & CLANRING_FOUND_BINDINGS)// CRMOD - don't send sm0 if they don't have that alias
+	if (self.style & CLANRING_FOUND_BINDINGS)// CRMOD - don't send sm0 if they don't have that alias
 		stuffcmd(self, "sm0\n");// CRMOD - smoothing off
 	else
 		stuffcmd(self, "cl_nolerp 0\n");// CRMOD - send the real thing instead
@@ -257,7 +257,6 @@ void () observer_walk_start =
 	sprint(self, "walk mode\n");
 	if (!(self.style & CLANRING_HEADS_UP))
 		sprint(self, "type 'headsup' for fullscreen display\n");
-*/
 	observer_update_player_observer_key(self);
 
 	if (mode_is_arena())
@@ -293,7 +292,6 @@ void () observer_fly_start =
 		sprint(self, "type 'headsup' for fullscreen display\n");
 */
 	sprint(self, "fly mode\n");
-	centerprint(self, "fly mode\n");
 	if (mode_is_arena())
 	{
 		if (boss.state == CA_MATCH_WAITING)
@@ -454,7 +452,13 @@ void () observer_chase_start =
 //
 void () observer_demo_start =
 {
-	observer_check_demo_end();
+	local float was_in_demo;
+	was_in_demo = (self.oflags & OBSERVER_DEMO);
+
+	if (!was_in_demo)
+	{
+		observer_check_demo_end();
+	}
 
 	// If a player number was provided, try to find that specific player
 	if (self.observer_number)
@@ -467,19 +471,30 @@ void () observer_demo_start =
 				// Only allow targeting connected players who aren't observers
 				if ((target.style & CLANRING_CONNECTED) && !(target.style & CLANRING_OBSERVER))
 				{
-					self.movetarget = target;
-					break;
+					// In arena modes, if actively participating this round, restrict to teammates
+					if ((mode_is_arena()) && (self.next_team != world) && ((self.ca_player_flag == PF_PLAYING) || (self.ca_player_flag == PF_DEAD)))
+					{
+						if (target.next_team == self.next_team)
+						{
+							self.movetarget = target;
+							break;
+						}
+					}
+					else
+					{
+						self.movetarget = target;
+						break;
+					}
 				}
 			}
 			target = find(target, classname, "player");
 		}
 
-    	self.observer_number = 0;  // Clear the number here?
+		self.observer_number = 0;  // Clear the number here?
 
 		if (!self.movetarget)
 		{
 			sprint(self, "Player number not found or is an observer\n");
-
 			observer_fly_start();
 			return;
 		}
@@ -493,23 +508,45 @@ void () observer_demo_start =
 		}
 	}
 
-    if (!self.movetarget || self.movetarget.classname != "player")
-    {
-        // see if we can find a target to chase
-        self.movetarget = observer_find_target(world);
-        if (!self.movetarget)
-        {
-            sprint(self, "no chase target found\n");
+	if (!self.movetarget || self.movetarget.classname != "player")
+	{
+		// see if we can find a target to chase
+		self.movetarget = observer_find_target(world);
+		if (!self.movetarget)
+		{
+			sprint(self, "no chase target found\n");
 			observer_fly_start();
-            return;
-        }
-        self.delay = 0;
-    }
+			return;
+		}
+		self.delay = 0;
+	}
 
-    observer_clear_flags();
-    self.oflags = self.oflags | OBSERVER_DEMO;
-    self.finaldest_y = self.movetype = MOVETYPE_FLY;
-    self.view_ofs = '0 0 22';
+	// If already in eyecam, just update the viewport+position for the new target
+	if (was_in_demo && (self.movetarget != world))
+	{
+		// Apply pending auto-pov once if requested
+		if (self.oflags & OBSERVER_GO_AUTO)
+		{
+			sprint(self, "Automatic Eyecam Enabled.\n");
+			self.oflags = self.oflags - OBSERVER_GO_AUTO;
+			self.oflags = self.oflags | OBSERVER_AUTO;
+		}
+
+		// Ensure our own model stays hidden to avoid stray eyes rendering
+		setmodel(self, string_null);
+
+		msg_entity = self;
+		WriteByte(MSG_ONE, SVC_SETVIEWPORT);
+		WriteEntity(MSG_ONE, self.movetarget);
+		observer_set_demo_position();
+		observer_update_player_observer_key(self);
+		return;
+	}
+
+	observer_clear_flags();
+	self.oflags = self.oflags | OBSERVER_DEMO;
+	self.finaldest_y = self.movetype = MOVETYPE_FLY;
+	self.view_ofs = '0 0 22';
 
 	msg_entity = self;
 	WriteByte(MSG_ONE, SVC_SETVIEWPORT);
@@ -520,10 +557,6 @@ void () observer_demo_start =
 
 	stuffcmd(self, "v_centerspeed 0\n");
 	sprint(self, "eyecam mode\n");
-    
-	// if (!(self.style & CLANRING_HEADS_UP))
-    // 	sprint(self, "type 'headsup' for fullscreen display\n");
-	// sprint(self, "type 'smooth' to eliminate choppines\n");
 	
 	observer_update_player_observer_key(self);
 
@@ -540,7 +573,7 @@ void () observer_demo_start =
 	}
 
 	self.nextthink = -1;
-    self.think = SUB_Null;
+	self.think = SUB_Null;
 	if ((((clanring_playmode & CLANRING_MATCH_MODE)&&(!(clanring_state & CLANRING_MATCH_STARTED)))||(clanring_playmode & CLANRING_NORMAL_MODE))||(self.statstate < 0))
 	{	
 		if (self.oflags & OBSERVER_AUTO)
@@ -560,6 +593,17 @@ void () observer_start =
 {
 	//local float go_auto;
 	local string tmp="";
+
+	// Add "left the game" message for normal DM and CTF modes
+	local float was_playing = !(self.style & CLANRING_OBSERVER);
+	if (was_playing && !mode_is_arena() && !(clanring_playmode & CLANRING_MATCH_MODE))
+	{
+		if ((clanring_playmode & CLANRING_NORMAL_MODE) &&
+			(!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) || (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)))
+		{
+			bprint2(self.netname, " left the game\n");
+		}
+	}
 
 	self.style = self.style | CLANRING_OBSERVER;
 
@@ -750,9 +794,9 @@ void() observer_end =
 		clear_name();
 		setcolour (self, self.team2,self.team2);
 		tmp = ftos (self.team2);
-		stuffcmd (self, "color ");
+		stuffcmd (self, ";color ");
 		stuffcmd (self, tmp);
-		stuffcmd (self, "\n");
+		stuffcmd (self, ";\n");
 
 		self.velocity = '0 0 0';//R00k 1.95
 		self.ca_player_flag = PF_PLAYING;
@@ -766,6 +810,17 @@ void() observer_end =
 	}
 
 	self.style 	= self.style - (self.style & CLANRING_OBSERVER);//dont clear the .oflags as we want to keep our observer settings.
+
+	// Add "joined the game" message for normal DM and CTF modes
+	if (!mode_is_arena() && !(clanring_playmode & CLANRING_MATCH_MODE))
+	{
+		if ((clanring_playmode & CLANRING_NORMAL_MODE) &&
+			(!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) || (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)))
+		{
+			bprint2(self.netname, " entered the game\n");
+		}
+	}
+
 	self.dmg_tally = 0;
 
 	if (!mode_is_arena())
@@ -800,7 +855,7 @@ void() observer_end =
 	if (!mode_is_arena())
 		stats_reset_player();
 	clear_afk_status(self);		//R00k: added (12/7/2022)
-	SetNewParms2();	
+	SetNewParms2();
 	PutClientInServer();
 };
 
@@ -974,8 +1029,10 @@ void () observer_arena_next_target =
 
     entity newt;
 
-    // With cam lock a player can only track his teammates.
-    if (self.next_team != world)
+    // With cam lock, only active team members (playing or dead this round)
+    // are restricted to tracking their teammates. Pure observers or those
+    // not currently in the round can cycle through all players.
+    if ((self.next_team != world) && ((self.ca_player_flag == PF_PLAYING) || (self.ca_player_flag == PF_DEAD)))
         newt = observer_find_team_target(self.movetarget);
     else
          newt = observer_find_target(self.movetarget);
@@ -996,7 +1053,7 @@ void () observer_arena_next_target =
 
     self.delay = 0;
 
-    if (((self.oflags & OBSERVER_DEMO) && (self.movetarget != world)) && (self.movetarget.player_flag == PF_PLAYING))
+    if ((self.oflags & OBSERVER_DEMO) && (self.movetarget != world))
     {
         msg_entity = self;
         WriteByte(MSG_ONE, SVC_SETVIEWPORT);

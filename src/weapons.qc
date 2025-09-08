@@ -92,6 +92,10 @@ void() W_FireAxe =
 	if (trace_fraction == 1.0)
 		return;
 	
+	// Prewar: ignore LMA players (and skip visuals)
+	if (!match_in_progress() && trace_ent && trace_ent.classname == "player" && trace_ent.leavemealone)
+		return;
+	
 	org = trace_endpos - v_forward*4;
 
 	if (trace_ent.takedamage)
@@ -259,6 +263,13 @@ void(float damage, vector dir) TraceAttack =
 {
 	local	vector	vel = '0 0 0', org = '0 0 0';
 
+	// Prewar: ignore LMA players (and skip visuals)
+	if (!match_in_progress())
+	{
+		if (trace_ent && trace_ent.classname == "player" && trace_ent.leavemealone)
+			return;
+	}
+
 	org = (trace_endpos - (dir * 4));
 
 	if (trace_ent.takedamage)
@@ -410,6 +421,10 @@ void() T_MissileTouch =
 	if (other == self.owner)
 		return;		// don't explode on owner
 
+	// Prewar: don't detonate on LMA players
+	if (!match_in_progress() && other && other.classname == "player" && other.leavemealone)
+		return;
+
 	if (pointcontents(self.origin) == CONTENT_SKY)
 	{
 		remove(self);
@@ -560,6 +575,10 @@ LightningDamage
 void(vector p1, vector p2, entity from, float damage) LightningDamage =
 {
 	traceline (p1, p2, FALSE, self);
+
+	// Prewar: ignore LMA players (and skip visuals)
+	if (!match_in_progress() && trace_ent && trace_ent.classname == "player" && trace_ent.leavemealone)
+		return;
 
 	if (trace_ent.takedamage)
 	{
@@ -715,6 +734,10 @@ void() GrenadeExplode =
 
 void() GrenadeTouch =
 {
+	// Prewar: don't detonate on LMA players
+	if (!match_in_progress() && other && other.classname == "player" && other.leavemealone)
+		return;
+
 	if (other == self.owner)
 		return;		// don't explode on owner
 
@@ -946,6 +969,10 @@ void() spike_touch =
 	if (other == self.owner)
 		return;
 
+	// Prewar: pass through LMA players
+	if (!match_in_progress() && other && other.classname == "player" && other.leavemealone)
+		return;
+
 	if (other.solid == SOLID_TRIGGER)
 		return; // trigger field, do nothing
 
@@ -983,6 +1010,10 @@ void() spike_touch =
 void() superspike_touch =
 {
 	if (other == self.owner)
+		return;
+
+	// Prewar: pass through LMA players
+	if (!match_in_progress() && other && other.classname == "player" && other.leavemealone)
 		return;
 
 	if (other.solid == SOLID_TRIGGER)

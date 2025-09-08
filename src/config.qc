@@ -11,6 +11,15 @@ void(string command, string value) config_command =
 {
 	switch(command)
 	{
+        case "captimesdiscordurl":
+        {
+            // Store privately (not visible via serverinfo) for webhook usage
+            // Zone a copy to avoid temp-string lifetime issues; free old if set
+            if (clanring_captimesdiscordurl != string_null && clanring_captimesdiscordurl != "")
+                strunzone(clanring_captimesdiscordurl);
+            clanring_captimesdiscordurl = strzone(value);
+            break;
+        }
 		case "matchsoundson":
 		{
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;
@@ -37,6 +46,11 @@ void(string command, string value) config_command =
 		case "tdmticrate":
 		{
 			clanring_tdm_ticrate = stof(value);
+			break;
+		}
+		case "cr_allow_leavemealone":
+		{
+			cvar_set("cr_allow_leavemealone", value);
 			break;
 		}
 		case "setadmin":
@@ -164,6 +178,8 @@ void(string command, string value) config_command =
 		case "ringon":
 		{
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;
+			// Force-enable ring and apply immediately
+			clanring_force_ring = 1;
 			if (clanring_playmode & CLANRING_NO_RING)
 				votables_set_ring ();
 			break;
@@ -171,10 +187,18 @@ void(string command, string value) config_command =
 		case "ringoff":
 		{
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;
+			// Force-disable ring and apply immediately
+			clanring_force_ring = -1;
 			if (!(clanring_playmode & CLANRING_NO_RING))
 				votables_set_ring ();
 			break;
 		}
+        case "ringauto":
+        {
+            // Return to automatic ring behavior (team-size based)
+            clanring_force_ring = 0;
+            break;
+        }
 		case "modevoteon":
 		{
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;
@@ -442,6 +466,7 @@ void(string command, string value) config_command =
 					clanring_state = clanring_state | CLANRING_IGNORE_CONSOLE;
 				else
 					clanring_state = clanring_state - (clanring_state & CLANRING_IGNORE_CONSOLE);
+				// no-op: removed debug prints
 			}
 
 			if (command == "-match-ctf-")
@@ -453,6 +478,7 @@ void(string command, string value) config_command =
 					clanring_state = clanring_state | CLANRING_IGNORE_CONSOLE;
 				else
 					clanring_state = clanring_state - (clanring_state & CLANRING_IGNORE_CONSOLE);
+				// no-op: removed debug prints
 			}
 
 			if (command == "-done-")
@@ -499,6 +525,40 @@ void(string command, string value) config_command =
 		{
 			if (!(clanring_state & CLANRING_IGNORE_CONSOLE))
 			{
+				// Ensure deathmatch updates are authoritative and visible
+				if (strtolower(command) == "deathmatch")
+				{
+					bprint("cfg: deathmatch -> ", value, "\n");
+					admin_dmset(stof(value));
+					console_deathmatch = stof(value);
+					// Ensure prewar weapon animation state matches new weaponstay
+					if ((clanring_playmode & CLANRING_MATCH_MODE) &&
+					    !(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) &&
+					    !(clanring_state & CLANRING_MATCH_STARTED))
+					{
+						if (stof(value) < 3)
+						{
+							utils_do_weapons(weapon_prewar_setup);
+							bprint("prewar: weapon animation setup (weaponstay off)\n");
+						}
+						else
+						{
+							utils_do_weapons(weapon_prewar_cleanup);
+							bprint("prewar: weapon animation cleanup (weaponstay on)\n");
+						}
+					}
+					break;
+				}
+				// Ensure timelimit from cfg sticks and updates match state; also set force flag
+				if (strtolower(command) == "timelimit")
+				{
+					bprint("cfg: timelimit -> ", value, "\n");
+					request_timelimit = stof(value);
+					votables_set_timelimit();
+					console_timelimit = stof(value);
+					clanring_force_timelimit = 1;
+					break;
+				}
 				dprint("setting cvar: ",command," to ",value,"\n");
 				cvar_set (command, value); break;
 			}
@@ -694,6 +754,32 @@ void() clanring_nextlevel_config =
         mode = "-dm-";
 
 	clanring_count_maps(mode);	//Set clanring_lastcount for this mode.
+
+	// When switching into RA mode, start rotation at a random map once
+	if ((clanring_playmode & CLANRING_RA_MODE) && (clanring_level <= 1))
+	{
+		if (clanring_lastcount > 0)
+		{
+			clanring_level = (floor(random() * clanring_lastcount) + 1);
+			print(sprintf("[Rotation] RA start randomized to %s of %s\n",
+						  ftos(clanring_level), ftos(clanring_lastcount)));
+		}
+	}
+
+    // When switching into DM normal mode, start rotation at a random map once
+    // Normal DM = NORMAL_MODE bit set, but NOT match mode and NOT practice mode.
+    if ((clanring_playmode & CLANRING_NORMAL_MODE)
+        && !(clanring_playmode & CLANRING_MATCH_MODE)
+        && !(clanring_playmode & CLANRING_PRACTICE_MODE)
+        && (clanring_level <= 1))
+    {
+        if (clanring_lastcount > 0)
+        {
+            clanring_level = (floor(random() * clanring_lastcount) + 1);
+            print(sprintf("[Rotation] DM start randomized to %s of %s\n",
+                          ftos(clanring_level), ftos(clanring_lastcount)));
+        }
+    }
     tokenize(levels[clanring_level]);
    	nextmap = strzone(argv(0));
 
@@ -734,6 +820,19 @@ void(string cfg) exec_clanring_cfg =
 			continue;
 		string cmd = argv(0);
 		if (cmd == "//" || cmd == "#" || cmd == "\n") continue; //Skip comments and blank lines.
+		// Support generic set syntax: set <name> <value>
+		if ((cmd == "set") || (cmd == "seta"))
+		{
+			if (argc >= 3)
+			{
+				cvar_set(argv(1), argv(2));
+			}
+			else
+			{
+				dprint("config: set missing args\n");
+			}
+			continue;
+		}
 		string val = argv(1);
 		dprint(cmd," ",val,"\n");
 		config_command(cmd, val);				//Parse the line.
@@ -755,10 +854,10 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 	string line;
 	string tt_player = "";
 	float tt_statvalue = 0,tt_teamcolor=0;
-	filestream f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
+	filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
 	if (f < 0)
 	{
-		f = fopen(sprintf("stats/%s", filename), FILE_READ);
+		f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
 	}
 	if (f < 0)
 	{
@@ -767,8 +866,28 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 	}
 
 	dprint("Loading ", filename, "...\n");
-	while ((line = fgets(f)))
+	_crx_peek_line = ""; // clear any stale cache
+	// Initialize metadata globals
+	if (crx_meta_date != "") strunzone(crx_meta_date);
+	crx_meta_date = "";
+	crx_meta_mt_remain = -1;
+	if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
+	crx_meta_mt_str = "";
+	while (TRUE)
 	{
+		// read first line of a record (player name),
+		// honoring any cached peek (used when we looked ahead last loop)
+		if (_crx_peek_line != "")
+		{
+			line = _crx_peek_line;
+			_crx_peek_line = "";
+		}
+		else
+		{
+			line = fgets(f);
+		}
+		if (!line) break;
+
 		float argc = tokenize(line);
 		if (!argc)
 			continue;
@@ -776,6 +895,51 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 		tt_player 	 = strtrim(line);
 		tt_teamcolor = stof(fgets(f));
 		tt_statvalue = stof(fgets(f));
+
+		// Default: no metadata for this row
+		if (crx_meta_date != "") strunzone(crx_meta_date);
+		crx_meta_date = "";
+		crx_meta_mt_remain = -1;
+		if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
+		crx_meta_mt_str = "";
+
+		// Look ahead one line for an optional "# meta ..." line.
+		// If it's not meta, cache it for the next loop.
+		string maybe = fgets(f);
+		if (maybe)
+		{
+			float argc2 = tokenize(maybe);
+			if (argc2 >= 3 && argv(0) == "#" && strtolower(argv(1)) == "meta")
+			{
+				// tokens: "#", "meta", [maybe "v2"], <iso>, ["mt", <secs>], ["mt_str", <text>]
+				float p = 2;
+				if (argc2 >= 4 && strtolower(argv(2)) == "v2")
+					p = 3;
+				if (argc2 > p) {
+					if (crx_meta_date != "") strunzone(crx_meta_date);
+					crx_meta_date = strzone(argv(p));
+				}
+				// parse trailing key/value pairs if present
+				float k = p + 1;
+				while (k + 1 < argc2)
+				{
+					string key = strtolower(argv(k));
+					string val = argv(k+1);
+					if (key == "mt")
+						crx_meta_mt_remain = stof(val);
+					else if (key == "mt_str") {
+						if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
+						crx_meta_mt_str = strzone(val);
+					}
+					k += 2;
+				}
+			}
+			else
+			{
+				_crx_peek_line = maybe; // not meta; feed back as next record's first line
+			}
+		}
+
 		if (tt_statvalue > 0)
 		{
 			if (desc == RECORD_LOW)
@@ -801,7 +965,9 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 }
 void () read_capture_stats =
 {
+	reset_records(0);
 	read_player_stats(sprintf("%s_captimes.crx", mapname), RECORD_LOW, 0);
+	reset_records(2);
 	read_player_stats(sprintf("%s_captimes_match.crx", mapname), RECORD_LOW, 2);
 };
 void () read_longrange_stats =
@@ -818,6 +984,7 @@ void () read_airshot_stats =
 void (string filename, float recordset) write_player_stats =
 {
 	float i=0;
+	string extra; // CRX v2: declare once for metadata formatting
 	filestream f = fopen(sprintf("stats/%s", filename), FILE_WRITE);
 	if (f<0)
 	{
@@ -843,6 +1010,15 @@ void (string filename, float recordset) write_player_stats =
 					fputs(f, "\n");
 					fputs(f, ftos(playerrecord2[i].statvalue));
 					fputs(f, "\n");
+					// CRX v2: write optional metadata comment line
+					if (playerrecord2[i].rec_date != "")
+					{
+						// "# meta v2 <ISO> [mt <secs>] [mt_str <pretty>]"
+						extra = sprintf("# meta v2 %s", playerrecord2[i].rec_date);
+						if (playerrecord2[i].rec_mt_remain >= 0)
+							extra = sprintf("%s mt %g mt_str %s", extra, playerrecord2[i].rec_mt_remain, playerrecord2[i].rec_mt_str);
+						fputs(f, extra); fputs(f, "\n");
+					}
 					i += 1;
 				}
 				else break;
@@ -857,6 +1033,13 @@ void (string filename, float recordset) write_player_stats =
 					fputs(f, "\n");
 					fputs(f, ftos(playerrecord[i].statvalue));
 					fputs(f, "\n");
+					// CRX v2: write optional metadata comment line (trial record: date only)
+					if (playerrecord[i].rec_date != "")
+					{
+						extra = sprintf("# meta v2 %s", playerrecord[i].rec_date);
+						// mt_* intentionally omitted for trial records
+						fputs(f, extra); fputs(f, "\n");
+					}
 					i += 1;
 				}
 				else break;
@@ -913,12 +1096,18 @@ void() clanring_map_config =
 	//Map specific settings
 	print(sprintf("Loading Map Configuration File: \"configs/%s.cfg\n", mapname));
 //	print("\"It is OPTIONAL - there is nothing wrong if it can't be found.\"\n");
+	// Reset per-map timelimit force before applying map cfg
+	clanring_force_timelimit = 0;
 	exec_clanring_cfg((strcat("configs/", mapname, ".cfg")));
+	// Trace current key cvars after map cfg
+	bprint("after map cfg: deathmatch ", ftos(cvar("deathmatch")), ", timelimit ", ftos(cvar("timelimit")), ", forceTL ", ftos(clanring_force_timelimit), "\n");
 };
 
 void() clanring_main_config =
 {
 	print("Loading ClanRing Configuration File: \"configs/clanring.cfg\"\n");
+	// Ensure custom cvars exist before parsing config so cvar_set works on them
+	registercvar("cr_allow_leavemealone", "1");
 	exec_clanring_cfg("configs/clanring.cfg");
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.
@@ -932,11 +1121,28 @@ void() clanring_exec_configs =
 	if (cvar ("deathmatch") == 0)
 		utils_set_cvar ("deathmatch", 1);
 
+	// --- NEW: make sure QuakeTag toggle cvars exist before any use ---
+	// (prevents "Cvar_Set: variable ... not found" during startup)
+	registercvar("cr_allow_qwsucks", "0");
+	registercvar("cr_allow_q14ever", "0");
+	// -----------------------------------------------------------------
+
 	console_timelimit 	= cvar ("timelimit");
 	console_deathmatch 	= cvar ("deathmatch");
 	console_fraglimit 	= cvar ("fraglimit");
 	console_pausable 	= cvar ("pausable");
 	console_noexit 		= cvar ("noexit");
+
+	// Initialize QuakeTag toggle cvars (persist across maps/restarts)
+	// If both are set, prefer qwsucks and clear q14ever.
+	clanring_allow_qwsucks = (cvar("cr_allow_qwsucks") != 0);
+	clanring_allow_q14ever = (cvar("cr_allow_q14ever") != 0);
+	if (clanring_allow_qwsucks && clanring_allow_q14ever)
+	{
+		clanring_allow_q14ever = 0;
+		// Use cvar_set (we've registered it above) instead of localcmd
+		cvar_set("cr_allow_q14ever", "0");
+	}
 
 	clanring_main_config();
 	clanring_warp_config();
@@ -980,6 +1186,9 @@ void() clanring_exec_configs =
 		dprint(sprintf("setting sys_ticrate to %1.3f\n", clanring_ctf_ticrate));
 		cvar_set("sys_ticrate", ftos(clanring_ctf_ticrate));
 	}
+
+	// Final trace: show deathmatch at end of config execution
+	bprint("config end: deathmatch ", ftos(cvar("deathmatch")), "\n");
 
 	remove(self);//scheduled_event_entity
 	sys_ready = TRUE;

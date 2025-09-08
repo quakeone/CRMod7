@@ -471,6 +471,20 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 	
 	if (clanring_state & CLANRING_MATCH_PAUSED) return;
 
+	// Prewar: no PvP when either party is in leave-me-alone.
+	// Exceptions: telefrags still kill; self-damage allowed.
+	if (!match_in_progress())
+	{
+		if (targ.classname == "player" && attacker.classname == "player")
+		{
+			if (inflictor.classname != "teledeath")
+			{
+				if (targ != attacker && (targ.leavemealone || attacker.leavemealone))
+					return;
+			}
+		}
+	}
+
 	if (mode_is_arena())
 	{
 		if ((inflictor.classname == "teledeath") && (boss.timetofight == FALSE)) //This is here for pre-game spawn's tdeath_touch to push the player out of the way...

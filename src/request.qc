@@ -167,7 +167,7 @@ void(entity player, float cast) Request_Poll_Vote =
 					
 					if (cast == 1)
 					{
-						bprint("vote passed.\n");
+						bprint("Vote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n");
 						clanring_request.touch();
 						sound(world, CHAN_AUTO, "misc/runekey.wav", 1, ATTN_NONE);
 					}
@@ -190,24 +190,23 @@ void(entity player, float cast) Request_Poll_Vote =
 
 	player.vote = cast;
 
-	if (player != clanring_request.owner)
-	{
-		if (cast == 1)
-			bprint(player.netname, " voted \byes\b.\n");
-		else if (cast == 2)
-			bprint(player.netname, " voted \bno\b.\n");
-	}
+	// Precompute remaining YES votes to pass after this ballot was recorded.
+	// Used for the "X more votes needed" suffix in both YES and NO displays.
+	local float yes_remaining_after = Request_Poll_Votes_Needed(1);
 
 	if (cast == 1)
 	{
-		votes_needed = Request_Poll_Votes_Needed(cast);
+		votes_needed = Request_Poll_Votes_Needed(cast); // majority YES check (after this ballot)
 
 		if (votes_needed == 0)// majority YES
 		{
-			bprint("\n");
+			// The final (passing) YES ballot: single-line message per request.
+			// Example: "woods voted yes. Vote passed."
+			bprint(player.netname, " voted \byes\b. \n\nVote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n\n");
 			clanring_request.touch();
 			sound(world, CHAN_AUTO, "misc/runekey.wav", 1, ATTN_NONE);
 			Request_Poll_Cleanup();
+			return;
 		}
 		else
 		{			
@@ -217,10 +216,18 @@ void(entity player, float cast) Request_Poll_Vote =
 				{
 					sprint(player,"\x90\bWarning\b\x91: You are an admin, type \byes\b again to force this vote.\n");
 				}
-				if (votes_needed == 1)
-					bprint(" \1 vote needed to \bpass\b.\n");
+
+				// Single-line "voted yes. X more votes needed."
+				bprint(player.netname, " voted \byes\b.");
+				if (yes_remaining_after > 0)
+				{
+					if (yes_remaining_after == 1)
+						bprint3(" ", strings_ftos_gold(1), " more vote needed.\n");
+					else
+						bprint3(" ", strings_ftos_gold(yes_remaining_after), " more votes needed.\n");
+				}
 				else
-					bprint3(" ", strings_ftos_gold(votes_needed), " votes needed to \bpass\b.\n");
+					bprint("\n");
 			}
 			return;
 		}
@@ -232,6 +239,8 @@ void(entity player, float cast) Request_Poll_Vote =
 			votes_needed = Request_Poll_Votes_Needed(cast);
 			if (votes_needed == 0) // majority NO
 			{
+				if (player != clanring_request.owner)
+					bprint(player.netname, " voted \bno\b.\n");
 				bprint("\n");
 				sound(world, CHAN_AUTO, "misc/menu2.wav", 1, ATTN_NONE);
 				bprint("The request was declined.\n");
@@ -240,6 +249,21 @@ void(entity player, float cast) Request_Poll_Vote =
 			else if (player.style & CLANRING_ADMINISTRATOR)
 			{
 				sprint(player,"\x90\bWarning\b\x91: You are an admin, type \bno\b again to cancel this vote.\n");
+			}
+
+			// If not resolved, show remaining YES needed to pass, inline with the NO vote line
+			if (player != clanring_request.owner)
+			{
+				bprint(player.netname, " voted \bno\b.");
+				if (yes_remaining_after > 0)
+				{
+					if (yes_remaining_after == 1)
+						bprint3(" ", strings_ftos_gold(1), " more vote needed.\n");
+					else
+						bprint3(" ", strings_ftos_gold(yes_remaining_after), " more votes needed.\n");
+				}
+				else
+					bprint("\n");
 			}
 		}
 	}
@@ -264,8 +288,50 @@ void() Request_Poll_Announce =
 	{
 		sound(world, CHAN_AUTO, "misc/menu1.wav", 1, ATTN_NONE);
 		bprint("\n\[ vote request \]\n");
-		bprint(" ",self.owner.netname, " requests to ", self.noise1, self.noise2, "\n");
-		bprint("\n Type \byes\b or \bno\b in console to cast your vote.\n\n");
+		bprint(" ", self.owner.netname, " requests to ", self.noise1, self.noise2, "\n");
+
+		// Compute YES votes needed to pass
+		local float yn;
+		yn = Request_Poll_Votes_Needed(1);
+
+		// Show "more vote(s) needed" ONLY if someone (not the requester) actually cast a ballot (.vote != 0)
+		local float anyvotes;
+		anyvotes = 0;
+		local entity tmp = find(world, classname, "player");
+		while (tmp)
+		{
+			// Exclude the request owner and require an explicit ballot (1 or 2)
+			if ((tmp.style & CLANRING_CONNECTED) && (tmp != self.owner) && (tmp.vote != 0))
+			{
+				anyvotes = 1;
+				break;
+			}
+			tmp = find(tmp, classname, "player");
+		}
+
+		if (yn > 0)
+		{
+			bprint("\n Type \byes\b or \bno\b in console to cast your vote.");
+			if (anyvotes)
+			{
+				if (yn == 1)
+					bprint3(" ", strings_ftos_gold(yn), " more vote needed.\n\n");
+				else
+					bprint3(" ", strings_ftos_gold(yn), " more votes needed.\n\n");
+			}
+			else
+			{
+				if (yn == 1)
+					bprint3(" ", strings_ftos_gold(yn), " vote needed.\n\n");
+				else
+					bprint3(" ", strings_ftos_gold(yn), " votes needed.\n\n");
+			}
+		}
+		else
+		{
+			// Already enough to pass; keep line simple (pass will occur upon a YES cast)
+			bprint("\n Type \byes\b or \bno\b in console to cast your vote.\n\n");
+		}
 
 		if (self.health < 40)	// 30, 20, 10
 			bprint(sprintf(" request expires in %s seconds.\n", strings_ftos_gold(self.health)));
@@ -309,12 +375,31 @@ float (string captiona, string captionb, void() passfunc, string pollname = "") 
 	clanring_request.health = 20;					// This will be the time-limit for how long to wait for everyone to cast a vote.
 	clanring_request.touch = passfunc;				// Call this function if the poll is positive
 
+	// Safety: clear any stale ballots from prior polls before first announce
+	// (prevents "more votes needed" from showing when nobody has voted yet)
+	{
+		local entity clr = find(world, classname, "player");
+		while (clr)
+		{
+			clr.vote = 0;
+			clr = find(clr, classname, "player");
+		}
+	}
+
 	if ((Request_Poll_Votes_Needed(1) > 0))			// if there is only one player on the server then there is no need to announce the vote.
 	{
 		sound(world, CHAN_AUTO, "misc/menu1.wav", 1, ATTN_NONE);
 		bprint("\n\[ vote request \]\n");
 		bprint(" ", clanring_request.owner.netname, " requests to ", clanring_request.noise1, clanring_request.noise2, "\n");
-		bprint("\n Type \byes\b or \bno\b in console to cast your vote.\n\n");
+
+		// Initial line shows "X votes needed" (no one has voted yet)
+		local float yn_init;
+		yn_init = Request_Poll_Votes_Needed(1);
+		bprint("\n Type \byes\b or \bno\b in console to cast your vote.");
+		if (yn_init == 1)
+			bprint3(" ", strings_ftos_gold(1), " vote needed.\n\n");
+		else
+			bprint3(" ", strings_ftos_gold(yn_init), " votes needed.\n\n");
 	}
 	return TRUE;
 };

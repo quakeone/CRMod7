@@ -836,7 +836,7 @@ void(float val) admin_dmset =
 	if (deathmatch > 4)//R00k changed to allow dmm4
 	deathmatch = 1;
 	temp = ftos(deathmatch);
-	localcmd3("deathmatch ", temp, "\n");
+	cvar_set("deathmatch", temp);
 //	announce2("deathmatch changed to ", temp);
 };
 

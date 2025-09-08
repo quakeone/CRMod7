@@ -202,6 +202,10 @@ void() T_HookTouch =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 	return;
 
+	// Prewar: don't latch or cause blood on LMA players
+	if (!match_in_progress() && other && other.classname == "player" && other.leavemealone)
+		return;
+
 	if (other != self.owner)
 	{
 		if ((pointcontents(self.origin) == CONTENT_SKY) || (gameover))

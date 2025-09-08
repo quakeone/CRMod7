@@ -525,10 +525,18 @@ string () report_winning_team =
 
 	if (boss.round == 1) return string_null; //Match just started we know...
 
+	// In Rocket Arena, suppress between-round standings text entirely
+	if (clanring_playmode & CLANRING_RA_MODE)
+		return string_null;
+
 	arena_set_winning_team();
 
 	if ((team_first_place.wins > team_second_place.wins))
 	{
+		// In Rocket Arena, suppress the "X leads by" messaging between rounds
+		if (clanring_playmode & CLANRING_RA_MODE)
+			return string_null;
+
 		team_score_number = (team_first_place.wins - team_second_place.wins);
 
 		if (clanring_playmode & CLANRING_RA_MODE)
@@ -543,16 +551,20 @@ string () report_winning_team =
 		output = (sprintf("\x85%s leads by ",team_winning_teamname));
 		output = (strcat(output,tmp));
 
-		if (clanring_playmode & CLANRING_RA_MODE)
-			tnum = ra_wins;
-		else
-			tnum = (ceil(boss.max_rounds / 2));
-		team_score_number = (tnum - team_first_place.wins);
-		tmp = ftos(team_score_number);
+		// Skip "needs X to win" messaging in Rocket Arena
+		if (!(clanring_playmode & CLANRING_RA_MODE))
+		{
+			if (clanring_playmode & CLANRING_RA_MODE)
+				tnum = ra_wins;
+			else
+				tnum = (ceil(boss.max_rounds / 2));
+			team_score_number = (tnum - team_first_place.wins);
+			tmp = ftos(team_score_number);
 
-		output = (strcat(output," needs "));
-		output = (strcat(output,tmp));
-		output = (strcat(output," to win\x85"));
+			output = (strcat(output," needs "));
+			output = (strcat(output,tmp));
+			output = (strcat(output," to win\x85"));
+		}
 	}
 	else
 	{
@@ -583,15 +595,19 @@ string () report_winning_team =
 			output = (strcat(output," are tied at "));
 			output = (strcat(output,tmp));
 
-			if (clanring_playmode & CLANRING_RA_MODE)
-				tnum = ra_wins;
-			else
-				tnum 	= (ceil(boss.max_rounds / 2));
-			team_score_number = (tnum - team_first_place.wins);
-			tmp 	= ftos(team_score_number);
-			output 	= (strcat(output," need "));
-			output 	= (strcat(output,tmp));
-			output 	= (strcat(output," to win\x85"));
+			// Skip "need X to win" messaging in Rocket Arena
+			if (!(clanring_playmode & CLANRING_RA_MODE))
+			{
+				if (clanring_playmode & CLANRING_RA_MODE)
+					tnum = ra_wins;
+				else
+					tnum 	= (ceil(boss.max_rounds / 2));
+				team_score_number = (tnum - team_first_place.wins);
+				tmp 	= ftos(team_score_number);
+				output 	= (strcat(output," need "));
+				output 	= (strcat(output,tmp));
+				output 	= (strcat(output," to win\x85"));
+			}
 		}
 		else
 		{
@@ -600,15 +616,19 @@ string () report_winning_team =
 			tmp = ftos(team_score_number);
 			output = (strcat("Teams \btied\b at ",tmp));
 
-			if (clanring_playmode & CLANRING_RA_MODE)
-				tnum = ra_wins;
-			else
-				tnum = (ceil(boss.max_rounds / 2));
-			team_score_number = (tnum - team_first_place.wins);
-			tmp = ftos(team_score_number);
-			output = (strcat(output," need "));
-			output = (strcat(output,tmp));
-			output = (strcat(output," to win\x85"));
+			// Skip "need X to win" messaging in Rocket Arena
+			if (!(clanring_playmode & CLANRING_RA_MODE))
+			{
+				if (clanring_playmode & CLANRING_RA_MODE)
+					tnum = ra_wins;
+				else
+					tnum = (ceil(boss.max_rounds / 2));
+				team_score_number = (tnum - team_first_place.wins);
+				tmp = ftos(team_score_number);
+				output = (strcat(output," need "));
+				output = (strcat(output,tmp));
+				output = (strcat(output," to win\x85"));
+			}
 		}
 	}
 	return output;
@@ -877,7 +897,20 @@ void () RemoveFromTeam =
 	return;
 
 	if (!self.cc_queue)
-	bprint4 (self.netname, "\b has left the ", self.next_team.netname, "\n");
+	{
+		if (clanring_playmode & CLANRING_RA_MODE)
+		{
+			// RA: show 'left the match' instead of team name
+			bprint2 (self.netname, " has left the match\n");
+		}
+		else
+		{
+			local string teamname = self.next_team.netname;
+			if (!teamname || teamname == "")
+				teamname = "their team";
+			bprint4 (self.netname, "\b has left the ", teamname, "\n");
+		}
+	}
 
 	if (self.ca_player_flag == PF_PLAYING)
 	{
@@ -1051,7 +1084,8 @@ void(float whichteam) Join_Team =
 
 	motd_top5 = string_null;
 	motd_top6 = string_null;
-	motd_playercount();
+	if (clanring_playmode & CLANRING_CA_MODE)
+		motd_playercount();
 	stats_reset_player (); //BAM MOVED
 
 };
@@ -1387,7 +1421,8 @@ void () arena_pause_player =
 
 void () arena_pause =
 {
-	if ((boss.state == CA_MATCH_WAITING) || (clanring_state & CLANRING_MATCH_PAUSED) || (gameover))
+	// Only allow pausing while actually playing
+	if ((boss.state != CA_MATCH_PLAYING) || (clanring_state & CLANRING_MATCH_PAUSED) || (gameover))
 	{
 		return;
 	}
@@ -1397,7 +1432,7 @@ void () arena_pause =
 	boss.timetofight = FALSE;//v1.4
 	utils_do_projectiles (arena_pause_item);
 	utils_do_arena_players (arena_pause_player);
-	announce ("game paused");
+	announce ("Match paused");
 };
 
 void () arena_unpause_item =
@@ -1458,7 +1493,7 @@ void () arena_unpause =
 	utils_do_projectiles (arena_unpause_item);
 	utils_do_arena_players (arena_unpause_player);
 	boss.timetofight = TRUE;//R00k added v1.4
-	announce ("game on!");
+	announce ("Match unpaused");
 	WriteByte (MSG_ALL, SVC_CENTERPRINT);
 	WriteString (MSG_ALL, " ");
 	utils_do_arena_players (arena_fight_and_shoot);
@@ -1471,40 +1506,15 @@ void () arena_unpause_countdown_think =
 	{
 		boss.unpausing = FALSE;
 		arena_unpause ();
-		ctprint("\bFIGHT!");
 		sound(world, CHAN_AUTO, "crx/fight.wav", 1, ATTN_NONE);
 		remove (self);
 	}
 	else
 	{
-		if (self.count == 1)
-		{
-			ctprint("1");
-			sound(world, CHAN_AUTO, "crx/one.wav",1, ATTN_NONE);
-		}
-		else
-		{
-			if (self.count == 2)
-			{
-				ctprint("2\n");
-				sound(world, CHAN_AUTO, "crx/two.wav", 1, ATTN_NONE);
-			}
-			else
-			{
-				if (self.count == 3)
-				{
-					ctprint("3\n");
-					sound(world, CHAN_AUTO, "crx/three.wav", 1, ATTN_NONE);
-				}
-				else
-				{
-					if (self.count == 5)
-					{
-						ctprint("prepare to fight\n");
-					}
-				}
-			}
-		}
+		// Console prints + switch beeps like CTF/DM
+		announce2(" ", ftos(self.count));
+		if (self.count <= 3)
+			sound(world, CHAN_AUTO, "buttons/switch04.wav", 1, ATTN_NONE);
 	}
 
 	self.nextthink = (time + 1);
@@ -1522,7 +1532,7 @@ void () arena_start_unpause_countdown =
 	boss.unpausing = TRUE;
 	countdown = utils_make_scheduled_event (arena_unpause_countdown_think, 1);
 	countdown.count = 4;
-	announce ("Unpausing match...");
+	announce ("Match restarts in T minus");
 };
 //-----------------------------------------------------------------------
 //Match is over so reset player
@@ -1531,7 +1541,7 @@ void() arena_reset_player =
 	if (self.next_team != world)
 	remove_player_from_chain(self.next_team,self);
 
-	updatename(self,self.netname);
+    clear_name();
 	self.weaponlevel 	= 0;
 	self.next_team 	 	= world;
 
@@ -1565,6 +1575,15 @@ void() reset_match =
 {
 	utils_do_arena_players (arena_reset_player);
 	arena_delete_teams();
+	// NEW: Also zero out any lingering CA join-menu counts during the cleanup window.
+	if (clanring_playmode & CLANRING_CA_MODE)
+	{
+		utils_do_players(motd_playercount);
+	}
+	// Ensure all players are reset to spectator score (-99) after teams are cleared
+	utils_do_players(reset_frags);
+	// Also normalize player colors back to white after match ends
+	utils_do_players(reset_color_white);
 	boss.busy = FALSE;//triggered TRUE in arena_match_end()
 
 	remove(self);
@@ -1607,11 +1626,14 @@ void () arena_match_end =
 
 	boss.busy = TRUE;
 
-	if (boss.aborted == FALSE)
-	{
-		stats_final_summary();
+	    if (boss.aborted == FALSE)
+    {
+        stats_final_summary();
 
-		if ((clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_AIRSHOT_MODE))
+        // Log for /lastscores across all arena modes (CA/RA/DMM4/Wipeout/Airshot)
+        match_log_score();
+
+        if ((clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_AIRSHOT_MODE))
 		{
 			dmm4_report_winner();
 		}
@@ -1704,7 +1726,7 @@ void () arena_match_end =
 //Called at end of rounds...
 void() arena_refresh_player =
 {
-	updatename(self,self.netname);
+    clear_name();
 
 	if (clanring_playmode & CLANRING_RA_MODE)
 		return; //bucksh0t: RA will handle this in ra_spawn_players
@@ -1754,7 +1776,6 @@ void() reset_round =
 	{
 		if (boss.draw == FALSE)
 			ra_next_player_ready(boss.next_color);
-		announce("prepare to fight");
 	}
 
 	utils_do_arena_players(arena_refresh_player);
@@ -1770,25 +1791,26 @@ void (float x,float y) announce_winner =
 	if (x == 200 && y == 100)
 	{
 		sound(world, CHAN_AUTO, "crx/flawless.wav", 1, ATTN_NONE);// Health = 100 Armor == 200 = 300
-		ctprint("Flawless Victory");
+		ctprint("\bFLAWLESS VICTORY\b");
+
 	}
 	else
 	if (x >= 100 && y >= 75)
 	{
 		sound(world, CHAN_AUTO, "ra/outstand.wav", 1, ATTN_NONE);// Health >= 75 Armor >= 100 = 175
-		ctprint("Outstanding");
+		//ctprint("Outstanding");
 	}
 	else
 	if (x >= 75 && y >= 50)
 	{
 		sound(world, CHAN_AUTO, "crx/excell2.wav", 1, ATTN_NONE);// Health >= 50 Armor >= 75 == 125
-		ctprint("Excellent");
+		//ctprint("Excellent");
 	}
 	else
 	if (x >= 50 && y >= 50)
 	{
 		sound(world, CHAN_AUTO, "ra/welldone.wav", 1, ATTN_NONE);// Health >=50 Armor >= 50 == 100
-		ctprint("Well Done");
+		//ctprint("Well Done");
 	}
 };
 
@@ -1842,10 +1864,11 @@ void() round_end =
 				wteam.armorvalue = (wteam.armorvalue + current_player.armorvalue);
 				wteam.health = (wteam.health + current_player.health);
 
+				bprint ("\n");
 				bprint3 ("\b[", current_player.netname, " has ");
-				temp = ftos (current_player.health);
+				temp = strings_ftos_gold (current_player.health);
 				bprint2 (temp, " Health ");
-				temp = ftos (current_player.armorvalue);
+				temp = strings_ftos_gold (current_player.armorvalue);
 				bprint2 (temp, " Armor\b]\n");
 			}
 		}

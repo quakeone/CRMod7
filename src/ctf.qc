@@ -11,6 +11,93 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_record2;
 void() match_bprint_score;
 
+// Returns 1 if a top time-trial record exists for (current map, team).
+// On success, sets tt_top_time (float seconds) and tt_top_player (string).
+float(float team) ctf_trial_get_top_record;
+
+// Implementation
+float (float team) ctf_trial_get_top_record =
+{
+    local float i;
+
+    // First try to find record in the loaded playerrecord array
+    for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i++)
+    {
+        if (playerrecord[i].statvalue > 0 && playerrecord[i].teamcolor == team)
+        {
+            // Found a record for this team
+            tt_top_time = playerrecord[i].statvalue;
+            tt_top_player = playerrecord[i].player;
+            return TRUE;
+        }
+    }
+
+    // If no records found, try loading from file (for maps that have records but weren't loaded yet)
+    local string filename = sprintf("%s_captimes.crx", mapname);
+    local filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
+    if (f < 0)
+    {
+        f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
+    }
+
+    if (f >= 0)
+    {
+        local string line;
+        local float best_time = 999999; // Very high number
+        local string best_player = "";
+
+        // Read through the file to find the best time for this team
+        while (TRUE)
+        {
+            line = fgets(f);
+            if (!line) break;
+
+            local float argc = tokenize(line);
+            if (!argc || argv(0) == "//" || argv(0) == "#") continue;
+
+            local string player_name = strtrim(line);
+            local float team_color = stof(fgets(f));
+            local float time_value = stof(fgets(f));
+
+            // Skip meta line if present
+            line = fgets(f);
+            if (line)
+            {
+                argc = tokenize(line);
+                if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
+                {
+                    // Not a meta line, this might be the next record
+                    // We can't easily rewind, so we'll work with what we have
+                }
+            }
+
+            // Check if this is a better time for the target team
+            if (time_value > 0 && time_value < best_time && team_color == team)
+            {
+                best_time = time_value;
+                if (best_player != "") strunzone(best_player);
+                best_player = strzone(player_name);
+            }
+        }
+
+        fclose(f);
+
+        if (best_time < 999999 && best_player != "")
+        {
+            tt_top_time = best_time;
+            tt_top_player = best_player;
+            return TRUE;
+        }
+
+        if (best_player != "") strunzone(best_player);
+    }
+
+    // No record found for this team
+    tt_top_time = 0;
+    tt_top_player = "";
+    return FALSE;
+};
+
 void(entity flg) RegenFlag =
 {
 	if (flg == world) return;
@@ -57,6 +144,9 @@ void(entity flg) RegenFlag =
 void(entity flg) TeamCaptureReturnFlag =
 {
 	RegenFlag (flg);
+	// Remove ghost for this team if present (flag is back at base)
+	if (flg.team == RED) CTF_RemoveGhostFlag(red_flag_ghost);
+	else CTF_RemoveGhostFlag(blue_flag_ghost);
 
 //	if (!(clanring_playmode & CLANRING_MATCH_MODE))	//  Only show newbie messages in newbie mode.
 	{
@@ -110,6 +200,7 @@ void() TeamCaptureRegenFlags =
 		if (f.owner.classname == "player")		
 			f.owner.items = f.owner.items - (f.owner.items & IT_KEY1);
 		RegenFlag(f);
+		CTF_RemoveGhostFlag(red_flag_ghost);
 	}	
 	
 	f = find(world, classname, "item_flag_team2");	
@@ -119,6 +210,7 @@ void() TeamCaptureRegenFlags =
 		if (f.owner.classname == "player")		
 			f.owner.items = f.owner.items - (f.owner.items & IT_KEY2);
 		RegenFlag(f);
+		CTF_RemoveGhostFlag(blue_flag_ghost);
 	}
 };
 
@@ -222,6 +314,18 @@ void() TeamCaptureFlagTouch =
 {
 	local entity p;
 	local float compare, i=0,j=0;
+	
+	// CRX v2: Snapshot match timer BEFORE any other logic
+	local float match_seconds_remaining;
+	local string match_time_str;
+
+	match_seconds_remaining = crx_get_match_secs_remaining();
+	if (match_seconds_remaining >= 0)
+		match_time_str = utils_format_time(match_seconds_remaining);
+	else {
+		match_time_str = "";
+		match_seconds_remaining = -1;
+	}
 
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
@@ -289,9 +393,35 @@ void() TeamCaptureFlagTouch =
 				compare = (time - other.lefty);//stop the clock
 				if (other.lefty > 0)
 				{
-					bprint("\bcapture time \x90");
-					utils_bprint_time (compare);
-					bprint("\x91\n");					
+					// Unified TT/match capture time banner
+					// TT (prematch) shows diff vs #1; match/normal keeps legacy time-only
+					bprint("\bcapture time ");
+					bprint("[");
+					utils_bprint_time_plain(compare);  // White numbers for capture time
+					bprint("]");
+
+					if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
+					{
+						// Prewar Time Trial: include (+/- diff vs record … by …)
+						if (ctf_trial_get_top_record(other.team))
+						{
+							bprint(" ");
+							utils_bprint_signed_time_diff(compare - tt_top_time);  // Gold numbers for diff
+							bprint(" vs record [");
+							utils_bprint_time_plain(tt_top_time);  // White numbers for record
+							bprint("] by ");
+							bprint(tt_top_player);
+						}
+					}
+					else
+					{
+						// Match/normal mode: keep legacy gold time display
+						bprint("\x90");
+						utils_bprint_time(compare);
+						bprint("\x91");
+					}
+					bprint("\n");
+
 					if (compare < other.captime) other.captime = compare;
 
 					if (clanring_playmode & CLANRING_MATCH_MODE)
@@ -299,17 +429,48 @@ void() TeamCaptureFlagTouch =
 						new_player_record = 0;
 						if (!(clanring_state & CLANRING_MATCH_STARTED))
 						{
-							check_player_low_record(compare, other.team, other.netname);
-							if (new_player_record > 0)
+							// --- CRX v2 metadata (trial run): date only ---
+							if (crx_meta_date != "") strunzone(crx_meta_date);
+							crx_meta_date = strzone(strftime(TRUE, "%Y-%m-%dT%H:%M:%S%z"));
+							crx_meta_mt_remain = -1;
+							if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
+							crx_meta_mt_str = "";
+                            check_player_low_record(compare, other.team, other.netname);
+                            if (new_player_record > 0)
 							{
 								if (new_player_record == 1)
 								{
 									sound(world,CHAN_AUTO,"crx/congrats.wav",1,ATTN_NONE);
-									clanring_new_record_player = other.netname;
+									if (clanring_new_record_player != "") strunzone(clanring_new_record_player);
+									clanring_new_record_player = strzone(other.netname);
 								}									
 								else if ((new_player_record == 2) || (new_player_record == 3))
 									sound(world,CHAN_AUTO,"crx/goodstat.wav",1,ATTN_NONE);
 								write_capture_stats();
+                                // Webhook: time trial record (top 3)
+                                if (new_player_record == 1)
+                                {
+                                    local string msg_tt, team_s, server_host;
+                                    local float sec_whole, cs;
+                                    local string tsec, tcs, tshort;
+                                    if (other.team == RED) team_s = "RED"; else if (other.team == BLUE) team_s = "BLUE"; else team_s = "?";
+                                    sec_whole = floor(compare);
+                                    cs = floor(((compare - sec_whole) * 100) + 0.001);
+                                    tsec = ftos(sec_whole);
+                                    if (sec_whole < 10) tsec = strcat("0", tsec);
+                                    tcs = ftos(cs);
+                                    if (cs < 10) tcs = strcat("0", tcs);
+                                    tshort = sprintf("%s.%s", tsec, tcs);
+                                    server_host = cvar_string("hostname");
+                                    msg_tt = sprintf("New Time Trial #%g Record | %s, %s, %s, %s, %s",
+                                        new_player_record,
+                                        mapname,
+                                        other.netname,
+                                        tshort,
+                                        team_s,
+                                        server_host);
+                                    webhook_post_deferred(msg_tt);
+                                }
 							}
 							//else sound(world,CHAN_AUTO,"crx/capreg.wav",1,ATTN_NONE);
 						}
@@ -317,11 +478,42 @@ void() TeamCaptureFlagTouch =
 						{
 							if (clanring_maxsize > 1)
 							{
-								check_player_low_record2(compare, other.team, other.netname);
-								if (new_player_record > 0)
+								// --- CRX v2 metadata (match): date + match time remaining ---
+								// Use pre-captured timer values to avoid race conditions
+								if (crx_meta_date != "") strunzone(crx_meta_date);
+								crx_meta_date = strzone(strftime(TRUE, "%Y-%m-%dT%H:%M:%S%z"));
+								crx_meta_mt_remain = match_seconds_remaining;
+								if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
+								crx_meta_mt_str = strzone(match_time_str);
+                                check_player_low_record2(compare, other.team, other.netname);
+                                if (new_player_record > 0)
 								{
 									new_player_record_match = new_player_record;
 									write_capture_stats_match();
+                                    // Webhook: match record (top 3), same compact format as TT
+                                    if (new_player_record == 1)
+                                    {
+                                        local string msg_m, team_s_m, server_host_m;
+                                        local float sec_whole_m, cs_m;
+                                        local string tsec_m, tcs_m, tshort_m;
+                                        if (other.team == RED) team_s_m = "RED"; else if (other.team == BLUE) team_s_m = "BLUE"; else team_s_m = "?";
+                                        sec_whole_m = floor(compare);
+                                        cs_m = floor(((compare - sec_whole_m) * 100) + 0.001);
+                                        tsec_m = ftos(sec_whole_m);
+                                        if (sec_whole_m < 10) tsec_m = strcat("0", tsec_m);
+                                        tcs_m = ftos(cs_m);
+                                        if (cs_m < 10) tcs_m = strcat("0", tcs_m);
+                                        tshort_m = sprintf("%s.%s", tsec_m, tcs_m);
+                                        server_host_m = cvar_string("hostname");
+                                        msg_m = sprintf("New Match #%g Record | %s, %s, %s, %s, %s",
+                                            new_player_record_match,
+                                            mapname,
+                                            other.netname,
+                                            tshort_m,
+                                            team_s_m,
+                                            server_host_m);
+                                        webhook_post_deferred(msg_m);
+                                    }
 								}
 							}
 						}
@@ -467,6 +659,8 @@ void() TeamCaptureFlagTouch =
 	if ((clanring_playmode & CLANRING_MATCH_MODE) && (!(clanring_state & CLANRING_MATCH_STARTED)))
 	{
 		centerprint(other, "ŽŽmatch has not begunŽŽ\n\x80\x81\bcapture time trials\b\x81\x82");
+		// spawn ghost at the base the flag was taken from
+		CTF_SpawnGhostFlag(self);
 	}
 
 	if ((!(clanring_playmode & CLANRING_MATCH_MODE)) || (clanring_state & CLANRING_MATCH_STARTED))
@@ -1284,4 +1478,159 @@ void() TossRune =
 	item.think = RuneRespawn;
 	self.player_flag = (self.player_flag - (self.player_flag & ITEM_RUNE_MASK));
 	item.classname = "item_rune";
+};
+
+void(entity baseflag) CTF_SpawnGhostFlag =
+{
+	local entity g;
+	// avoid duplicates
+	if (baseflag.team == RED)
+	{
+		if (red_flag_ghost) return;
+	}
+	else
+	{
+		if (blue_flag_ghost) return;
+	}
+	g = spawn();
+	g.classname = "ghost_flag";
+	g.team = baseflag.team;
+	setmodel(g, baseflag.mdl);
+	// Match the base flag's skin (red/blue) and copy tint bits without hiding the model
+	g.skin = baseflag.skin;
+	g.effects = (g.effects - (g.effects & EF_NOMODELFLAGS));
+	// Preserve red/blue tint if the model uses EF_* coloring
+	if (baseflag.effects & EF_RED)
+		g.effects = (g.effects | EF_RED);
+	if (baseflag.effects & EF_BLUE)
+		g.effects = (g.effects | EF_BLUE);
+	g.solid = SOLID_TRIGGER;
+	g.movetype = MOVETYPE_NONE;
+	g.alpha = 0.5;
+	setsize(g, baseflag.mins, baseflag.maxs);
+	setorigin(g, baseflag.oldorigin);
+	g.touch = CTF_GhostFlagTouch;
+	if (baseflag.team == RED)
+		red_flag_ghost = g;
+	else
+		blue_flag_ghost = g;
+};
+
+void(entity ghost) CTF_RemoveGhostFlag =
+{
+	if (!ghost) return;
+	if (ghost == red_flag_ghost) red_flag_ghost = world;
+	if (ghost == blue_flag_ghost) blue_flag_ghost = world;
+	remove(ghost);
+};
+
+void() CTF_GhostFlagTouch =
+{
+	// Prewar only, match mode only
+	if (!((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED)))
+		return;
+	if (other.classname != "player") return;
+	if (other.health <= 0) return;
+	if (other.style & CLANRING_OBSERVER) return;
+	// Only count if touching own base ghost and carrying enemy flag
+	if (self.team != other.team) return;
+	if ((other.items & IT_KEY1) || (other.items & IT_KEY2))
+	{
+		// finish time trial as if flag was at base
+		local float compare;
+		// best record for this map/team (if available)
+		local float have_top;
+
+		if (other.lefty > 0)
+		{
+			compare = (time - other.lefty);
+
+			// Lookup #1 TT record BEFORE we update records
+			have_top = ctf_trial_get_top_record(other.team);
+
+			// New display: capture time [MM:SS.CS]  (+/-DD:dd.cc vs record MM:SS.CS by NAME)
+			bprint("\bcapture time ");
+			bprint("[");
+			utils_bprint_time_plain(compare);  // White numbers for capture time
+			bprint("]");
+			if (have_top)
+			{
+				bprint(" ");
+				utils_bprint_signed_time_diff(compare - tt_top_time);  // Gold numbers for diff
+				bprint(" vs record [");
+				utils_bprint_time_plain(tt_top_time);  // White numbers for record
+				bprint("] by ");
+				bprint(tt_top_player);
+			}
+			bprint("\n");
+
+			if (compare < other.captime) other.captime = compare;
+
+			// mirror the prewar TT record path
+			new_player_record = 0;
+			// --- CRX v2 metadata (trial run): date only ---
+			if (crx_meta_date != "") strunzone(crx_meta_date);
+			crx_meta_date = strzone(strftime(TRUE, "%Y-%m-%dT%H:%M:%S%z"));
+			crx_meta_mt_remain = -1;
+			if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
+			crx_meta_mt_str = "";
+			check_player_low_record(compare, other.team, other.netname);
+			if (new_player_record > 0)
+			{
+				if (new_player_record == 1)
+				{
+					sound(world,CHAN_AUTO,"crx/congrats.wav",1,ATTN_NONE);
+					if (clanring_new_record_player != "") strunzone(clanring_new_record_player);
+					clanring_new_record_player = strzone(other.netname);
+				}
+				else if ((new_player_record == 2) || (new_player_record == 3))
+					sound(world,CHAN_AUTO,"crx/goodstat.wav",1,ATTN_NONE);
+				write_capture_stats();
+				// Webhook: time trial record (top 3)
+				if (new_player_record == 1)
+				{
+					local string msg_tt, team_s, server_host;
+					local float sec_whole, cs;
+					local string tsec, tcs, tshort;
+					if (other.team == RED) team_s = "RED"; else if (other.team == BLUE) team_s = "BLUE"; else team_s = "?";
+					sec_whole = floor(compare);
+					cs = floor(((compare - sec_whole) * 100) + 0.001);
+					tsec = ftos(sec_whole);
+					if (sec_whole < 10) tsec = strcat("0", tsec);
+					tcs = ftos(cs);
+					if (cs < 10) tcs = strcat("0", tcs);
+					tshort = sprintf("%s.%s", tsec, tcs);
+					server_host = cvar_string("hostname");
+					msg_tt = sprintf("New Time Trial #%g Record | %s, %s, %s, %s, %s",
+						new_player_record,
+						mapname,
+						other.netname,
+						tshort,
+						team_s,
+						server_host);
+					webhook_post_deferred(msg_tt);
+				}
+			}
+		}
+		// reset carrier state and regen flags at base to keep prewar flowing
+		other.flag_carrier = FALSE;
+		other.items = other.items - (other.items & (IT_KEY1 | IT_KEY2));
+		// Return only the enemy flag that was being carried
+		local entity ef;
+		ef = find(world, classname, "item_flag_team1");
+		if (ef != world && ef.owner == other)
+		{
+			RegenFlag(ef);
+		}
+		else
+		{
+			ef = find(world, classname, "item_flag_team2");
+			if (ef != world && ef.owner == other)
+			{
+				RegenFlag(ef);
+			}
+		}
+		// Do NOT call TeamCaptureRegenFlags() here; if our home flag is still out,
+		// the ghost must remain so more TT runs can finish.
+	}
 };

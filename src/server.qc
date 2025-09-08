@@ -197,6 +197,8 @@ void () clanring_remove_start_teleport;
 void () clanring_find_powerups;
 void () clanring_exec_configs;
 void () clanring_precache_matchsounds;
+void () votables_disable_item;
+void () SUB_regen;
 void (float value) clanring_set_teamplay;
 void (float value) clanring_set_fraglimit;
 void () stats_reset_player;
@@ -209,9 +211,17 @@ void() utils_save_disconnect_log;
 void() utils_load_disconnect_log;
 float() utils_server_time;
 void() utils_update_server_time;
+float(string a, string b) utils_str_eq;
+float(string s) utils_semver_to_code;
+void() utils_dedupe_disconnect_log;
+void() utils_namewatch_think;
+float(string player_name) utils_is_in_last_disconnects;
+float(string player_name) utils_name_has_player;
 void () score_init_world;
 void (float command) console_command;
 void () console_set_aliases;
+void () quaketag_init_world;
+void () quaketag_start_frame;
 void () client_select_warp;
 void (float episode) votables_init_warp;
 void () votables_request_vote_exit;
@@ -271,7 +281,135 @@ void () AirshotHighScores_sprint;
 void () LongRangeGibs_sprint;
 void () check_client_status;
 //void () Teamplay_Select_Team;
-//
+
+// ------------------------------------------------------------------
+// Auto-ghost Quad (1v1) helpers
+// ------------------------------------------------------------------
+float() CountActivePlayersDM =
+{
+    local entity p;
+    local float n;
+    n = 0;
+    p = find(world, classname, "player");
+    while (p)
+    {
+        // Count only connected, non-observer players as "active"
+        if ((p.style & CLANRING_CONNECTED) && !(p.style & CLANRING_OBSERVER))
+            n = n + 1;
+        p = find(p, classname, "player");
+    }
+    return n;
+};
+
+float() InDMNormalMode =
+{
+    // "Normal" (FFA) only — exclude arena/CTF/etc.
+    if (!(clanring_playmode & CLANRING_NORMAL_MODE))
+        return FALSE;
+    if (clanring_playmode & (CLANRING_CAPTURE_THE_FLAG
+                           | CLANRING_WIPEOUT_MODE
+                           | CLANRING_DMM4_MODE
+                           | CLANRING_CA_MODE
+                           | CLANRING_RA_MODE))
+        return FALSE;
+    return TRUE;
+};
+
+// ------------------------------------------------------------------
+// Make every Quad in the world match the desired opacity
+// ------------------------------------------------------------------
+void(float ghost) G1v1_UpdateQuadAlpha =
+{
+    local entity e;
+    e = find(world, classname, "item_artifact_super_damage");
+    while (e)
+    {
+        // 0.5 when ghosted, 1.0 otherwise
+        e.alpha = ghost ? 0.5 : 1.0;
+        e = find(e, classname, "item_artifact_super_damage");
+    }
+};
+
+void() AutoGhostQuad_Refresh =
+{
+    local float active, want_ghost;
+
+    // Only relevant in DM normal
+    if (!InDMNormalMode())
+    {
+        // ensure we're not stuck in a ghosting state if mode changed
+        if (g1v1_in_effect)
+        {
+            g1v1_in_effect = FALSE;
+            g1v1_quad_ghosted = FALSE;
+            // do not alter setquad here; mode change should preserve current setting
+        }
+        return;
+    }
+
+    active = CountActivePlayersDM();
+    want_ghost = (active == 2); // exactly two active players => 1v1
+
+    if (want_ghost)
+    {
+        // Entering or staying in 1v1
+        if (!g1v1_in_effect)
+        {
+            // First tick entering 1v1: remember server's pre-1v1 setquad and default to OFF
+            g1v1_in_effect     = TRUE;
+            g1v1_saved_no_quad = (clanring_playmode & CLANRING_NO_QUAD) != 0;
+
+            if (!(clanring_playmode & CLANRING_NO_QUAD))
+            {
+                clanring_playmode = clanring_playmode | CLANRING_NO_QUAD; // default OFF in 1v1
+                utils_set_cvar("samelevel", clanring_playmode);
+            }
+            g1v1_quad_ghosted = TRUE; // and enforce ghosting behavior
+            G1v1_UpdateQuadAlpha(TRUE);
+        }
+        else
+        {
+            // While in 1v1, ghost state follows the NO_QUAD bit (toggled by setquad)
+            g1v1_quad_ghosted = (clanring_playmode & CLANRING_NO_QUAD) != 0;
+            G1v1_UpdateQuadAlpha(g1v1_quad_ghosted);
+        }
+        return;
+    }
+
+    // Not 1v1 anymore: leaving the window
+    if (g1v1_in_effect)
+    {
+        g1v1_in_effect   = FALSE;
+        g1v1_quad_ghosted = FALSE;
+        G1v1_UpdateQuadAlpha(FALSE);
+
+        // Restore pre-1v1 setquad state and physically sync items to that
+        if (g1v1_saved_no_quad)
+        {
+            // was OFF before 1v1
+            if (!(clanring_playmode & CLANRING_NO_QUAD))
+            {
+                // use standard path: disable removes/pauses items
+                utils_do_item(votables_disable_item, "item_artifact_super_damage");
+                clanring_playmode = clanring_playmode | CLANRING_NO_QUAD;
+                bprint("Quad disabled\n");
+                utils_set_cvar("samelevel", clanring_playmode);
+            }
+        }
+        else
+        {
+            // was ON before 1v1
+            if (clanring_playmode & CLANRING_NO_QUAD)
+            {
+                clanring_playmode = clanring_playmode - CLANRING_NO_QUAD;
+                utils_do_item(SUB_regen, "item_artifact_super_damage");
+                bprint("Quad enabled\n");
+                utils_set_cvar("samelevel", clanring_playmode);
+            }
+        }
+    }
+};
+
 // C L E A R   A F K   S T A T U S
 //
 
@@ -386,8 +524,6 @@ void () server_set_infokey_modes =
     forceinfokey(world, "playmode", pmode);
 };
 
-.float matchTime;
-
 /**/
 void () W_Precache;
 //
@@ -473,8 +609,21 @@ void () clanring_init_world =
     precache_sound ("crx/laugh6.wav");
     //end
     precache_sound ("ra/gong.wav");
+    // legacy tip-check gag sounds
+    precache_sound ("player/death1.wav");
+    precache_sound ("player/death2.wav");
+    precache_sound ("player/death3.wav");
+    precache_sound ("player/pain2.wav");
+    precache_sound ("player/pain4.wav");
+    precache_sound ("player/gasp1.wav");
 
     //	qsmack_init_server ();
+
+    // q14ever visuals: primary + fallbacks
+    precache_model("progs/missile.mdl");   // stock rocket
+
+
+    quaketag_init_world();
 
     // Check to see if we need to initialize the server
     if (!(clanring_playmode & CLANRING_SERVER_INITIALIZED))
@@ -598,6 +747,12 @@ void () clanring_init_world =
     else
     if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_playmode & CLANRING_PRACTICE_MODE))
         clanring_state = clanring_state | CLANRING_TEAM_CAPTURE_CUSTOM;
+    else if ((clanring_playmode & CLANRING_PRACTICE_MODE) && !(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
+    {
+        // Practice DM/RA/etc should be FFA: ensure friendly fire is enabled
+        cvar_set("teamplay","0");
+        clanring_set_teamplay(0);
+    }
     else
     if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_playmode & CLANRING_MATCH_MODE))
     {
@@ -639,6 +794,8 @@ void () clanring_init_world =
     utils_make_scheduled_event(StartRuneSpawnStart, 2);
     // fix the start teleport bug
     utils_make_scheduled_event(clanring_remove_start_teleport, 3);
+    // keep name overlays in sync if players rename mid-status (AFK/Ready/etc)
+    utils_make_scheduled_event(utils_namewatch_think, 1);
 
     // woods set serverinfo mod name
     forceinfokey(world, "mod", clanring_version_info);
@@ -910,6 +1067,12 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias itstats cmd itstats\n");
     stuffcmd(self, "alias altents cmd altents\n");
     stuffcmd(self, "alias last cmd last\n");
+    stuffcmd(self, "alias lastscores cmd lastscores\n");
+    stuffcmd(self, "alias pos_save cmd pos_save\n");
+    stuffcmd(self, "alias pos_move cmd pos_move\n");
+    stuffcmd(self, "alias pos_show cmd pos_show\n");
+    stuffcmd(self, "alias pos_origin cmd pos_origin\n");
+    stuffcmd(self, "alias pos_angles cmd pos_angles\n");
     stuffcmd(self, "alias lastplayers impulse 188\n");
     
     self.style = self.style | CLANRING_FOUND_BINDINGS;
@@ -1198,11 +1361,15 @@ string() server_find_myClient =
     myClient = string_null;
 
     myClient = infokey(self,"*ver");						//FTE and QSS
+    self.client_ver_code = 0; // default
 
     if (myClient != "")
     {
         if (substring(myClient, 0, 5) == "QSS-M")
+        {
             self.client = "QSS-M";
+            self.client_ver_code = utils_semver_to_code(myClient);
+        }
 
         if (substring(myClient, 0, 3) == "FTE")
             self.client = "FTE";
@@ -1239,8 +1406,11 @@ void () clanring_client_connect =
     if (parm10 & CLANRING_NEW_CLIENT)
     {
         // This is a new client (just connected over the network)
-        // Show the MOTD
-        motd_create();
+        // Show the MOTD unless this player was here recently (in 'last').
+        // EXEMPTION: if the name contains "player" anywhere, always show MOTD.
+        if ( utils_name_has_player(self.netname)
+          || !utils_is_in_last_disconnects(self.netname) )
+            motd_create();
 
         utils_make_scheduled_event(clanring_init_think, 0.5);
         // Get rid of the new client flag
@@ -1285,6 +1455,10 @@ void () clanring_client_connect =
 	}
 
     utils_make_scheduled_event(clanring_show_mode, 0.5);
+
+    // Force an initial PL emit on next periodic check (ensures a value appears even at 0%)
+    self.packet_loss = -1;
+
     self.cnt = CLANRING_MAX_SUICIDES;  // numer of suicides allowed
     self.clanring_hack_count = -1;  // count of admin code attempts
 //	self.finaldest_y = MOVETYPE_WALK;
@@ -1319,6 +1493,9 @@ void () clanring_client_connect =
         self.skin	     	= 0;
         self.ca_player_flag	= PF_WAITING;
     }
+
+    // Re-evaluate 1v1 auto-ghost on join
+    AutoGhostQuad_Refresh();
 };
 
 void(entity player, float cast) Request_Poll_Vote;
@@ -1383,6 +1560,9 @@ void () clanring_client_disconnect =
     // Check to see if we were debugging this client
     if (clanring_debug_client == self)
         clanring_debug_client = world;
+
+    // Re-evaluate 1v1 auto-ghost on leave
+    AutoGhostQuad_Refresh();
 };
 
 //
@@ -1502,13 +1682,16 @@ void () clanring_put_client_in_server =
         }
 
         UnHookPlayer();
-        if (!((clanring_playmode & CLANRING_PRACTICE_MODE) || ((clanring_playmode & CLANRING_NORMAL_MODE) && !teamplay)))
+        if (!mode_is_arena())
         {
-            string temp = ftos(self.height);
-            stuffcmd(self, "color ");
-            stuffcmd(self, temp);
-            stuffcmd(self, "\n");
-            temp = "";
+            if (!((clanring_playmode & CLANRING_PRACTICE_MODE) || ((clanring_playmode & CLANRING_NORMAL_MODE) && !teamplay)))
+            {
+                string temp = ftos(self.height);
+                stuffcmd(self, "color ");
+                stuffcmd(self, temp);
+                stuffcmd(self, "\n");
+                temp = "";
+            }
         }
         player_stand1();
         spawn_tdeath(self.origin, self);
@@ -1674,7 +1857,7 @@ void () gameplay_commands =
         sprint(self, " \bflagstatus\b      \bsetring\b\n");
         sprint(self, " \bghost\b           \btimerstart [\bst\b]\b\n");
         sprint(self, " \bghostcode\b       \btimerstop [\bpa\b]\b\n");
-        sprint(self, " \block\b            \btimeset\b\n");
+        sprint(self, " \block\b            \btimeset [minutes]\b\n");
         sprint(self, " \botset\b           \btimeset10 [\bt10\b]\b\n");
         sprint(self, " \bready [\br\b]\b       \btimeset20 [\bt20\b]\b\n");
         sprint(self, " \bready? [\b?\b]\b      \bunlock\b\n");
@@ -1741,8 +1924,8 @@ void () shortcuts_commands =
 {
         sprint(self, "\n");
         sprint(self, " \bmapx\b  warp to    \brd\b   red\n");
-        sprint(self, " \b?\b     ready?     \bt10\b  timeset10\n");
-        sprint(self, " \bbl\b    blue       \bt20\b  timeset20\n");
+        sprint(self, " \b?\b     ready?     \btimeset 10\n");
+        sprint(self, " \bbl\b    blue       \btimeset 20\n");
         sprint(self, " \be\b     eyecam     \bst\b   timerstart\n");
         sprint(self, " \bn\b     no         \bpa\b   timerstop\n");
         sprint(self, " \bnr\b    notready   \byl\b   yellow\n");
@@ -2511,6 +2694,8 @@ void () Send_TeamInfo =
     if ((self.client != "QSS-M") && (self.client != "FTE"))
         return;
 
+
+
     void(entity target) SendPlayerInfo =
     {
         if (!(target.style & CLANRING_CONNECTED))
@@ -2620,6 +2805,53 @@ void () Send_TeamInfo =
             list_player = list_player.next_player;
         }
     }
+};
+
+//
+//  U T I L S :  S E M V E R  ?  C O D E
+//
+//  Parse the first semantic version triple in a string (e.g., "1.6.7")
+//  and encode as (major*10000 + minor*100 + patch). Returns 0 if none found.
+//
+
+float(string s) utils_semver_to_code =
+{
+    local float i, stage, d, maj, minr, patch;
+    local string ch;
+
+    i = 0; stage = 0; maj = 0; minr = 0; patch = 0;
+
+    while (i < 128)
+    {
+        ch = substring(s, i, 1);
+        if (utils_str_eq(ch, "")) break;
+
+        if (utils_str_eq(ch, "."))
+        {
+            stage = stage + 1;
+            if (stage > 2) break;
+            i = i + 1;
+            continue;
+        }
+
+        d = -1;
+        if (utils_str_eq(ch,"0")) d = 0; else if (utils_str_eq(ch,"1")) d = 1;
+        else if (utils_str_eq(ch,"2")) d = 2; else if (utils_str_eq(ch,"3")) d = 3;
+        else if (utils_str_eq(ch,"4")) d = 4; else if (utils_str_eq(ch,"5")) d = 5;
+        else if (utils_str_eq(ch,"6")) d = 6; else if (utils_str_eq(ch,"7")) d = 7;
+        else if (utils_str_eq(ch,"8")) d = 8; else if (utils_str_eq(ch,"9")) d = 9;
+
+        if (d >= 0)
+        {
+            if (stage == 0) maj = maj * 10 + d;
+            else if (stage == 1) minr = minr * 10 + d;
+            else patch = patch * 10 + d;
+        }
+        else if (maj + minr + patch > 0) break;
+
+        i = i + 1;
+    }
+    return (maj * 10000) + (minr * 100) + patch;
 };
 
 //
@@ -2859,6 +3091,9 @@ void () clanring_start_frame =
 {
     local float command;
 
+    if ( (clanring_playmode & CLANRING_MATCH_MODE) )
+        quaketag_start_frame();
+
     if (!gameover)
     {
         if (sys_ready)
@@ -3001,6 +3236,13 @@ void () clanring_start_frame =
                             bprint("\n");
                         break;
                     }
+                }
+
+                // Periodic re-check (spectator toggles, etc.)
+                if (time >= g1v1_next_check_time)
+                {
+                    AutoGhostQuad_Refresh();
+                    g1v1_next_check_time = time + 1;
                 }
 
                 clanring_nextcheck2 = time + 1;
