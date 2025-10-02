@@ -94,29 +94,6 @@ float CLANRING_CA_MODE				= 4194304;
 float CLANRING_RA_MODE				= 8388608;
 
 /*
-	P L A Y M O D E
-	clanring_playmode - stored in cvar 'samelevel' and preserved across levels
-	eg. (clanring_playmode & CLANRING_PRACTICE_MODE)
-
-float CLANRING_FREEFORALL_MODE    = 1;        // teamplay 0 dm; normal mode
-float CLANRING_PICKUP_DM_MODE     = 2;        // teamplay 1 dm; no friendly fire; normal mode
-float CLANRING_MATCH_TDM_MODE     = 4;        // teamplay 2 dm; friendlyfire; match mode
-float CLANRING_PRACTICE_DM_MODE   = 8;        // teamplay 0 dm; self damage; practice full inventory
-float CLANRING_PICKUP_CTF_MODE    = 16;       // teamplay 1 ctf; no friendly fire; normal mode
-float CLANRING_MATCH_CTF_MODE     = 32;       // teamplay 1 ctf; match timer
-float CLANRING_PRACTICE_CTF_MODE  = 64;       // teamplay 0 ctf; hook enabled; practice full inventory
-float CLANRING_CLAN_ARENA_MODE    = 128;      // Clan Arena
-float CLANRING_FREEZETAG_MODE     = 256;      // sub mode of ClanArena, you respawn by teammate intervention.
-float CLANRING_WIPEOUT_MODE       = 512;      // sub mode of ClanArena, you respawn at set time intervals.
-float CLANRING_ELIMINATION_MODE   = 1024;     // Sub mode of ClanArena, you respawn when your killer dies.
-float CLANRING_AIRSHOT_MODE       = 2048;     //
-float CLANRING_DMM4_MODE          = 4096;     //
-float CLANRING_ROCKET_ARENA_MODE  = 8192;     //
-float CLANRING_SPEEDBALL_MODE     = 16384;    //
-float CLANRING_INSTAGIB_MODE      = 32768;    //
-float CLANRING_SERVER_INITIALIZED = 0;
-*/
-/*
 	G A M E C O N F I G
 	clanring_gameconfig - preserved across levels in cvar 'gamecfg'
 	eg. (clanring_gameconfig & CLANRING_NO_HOOK)
@@ -523,6 +500,7 @@ float	clanring_afk_timeout;
 .float stats_item_health;			//
 .float stats_item_mega;				//
 .float stats_item_biosuit;			//
+.float stats_item_ring;				//
 .float stats_item_redarmor;			//
 .float stats_item_yellowarmor;		//
 .float stats_item_greenarmor;		//
@@ -870,3 +848,6 @@ entity blue_flag_ghost;
 void(entity baseflag) CTF_SpawnGhostFlag;
 void(entity ghost) CTF_RemoveGhostFlag;
 void() CTF_GhostFlagTouch;
+.void(entity) webhook_prepfn;   // single-slot; PREP reads ev.message
+.string hook_url;                   // prepared URL
+.string hook_payload;               // prepared JSON payload

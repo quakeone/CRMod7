@@ -32,6 +32,7 @@ void () client_afk_off;
 void() quaketag_init;
 void() votables_request_qwsucks;   // new: single-command toggle+auto-start
 void() votables_request_q14ever;   // new: single-command toggle+auto-start
+void() votables_request_set_prediction;
 void () client_typing_on;
 void () client_typing_off;
 
@@ -338,10 +339,30 @@ void() IntermissionThink =
         string myVoteMapName = strzone(argv(0));
         string myVoteMapTitle = strzone(redify(argv(1)));
 
+        // Helper: compute how many more votes are needed for a simple majority right now
+        // (matches the majority check later: > (players * 0.5))
+        float(float slot) votes_needed_for_slot =
+        {
+            local entity p = find(world, classname, "player");
+            local float c = 0;
+            while (p != world)
+            {
+                c += 1;
+                p = find(p, classname, "player");
+            }
+            local float majority = floor(c * 0.5) + 1;
+            local float need = majority - map_choices[slot];
+            if (need < 0) need = 0;
+            return need;
+        };
+
         if ((self.warp_map) && ((self.warp_map) == self.impulse))
         {
-            bprint(sprintf("%s \bREMOVED\b their vote for %s %s\n",self.netname, myVoteMapName, myVoteMapTitle));
             map_choices[self.warp_map] -= 1;
+            // After decrement, report how many more are needed for this map
+            bprint(sprintf("%s \bREMOVED\b their vote for %s %s (%s more needed to pass)\n",
+                           self.netname, myVoteMapName, myVoteMapTitle,
+                           strings_ftos_gold(votes_needed_for_slot(self.warp_map))));
             self.warp_map = 0;
             self.impulse = 0;
             self.centerTime = 0;	//Update now.
@@ -351,15 +372,26 @@ void() IntermissionThink =
 
         if ((self.warp_map) && ((self.warp_map) != self.impulse))
         {
-            bprint(sprintf("%s \bREMOVED\b their vote for %s %s\n",self.netname, myVoteMapName, myVoteMapTitle));
+            // Print the REMOVED line for the PREVIOUSLY voted map (self.warp_map), not the new one
+            tokenize(vote_map_choices[self.warp_map]);
+            string prevVoteMapName  = strzone(argv(0));
+            string prevVoteMapTitle = strzone(redify(argv(1)));
             map_choices[self.warp_map] -= 1;
+            bprint(sprintf("%s \bREMOVED\b their vote for %s %s (%s more needed to pass)\n",
+                           self.netname, prevVoteMapName, prevVoteMapTitle,
+                           strings_ftos_gold(votes_needed_for_slot(self.warp_map))));
             self.warp_map = 0;
             centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[1], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);
+            strunzone(prevVoteMapName);
+            strunzone(prevVoteMapTitle);
         }
 
         self.warp_map = self.impulse;
         map_choices[self.warp_map] += 1;
-        bprint(sprintf("%s voted for %s %s\n",self.netname, myVoteMapName, myVoteMapTitle));
+        // Also show the updated "needed" after incrementing
+        bprint(sprintf("%s voted for %s %s (%s more needed to pass)\n",
+                       self.netname, myVoteMapName, myVoteMapTitle,
+                       strings_ftos_gold(votes_needed_for_slot(self.warp_map))));
 
         strunzone(myVoteMapName);
         strunzone(myVoteMapTitle);
@@ -3351,6 +3383,10 @@ void(string cmd) SV_ParseClientCommand =
         case "pudrop":
                 votables_request_set_powerupdrop();
                 return;
+
+        case "prediction":
+            votables_request_set_prediction();
+            return;
 
         // Back-compat alias: 'quaketag' behaves like 'qwsucks' toggle/start
         case "quaketag":

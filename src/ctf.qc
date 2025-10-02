@@ -15,84 +15,96 @@ void() match_bprint_score;
 // On success, sets tt_top_time (float seconds) and tt_top_player (string).
 float(float team) ctf_trial_get_top_record;
 
-// Implementation
-float (float team) ctf_trial_get_top_record =
+// Returns 1 if a top time-trial record exists for (current map, team).
+// On success, sets tt_top_time (float seconds) and tt_top_player (string).
+float(float team) ctf_trial_get_top_record =
 {
-    local float i;
+    local float i, best_time, have_mem;
+    local string best_player;
 
-    // First try to find record in the loaded playerrecord array
-    for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i++)
+    best_time = 999999;
+    best_player = "";
+    have_mem = FALSE;
+
+    // --- Fix: scan ALL loaded records; choose the MIN statvalue for this team
+    for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i = i + 1)
     {
         if (playerrecord[i].statvalue > 0 && playerrecord[i].teamcolor == team)
         {
-            // Found a record for this team
-            tt_top_time = playerrecord[i].statvalue;
-            tt_top_player = playerrecord[i].player;
-            return TRUE;
+            if (playerrecord[i].statvalue < best_time)
+            {
+                best_time = playerrecord[i].statvalue;
+                best_player = playerrecord[i].player; // pointer; already zoned by loader
+                have_mem = TRUE;
+            }
         }
     }
 
-    // If no records found, try loading from file (for maps that have records but weren't loaded yet)
-    local string filename = sprintf("%s_captimes.crx", mapname);
-    local filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
-    if (f < 0)
+    // If nothing in memory, fall back to reading from disk
+    if (!have_mem)
     {
-        f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
-    }
+        local string filename = sprintf("%s_captimes.crx", mapname);
+        local filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
+        if (f < 0)
+            f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
 
-    if (f >= 0)
-    {
-        local string line;
-        local float best_time = 999999; // Very high number
-        local string best_player = "";
-
-        // Read through the file to find the best time for this team
-        while (TRUE)
+        if (f >= 0)
         {
-            line = fgets(f);
-            if (!line) break;
+            local string line, player_name, meta_line;
+            local float team_color, time_value;
 
-            local float argc = tokenize(line);
-            if (!argc || argv(0) == "//" || argv(0) == "#") continue;
-
-            local string player_name = strtrim(line);
-            local float team_color = stof(fgets(f));
-            local float time_value = stof(fgets(f));
-
-            // Skip meta line if present
-            line = fgets(f);
-            if (line)
+            while (TRUE)
             {
-                argc = tokenize(line);
-                if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
+                line = fgets(f);
+                if (!line) break;
+
+                // Player line
+                if (line == "" || substring(line,0,2) == "//") // skip blank/comment
+                    continue;
+
+                player_name = strtrim(line);
+
+                // Team and time lines
+                line = fgets(f); if (!line) break;
+                team_color = stof(line);
+
+                line = fgets(f); if (!line) break;
+                time_value = stof(line);
+
+                // Optional meta line (consume if present)
+                meta_line = fgets(f);
+                if (meta_line)
                 {
-                    // Not a meta line, this might be the next record
-                    // We can't easily rewind, so we'll work with what we have
+                    local float argc = tokenize(meta_line);
+                    if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
+                    {
+                        // Not a meta line; it's likely the next record's player line.
+                        // We can't unread; the next loop iteration will treat it as the player line.
+                        // (This matches previous behavior.)
+                        // No action needed.
+                    }
+                }
+
+                if (time_value > 0 && time_value < best_time && team_color == team)
+                {
+                    best_time = time_value;
+                    // ensure a zoned copy since file scope ends after close
+                    if (best_player != "") strunzone(best_player);
+                    best_player = strzone(player_name);
                 }
             }
-
-            // Check if this is a better time for the target team
-            if (time_value > 0 && time_value < best_time && team_color == team)
-            {
-                best_time = time_value;
-                if (best_player != "") strunzone(best_player);
-                best_player = strzone(player_name);
-            }
+            fclose(f);
+            if (best_time < 999999) have_mem = TRUE; // we found one on disk
         }
-
-        fclose(f);
-
-        if (best_time < 999999 && best_player != "")
-        {
-            tt_top_time = best_time;
-            tt_top_player = best_player;
-            return TRUE;
-        }
-
-        if (best_player != "") strunzone(best_player);
     }
 
-    // No record found for this team
+    if (have_mem)
+    {
+        tt_top_time = best_time;
+        tt_top_player = best_player;
+        return TRUE;
+    }
+
     tt_top_time = 0;
     tt_top_player = "";
     return FALSE;
@@ -469,7 +481,7 @@ void() TeamCaptureFlagTouch =
                                         tshort,
                                         team_s,
                                         server_host);
-                                    webhook_post_deferred(msg_tt);
+										webhook_post_deferred(webhook_captime_info, msg_tt);
                                 }
 							}
 							//else sound(world,CHAN_AUTO,"crx/capreg.wav",1,ATTN_NONE);
@@ -512,7 +524,7 @@ void() TeamCaptureFlagTouch =
                                             tshort_m,
                                             team_s_m,
                                             server_host_m);
-                                        webhook_post_deferred(msg_m);
+											webhook_post_deferred(webhook_captime_info, msg_tt);
                                     }
 								}
 							}
@@ -1608,7 +1620,7 @@ void() CTF_GhostFlagTouch =
 						tshort,
 						team_s,
 						server_host);
-					webhook_post_deferred(msg_tt);
+						webhook_post_deferred(webhook_captime_info, msg_tt);
 				}
 			}
 		}

@@ -20,6 +20,21 @@ void(string command, string value) config_command =
             clanring_captimesdiscordurl = strzone(value);
             break;
         }
+		case "statsdiscordurl":
+        {
+            if (clanring_statsdiscordurl != string_null && clanring_statsdiscordurl != "")
+                strunzone(clanring_statsdiscordurl);
+            clanring_statsdiscordurl = strzone(value);
+            break;
+        }
+		case "matchposturl":
+	{
+		if (clanring_matchpost_url != string_null && clanring_matchpost_url != "")
+			strunzone(clanring_matchpost_url);
+		clanring_matchpost_url = strzone(value);
+		break;
+	}
+
 		case "matchsoundson":
 		{
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;

@@ -1003,6 +1003,7 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias help-match impulse 129\n");
     stuffcmd(self, "alias lock impulse 130\n");
     stuffcmd(self, "alias rockets impulse 133\n");
+    stuffcmd(self, "alias rpickup impulse 134\n");
     stuffcmd(self, "alias observer impulse 140\n");
     stuffcmd(self, "alias walk impulse 141\n");
     stuffcmd(self, "alias flyme impulse 142\n");

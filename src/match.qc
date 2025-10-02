@@ -51,6 +51,13 @@ void() PlayerDead;
 void() weapon_prewar_cleanup;
 void() weapon_prewar_animate_think;
 void() weapon_prewar_setup;
+// Random Pickup (reshuffle teams without repeats per roster)
+void() match_rpickup;
+void() match_request_rpickup;
+// Utility: remove a player from lists without announcements
+void(entity player) match_remove_player_silent;
+// Utility: add a player to a team without announcements
+void(entity player, float targetColor) match_add_player_silent;
 
 void() match_clear_leavemealone =
 {
@@ -70,6 +77,38 @@ static string pausehint[6] =
     "Hint: megahealth respawns at most 125 seconds after being taken.",
     "Hint: Leave backpack for teammates; communicate location"
 };
+
+// ============================================================
+// Random pickup deck (global state) - cycles all unique assignments
+// for the current roster & team-size distribution before repeat.
+// ============================================================
+float rs_valid;                    // 1 if a deck is built for current roster
+float rs_N;                        // number of committed players (READY, non-observer)
+float rs_T;                        // number of teams present in roster
+float rs_counts[8];                // team sizes aligned with rs_colors
+float rs_colors[8];                // team identifiers (height), sorted asc
+entity rs_plist[32];               // fixed player order for this deck
+float rs_labels[32];               // current multiset permutation labels (0..rs_T-1)
+float rs_used_in_cycle;            // how many permutations yielded in this cycle
+float rs_total_perms;              // multinomial count of unique assignments
+float rs_start_offset;             // random start offset within the cycle
+float rs_work_counts[8];           // scratch counts for unranking
+// Suppress client "cannot change color" prints during server-driven reshuffles
+float rs_silence_until;            // absolute time until which color-change prints are muted
+void()  rs_enforce_balanced_counts; // force balanced team-size targets for rpickup
+
+// Forward decls for deck helpers
+float() rs_build_or_refresh;
+void()  rs_build_deck_from_roster;
+float() rs_same_roster;
+float() rs_next_labels;
+float(float n, float k) rs_choose;
+void()  rs_enforce_balanced_counts;
+float() rs_multinomial_total;
+void(float rank) rs_unrank_into_labels;
+float(float remN, float dec_idx) rs_multinomial_with_dec_from_work;
+// ============================================================
+
 
 //
 //  I N I T  W O R L D
@@ -2165,6 +2204,107 @@ void(entity player) match_remove_player =
     }
 };
 
+// ---------------------------------------------
+//  S I L E N T   R E M O V E   (no announcements)
+//  Unlinks a player from team/global lists without prints.
+// ---------------------------------------------
+void(entity player) match_remove_player_silent =
+{
+    local entity plast;
+    if (player.next_team == world)
+        return;
+
+    // unlink from global player list
+    plast = clanring_sentinel;
+    while (plast.next_player != player)
+    {
+        plast = plast.next_player;
+        if (!plast) return; // not found
+    }
+    plast.next_player = player.next_player;
+
+    if (teamplay)
+    {
+        // fix team-first-player pointer if needed
+        if (player.next_team.next_player == player)
+            player.next_team.next_player = player.next_player;
+
+        if (player.next_team != world)
+            player.next_team.count = player.next_team.count - 1;
+    }
+    else
+    {
+        plast.next_team = player.next_team;
+        clanring_numteams = clanring_numteams - 1;
+    }
+
+    player.next_player = world;
+    player.next_team   = world;
+};
+
+// ---------------------------------------------
+//  S I L E N T   A D D   (no announcements)
+//  Re-links a player into the target team/global lists quietly.
+//  Assumes match is NOT started (reshuffle is pre-match) and that
+//  target team exists (created automatically if missing).
+// ---------------------------------------------
+void(entity player, float targetColor) match_add_player_silent =
+{
+    local entity pteam;
+
+    // locate (or create) the team with this color
+    pteam = clanring_sentinel.next_team;
+    while (pteam)
+    {
+        if (pteam.height == targetColor) break;
+        pteam = pteam.next_team;
+    }
+    if (!pteam)
+    {
+        // create minimal team silently (rare: if colors changed)
+        pteam                      = spawn();
+        pteam.classname            = "clanring_team";
+        pteam.next_team            = clanring_sentinel.next_team;
+        clanring_sentinel.next_team= pteam;
+        pteam.count                = 0;
+        pteam.height               = targetColor;
+        pteam.frags                = 0;
+        pteam.netname              = strings_get_teamname(pteam.height);
+        pteam.mdl                  = strings_get_teamname_bronze(pteam.height);
+        pteam.ammo_rockets         = 0;
+        clanring_numteams          = clanring_numteams + 1;
+        pqc_new_team(pteam.height);
+        stats_reset_team(pteam);
+    }
+
+    // insert into global player list and team block
+    if (pteam.count > 0)
+    {
+        // append directly after the team's head player so the team's block stays contiguous
+        player.next_player             = pteam.next_player.next_player;
+        pteam.next_player.next_player  = player;
+    }
+    else
+    {
+        // first player for this team: push to global head and mark team head
+        player.next_player             = clanring_sentinel.next_player;
+        clanring_sentinel.next_player  = player;
+        pteam.next_player              = player;
+    }
+
+    // link back-pointers & counters
+    player.next_team = pteam;
+    pteam.count      = pteam.count + 1;
+
+    // enforce colors/skins and style flags
+    player.team   = targetColor + 1;
+    player.height = targetColor;
+    setcolour(player, targetColor, targetColor);
+    if ((targetColor + 1) == RED)  { player.style = (player.style | CLANRING_RED_TEAM);  if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM) player.skin = 1; }
+    if ((targetColor + 1) == BLUE) { player.style = (player.style | CLANRING_BLUE_TEAM); if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM) player.skin = 3; }
+};
+
+
 //
 //  R E M O V E  T E A M
 //
@@ -2359,6 +2499,337 @@ void() match_request_lock =
             sprint(self, "participants and administrators only\n");
         }
     }
+};
+
+
+
+
+// ---------------------------------------------
+//  R P I C K U P   D E C K   H E L P E R S
+// ---------------------------------------------
+float(float n, float k) rs_choose =
+{
+    local float i, r, kk;
+    if (k < 0 || k > n) return 0;
+    kk = (k > (n - k)) ? (n - k) : k;
+    r = 1;
+    for (i = 1; i <= kk; i = i + 1)
+    {
+        // r *= (n - kk + i) / i;
+        r = r * (n - kk + i) / i;
+    }
+    return r;
+};
+
+float() rs_multinomial_total =
+{
+    local float total, rem, t;
+    total = 1;
+    rem = rs_N;
+    for (t = 0; t < rs_T; t = t + 1)
+    {
+        total = total * rs_choose(rem, rs_counts[t]);
+        rem = rem - rs_counts[t];
+    }
+    return total;
+};
+
+// Count permutations of remaining multiset if we place label 'dec_idx' now.
+// Uses rs_work_counts[] as the current remaining counts.
+float(float remN, float dec_idx) rs_multinomial_with_dec_from_work =
+{
+    local float total, rem, t, c;
+    if (remN <= 0) return 0;
+    rem = remN - 1;
+    total = 1;
+    for (t = 0; t < rs_T; t = t + 1)
+    {
+        c = rs_work_counts[t];
+        if (t == dec_idx) c = c - 1;
+        if (c < 0) return 0;
+        total = total * rs_choose(rem, c);
+        rem = rem - c;
+    }
+    return total;
+};
+
+// ---------------------------------------------------------
+// Enforce BALANCED team sizes for rpickup (2-team modes only)
+// Even N  -> N/2 vs N/2
+// Odd  N  -> ceil(N/2) vs floor(N/2)
+// The +1 (when odd) goes to the team that currently has fewer
+// committed players to avoid bias over repeated reshuffles.
+// ---------------------------------------------------------
+void() rs_enforce_balanced_counts =
+{
+    local float base, extra, a_old, b_old;
+
+    // Only enforce for classic 2-team modes (CTF/DM, etc.)
+    if (rs_T != 2) return;
+    if (rs_N <= 1) return;
+
+    // Keep prior counts to decide where the +1 should go if odd
+    a_old = rs_counts[0];
+    b_old = rs_counts[1];
+
+    base  = floor(rs_N / 2);
+    extra = rs_N - base * 2; // 0 or 1
+
+    if (extra == 0)
+    {
+        rs_counts[0] = base;
+        rs_counts[1] = base;
+        return;
+    }
+
+    // extra == 1: give +1 to the team that currently has fewer players
+    if (a_old < b_old)
+    {
+        rs_counts[0] = base + 1; rs_counts[1] = base;
+    }
+    else if (b_old < a_old)
+    {
+        rs_counts[0] = base;     rs_counts[1] = base + 1;
+    }
+    else { rs_counts[0] = base + 1; rs_counts[1] = base; }
+};
+
+// Direct combinatorial unranking: fill rs_labels[] for the given rank.
+void(float rank) rs_unrank_into_labels =
+{
+    local float pos, t, ways, remN;
+
+    // copy counts into work buffer
+    for (t = 0; t < rs_T; t = t + 1)
+        rs_work_counts[t] = rs_counts[t];
+
+    remN = rs_N;
+    for (pos = 0; pos < rs_N; pos = pos + 1)
+    {
+        for (t = 0; t < rs_T; t = t + 1)
+        {
+            if (rs_work_counts[t] <= 0) continue;
+            ways = rs_multinomial_with_dec_from_work(remN, t);
+            if (rank >= ways) { rank = rank - ways; continue; }
+            rs_labels[pos] = t; rs_work_counts[t] = rs_work_counts[t] - 1; remN = remN - 1; break;
+        }
+    }
+};
+
+// Build rs_plist/rs_colors/rs_counts/rs_labels (canonical sorted start)
+void() rs_build_deck_from_roster =
+{
+    local entity p;
+    local float i, j, col, idx, nplayers, nteams, k;
+
+    // Collect committed players
+    nplayers = 0; nteams = 0;
+    p = clanring_sentinel.next_player;
+    while (p)
+    {
+        if (!(p.style & CLANRING_OBSERVER) && (p.style & CLANRING_READY) && (p.next_team != world))
+        {
+            // Record team colour and grow counts
+            col = p.next_team.height;
+            idx = -1;
+            for (i = 0; i < nteams; i = i + 1) if (rs_colors[i] == col) { idx = i; break; }
+            if (idx < 0) { rs_colors[nteams] = col; rs_counts[nteams] = 0; idx = nteams; nteams = nteams + 1; }
+            rs_counts[idx] = rs_counts[idx] + 1;
+
+            if (nplayers < 32) { rs_plist[nplayers] = p; nplayers = nplayers + 1; }
+        }
+        p = p.next_player;
+    }
+
+    rs_N = nplayers;
+    rs_T = nteams;
+
+    // Sort colours ascending and keep counts aligned (selection sort)
+    for (i = 0; i < rs_T - 1; i = i + 1)
+    {
+        idx = i;
+        for (j = i + 1; j < rs_T; j = j + 1) if (rs_colors[j] < rs_colors[idx]) idx = j;
+        if (idx != i)
+        {
+            col = rs_colors[i]; rs_colors[i] = rs_colors[idx]; rs_colors[idx] = col;
+            k   = rs_counts[i]; rs_counts[i] = rs_counts[idx]; rs_counts[idx] = k;
+        }
+    }
+
+    // Force rpickup to operate over *balanced* team-size targets
+    // (ignores current roster skew like 3:1 and builds a 2:2 deck for N=4)
+    rs_enforce_balanced_counts();
+
+    // Canonical start labels: [0..0, 1..1, 2..2, ...]
+    nplayers = 0;
+    for (i = 0; i < rs_T; i = i + 1)
+        for (j = 0; j < rs_counts[i]; j = j + 1)
+            rs_labels[nplayers++] = i;
+
+    rs_total_perms    = rs_multinomial_total();
+    rs_used_in_cycle  = 0;
+    rs_start_offset   = floor(random() * rs_total_perms);
+    rs_valid          = TRUE;
+};
+
+// Compare current roster/distribution against deck's
+float() rs_same_roster =
+{
+    local entity seen[32];
+    local entity p;
+    local float i, j, ncur, matchcount, col, idx, curT;
+    local float curColors[8], curCounts[8];
+
+    // Build current committed set
+    ncur = 0; curT = 0;
+    p = clanring_sentinel.next_player;
+    while (p)
+    {
+        if (!(p.style & CLANRING_OBSERVER) && (p.style & CLANRING_READY) && (p.next_team != world))
+        {
+            if (ncur < 32) { seen[ncur] = p; ncur = ncur + 1; }
+
+            col = p.next_team.height; idx = -1;
+            for (i = 0; i < curT; i = i + 1) if (curColors[i] == col) { idx = i; break; }
+            if (idx < 0) { curColors[curT] = col; curCounts[curT] = 0; idx = curT; curT = curT + 1; }
+            curCounts[idx] = curCounts[idx] + 1;
+        }
+        p = p.next_player;
+    }
+
+    if (ncur != rs_N) return FALSE;
+    if (curT != rs_T) return FALSE;
+
+    // colours & counts (order-insensitive)
+    for (i = 0; i < rs_T; i = i + 1)
+    {
+        idx = -1;
+        for (j = 0; j < curT; j = j + 1) if (curColors[j] == rs_colors[i]) { idx = j; break; }
+        if (idx < 0) return FALSE;
+        if (curCounts[idx] != rs_counts[i]) return FALSE;
+    }
+
+    // membership set equality
+    matchcount = 0;
+    for (i = 0; i < rs_N; i = i + 1)
+        for (j = 0; j < ncur; j = j + 1)
+            if (rs_plist[i] == seen[j]) { matchcount = matchcount + 1; break; }
+
+    return (matchcount == rs_N);
+};
+
+// Lexicographic next_permutation over rs_labels[0..rs_N-1]
+float() rs_next_labels =
+{
+    local float i, j, l, r, tmp;
+
+    if (rs_N <= 1) return FALSE;
+
+    i = rs_N - 2;
+    while ((i >= 0) && (rs_labels[i] >= rs_labels[i + 1])) i = i - 1;
+    if (i < 0) return FALSE; // last permutation
+
+    j = rs_N - 1;
+    while (rs_labels[j] <= rs_labels[i]) j = j - 1;
+
+    // swap i <-> j
+    tmp = rs_labels[i]; rs_labels[i] = rs_labels[j]; rs_labels[j] = tmp;
+
+    // reverse suffix [i+1 .. end]
+    l = i + 1; r = rs_N - 1;
+    while (l < r)
+    {
+        tmp = rs_labels[l]; rs_labels[l] = rs_labels[r]; rs_labels[r] = tmp;
+        l = l + 1; r = r - 1;
+    }
+    return TRUE;
+};
+
+// Ensure deck matches current roster; rebuild if needed
+float() rs_build_or_refresh =
+{
+    if (!rs_valid || !rs_same_roster())
+    {
+        rs_build_deck_from_roster();
+        // rs_start_offset is set inside rs_build_deck_from_roster()
+    }
+    return rs_valid;
+};
+
+// ---------------------------------------------
+//  R P I C K U P   (core; decked, no repeats)
+// ---------------------------------------------
+void() match_rpickup =
+{
+    local float i;
+
+    if (!teamplay)
+    { sprint(self, "Command valid in team modes only\n"); return; }
+    if (clanring_state & CLANRING_MATCH_STARTED)
+    { sprint(self, "Cannot reshuffle during a live match\n"); return; }
+
+    if (!rs_build_or_refresh())
+    { sprint(self, "Unable to build reshuffle deck\n"); return; }
+
+    // Choose the next configuration by direct unranking
+    // rank = (rs_start_offset + rs_used_in_cycle) % rs_total_perms (safe wrap without long loops)
+    local float rank;
+    rank = rs_start_offset + rs_used_in_cycle;
+    if (rs_total_perms > 0)
+        rank = rank - rs_total_perms * floor(rank / rs_total_perms);
+    rs_unrank_into_labels(rank);
+
+    if (rs_T < 2 || rs_N < 2)
+    { sprint(self, "Reshuffle requires at least two teams and two committed players\n"); return; }
+
+    // Mute verify-team color-change complaints briefly while we relink players
+    rs_silence_until = time + 1;
+
+    // Unlink all committed players silently (use deck order)
+    for (i = 0; i < rs_N; i = i + 1)
+        match_remove_player_silent(rs_plist[i]);
+
+    // Apply labels -> assign players to target team colours (silently)
+    for (i = 0; i < rs_N; i = i + 1)
+    {
+        match_add_player_silent(rs_plist[i], rs_colors[ rs_labels[i] ]);
+    }
+
+    // (keep silence window a little longer to cover client 'color' echoes)
+    rs_silence_until = time + 1;
+    announce("Teams reshuffled");
+
+    local float idx, total;
+    local string sx, sy;
+    total = (rs_total_perms > 0) ? rs_total_perms : 1;
+    // used_in_cycle is 0-based; display as 1-based within the current cycle
+    idx   = ((rs_used_in_cycle % total) + 1);
+    sx = ftos(idx);
+    sy = ftos(total);
+    bprint4("cycle ", sx, " of ", sy);
+    bprint(" possibilities\n");
+    
+
+    match_update_score_info();
+
+    rs_used_in_cycle = rs_used_in_cycle + 1;
+};
+
+// Vote/Admin entry point
+void() match_request_rpickup =
+{
+    if (!teamplay) { sprint(self, "Command valid in team modes only\n"); return; }
+    if (clanring_state & CLANRING_MATCH_STARTED)
+    { sprint(self, "Cannot reshuffle during a live match\n"); return; }
+
+    // Pre-check roster; do not start a vote if conditions aren't met
+    if (!rs_build_or_refresh()) { sprint(self, "Unable to build reshuffle deck\n"); return; }
+    if (rs_T < 2 || rs_N < 2) { sprint(self, "Reshuffle requires at least two teams and two committed players\n"); return; }
+
+    if (self.style & CLANRING_ADMINISTRATOR)
+        match_rpickup();
+    else if (vote_init("\brandomly reshuffle the teams\b", "", match_rpickup))
+        vote_yes();
 };
 
 //
@@ -3039,6 +3510,11 @@ void() match_impulse =
             match_show_rockets();
             break;
         }
+        case (134):
+        {
+            match_request_rpickup();
+            break;
+        }
     }
 };
 
@@ -3098,7 +3574,11 @@ void() match_verify_team =
     if (clanring_state & CLANRING_MATCH_STARTED)
         announce2(self.netname, " tried to change color");
     else
-        sprint(self, "You cannot change color after you have committed\n");
+    {
+        // Suppress this message if we're in a server-driven reshuffle window
+        if (time >= rs_silence_until)
+            sprint(self, "You cannot change color after you have committed\n");
+    }
 };
 
 //

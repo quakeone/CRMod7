@@ -938,7 +938,7 @@ void() console_autodump =
 		if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
 			console_show_fstats ();
 		
-			json_export_match_to_file();//R00k: dump player stat values to file
+		//json_post_and_maybe_save(MATCHPOST_DEFAULT_PRETTY, 1, "json/match_last.json", MATCHPOST_DEFAULT_DEFERRED);
 	}
 };
 

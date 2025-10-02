@@ -13,6 +13,10 @@
 //  10) Public APIs: json_export_match_to_file / json_append_lastscores / utils_show_last_scores
 // -----------------------------------------------------------------------------
 
+void(string payload) match_post_json;
+void(string payload) match_post_json_deferred;
+string(string rel) mp_resolve_for_engine;
+
 // ============================================================================
 // 1) Constants & Globals
 // ============================================================================
@@ -841,18 +845,16 @@ string () json_get_gametype_playmode =
 // 10) Public APIs
 // ============================================================================
 
-// Main: write a super-detailed match JSON
-void () json_export_match_to_file =
+// Build the current match JSON document using the active builder.
+// Call this inside json_begin_* context helpers.
+void() json_emit_match_document =
 {
-    float f; entity t, p;
-    string date   = strftime(TRUE, "%Y-%m-%d %H:%M:%S");
-    string sgtype = json_get_gametype_playmode();
-    string hname  = infokey(world, "hostname");
-
-    f = fopen("json/match_test.json", FILE_WRITE);
-    if (f < 0) { dprint("*** ERROR creating json file!\n"); return; }
-
-    json_begin_compact_to_file(f);
+    // === Desired schema: { "match": { ... } } ==============================
+    local float f;  // scratch
+    local entity t, p;
+    local string date   = strftime(TRUE, "%Y-%m-%d %H:%M:%S");
+    local string sgtype = json_get_gametype_playmode();
+    local string hname  = infokey(world, "hostname");
 
     json_begin_object();
       json_key("match"); json_begin_object();
@@ -864,16 +866,16 @@ void () json_export_match_to_file =
         json_kv_number("team size",  stats_matchtype);
         json_kv_number("timelimit",  stats_timelimit);
 
+        // ---- Teams ---------------------------------------------------------
         json_key("teams"); json_begin_array();
           t = clanring_sentinel.next_team;
           while (t && t != world)
           {
             json_begin_object();
-              json_kv_string("name", t.netname);
-              // add clean (unpadded) team color
+              json_kv_string("name",  t.netname);
               json_kv_string("color", str_rtrim(strings_get_teamname3(t.height)));
 
-              // --- team summary (stats_show_teamstats mirrored) ---
+              // team summary (vectors)
               json_key("team_summary"); json_begin_object();
                 json_key("quad_ring"); json_begin_array(); json_number(t.dest2_x); json_number(t.dest2_y); json_number(t.dest2_z); json_end_array();
                 json_key("rl_lg_gl");  json_begin_array(); json_number(t.dest1_x); json_number(t.dest1_y); json_number(t.dest1_z); json_end_array();
@@ -881,63 +883,48 @@ void () json_export_match_to_file =
                 json_key("ra_ya_ga");  json_begin_array(); json_number(t.dest_x);  json_number(t.dest_y);  json_number(t.dest_z);  json_end_array();
                 json_kv_number("rlpak_plus",  t.mangle_y);
                 json_kv_number("rlpak_minus", t.mangle_z);
-                local float control = 0; if (clanring_sentinel.cnt > 0) control = floor((1000 * t.mangle_x) / clanring_sentinel.cnt) / 10; // one decimal
-                json_kv_number("control_pct", control);
+                f = 0; if (clanring_sentinel.cnt > 0) f = floor((1000 * t.mangle_x) / clanring_sentinel.cnt) / 10;
+                json_kv_number("control_pct", f);
               json_end_object();
 
+              // players in this team
               json_key("players"); json_begin_array();
                 p = t.next_player;
                 while (p && p != world)
                 {
-                  // Only include players that actually belong to team 't'.
-                  // Some builds link extra players into t.next_player; skip those.
                   if (p.next_team != t) { p = p.next_player; continue; }
-                  // --- Pre-compute ---
-                  float deaths = p.mangle_z;
-                  float kdr_val = (deaths > 0) ? floor(p.true_kills / deaths)
-                                 : ((deaths == 0 && p.true_kills == 0) ? 0 : p.true_kills);
-
-                  float bullet_eff = json_pct(p.dest2_x, p.dest1_x);
-                  float nails_eff  = json_pct(p.dest2_y, p.dest1_y);
-                  float rockets_eff= json_pct(p.dest_y,  p.dest_x);
-                  float lg_eff     = json_pct(p.dest2_z, p.dest1_z);
-                  float gl_eff     = json_pct(p.stats_gl_frac, p.stats_gl_tot);
-
-                  float tot_fired_inc_gl = (p.dest1_x + p.dest1_y + p.dest1_z + p.dest_x + p.stats_gl_tot);
-                  float tot_done_inc_gl  = (p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y + p.stats_gl_frac);
-                  float total_eff        = json_pct(tot_done_inc_gl, tot_fired_inc_gl);
-
-                  float kpm = 0;
-                  if (p.join_time > 0)
-                  {
-                    float secs = time - p.join_time;
-                    if (secs > 1) kpm = (p.true_kills * 60) / secs;
-                  }
-                  // Optional: round to 1 decimal
+                  // pre-compute metrics
+                  local float deaths = p.mangle_z;
+                  local float kdr_val = (deaths > 0) ? floor(p.true_kills / deaths)
+                                     : ((deaths == 0 && p.true_kills == 0) ? 0 : p.true_kills);
+                  local float bullet_eff = json_pct(p.dest2_x, p.dest1_x);
+                  local float nails_eff  = json_pct(p.dest2_y, p.dest1_y);
+                  local float rockets_eff= json_pct(p.dest_y,  p.dest_x);
+                  local float lg_eff     = json_pct(p.dest2_z, p.dest1_z);
+                  local float gl_eff     = json_pct(p.stats_gl_frac, p.stats_gl_tot);
+                  local float tot_fired_inc_gl = (p.dest1_x + p.dest1_y + p.dest1_z + p.dest_x + p.stats_gl_tot);
+                  local float tot_done_inc_gl  = (p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y + p.stats_gl_frac);
+                  local float total_eff        = json_pct(tot_done_inc_gl, tot_fired_inc_gl);
+                  local float kpm = 0;
+                  if (p.join_time > 0) { local float secs = time - p.join_time; if (secs > 1) kpm = (p.true_kills * 60) / secs; }
                   kpm = floor(kpm * 10) / 10;
-
-                  float qd_eff = json_pct(p.clanring_qdwep_x, p.clanring_qdwep_y);
-                  float pt_eff = json_pct(p.clanring_ptwep_x, p.clanring_ptwep_y);
-
-                  float tot_enemy = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
-                  float tot_done  = tot_enemy + p.clanring_badstats_y + p.clanring_badstats_z;
-                  float self_pct  = json_pct(p.clanring_badstats_y, tot_done);
-                  float team_pct  = json_pct(p.clanring_badstats_z, tot_done);
-
-                  float per_val = 0; if (p.join_time > 0){ float s2 = time - p.join_time; if (s2 > 1) per_val = Q1_PER_Calc_Raw(p) / (s2 / 60); }
+                  local float qd_eff = json_pct(p.clanring_qdwep_x, p.clanring_qdwep_y);
+                  local float pt_eff = json_pct(p.clanring_ptwep_x, p.clanring_ptwep_y);
+                  local float tot_enemy = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
+                  local float tot_done  = tot_enemy + p.clanring_badstats_y + p.clanring_badstats_z;
+                  local float self_pct  = json_pct(p.clanring_badstats_y,  tot_done);
+                  local float team_pct  = json_pct(p.clanring_badstats_z,  tot_done);
+                  local float per_val   = 0; if (p.join_time > 0){ local float s2 = time - p.join_time; if (s2 > 1) per_val = Q1_PER_Calc_Eff(p) / (s2 / 60); }
 
                   json_begin_object();
-                    // identity
                     json_kv_string("name", p.netname);
                     json_kv_string("team", strings_get_colour(p.height));
 
-                    // core
                     json_kv_number("score",  p.frags);
                     json_kv_number("kills",  p.true_kills);
                     json_kv_number("deaths", deaths);
                     json_kv_number("kdr",    kdr_val);
 
-                    // killstats
                     json_kv_number("avenges",         p.stats_avenge_teammate);
                     json_kv_number("self_kills",      p.mangle_x);
                     json_kv_number("team_kills",      p.mangle_y);
@@ -946,7 +933,6 @@ void () json_export_match_to_file =
                     json_kv_number("damage_given",    p.dmg_given);
                     json_kv_number("enemy_weapon_dmg",p.ewep);
 
-                    // weapon efficiency (incl. GL) + KPM
                     json_kv_number("bullet_eff",    bullet_eff);
                     json_kv_number("nails_eff",     nails_eff);
                     json_kv_number("rockets_eff",   rockets_eff);
@@ -955,7 +941,6 @@ void () json_export_match_to_file =
                     json_kv_number("total_eff",     total_eff);
                     json_kv_number("kpm",           kpm);
 
-                    // Quad
                     json_kv_number("quads",            p.clanring_qdwep_z);
                     json_kv_number("quad_time",        p.totalquad);
                     json_kv_number("quad_weapon_eff",  qd_eff);
@@ -963,13 +948,11 @@ void () json_export_match_to_file =
                     json_kv_number("quad_self_kills",  p.clanring_qdkill_z);
                     json_kv_number("quad_team_kills",  p.clanring_qdkill_y);
 
-                    // Pent
                     json_kv_number("pents",            p.clanring_ptwep_z);
                     json_kv_number("pent_weapon_eff",  pt_eff);
                     json_kv_number("pent_enemy_kills", p.clanring_ptkill_x);
                     json_kv_number("pent_team_kills",  p.clanring_ptkill_y);
 
-                    // Bad stuff
                     json_kv_number("rl_paks_given", p.clanring_badstats_x);
                     json_kv_number("self_dmg_pct",  self_pct);
                     json_kv_number("team_dmg_pct",  team_pct);
@@ -977,28 +960,23 @@ void () json_export_match_to_file =
                     json_kv_number("axe_deaths",    p.clanring_badstats2_y);
                     json_kv_number("fall_deaths",   p.clanring_badstats2_z);
 
-                    // Defense
                     json_kv_number("def_teammate", p.stats_defense_teammate);
                     json_kv_number("def_backpack", p.stats_defense_backpack);
                     json_kv_number("def_powerup",  p.stats_defense_powerup);
                     json_kv_number("def_weapon",   p.stats_defense_weapon);
                     json_kv_number("def_armor",    p.stats_defense_armor);
 
-                    // Items taken
                     json_key("items_taken"); json_begin_object();
-                      // weapons
                       json_kv_number("ssg", p.stats_item_ssg);
                       json_kv_number("ng",  p.stats_item_ng);
                       json_kv_number("sng", p.stats_item_sng);
                       json_kv_number("gl",  p.stats_item_gl);
                       json_kv_number("rl",  p.stats_item_rl);
                       json_kv_number("lg",  p.stats_item_lg);
-                      // ammo
                       json_kv_number("shells",  p.stats_item_shells);
                       json_kv_number("nails",   p.stats_item_nails);
                       json_kv_number("rockets", p.stats_item_rockets);
                       json_kv_number("cells",   p.stats_item_cells);
-                      // pickups
                       json_kv_number("health",  p.stats_item_health);
                       json_kv_number("mega",    p.stats_item_mega);
                       json_kv_number("biosuit", p.stats_item_biosuit);
@@ -1008,7 +986,6 @@ void () json_export_match_to_file =
                       json_kv_number("backpacks", p.stats_item_backpacks);
                     json_end_object();
 
-                    // CTF block
                     if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
                     {
                       json_key("ctf"); json_begin_object();
@@ -1025,27 +1002,19 @@ void () json_export_match_to_file =
                       json_end_object();
                     }
 
-                    // Efficiency rating per minute
-                    json_kv_number("per", per_val);
-
-                    // Misc
+                    json_kv_number("per",         per_val);
                     json_kv_number("direct_hits", p.direct_hit);
                   json_end_object();
-
                   p = p.next_player;
                 }
               json_end_array();
             json_end_object();
-
             t = t.next_team;
           }
         json_end_array();
       json_end_object();
     json_end_object();
-
-    json_clear_sink();
-    fclose(f);
-}
+};
 
 void(string entry) json_append_lastscores =
 {
@@ -1208,6 +1177,158 @@ void(string entry) json_append_lastscores =
 
     // Free inputs
     strunzone(z_map); strunzone(z_mode); strunzone(z_host); strunzone(z_entry); strunzone(z_date);
+};
+
+// 1) Build JSON to an in-memory string (auto-compact if pretty is too large)
+
+string(float pretty) json_export_match_to_string =
+{
+    bprint(sprintf("[matchpost] build-json: begin (pretty=%g)\n", pretty));
+    json_begin_pretty(pretty);   // sets builder to string mode
+    json_emit_match_document();  // <-- single source of truth
+    local string out = json_result();        // grab the built JSON
+    bprint(sprintf("[matchpost] build-json: done bytes=%g\n", strlen(out)));
+    // If pretty output bumps into QC's ~1KB string limit, rebuild compact.
+    if (pretty != 0 && strlen(out) >= 1000)
+    {
+        bprint("[matchpost] build-json: pretty too large, retrying compact\n");
+        json_begin_pretty(0);
+        json_emit_match_document();
+        out = json_result();
+        bprint(sprintf("[matchpost] build-json (compact): bytes=%g\n", strlen(out)));
+    }
+    return out;
+};
+
+// 2) Write JSON to a file (STREAM builder to file; avoids QC string cap)
+void(string path, float pretty) json_export_match_to_file =
+{
+    if (!path || path == "")
+    {
+        dprint("json_export_match_to_file: empty path\n");
+        bprint("[matchpost] save-json: ERROR (empty path)\n");
+        return;
+    }
+
+    local filestream f = fopen(path, FILE_WRITE);
+    if (f < 0)
+    {
+        dprint(sprintf("json_export_match_to_file: open failed '%s'\n", path));
+        bprint(sprintf("[matchpost] save-json: ERROR (open failed '%s')\n", path));
+        return;
+    }
+
+    bprint(sprintf("[matchpost] save-json: writing '%s' (stream)\n", path));
+
+    // IMPORTANT: (f, pretty) — put the file handle first, not the pretty flag.
+    json_begin_pretty_to_file(f, 0);  // stream compact JSON directly into 'f'
+    json_emit_match_document();
+
+    // We streamed everything to 'f'; just detach the sink before closing.
+    json_clear_sink();
+    fclose(f);
+
+    bprint(sprintf("[matchpost] save-json: wrote '%s'\n", path));
+};
+
+
+// 3) Post the current match JSON (send the file via '@')
+void(float pretty, float deferred) json_post_current_match =
+{
+    local string rel_write = "json/match_last.json";
+    local string rel_read  = "data/json/match_last.json";
+
+    // Build the JSON (compact) to our normal write location.
+    json_export_match_to_file(rel_write, pretty);
+
+    // Show what we wrote.
+    bprint(sprintf("[matchpost] wrote rel(write)='%s'\n", rel_write));
+
+    // Resolve to likely absolute candidates for the engine to fopen().
+    local string gdir = cvar_string("fs_gamedir");
+    local string bdir = cvar_string("fs_basedir");
+    local string mod  = cvar_string("game");
+
+    bprint(sprintf("[matchpost] cvars: fs_gamedir='%s' fs_basedir='%s' game='%s'\n",
+                   gdir ? gdir : "", bdir ? bdir : "", mod ? mod : ""));
+
+    // Candidate list (most engines actually write file into <gamedir>/data/…)
+    local string cand[6]; local float n = 0;
+    if (gdir && gdir != "")
+    {
+        cand[n++] = strcat(gdir, "/data/", rel_write); // <gdir>/data/json/...
+        cand[n++] = strcat(gdir, "/",     rel_write);  // <gdir>/json/...
+    }
+    if (bdir && bdir != "" && mod && mod != "")
+    {
+        cand[n++] = strcat(bdir, "/", mod, "/data/", rel_write);
+        cand[n++] = strcat(bdir, "/", mod, "/",     rel_write);
+    }
+    if (mod && mod != "")
+    {
+        cand[n++] = strcat(mod, "/data/", rel_write);
+        cand[n++] = strcat(mod, "/",      rel_write);
+    }
+
+    // Fall back to the bare rel_read (works only if CWD is game root).
+    cand[n++] = rel_read;
+
+    // Try each candidate: if QC can fopen() it, ask the engine to POST it.
+    bprint(sprintf("[matchpost] payload mode=%s (build-to-file -> post file)\n",
+                   deferred ? "deferred" : "immediate"));
+
+    local float i;
+    for (i = 0; i < n; i = i + 1)
+    {
+        local string p = cand[i];
+        if (!p || p == "") continue;
+
+        // QC-side proof the file exists & is readable.
+        local float fh = fopen(p, FILE_READ);
+        if (fh < 0)
+        {
+            dprint(sprintf("[matchpost] QC fopen failed: '%s'\n", p));
+            continue;
+        }
+
+        // Optional: preview up to 160 bytes (helps confirm we found the right file)
+        {
+            local string head = "", line;
+            while (strlen(head) < 160) { line = fgets(fh); if (line == "") break; head = strcat(head, line); }
+            bprint(sprintf("[matchpost] try '%s' head=%g bytes\n", p, strlen(head)));
+            if (strlen(head) > 0) bprint(sprintf("[matchpost] head preview: %s\n", substring(head, 0, 160)));
+        }
+        fclose(fh);
+
+        // Hand the engine an @absolute (or at least QC-verified) path.
+        if (deferred) match_post_json_deferred(strcat("@", p));
+        else          match_post_json        (strcat("@", p));
+        return; // stop after first good candidate
+    }
+
+    // If we got here, none of the candidates opened in QC.
+    bprint("[matchpost] ERROR: no candidate file path could be opened; POST aborted.\n");
+};
+
+
+// 4) Convenience: post and optionally save a local copy
+void(float pretty, float save_copy, string path, float deferred) json_post_and_maybe_save =
+{
+    
+        bprint(sprintf("[matchpost] maybe-save: save_copy=%g path='%s' pretty=%g deferred=%g\n",
+                   save_copy, path, pretty, deferred));
+    
+    if (save_copy && path && path != "")
+    {
+        bprint(sprintf("[matchpost] maybe-save: requested path='%s' (pretty=%g)\n", path, pretty));
+        json_export_match_to_file(path, pretty);
+    }
+    else if (save_copy)
+    {
+        dprint("json_post_and_maybe_save: no path; skipping save_copy\n");
+        bprint("[matchpost] maybe-save: skipping (no path)\n");
+    }
+    json_post_current_match(pretty, deferred);
 };
 
 void () utils_show_last_scores =

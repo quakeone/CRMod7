@@ -736,7 +736,6 @@ void() armor_touch =
 			self.nextthink = time + 20;
 
 		self.think= SUB_regen;
-//		sprint(other, "You got armor\n");
 // armor touch sound
 		sound (other, CHAN_ITEM, "items/armor1.wav", 1, ATTN_NORM);
 		stuffcmd(other, "bf\n");
@@ -1878,6 +1877,8 @@ void() powerup_touch =
 		other.frame = 0;
 		//other.modelindex = modelindex_eyes;
 		// 1998-07-23 Better performance in handling of powerups by Maddes  end
+
+		other.stats_item_ring = other.stats_item_ring + 1; //ring stats
         SendObserverItemTimer(self, "ring", 300); // woods
 		if (other.next_team != world)
 		{
@@ -2234,16 +2235,20 @@ void() DropBackpack =
 	item.items = self.weapon;
 	item.enemy = self.enemy;	// for backpack stats
 
-	    if ((deathmatch == 1 && ((clanring_playmode & CLANRING_MATCH_MODE) || (clanring_playmode & CLANRING_NORMAL_MODE))) && (item.items == IT_ROCKET_LAUNCHER || item.items == IT_LIGHTNING))
+    // Only announce RL/LG drops while a match is actually running.
+    // Suppress in prewar (no match yet) and in normal/non-match play.
+    if ( deathmatch == 1
+         && (item.items == IT_ROCKET_LAUNCHER || item.items == IT_LIGHTNING)
+         && (clanring_state & CLANRING_MATCH_STARTED) )
     {
         msg = self.netname;
         msg = strcat(msg, " dropped a ");
-        
+
         if (item.items == IT_ROCKET_LAUNCHER)
             msg = strcat(msg, "\bRL\b");
-        else if (item.items == IT_LIGHTNING) 
+        else if (item.items == IT_LIGHTNING)
             msg = strcat(msg, "\bLG\b");
-            
+
         // Find all observers and notify them
         local entity client;
         client = find(world, classname, "player");

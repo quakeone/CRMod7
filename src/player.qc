@@ -564,22 +564,37 @@ void() PlayerDead =
 		self.think = respawn;
 	}
 	else if (mode_is_arena())
-	{
-		if (!gameover)			
-		{
-			self.think = respawn;
-			if (deathmatch == 4)
-			{
-				self.nextthink = time + 1;
-			}
-			else if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait == 0))
-			{
-				self.movetarget = world;
-				self.nextthink = time + 2;
-			}
-			else self.nextthink = time + 3; //default for ca mode.
-		}
-	}
+{
+    if (!gameover)
+    {
+        // In Rocket Arena 1v1 (exactly two participants, no queue),
+        // skip the intermediate respawn->observer step.
+        // Let RA's round reset spawn players directly once (no double spawn).
+        if ((clanring_playmode & CLANRING_RA_MODE) && (ra_number_teams() == 2))
+        {
+            self.think = SUB_Null;
+            self.nextthink = -1;
+        }
+        else
+        {
+            self.think = respawn;
+            if (deathmatch == 4)
+            {
+                self.nextthink = time + 1;
+            }
+            else if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait == 0))
+            {
+                self.movetarget = world;
+                self.nextthink = time + 2;
+            }
+            else
+            {
+                self.nextthink = time + 3; // default for ca mode.
+            }
+        }
+    }
+}
+
 	else
 	{
 		if (!gameover)

@@ -132,8 +132,12 @@ float(float ballot) Request_Poll_Votes_Needed =
 void(entity player, float cast) Request_Poll_Vote =
 {
 	local float votes_needed = 99;
-	
+
 	clear_afk_status(player);	//R00k
+
+    // Suppress per-player vote lines if the caller is no longer connected
+    local float player_is_connected;
+    player_is_connected = (player.style & CLANRING_CONNECTED) ? 1 : 0;
 
 	if (clanring_request == world)
 	{
@@ -148,13 +152,15 @@ void(entity player, float cast) Request_Poll_Vote =
 			if (player == clanring_request.owner)							// This person, who changed their mind, also started the request, so just cancel it.
 			{
 				sound(world, CHAN_AUTO, "misc/menu2.wav", 1, ATTN_NONE);
-				bprint(player.netname," cancelled their request.\n");
+                if (player_is_connected)
+                    bprint(player.netname," cancelled their request.\n");
 				Request_Poll_Cleanup();
 				return;
 			}
 			else
 			{
-				bprint(player.netname, " flipped their vote.\n");
+                if (player_is_connected)
+                    bprint(player.netname, " flipped their vote.\n");
 			}
 		}
 		else
@@ -196,7 +202,21 @@ void(entity player, float cast) Request_Poll_Vote =
 
 	if (cast == 1)
 	{
-		votes_needed = Request_Poll_Votes_Needed(cast); // majority YES check (after this ballot)
+        votes_needed = Request_Poll_Votes_Needed(cast); // majority YES check (after this ballot)
+
+        // If this recount was triggered by a disconnect (not a live client),
+        // resolve without printing a per-player "voted" line.
+        if (!player_is_connected)
+        {
+            if (votes_needed == 0)
+            {
+                bprint("Vote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n");
+                clanring_request.touch();
+                sound(world, CHAN_AUTO, "misc/runekey.wav", 1, ATTN_NONE);
+                Request_Poll_Cleanup();
+                return;
+            }
+        }
 
 		if (votes_needed == 0)// majority YES
 		{
@@ -236,7 +256,17 @@ void(entity player, float cast) Request_Poll_Vote =
 	{
 		if (cast == 2)
 		{
-			votes_needed = Request_Poll_Votes_Needed(cast);
+            votes_needed = Request_Poll_Votes_Needed(cast);
+
+            // Silent resolve for disconnect-triggered recount (no per-player line)
+            if (!player_is_connected && (votes_needed == 0))
+            {
+                bprint("\n");
+                sound(world, CHAN_AUTO, "misc/menu2.wav", 1, ATTN_NONE);
+                bprint("The request was declined.\n");
+                Request_Poll_Cleanup();
+                return;
+            }
 			if (votes_needed == 0) // majority NO
 			{
 				if (player != clanring_request.owner)
@@ -402,4 +432,37 @@ float (string captiona, string captionb, void() passfunc, string pollname = "") 
 			bprint3(" ", strings_ftos_gold(yn_init), " votes needed.\n\n");
 	}
 	return TRUE;
+};
+
+// Recalculate current vote state after roster changes (e.g., disconnects)
+// without attributing a new ballot. If a majority is already met,
+// resolve the vote silently using the same side effects/messages
+// as Request_Poll_Vote would, but without a per-player "voted" line.
+void() Request_Poll_Recount =
+{
+    if (clanring_request == world)
+        return;
+
+    // Check majority YES against currently connected voters
+    local float yn;
+    yn = Request_Poll_Votes_Needed(1);
+    if (yn == 0)
+    {
+        bprint("\nVote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n\n");
+        clanring_request.touch();
+        sound(world, CHAN_AUTO, "misc/runekey.wav", 1, ATTN_NONE);
+        Request_Poll_Cleanup();
+        return;
+    }
+
+    // Check majority NO against currently connected voters
+    local float nn;
+    nn = Request_Poll_Votes_Needed(2);
+    if (nn == 0)
+    {
+        sound(world, CHAN_AUTO, "misc/menu2.wav", 1, ATTN_NONE);
+        bprint("The request was declined.\n");
+        Request_Poll_Cleanup();
+        return;
+    }
 };

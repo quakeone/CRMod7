@@ -85,6 +85,7 @@ void() votables_send_aliases =
 	stuffcmd(self, "alias airshot cmd airshot\n");
 	stuffcmd(self, "alias powerupdrop cmd powerupdrop;\n");
 	stuffcmd(self, "alias leavemealone \"cmd leavemealone\"\n");
+	stuffcmd(self, "alias prediction \"cmd prediction\"\n");
 
 	// QuakeTag aliases (only two commands now)
 	stuffcmd(self, "alias qwsucks \"cmd qwsucks\"\n");
@@ -1838,6 +1839,51 @@ void() votables_request_set_autopause =
 		if (vote_init(newstate, " \bmatch autopause\b", votables_set_autopause))
 			vote_yes();
 	}
+};
+
+//
+//  S E T  P R E D I C T I O N
+//
+//  Toggle sv_nqplayerphysics to enable or disable client prediction.
+//
+void() votables_set_prediction =
+{
+        if (cvar("sv_nqplayerphysics"))
+        {
+                utils_set_cvar("sv_nqplayerphysics", 0);
+                announce("Client prediction enabled");
+        }
+        else
+        {
+                utils_set_cvar("sv_nqplayerphysics", 1);
+                announce("Client prediction disabled");
+        }
+};
+
+//
+//  R E Q U E S T  S E T  P R E D I C T I O N
+//
+//  Request to toggle sv_nqplayerphysics via a vote.
+//
+void() votables_request_set_prediction =
+{
+        // Administrators bypass the vote and toggle immediately.
+        if (self.style & CLANRING_ADMINISTRATOR)
+        {
+                votables_set_prediction();
+        }
+        else
+        {
+                local string newstate;
+
+                if (cvar("sv_nqplayerphysics"))
+                        newstate = "\benable\b";
+                else
+                        newstate = "\bdisable\b";
+
+                if (vote_init(newstate, " \bprediction\b", votables_set_prediction))
+                        vote_yes();
+        }
 };
 
 void() StartRuneSpawn;

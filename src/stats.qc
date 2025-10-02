@@ -51,6 +51,7 @@ void() stats_reset_player =
 	self.stats_item_health = 0;
 	self.stats_item_mega = 0;
 	self.stats_item_biosuit = 0;
+	self.stats_item_ring = 0;
 	self.stats_item_redarmor = 0;
 	self.stats_item_yellowarmor = 0;
 	self.stats_item_greenarmor = 0;
@@ -1042,112 +1043,349 @@ void() stats_show_defense_stats =
 //
 // P L A Y E R   E F F I C I E N C Y   R A T I N G
 //
-float (entity p) Q1_PER_Calc_Raw =
+// helper function (round to 2 decimals)
+float(float x) round2d =
 {
-    local float eff_raw;
+  return floor(x * 100 + 0.5) / 100;
+}
 
-    // Return 0 if no kills or deaths (no combat engagement)
-    if (p.true_kills == 0 && p.mangle_z == 0)
-        return 0;
+// Separated fields for tracking contribution per player by type (add to p entity)
+.float per_combat, per_resources, per_objectives, per_penalties;
 
-    // Kills / Deaths
-    eff_raw = eff_raw + (1.00 * p.true_kills);
-    eff_raw = eff_raw - (1.00 * p.mangle_z);
+//
+//  PLAYER EFFICIENCY RATINGS
+//
+//  Q1 PER is a "combined stat" tracking overall contribution to the outcome of games.  
+//  It is broken down as follows:
+//
+//  * Combat            kill-death spread + damage spread + "hard to kill" bonus + Quad Kill (enemy) bonus
+//  * Resources         powerup pickups + armour/mega taken + weapon pickups
+//  * Objectives (CTF)  captures, carries time, base/carrier defense, returns
+//  * Penalties         Teamkills, team?damage, dropped RL/LG paks, extra pen. for Quad-TK
+//
+float (entity p) Q1_PER_Calc_Eff =
+{
+    float kd_spread, dmg_spread, dmg_tokill, dmg_min, resilience, res_coeff, res_term;
+    float combat_raw, resources_raw, objectives_raw, penalties_raw;
+    
+    // Combat (Kills/Deaths, Damage, Resilience, and bonuses)
+    // ======================================================
 
-	// Teamkills
+    // players spawn in CTF with 50 GA (absorbs 30% of damage)
+    dmg_min = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? 142 : 100;
 
-	if (deathmatch == 3)
-		eff_raw = eff_raw - (0.50 * p.mangle_y); // Reduced teamkill penalty for non-team modes
-	else
-		eff_raw = eff_raw - (2.00 * p.mangle_y); // Full teamkill penalty for team modes
+    // adjust resilience coefficient for TDM/CTF (easier to survive in CTF with hook, and higher min damage)
+    res_coeff = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? 10: 13;
 
-	eff_raw = eff_raw - (3.00 * p.stats_teamkill_quad); // Penalty for killing quadded teammate
+    kd_spread  = p.true_kills - p.mangle_z;
+    dmg_spread = p.dmg_given - p.dmg_taken;
+    // Average damage to kill per life. If no deaths, use total damage (can be 0).
+    // We'll treat resilience as *bonus-only*: no penalty for being below baseline.
+    dmg_tokill = (p.mangle_z > 0) ? (p.dmg_taken / p.mangle_z) : p.dmg_taken;
+    resilience = dmg_tokill / dmg_min;  // 1.0 == baseline 'took about enough damage to die once'
+    res_term  = res_coeff * max(0, pow(resilience, 1.2) - 1);
 
-	// Resilience (average damage taken per death)
-	if (p.mangle_z > 0)
-    	eff_raw = eff_raw + (0.01 * (p.dmg_taken / p.mangle_z)); // harder to finish off
-	else
-    	eff_raw += 6; // flat reward for flawless run (never dying)
+    combat_raw =
+        0.9 * kd_spread * pow(fabs(kd_spread), 0.1125)  // killstats: kills-deaths, using a 0.9 multiplier, and super-linearly scaled @ ^1.1125
+      + 0.6 * (dmg_spread / dmg_min)                    // damagestats: given-taken, divided by minimum damage to kill
+      + 2.5 * p.stats_powerup_denial_quad               // Bonus for enemy Quads killed
+      + res_term;                                       // Bonus-only survivability (never negative on zero activity)
 
-    // Power-ups
-    eff_raw = eff_raw + (0.50 * p.totalquad);
-    eff_raw = eff_raw + (0.90 * p.clanring_ptwep_z); // Pent pickups
 
-    // Item Pickups
-    eff_raw = eff_raw + (0.30 * p.stats_item_redarmor) + (0.20 * p.stats_item_yellowarmor);
-	eff_raw = eff_raw + (0.30 * p.stats_item_mega);
+    // Resources (powerups and item/weapon pickups)
+    // ============================================
+   
+    resources_raw =
+        2.0 * p.totalquad
+      + 5.0 * p.clanring_ptwep_z                  // Pents taken
+      + 1.0 * p.stats_item_ring
+      + 0.30 * p.stats_item_redarmor
+      + 0.10 * p.stats_item_yellowarmor
+      + 0.15 * p.stats_item_mega
+      + 0.20 * p.stats_item_rl        
+      + 0.20 * p.stats_item_lg;
 
-    // CTF Objectives
+
+    // Objectives (CTF)
+    // ================
+ 
     if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
     {
-        eff_raw = eff_raw + (3.0 * p.fcaptures); // Flag captures - primary objective
-        eff_raw = eff_raw + (0.2 * p.freturns); // Regular flag returns - basic defensive play
-		eff_raw = eff_raw + (2.5 * p.strategic_returns); // Strategic returns - returns followed by team capture within 5s
-        eff_raw = eff_raw + (1.0 * p.fdefenses); // Flag defenses - protecting home base
-        eff_raw = eff_raw + (1.0 * p.fcdefenses); // Flag carrier defenses - protecting teammate
-		eff_raw = eff_raw + (1.5 * p.fcfrags);  // Flag carrier kills
-		eff_raw = eff_raw + (0.01 * p.fcarries_time); // Active flag carry time - distance/time control
+		objectives_raw =
+          2.5 * p.fcaptures + 0.55 * pow(p.fcaptures, 1.125)    // slight super-linear scaling of flag captures as the # increases, extra reward for many caps - balanced with secondary coefficient (+0.55) 
+        + 5.0 * pow(p.fcarries_time / 60, 0.9)                  // sub-linear scaling, value of holding flag decreases slightly over time (prevent runaway stats from eg. hiding in ctf2m8)
+        + 1.5 * p.fcfrags                                       // killing flag carrier has ~equivalent value to a capture (add ~+1 for the kill - combat stat)
+        + 0.25 * p.freturns                                      // return alone has low value
+        + 2.25 * p.strategic_returns                             // return resulting in a capture has equivalent value to a capture
+        + (1.0 * p.fdefenses + 0.23 * pow(p.fdefenses, 1.10))   // base/flag defense bonus grows over time on a very slight super-linear curve, offering extra points to players who lock down their base well
+        + 1.0 * p.fcdefenses;                                   // flag carrier defenses do not grow/scale (linear)
     }
-
-    // Weapon Losses (not applicable in dmm3)
-    if (deathmatch != 3)
+    else
     {
-        eff_raw = eff_raw - (0.50 * p.clanring_badstats_x);   // RL Paks lost
-        eff_raw = eff_raw - (0.50 * p.clanring_badstats2_x);  // LG Paks lost
+		objectives_raw = 0;
     }
 
-	// Team Damage (non-CTF modes)
-    if (teamplay && !(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
-        eff_raw = eff_raw - (0.0020 * p.clanring_badstats_z);
 
-	eff_raw = eff_raw + (3.0 * p.stats_powerup_denial_quad); // Bonus for denying enemy quad
+    // Penalties
+    // =========
+    
+    penalties_raw = 
+        1.0 * p.mangle_y                          // teamkills
+      + 1.0 * p.clanring_badstats_x               // rls dropped
+      + 1.0 * p.clanring_badstats2_x              // lgs dropped
+      + 0.15 * (p.clanring_badstats_z / dmg_min)  // team damage - 25% penalty (compared to damage values in combat group)
+      + 2.5 * p.stats_teamkill_quad;              // quad TKs
 
-    return eff_raw;
+  
+    // Final PER calculations
+    // ======================
+
+	p.per_combat = round2d(combat_raw);
+	p.per_resources = round2d(resources_raw);
+	p.per_objectives = round2d(objectives_raw);
+	// Store as negative so a quick dump shows deductions clearly
+	p.per_penalties = round2d(-penalties_raw);
+	
+	return round2d(combat_raw + resources_raw + objectives_raw - penalties_raw);
 };
+
+// ---------------------------------------------
+// Helper: did this player do anything meaningful?
+// (used to suppress printing on 0:00/no-activity)
+// ---------------------------------------------
+float(entity p) PER_HasNontrivialActivity =
+{
+	// Core combat/damage
+	if (p.true_kills) return TRUE;
+	if (p.mangle_z) return TRUE;       // deaths
+	if (p.dmg_given) return TRUE;
+	if (p.dmg_taken) return TRUE;
+
+	// Powerups/items (resource control)
+	if (p.totalquad) return TRUE;
+	if (p.clanring_ptwep_z) return TRUE; // pents
+	if (p.stats_item_ring) return TRUE;
+	if (p.stats_item_redarmor) return TRUE;
+	if (p.stats_item_yellowarmor) return TRUE;
+	if (p.stats_item_mega) return TRUE;
+	if (p.stats_item_rl) return TRUE;
+	if (p.stats_item_lg) return TRUE;
+
+	// Objectives (CTF)
+	if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) &&
+	    (p.fcaptures || p.fcarries_time || p.fcfrags || p.freturns || p.strategic_returns || p.fdefenses || p.fcdefenses)) return TRUE;
+	return FALSE;
+};
+
+// ---------------------------------------------------------
+// Helper: print top-3 contributing reasons for player's PER
+// (normalized per minute, so it aligns with the table)
+// ---------------------------------------------------------
+void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
+{
+	local float dmg_min, res_coeff, kd_spread, dmg_spread, dmg_tokill, resilience, res_term;
+	local float v, top1, top2, top3;
+	local string r1, r2, r3;
+	local float min_show; // ignore tiny noise terms
+	local float carry_sec, cm;
+
+	if (mins_norm <= 0) mins_norm = 1;
+	min_show = 0.25; // ~0.25 PER/min threshold to avoid spammy reasons
+
+	// ---- recompute terms (mirror Q1_PER_Calc_Eff) ----
+	dmg_min   = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? 142 : 100;
+	res_coeff = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? 10  : 13;
+
+	kd_spread  = p.true_kills - p.mangle_z;
+	dmg_spread = p.dmg_given - p.dmg_taken;
+	dmg_tokill = (p.mangle_z > 0) ? (p.dmg_taken / p.mangle_z) : p.dmg_taken;
+	resilience = dmg_tokill / dmg_min;
+	res_term   = res_coeff * max(0, pow(resilience, 1.2) - 1);
+
+	// insertion helper (inline) — maintain top1/top2/top3 by value
+	#define TRY_PUSH(_val, _label) \
+		do { \
+			v = (_val) / mins_norm; \
+			if (v > min_show) { \
+				if (v > top1) { top3 = top2; r3 = r2; top2 = top1; r2 = r1; top1 = v; r1 = (_label); } \
+				else if (v > top2) { top3 = top2; r3 = r2; top2 = v; r2 = (_label); } \
+				else if (v > top3) { top3 = v; r3 = (_label); } \
+			} \
+		} while(0)
+
+	top1 = top2 = top3 = -9999;
+	r1 = r2 = r3 = "";
+
+	// ---- Combat atomic terms ----
+	TRY_PUSH( 0.9 * kd_spread * pow(fabs(kd_spread), 0.1125),
+	          sprintf("big KD spread (%g-%g)", p.true_kills, p.mangle_z) );
+	TRY_PUSH( 0.6 * (dmg_spread / dmg_min),
+	          sprintf("damage advantage (+%g)", dmg_spread) );
+	TRY_PUSH( res_term,
+	          sprintf("hard-to-kill bonus (~%g dmg/life)", round2d(dmg_tokill)) );
+	TRY_PUSH( 2.5 * p.stats_powerup_denial_quad,
+	          sprintf("enemy Quad kills (%g)", p.stats_powerup_denial_quad) );
+
+	// ---- Resources atomic terms ----
+	TRY_PUSH( 2.0 * p.totalquad,
+	          sprintf("Quads taken (%g)", p.totalquad) );
+	TRY_PUSH( 5.0 * p.clanring_ptwep_z,
+	          sprintf("Pents taken (%g)", p.clanring_ptwep_z) );
+	TRY_PUSH( 1.0 * p.stats_item_ring,
+	          sprintf("Rings taken (%g)", p.stats_item_ring) );
+	TRY_PUSH( 0.30 * p.stats_item_redarmor,
+	          sprintf("RA control (%g)", p.stats_item_redarmor) );
+	TRY_PUSH( 0.10 * p.stats_item_yellowarmor,
+	          sprintf("YA pickups (%g)", p.stats_item_yellowarmor) );
+	TRY_PUSH( 0.15 * p.stats_item_mega,
+	          sprintf("Megas taken (%g)", p.stats_item_mega) );
+	TRY_PUSH( 0.20 * p.stats_item_rl,
+	          sprintf("RL pickups (%g)", p.stats_item_rl) );
+	TRY_PUSH( 0.20 * p.stats_item_lg,
+	          sprintf("LG pickups (%g)", p.stats_item_lg) );
+
+	// ---- Objectives atomic terms (CTF only) ----
+	if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+	{
+		TRY_PUSH( 2.5 * p.fcaptures + 0.55 * pow(p.fcaptures, 1.125),
+		          sprintf("flag captures (%g)", p.fcaptures) );
+		// carry time nice-ish label
+		carry_sec = p.fcarries_time;
+		cm = floor(carry_sec / 60);
+		TRY_PUSH( 5.0 * pow(p.fcarries_time / 60, 0.9),
+		          sprintf("long flag holds (%g:%02g)", cm, carry_sec - cm*60) );
+		TRY_PUSH( 1.5 * p.fcfrags,
+		          sprintf("carrier kills (%g)", p.fcfrags) );
+		TRY_PUSH( 0.25 * p.freturns,
+		          sprintf("returns (%g)", p.freturns) );
+		TRY_PUSH( 2.25 * p.strategic_returns,
+		          sprintf("strategic returns (%g)", p.strategic_returns) );
+		TRY_PUSH( 1.0 * p.fdefenses + 0.23 * pow(p.fdefenses, 1.10),
+		          sprintf("base defenses (%g)", p.fdefenses) );
+		TRY_PUSH( 1.0 * p.fcdefenses,
+		          sprintf("carrier defenses (%g)", p.fcdefenses) );
+	}
+
+	#undef TRY_PUSH
+
+	// ---- Fallbacks: if fewer than 3 passed threshold, use category totals ----
+	if (r1 == "")
+	{
+		// Compute group totals again and push them if useful
+		local float combat_raw, resources_raw, objectives_raw;
+		combat_raw =
+			  0.9 * kd_spread * pow(fabs(kd_spread), 0.1125)
+			+ 0.6 * (dmg_spread / dmg_min)
+			+ 2.5 * p.stats_powerup_denial_quad
+			+ res_term;
+		resources_raw =
+			  2.0 * p.totalquad
+			+ 5.0 * p.clanring_ptwep_z
+			+ 1.0 * p.stats_item_ring
+			+ 0.30 * p.stats_item_redarmor
+			+ 0.10 * p.stats_item_yellowarmor
+			+ 0.15 * p.stats_item_mega
+			+ 0.20 * p.stats_item_rl
+			+ 0.20 * p.stats_item_lg;
+		objectives_raw = 0;
+		if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+			objectives_raw =
+				  (2.5 * p.fcaptures + 0.55 * pow(p.fcaptures, 1.125))
+				+ 5.0 * pow(p.fcarries_time / 60, 0.9)
+				+ 1.5 * p.fcfrags
+				+ 0.25 * p.freturns
+				+ 2.25 * p.strategic_returns
+				+ (1.0 * p.fdefenses + 0.23 * pow(p.fdefenses, 1.10))
+				+ 1.0 * p.fcdefenses;
+
+		// push the three category totals (largest first naturally by value)
+		// (not thresholded—these are intentional fallbacks)
+		top1 = combat_raw / mins_norm; r1 = "combat impact";
+		top2 = resources_raw / mins_norm; r2 = "resource control";
+		top3 = objectives_raw / mins_norm; r3 = "objectives";
+	}
+
+	// ---- Print reasons ----
+	sprint(towhom, sprintf("  why %s led PER:\n", p.netname));
+	if (r1 != "") sprint(towhom, sprintf("    1) %s (+%3.1f/min)\n", r1, top1));
+	if (r2 != "") sprint(towhom, sprintf("    2) %s (+%3.1f/min)\n", r2, top2));
+	if (r3 != "") sprint(towhom, sprintf("    3) %s (+%3.1f/min)\n", r3, top3));
+	sprint(towhom, "\n");
+};
+
 
 void() stats_show_per =
 {
     local entity p;
-    local float match_secs;
+    local float match_secs, mins_norm;
+    local entity bestp;
+    local float best_per_min, best_mins_norm;
+    local float best_is_valid; // 0/1 — only show reasons if leader wasn't short+empty
+    local float short_and_empty;
 
-    // Display the PER for each player
+    // Header
     sprint(self, "\bplayer efficiency rating (PER)\b\n");
     sprint(self, "\n");
     sprint(self, "  PER       name\n");
     sprint(self, "\n\n");
 
-	if (clanring_playmode & CLANRING_MATCH_MODE)
-		p = clanring_sentinel.next_player;
-	else	
-		p = find(world,classname, "player");
-        
-    while(p)
+    // Start at first player depending on match-mode list handling
+    if (clanring_playmode & CLANRING_MATCH_MODE)
+        p = clanring_sentinel.next_player;
+    else
+        p = find(world, classname, "player");
+
+    // Track top PER/min
+    bestp = world;
+    best_per_min = -9999;
+    best_mins_norm = 1;
+    best_is_valid = 0;
+
+    while (p)
     {
         if (!(p.style & CLANRING_OBSERVER) && p.join_time > 0)
         {
             local float final_per;
-            
+
             match_secs = time - p.join_time;
-            if (match_secs > 1)
-            {
-                final_per = Q1_PER_Calc_Raw(p) / (match_secs / 60); // Direct efficiency per minute
-            }
-            else
-            {
-                final_per = 0;
-            }
+            // Normalize to PER/minute with a 1-minute floor so very short aborts don't blow up values.
+            mins_norm = max(1, match_secs / 60);
+            // Mirror your "don't show PER on short (0:00) + no activity"
+            short_and_empty = (match_secs < 60) && (!PER_HasNontrivialActivity(p));
+
+            final_per = Q1_PER_Calc_Eff(p) / mins_norm;
 
             if (p == self)
                 sprint(self, sprintf("\x90%5.1f\x91 ü %s\n", final_per, p.netname));
             else
                 sprint(self, sprintf(" %5.1f  ü %s\n", final_per, p.netname));
+
+            // Track top PER/min player
+            // Only consider as a valid "leader" if not a short+empty stint.
+            // This keeps the reasons hidden for aborted 0:00/no-activity runs.
+            if ((!short_and_empty) && (final_per > best_per_min))
+            {
+                best_per_min = final_per;
+                bestp = p;
+                best_mins_norm = mins_norm;
+                best_is_valid = 1;
+            }
         }
-		if (clanring_playmode & CLANRING_MATCH_MODE)
-			p = p.next_player;
-		else
-			p = find(p,classname, "player");			
+
+        if (clanring_playmode & CLANRING_MATCH_MODE)
+            p = p.next_player;
+        else
+            p = find(p, classname, "player");
     }
+
     sprint(self, "\n");
+
+    // Print dynamic top-3 reasons under the table
+    // Only if the leader was NOT short+empty (same rule as hiding PER).
+    if (best_is_valid && bestp)
+    {
+        PER_PrintTop3Reasons(self, bestp, best_mins_norm);
+    }
 };
 
 //
@@ -1233,6 +1471,33 @@ void() stats_autodump =
 		{
 			stats_show_per();
 		}
+
+		// -------------------------------------------------
+        // Build a concise Discord header and send via webhook
+        // (Full text capture can be added later by routing
+        // the stats_prints through a capture helper.)
+        // -------------------------------------------------
+        local string modes, tplay, msg;
+
+        modes = "";
+        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) modes = strcat(modes, "[CTF] ");
+        if (clanring_playmode & CLANRING_CA_MODE)          modes = strcat(modes, "[CA] ");
+        if (clanring_playmode & CLANRING_WIPEOUT_MODE)     modes = strcat(modes, "[Wipeout] ");
+        if (mode_is_arena())                               modes = strcat(modes, "[Arena] ");
+        if (modes == "")                                   modes = "[Std] ";
+
+        tplay = teamplay ? "on" : "off";
+
+        // Compact, Discord-friendly header; you can add more lines here anytime.
+        msg = sprintf("**Match statistics**\n%s\n%s\nMap: %s\nTeamplay: %s\nModes: %s\n",
+                      date, hname, mapname, tplay, modes);
+
+        if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
+            msg = strcat(msg, sprintf("%s set a new match capture record!\n", clanring_new_record_player));
+
+        // Defer the post: PREP = webhook_stats_info, CONTENT = msg
+        webhook_post_deferred(webhook_stats_info, msg);
+
 };
 
 //

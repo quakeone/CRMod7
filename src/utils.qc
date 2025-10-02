@@ -2409,254 +2409,1220 @@ void() utils_load_disconnect_log =
 // Discord webhook helper
 // ------------------------------------------------------------
 
+string json_escape(string s);                 // from json.qc
+float (entity p) Q1_PER_Calc_Eff;            // PER helper
+
 // Private, non-serverinfo storage for webhook URL configured via clanring.cfg
 string clanring_captimesdiscordurl;
+string clanring_statsdiscordurl;
 float webhook_seq;
 
-string(string s) discord_escape =
+// -----------------------------
+// Zoned string helpers
+// -----------------------------
+string(string a, string b) zcat =
 {
-    // Discord/JSON-safe escaping for content strings
+    local string t;
+    t = strcat(a, b);       // tempstring
+    if (a) strunzone(a);    // free previous zone if any
+    return strzone(t);      // return new zoned string
+};
 
-    // 1) Strip control bytes that can break JSON/UTF-8 or cause weirdness
-    //    - ESC (0x1B), DEL (0x7F), and C1 controls (0x80–0x9F)
-    s = strreplace("\x1B", "", s); // ESC
-    s = strreplace("\x7F", "", s); // DEL
-    s = strreplace("\x80", "", s);
-    s = strreplace("\x81", "", s);
-    s = strreplace("\x82", "", s);
-    s = strreplace("\x83", "", s);
-    s = strreplace("\x84", "", s);
-    s = strreplace("\x85", "", s);
-    s = strreplace("\x86", "", s);
-    s = strreplace("\x87", "", s);
-    s = strreplace("\x88", "", s);
-    s = strreplace("\x89", "", s);
-    s = strreplace("\x8A", "", s);
-    s = strreplace("\x8B", "", s);
-    s = strreplace("\x8C", "", s);
-    s = strreplace("\x8D", "", s);
-    s = strreplace("\x8E", "", s);
-    s = strreplace("\x8F", "", s);
-    s = strreplace("\x90", "", s);
-    s = strreplace("\x91", "", s);
-    s = strreplace("\x92", "", s);
-    s = strreplace("\x93", "", s);
-    s = strreplace("\x94", "", s);
-    s = strreplace("\x95", "", s);
-    s = strreplace("\x96", "", s);
-    s = strreplace("\x97", "", s);
-    s = strreplace("\x98", "", s);
-    s = strreplace("\x99", "", s);
-    s = strreplace("\x9A", "", s);
-    s = strreplace("\x9B", "", s);
-    s = strreplace("\x9C", "", s);
-    s = strreplace("\x9D", "", s);
-    s = strreplace("\x9E", "", s);
-    s = strreplace("\x9F", "", s);
+// Append segment with a hard cap, return new *zoned* msg (free old via zcat)
+string(string msg, string seg, float maxlen) append_capped_z =
+{
+    local float rem;
+    local string s, z;
 
-    // 2) Normalize newlines
-    s = strreplace("\r", "\n", s);
+    if (!msg) msg = strzone("");
 
-    // 3) JSON-escape special characters
-    s = strreplace("\\", "\\\\", s);
-    s = strreplace("\"", "\\\"", s);
-    s = strreplace("\n", "\\n", s);
-    s = strreplace("\t", "\\t", s);
+    rem = maxlen - strlen(msg);
+    if (rem <= 0) return msg;
+
+    s = seg ? seg : "";
+    if (strlen(s) > rem) s = substring(s, 0, rem);
+
+    z = strzone(s);
+    msg = zcat(msg, z);
+    strunzone(z);
+    return msg;
+};
+
+// JSON-escape into a *zoned* string (safe vs tempstring churn)
+string(string s) json_escape_zoned_simple =
+{
+    local float i, n;
+    local string out, ch, src;
+
+    src = strzone(s);                // protect source
+    out = strzone("");
+    n   = strlen(src);
+
+    for (i = 0; i < n; i = i + 1)
+    {
+        ch = substring(src, i, 1);  // tempstring ok; src is zoned
+        if (ch == "\\")      out = zcat(out, "\\\\");
+        else if (ch == "\"") out = zcat(out, "\\\"");
+        else if (ch == "\n") out = zcat(out, "\\n");
+        else if (ch == "\t") out = zcat(out, "\\t");
+        else                 out = zcat(out, ch);
+    }
+
+    strunzone(src);
+    return out; // zoned
+};
+
+// Build {"content":"..."} as a *zoned* JSON payload
+string(string body) Webhook_MakeContentPayloadZ =
+{
+    local string out, esc;
+    out = strzone("{\"content\":\"");
+    esc = json_escape_zoned_simple(body);  // returns zoned
+    out = zcat(out, esc);
+    strunzone(esc);
+    out = zcat(out, "\"}");
+    return out; // zoned
+};
+
+// For legacy callers that want a tempstring payload (kept for compatibility)
+string(string raw) Webhook_MakeContentPayload =
+{
+    local string s;
+    s = raw ? raw : "";
+    return sprintf("{\"content\":\"%s\"}", json_escape(s));
+};
+
+// Macro for capped appends
+#define APPEND_SAFE(_segexpr) ( msg = append_capped_z(msg, (_segexpr), maxlen) )
+
+// ------------------------------------------------------------
+// Quake -> Discord sanitizer (preserve whitespace/padding)
+// ------------------------------------------------------------
+// - Fold 128..255 to 0..127 (avoid introducing C0 controls)
+// - Map common QC control glyphs to ASCII
+// - Drop remaining C0 controls except TAB(9) and LF(10)
+// - Do NOT trim/collapse spaces
+string(string s) utils_dequake_for_discord =
+{
+    local float i, j;
+    if (!s) return "";
+
+    // A) 128..255 -> 0..127 (red -> white). If target < 32, make '.'.
+    for (i = 128; i <= 255; i = i + 1)
+    {
+        j = i - 128; // 0..127
+        if (j < 32)
+            s = strreplace(sprintf("%c", i), ".", s);
+        else
+            s = strreplace(sprintf("%c", i), sprintf("%c", j), s);
+    }
+
+    // B) Control glyphs ? readable
+    s = strreplace(sprintf("%c", 1 ), ".", s);
+    s = strreplace(sprintf("%c", 5 ), ".", s);
+    s = strreplace(sprintf("%c", 14), ".", s);
+    s = strreplace(sprintf("%c", 15), ".", s);
+    s = strreplace(sprintf("%c", 28), ".", s);
+    s = strreplace(sprintf("%c", 16), "[", s);
+    s = strreplace(sprintf("%c", 17), "]", s);
+
+    // 18..27 -> '0'..'9'
+    for (i = 0; i <= 9; i = i + 1)
+        s = strreplace(sprintf("%c", 18 + i), sprintf("%c", 48 + i), s);
+
+    // arrows-ish
+    s = strreplace(sprintf("%c", 29), "<", s);
+    s = strreplace(sprintf("%c", 30), "-", s);
+    s = strreplace(sprintf("%c", 31), ">", s);
+
+    // form feed -> space
+    s = strreplace(sprintf("%c", 12), " ", s);
+
+    // C) Drop remaining C0 except TAB/LF
+    for (i = 0; i < 32; i = i + 1)
+        if (i != 9 && i != 10)
+            s = strreplace(sprintf("%c", i), "", s);
 
     return s;
 };
 
-void(string content) webhook_post =
+// Compact helper: dequake -> json_escape
+string(string s) discord_escape =
 {
-    local string url, body, payload;
+    if (!s) return "";
+    return json_escape(utils_dequake_for_discord(s));
+};
+
+// Mask a secret URL for logs: keep head and tail only
+string(string s) webhook_mask =
+{
+    local float n;
+    if (!s) return "";
+    n = strlen(s);
+    if (n <= 20) return s;
+    return strcat(substring(s, 0, 12), "...", substring(s, n - 4, 4));
+};
+
+// Sanitize user-provided webhook URL text
+string(string in) Webhook_SanitizeURL =
+{
+    local string s, ch;
+    if (!in) return "";
+    s = in;
+
+    // Trim L/R whitespace
+    while (strlen(s) > 0) { ch = substring(s, 0, 1); if (!(ch == " " || ch == "\t" || ch == "\r" || ch == "\n")) break; s = substring(s, 1, strlen(s) - 1); }
+    while (strlen(s) > 0) { ch = substring(s, strlen(s) - 1, 1); if (!(ch == " " || ch == "\t" || ch == "\r" || ch == "\n")) break; s = substring(s, 0, strlen(s) - 1); }
+
+    // Strip UTF-8 BOM, ZW*
+    if (strlen(s) >= 3 && substring(s, 0, 3) == "\xEF\xBB\xBF") s = substring(s, 3, strlen(s) - 3);
+    s = strreplace("\xE2\x80\x8B", "", s); // ZWSP
+    s = strreplace("\xE2\x80\x8C", "", s); // ZWNJ
+    s = strreplace("\xE2\x80\x8D", "", s); // ZWJ
+    s = strreplace("\xE2\x80\x8E", "", s); // LRM
+    s = strreplace("\xE2\x80\x8F", "", s); // RLM
+    s = strreplace("\xC2\xA0", " ", s);    // NBSP -> space
+
+    // Strip leading '@'
+    while (strlen(s) > 0 && substring(s, 0, 1) == "@") s = substring(s, 1, strlen(s) - 1);
+
+    // Strip <...>, '...', "..."
+    while (strlen(s) >= 2)
+    {
+        if ( (substring(s, 0, 1) == "<"  && substring(s, strlen(s) - 1, 1) == ">") ||
+             (substring(s, 0, 1) == "\"" && substring(s, strlen(s) - 1, 1) == "\"") ||
+             (substring(s, 0, 1) == "'"  && substring(s, strlen(s) - 1, 1) == "'") )
+            s = substring(s, 1, strlen(s) - 2);
+        else break;
+    }
+
+    // Drop trailing punctuation
+    while (strlen(s) > 0)
+    {
+        ch = substring(s, strlen(s) - 1, 1);
+        if (!(ch == "," || ch == "." || ch == ";" || ch == ")")) break;
+        s = substring(s, 0, strlen(s) - 1);
+    }
+
+    // Final re-trim
+    while (strlen(s) > 0) { ch = substring(s, 0, 1); if (!(ch == " " || ch == "\t" || ch == "\r" || ch == "\n")) break; s = substring(s, 1, strlen(s) - 1); }
+    while (strlen(s) > 0) { ch = substring(s, strlen(s) - 1, 1); if (!(ch == " " || ch == "\t" || ch == "\r" || ch == "\n")) break; s = substring(s, 0, strlen(s) - 1); }
+    return s;
+};
+
+// Keep content within Discord’s limit (budgeted lower for code blocks)
+string(string s) Webhook_TruncateForDiscord =
+{
+    local float max, n, keep;
+    local string suffix;
+
+    max = 950;            // headroom for JSON + headers
+    n   = strlen(s);
+    if (n <= max) return s;
+
+    suffix = " ... (truncated)";
+    keep   = max - strlen(suffix);
+    if (keep < 0) keep = 0;
+    return strcat(substring(s, 0, keep), suffix);
+};
+
+// ------------------------------------------------------------
+// PREP functions
+// ------------------------------------------------------------
+void(entity ev) webhook_captime_info =
+{
+    local string url, content;
+
+    content = utils_dequake_for_discord(ev.message);
+
+    url = clanring_captimesdiscordurl;
+    if (url == "") url = cvar_string("webhook_url");
+    url = Webhook_SanitizeURL(url);
+    if (url == "") return;
+
+    if (strstrofs(url, "?", 0) < 0)           url = strcat(url, "?wait=true");
+    else if (strstrofs(url, "wait=", 0) < 0)  url = strcat(url, "&wait=true");
+
+    if (ev.hook_url) strunzone(ev.hook_url);
+    ev.hook_url = strzone(url);
+
+    if (strstrofs(content, "```", 0) < 0) content = strcat("```text\n", content, "```");
+    content = Webhook_TruncateForDiscord(content);
+
+    if (ev.hook_payload) strunzone(ev.hook_payload);
+    ev.hook_payload = Webhook_MakeContentPayloadZ(content);
+};
+
+// Build and store a Discord "stats" message (safe against tempstring aliasing)
+void(entity ev) webhook_stats_info =
+{
+    local string url, msg;
+    local entity p;
+    local float lines, maxlines;
+
+    // efficiency helpers
+    local float kfrac, ktot, wfrac, wtot;
+    local string killpct, weappct;
+
+    // shared scratch
+    local string nm;
+    local float m, s;
+    local float mins_norm, per_min, v;
+    local float b1, b2, b3, b4, b5;
+
+    // shared tempstring-safe buffers
+    local string line;          // reusable line buffer
+    local string zname;         // zoned name buffer
+    local string z_mmss;        // zoned "mm:ss"
+    local string mmss_tmp;      // temp "mm:ss" pre-zone
+    local string ss_str;        // seconds (zero-padded)
+
+    float maxlen; maxlen = 900;
+
+    // Resolve + sanitize URL
+    url = clanring_statsdiscordurl;
+    if (url == "") url = cvar_string("webhook_stats_url");
+    url = Webhook_SanitizeURL(url);
+    if (url == "") return;
+
+    if (strstrofs(url, "?", 0) < 0)           url = strcat(url, "?wait=true");
+    else if (strstrofs(url, "wait=", 0) < 0)  url = strcat(url, "&wait=true");
+
+    if (ev.hook_url) strunzone(ev.hook_url);
+    ev.hook_url = strzone(url);
+
+    // -------------------------
+    // Header (piecewise)
+    // -------------------------
+    msg = strzone("**Match statistics**\n");
+    APPEND_SAFE(utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %H:%M")));
+    APPEND_SAFE("\n");
+    APPEND_SAFE(utils_dequake_for_discord(infokey(world, "hostname")));
+    APPEND_SAFE("\n");
+    APPEND_SAFE(utils_dequake_for_discord(mapname));  // just the map name
+    APPEND_SAFE("\n");
+
+    // Modes (no label/brackets)
+    {
+        local string modes; local float has_specific;
+        modes = ""; has_specific = 0;
+
+        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) { modes = strcat(modes, "CTF ");      has_specific = 1; }
+        if (clanring_playmode & CLANRING_CA_MODE)          { modes = strcat(modes, "CA ");       has_specific = 1; }
+        if (clanring_playmode & CLANRING_WIPEOUT_MODE)     { modes = strcat(modes, "Wipeout ");  has_specific = 1; }
+        if (!has_specific && mode_is_arena())              { modes = strcat(modes, "Arena "); }
+        if (modes == "")                                   { modes = "Std"; }
+        else if (substring(modes, strlen(modes)-1, 1) == " ") modes = substring(modes, 0, strlen(modes)-1);
+
+        APPEND_SAFE(modes);
+        APPEND_SAFE("\n\n");
+    }
+
+    // New CTF record note
+    if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
+    {
+        APPEND_SAFE(utils_dequake_for_discord(clanring_new_record_player));
+        APPEND_SAFE(" set a new match capture record!\n\n");
+    }
+
+    #define PCT_STR(_frac,_tot) ( (_tot) > 0 ? sprintf("%g%%", floor(100 * (_frac) / (_tot))) : "N/A" )
+
+    // ---- Efficiency (kill% / weap%) ----
+    APPEND_SAFE("**Efficiency (kill% / weap%)**\n");
+    APPEND_SAFE("```\n");
+    {
+        lines = 0; maxlines = 16;
+        if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
+        else p = find(world, classname, "player");
+        while (p && lines < maxlines)
+        {
+            if (!(p.style & CLANRING_OBSERVER) && !(mode_is_arena() && p.next_team == world))
+            {
+                kfrac = p.true_kills;
+                ktot  = kfrac + p.mangle_z;
+
+                wtot  = p.dest1_x + p.dest1_y + p.dest1_z + p.dest_x;
+                wfrac = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
+
+                // ZONE tempstrings so later tempstrings (like names) don't alias them
+                killpct = strzone(PCT_STR(kfrac, ktot));
+                weappct = strzone(PCT_STR(wfrac, wtot));
+
+                nm   = utils_dequake_for_discord(p.netname);
+                line = sprintf("%s / %s    %s\n", killpct, weappct, nm);
+                APPEND_SAFE(line);
+                strunzone(killpct);
+                strunzone(weappct);
+                lines = lines + 1;
+                if (strlen(msg) > (maxlen - 120)) break;
+            }
+            if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+        }
+    }
+    APPEND_SAFE("```\n");
+
+    // ---- K/D, damage, ewep ----
+    APPEND_SAFE("\n**K/D, damage, ewep**\n");
+    APPEND_SAFE("```\n");
+    {
+        local float k_seen, k_inc, k_obs, k_arena, k_limit;
+        k_seen = k_inc = k_obs = k_arena = k_limit = 0;
+
+        lines = 0; maxlines = 16;
+        if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
+        else p = find(world, classname, "player");
+        while (p && lines < maxlines)
+        {
+            k_seen += 1;
+
+            if (p.style & CLANRING_OBSERVER) { k_obs += 1; }
+            else if (mode_is_arena() && p.next_team == world) { k_arena += 1; }
+            else
+            {
+                nm = utils_dequake_for_discord(p.netname);
+                APPEND_SAFE(sprintf("K/D %g/%g  Dmg %g/%g  Ewep %g    %s\n",
+                                    p.true_kills, p.mangle_z,
+                                    p.dmg_given,  p.dmg_taken,
+                                    p.ewep,
+                                    nm));
+                k_inc += 1; lines += 1;
+                if (strlen(msg) > (maxlen - 120)) { k_limit += 1; break; }
+            }
+            if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+        }
+    }
+    APPEND_SAFE("```\n");
+
+    if (!mode_is_arena())
+    {
+        // ---- Bad stats (paks self% team% lava axe fall) ----
+        {
+            local float opened; opened = 0;
+            local float b_seen, b_inc, b_obs, b_noteam, b_limit;
+            b_seen = b_inc = b_obs = b_noteam = b_limit = 0;
+
+            lines = 0; maxlines = 16;
+            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
+            else p = find(world, classname, "player");
+
+            while (p && lines < maxlines)
+            {
+                b_seen += 1;
+
+                if (p.style & CLANRING_OBSERVER) { b_obs += 1; }
+                else if (p.next_team == world)   { b_noteam += 1; }
+                else
+                {
+                    if (!opened) {
+                        APPEND_SAFE("\n**Bad stats (paks self% team% lava axe fall)**\n\n");
+                        APPEND_SAFE("```\n");
+                        opened = 1;
+                    }
+                    // totals
+                    local float tot_enemy = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
+                    local float tot_done  = tot_enemy + p.clanring_badstats_y + p.clanring_badstats_z;
+
+                    // percentages
+                    local float self_pct = 0, team_pct = 0;
+                    if (tot_done > 0)
+                    {
+                        self_pct = floor(100 * p.clanring_badstats_y / tot_done);
+                        team_pct = floor(100 * p.clanring_badstats_z / tot_done);
+                    }
+
+                    // zone name to avoid tempstring aliasing
+                    nm    = utils_dequake_for_discord(p.netname);
+                    zname = strzone(nm);
+
+                    // one-shot formatted line; name only at the end
+                    line = sprintf(
+                        "%g %g%% %g%% %g %g %g    %s\n",
+                        p.clanring_badstats_x,       // paks
+                        self_pct,                    // self %
+                        team_pct,                    // team %
+                        p.clanring_badstats2_x,      // lava
+                        p.clanring_badstats2_y,      // axe
+                        p.clanring_badstats2_z,      // fall
+                        zname
+                    );
+
+                    APPEND_SAFE(line);
+                    strunzone(zname);
+
+                    b_inc += 1; lines += 1;
+                    if (strlen(msg) > (maxlen - 120)) { b_limit += 1; break; }
+                }
+
+                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+            }
+        }
+        // close if opened
+        if (opened) APPEND_SAFE("```\n");
+
+        // ---- Items (Q RA YA MG RL LG) ----
+        {
+            local float opened2; opened2 = 0;
+            local float it_seen, it_inc, it_obs, it_noteam, it_limit;
+            it_seen = it_inc = it_obs = it_noteam = it_limit = 0;
+
+            lines = 0; maxlines = 16;
+            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
+            else p = find(world, classname, "player");
+
+            while (p && lines < maxlines)
+            {
+                it_seen += 1;
+
+                if (p.style & CLANRING_OBSERVER) { it_obs += 1; }
+                else if (p.next_team == world)   { it_noteam += 1; }
+                else
+                {
+                    if (!opened2) {
+                        APPEND_SAFE("\n**Items (Q RA YA MG RL LG)**\n\n");
+                        APPEND_SAFE("```\n");
+                        opened2 = 1;
+                    }
+                    nm = utils_dequake_for_discord(p.netname);
+
+                    // Q = number of Quads taken (clanring_qdwep_z)
+                    APPEND_SAFE(sprintf("%g %g %g %g %g %g    %s\n",
+                                        p.clanring_qdwep_z,          // Q
+                                        p.stats_item_redarmor,       // RA
+                                        p.stats_item_yellowarmor,    // YA
+                                        p.stats_item_mega,           // MG
+                                        p.stats_item_rl,             // RL
+                                        p.stats_item_lg,             // LG
+                                        nm));                        // name
+
+                    it_inc += 1; lines += 1;
+                    if (strlen(msg) > (maxlen - 120)) { it_limit += 1; break; }
+                }
+
+                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player;
+                else p = find(p, classname, "player");
+            }
+        }
+        if (opened2) APPEND_SAFE("```\n");
+
+        // ---- PER (top-5, per-min) + inline reasons for #1 ----
+        {
+            local entity e1, e2, e3, e4, e5;
+            local float opened3; opened3 = 0;
+            b1 = b2 = b3 = b4 = b5 = -9999;
+            e1 = e2 = e3 = e4 = e5 = world;
+
+            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
+            else p = find(world, classname, "player");
+            while (p)
+            {
+                if (!(p.style & CLANRING_OBSERVER) && p.next_team != world && p.join_time > 0)
+                {
+                    mins_norm = max(1, (time - p.join_time) / 60);
+                    per_min   = Q1_PER_Calc_Eff(p) / mins_norm;
+                    v = per_min;
+
+                    if (v > b1) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=b1; e2=e1; b1=v; e1=p; }
+                    else if (v > b2) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=v; e2=p; }
+                    else if (v > b3) { b5=b4; e5=e4; b4=b3; e4=e3; b3=v; e3=p; }
+                    else if (v > b4) { b5=b4; e5=e4; b4=v; e4=p; }
+                    else if (v > b5) { b5=v; e5=p; }
+                }
+                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+            }
+
+            if (e1 && e1 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("1) %5.1f    %s\n", b1, utils_dequake_for_discord(e1.netname))); }
+            if (e2 && e2 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("2) %5.1f    %s\n", b2, utils_dequake_for_discord(e2.netname))); }
+            if (e3 && e3 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("3) %5.1f    %s\n", b3, utils_dequake_for_discord(e3.netname))); }
+            if (e4 && e4 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("4) %5.1f    %s\n", b4, utils_dequake_for_discord(e4.netname))); }
+            if (e5 && e5 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("5) %5.1f    %s\n", b5, utils_dequake_for_discord(e5.netname))); }
+
+            // Inline reasons for #1 (same code fence)
+            if (e1 && e1 != world)
+            {
+                if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; }
+                local entity ep; ep = e1;
+
+                // per-minute normalizer
+                local float per_mins = max(1, (time - ep.join_time) / 60);
+
+                // recompute atomic terms (mirror of PER_PrintTop3Reasons), per-minute
+                local float dmg_min   = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? 142 : 100;
+                local float res_coeff = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? 10  : 13;
+
+                local float kd_spread  = ep.true_kills - ep.mangle_z;
+                local float dmg_spread = ep.dmg_given - ep.dmg_taken;
+                local float dmg_tokill = (ep.mangle_z > 0) ? (ep.dmg_taken / ep.mangle_z) : ep.dmg_taken;
+                local float resilience = dmg_tokill / dmg_min;
+                local float res_term   = res_coeff * max(0, pow(resilience, 1.2) - 1);
+
+                local float T[20]; local float base, vv;
+                T[0]  = (0.9 * kd_spread * pow(fabs(kd_spread), 0.1125)) / per_mins;         // big KD spread
+                T[1]  = (0.6 * (dmg_spread / dmg_min)) / per_mins;                           // damage advantage
+                T[2]  = res_term / per_mins;                                                 // hard-to-kill bonus
+                T[3]  = (2.5 * ep.stats_powerup_denial_quad) / per_mins;                     // enemy Quad kills
+
+                T[4]  = (2.0 * ep.totalquad) / per_mins;                                     // Quads taken
+                T[5]  = (5.0 * ep.clanring_ptwep_z) / per_mins;                              // Pents taken
+                T[6]  = (1.0 * ep.stats_item_ring) / per_mins;                               // Rings
+                T[7]  = (0.30 * ep.stats_item_redarmor) / per_mins;                          // RA
+                T[8]  = (0.10 * ep.stats_item_yellowarmor) / per_mins;                       // YA
+                T[9]  = (0.15 * ep.stats_item_mega) / per_mins;                              // Megas
+                T[10] = (0.20 * ep.stats_item_rl) / per_mins;                                // RL
+                T[11] = (0.20 * ep.stats_item_lg) / per_mins;                                // LG
+                base = 12;
+
+                if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+                {
+                    T[12] = (2.5 * ep.fcaptures + 0.55 * pow(ep.fcaptures, 1.125)) / per_mins; // captures
+                    T[13] = (5.0 * pow(ep.fcarries_time / 60, 0.9)) / per_mins;                // long holds
+                    T[14] = (1.5 * ep.fcfrags) / per_mins;                                     // carrier kills
+                    T[15] = (0.25 * ep.freturns) / per_mins;                                   // returns
+                    T[16] = (2.25 * ep.strategic_returns) / per_mins;                          // strategic returns
+                    T[17] = (1.0 * ep.fdefenses + 0.23 * pow(ep.fdefenses, 1.10)) / per_mins;  // base defenses
+                    T[18] = (1.0 * ep.fcdefenses) / per_mins;                                  // carrier defenses
+                    base = 19;
+                }
+
+                // pick top-3 above a small threshold to avoid noise
+                local float min_show = 0.25;
+                local float r1v=-9999, r2v=-9999, r3v=-9999;
+                local float i1=-1, i2=-1, i3=-1;
+                {
+                    local float ii;
+                    for (ii = 0; ii < base; ii = ii + 1)
+                    {
+                        vv = T[ii];
+                        if (vv <= min_show) continue;
+                        if (vv > r1v) { r3v=r2v; i3=i2; r2v=r1v; i2=i1; r1v=vv; i1=ii; }
+                        else if (vv > r2v) { r3v=r2v; i3=i2; r2v=vv; i2=ii; }
+                        else if (vv > r3v) { r3v=vv; i3=ii; }
+                    }
+                }
+
+                // heading: keep within same fence
+                APPEND_SAFE(sprintf("\nwhy %s led PER:\n", utils_dequake_for_discord(ep.netname)));
+
+                // emit a line for each reason index
+                if (i1 >= 0)
+                {
+                    if      (i1 == 0)  APPEND_SAFE(sprintf("  1) big KD spread (%g-%g) (+%3.1f/min)\n", ep.true_kills, ep.mangle_z, r1v));
+                    else if (i1 == 1)  APPEND_SAFE(sprintf("  1) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r1v));
+                    else if (i1 == 2)  APPEND_SAFE(sprintf("  1) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r1v));
+                    else if (i1 == 3)  APPEND_SAFE(sprintf("  1) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r1v));
+                    else if (i1 == 4)  APPEND_SAFE(sprintf("  1) Quads taken (%g) (+%3.1f/min)\n", ep.totalquad, r1v));
+                    else if (i1 == 5)  APPEND_SAFE(sprintf("  1) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r1v));
+                    else if (i1 == 6)  APPEND_SAFE(sprintf("  1) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r1v));
+                    else if (i1 == 7)  APPEND_SAFE(sprintf("  1) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r1v));
+                    else if (i1 == 8)  APPEND_SAFE(sprintf("  1) YA pickups (%g) (+%3.1f/min)\n", ep.stats_item_yellowarmor, r1v));
+                    else if (i1 == 9)  APPEND_SAFE(sprintf("  1) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r1v));
+                    else if (i1 == 10) APPEND_SAFE(sprintf("  1) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r1v));
+                    else if (i1 == 11) APPEND_SAFE(sprintf("  1) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 12) APPEND_SAFE(sprintf("  1) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 13) { local float cm=floor(ep.fcarries_time/60); local float cs=ep.fcarries_time-cm*60; APPEND_SAFE(sprintf("  1) long flag holds (%g:%02g) (+%3.1f/min)\n", cm, cs, r1v)); }
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 14) APPEND_SAFE(sprintf("  1) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 15) APPEND_SAFE(sprintf("  1) returns (%g) (+%3.1f/min)\n", ep.freturns, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 16) APPEND_SAFE(sprintf("  1) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 17) APPEND_SAFE(sprintf("  1) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 18) APPEND_SAFE(sprintf("  1) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r1v));
+                }
+                if (i2 >= 0)
+                {
+                    if      (i2 == 0)  APPEND_SAFE(sprintf("  2) big KD spread (%g-%g) (+%3.1f/min)\n", ep.true_kills, ep.mangle_z, r2v));
+                    else if (i2 == 1)  APPEND_SAFE(sprintf("  2) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r2v));
+                    else if (i2 == 2)  APPEND_SAFE(sprintf("  2) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r2v));
+                    else if (i2 == 3)  APPEND_SAFE(sprintf("  2) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r2v));
+                    else if (i2 == 4)  APPEND_SAFE(sprintf("  2) Quads taken (%g) (+%3.1f/min)\n", ep.totalquad, r2v));
+                    else if (i2 == 5)  APPEND_SAFE(sprintf("  2) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r2v));
+                    else if (i2 == 6)  APPEND_SAFE(sprintf("  2) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r2v));
+                    else if (i2 == 7)  APPEND_SAFE(sprintf("  2) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r2v));
+                    else if (i2 == 8)  APPEND_SAFE(sprintf("  2) YA pickups (%g) (+%3.1f/min)\n", ep.stats_item_yellowarmor, r2v));
+                    else if (i2 == 9)  APPEND_SAFE(sprintf("  2) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r2v));
+                    else if (i2 == 10) APPEND_SAFE(sprintf("  2) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r2v));
+                    else if (i2 == 11) APPEND_SAFE(sprintf("  2) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 12) APPEND_SAFE(sprintf("  2) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 13) { local float cm2=floor(ep.fcarries_time/60); local float cs2=ep.fcarries_time-cm2*60; APPEND_SAFE(sprintf("  2) long flag holds (%g:%02g) (+%3.1f/min)\n", cm2, cs2, r2v)); }
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 14) APPEND_SAFE(sprintf("  2) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 15) APPEND_SAFE(sprintf("  2) returns (%g) (+%3.1f/min)\n", ep.freturns, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 16) APPEND_SAFE(sprintf("  2) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 17) APPEND_SAFE(sprintf("  2) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 18) APPEND_SAFE(sprintf("  2) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r2v));
+                }
+                if (i3 >= 0)
+                {
+                    if      (i3 == 0)  APPEND_SAFE(sprintf("  3) big KD spread (%g-%g) (+%3.1f/min)\n", ep.true_kills, ep.mangle_z, r3v));
+                    else if (i3 == 1)  APPEND_SAFE(sprintf("  3) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r3v));
+                    else if (i3 == 2)  APPEND_SAFE(sprintf("  3) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r3v));
+                    else if (i3 == 3)  APPEND_SAFE(sprintf("  3) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r3v));
+                    else if (i3 == 4)  APPEND_SAFE(sprintf("  3) Quads taken (%g) (+%3.1f/min)\n", ep.totalquad, r3v));
+                    else if (i3 == 5)  APPEND_SAFE(sprintf("  3) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r3v));
+                    else if (i3 == 6)  APPEND_SAFE(sprintf("  3) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r3v));
+                    else if (i3 == 7)  APPEND_SAFE(sprintf("  3) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r3v));
+                    else if (i3 == 8)  APPEND_SAFE(sprintf("  3) YA pickups (%g) (+%3.1f/min)\n", ep.stats_item_yellowarmor, r3v));
+                    else if (i3 == 9)  APPEND_SAFE(sprintf("  3) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r3v));
+                    else if (i3 == 10) APPEND_SAFE(sprintf("  3) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r3v));
+                    else if (i3 == 11) APPEND_SAFE(sprintf("  3) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 12) APPEND_SAFE(sprintf("  3) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 13) { local float cm3=floor(ep.fcarries_time/60); local float cs3=ep.fcarries_time-cm3*60; APPEND_SAFE(sprintf("  3) long flag holds (%g:%02g) (+%3.1f/min)\n", cm3, cs3, r3v)); }
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 14) APPEND_SAFE(sprintf("  3) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 15) APPEND_SAFE(sprintf("  3) returns (%g) (+%3.1f/min)\n", ep.freturns, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 16) APPEND_SAFE(sprintf("  3) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 17) APPEND_SAFE(sprintf("  3) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 18) APPEND_SAFE(sprintf("  3) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r3v));
+                }
+            }
+        }
+        if (opened3) APPEND_SAFE("```\n");
+    }
+
+    // ---- CTF ----
+    if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+    {
+        {
+            local float opened4; opened4 = 0;
+            lines = 0; maxlines = 16;
+            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
+            else p = find(world, classname, "player");
+
+            while (p && lines < maxlines)
+            {
+                if (!(p.style & CLANRING_OBSERVER) && p.next_team != world)
+                {
+                    if (!opened4) {
+                        APPEND_SAFE("\n**CTF (cap rtn def cdef cfrg hold)**\n");
+                        APPEND_SAFE("```\n");
+                        opened4 = 1;
+                    }
+                    m = floor(p.fcarries_time / 60);
+                    s = p.fcarries_time - m * 60;
+
+                    // Build mm:ss and ZONE it (avoid %02g and temp aliasing)
+                    ss_str   = ftos(s);
+                    if (s < 10) ss_str = strcat("0", ss_str);
+                    mmss_tmp = strcat(ftos(m), ":", ss_str);
+                    z_mmss   = strzone(mmss_tmp);
+
+                    // Dequake name and ZONE it (avoid aliasing)
+                    nm    = utils_dequake_for_discord(p.netname);
+                    zname = strzone(nm);
+
+                    // One-shot format using only zoned/safe args
+                    line = sprintf(
+                        "%g %g %g %g %g %s    %s\n",
+                        p.fcaptures, p.freturns, p.fdefenses, p.fcdefenses, p.fcfrags,
+                        z_mmss, zname
+                    );
+
+                    APPEND_SAFE(line);
+
+                    // cleanup
+                    strunzone(z_mmss);
+                    strunzone(zname);
+
+                    lines = lines + 1;
+                    if (strlen(msg) > (maxlen - 120)) break;
+                }
+                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+            }
+        }
+        if (opened4) APPEND_SAFE("```\n");
+    }
+
+    // Normalize newlines/tabs, cap, and store JSON payload (zoned)
+    {
+        local string prepared;
+        prepared = strreplace("\r\n", "\n", msg);
+        prepared = strreplace("\r", "\n", prepared);
+        prepared = strreplace("\t", "    ", prepared);
+        prepared = Webhook_TruncateForDiscord(prepared);
+
+        if (ev.hook_payload) strunzone(ev.hook_payload);
+        ev.hook_payload = Webhook_MakeContentPayloadZ(prepared);
+    }
+
+    if (msg) strunzone(msg);
+    #undef PCT_STR
+};
+
+
+// ------------------------------------------------------------
+// Sender pipeline (deferred + dedupe)
+// ------------------------------------------------------------
+#define WEBHOOK_DEBUG   0
+#define WEBHOOK_DEDUPE  1
+
+float  webhook_dedupe_until;
+string webhook_last_fingerprint;
+
+float(string url, string payload) Webhook_AllowSend =
+{
+    local float n1, n2;
+    local string url_head, payload_head, fp;
+
+    n1 = strlen(url);     if (n1 > 64)  n1 = 64;
+    n2 = strlen(payload); if (n2 > 256) n2 = 256;
+
+    url_head     = substring(url, 0, n1);
+    payload_head = substring(payload, 0, n2);
+    fp = strcat(url_head, "\n", payload_head);
+
+    if (webhook_last_fingerprint != "" && fp == webhook_last_fingerprint && time < webhook_dedupe_until)
+        return FALSE;
+
+    if (webhook_last_fingerprint) strunzone(webhook_last_fingerprint);
+    webhook_last_fingerprint = strzone(fp);
+    webhook_dedupe_until = time + 2.0;
+    return TRUE;
+};
+
+void(string url, string payload) webhook_post =
+{
     local float ok, id;
 
-    // Prefer private configured value from clanring.cfg; fallback to legacy cvar
-    url = clanring_captimesdiscordurl;
-    if (url == "")
-        url = cvar_string("webhook_url");
-
-    // Sanitize accidental leading '@' and trim simple whitespace
-    if (substring(url, 0, 1) == "@")
-        url = substring(url, 1, strlen(url) - 1);
-    while (strlen(url) > 0 && substring(url, 0, 1) == " ")
-        url = substring(url, 1, strlen(url) - 1);
-    while (strlen(url) > 0 && substring(url, strlen(url) - 1, 1) == " ")
-        url = substring(url, 0, strlen(url) - 1);
-
-    // Abort cleanly if no URL configured
-    if (url == "")
-    {
-        if (cvar("webhook_debug") > 0)
-            dprint("webhook: no URL set (set 'captimesdiscordurl' in configs/clanring.cfg or cvar \"webhook_url\"). Skipping send.\n");
-        return;
-    }
-
-    // Basic schema sanity check
-    if (!(substring(url, 0, 8) == "https://" || substring(url, 0, 7) == "http://"))
-    {
-        dprint("webhook: invalid URL scheme; must start with http:// or https://\n");
-        return;
-    }
-
-    // Ensure wait=true for Discord to return a payload reliably
-    if (strstrofs(url, "?", 0) < 0)
-        url = strcat(url, "?wait=true");
-    else if (strstrofs(url, "wait=", 0) < 0)
-        url = strcat(url, "&wait=true");
-
-    // Build minimal payload first; some Discord setups reject extra fields
-    body = discord_escape(content);
-    payload = sprintf("{\"content\":\"%s\"}", body);
+    if (url == "") return;
+    if (!(substring(url, 0, 8) == "https://" || substring(url, 0, 7) == "http://")) return;
+    if (payload == "") return;
 
     webhook_seq = webhook_seq + 1;
     id = 9100 + webhook_seq;
 
-    if (cvar("webhook_debug") > 0)
-    {
-        dprint(sprintf("Discord webhook POST id=%g, len=%g\n", id, strlen(payload)));
-        if (cvar("webhook_debug") > 1)
-        {
-            // Do not print full URL to keep webhook private
-            dprint("URL: [hidden]\n");
-            dprint(sprintf("Payload: %s\n", substring(payload, 0, min(strlen(payload), 200))));
-        }
-    }
+    ok = uri_post(url, id, "application/json", payload);
 
-    ok = uri_get(url, id, "application/json", payload);
-    if (!ok)
-        dprint("webhook POST not accepted\n");
+#if WEBHOOK_DEBUG
+    if (!ok) bprint("webhook: uri_post returned 0 (submit failed to queue)\n");
+#endif
+};
+
+void() webhook_cleanup =
+{
+    local entity ev = self;
+    if (ev.hook_payload) strunzone(ev.hook_payload);
+    if (ev.hook_url)     strunzone(ev.hook_url);
+    if (ev.message)      strunzone(ev.message);
+    remove(ev);
 };
 
 void() webhook_do_post =
 {
-	local entity ev;
-	local string payload;
+    local entity ev = self;
+    local float posted; posted = FALSE;
 
-	ev = self;
-	payload = ev.message;
-	if (payload != "")
-	{
-        // Send and avoid spamming repeated posts if many records happen quickly
-        if (cvar("webhook_debug") > 0)
-        {
-            dprint(sprintf("Deferred Discord webhook len=%g\n", strlen(payload)));
-        }
-        webhook_post(payload);
-		strunzone(ev.message);
-	}
-	remove(ev);
-};
-
-void(string content) webhook_post_deferred =
-{
-	local entity ev;
-	ev = spawn();
-    ev.classname = "webhook_event";
-	ev.message = strzone(content);
-    ev.nextthink = time + 0.5;
-    ev.think = webhook_do_post;
-};
-
-
-// Engine callback for all uri_get requests from this VM
-
-void(float reqid, float responsecode, string resourcebody, int resourcebytes) URI_Get_Callback =
-{
-    local float L, bytes, dp_style;
-
-    // Transport failure (socket, DNS, etc.)
-    if (responsecode < 0)
+    if (ev.webhook_prepfn)
     {
-        bprint(sprintf("URI %f transport failure (code=%g)\n", reqid, responsecode));
-        return;
+        // 1) PREP fills ev.hook_url + ev.hook_payload (both zoned)
+        ev.webhook_prepfn(ev);
+
+        // 2) POST once if both fields present
+        if (ev.hook_url != "" && ev.hook_payload != "")
+        {
+#if WEBHOOK_DEDUPE
+            if (Webhook_AllowSend(ev.hook_url, ev.hook_payload)) {
+                webhook_post(ev.hook_url, ev.hook_payload);
+                posted = TRUE;
+            }
+#else
+            webhook_post(ev.hook_url, ev.hook_payload);
+            posted = TRUE;
+#endif
+        }
     }
 
-    // Detect DP-style callback routed through FTE-style declaration:
-    // resourcebytes often 0/garbage and resourcebody contains content-type.
-    dp_style = 0;
-    if (resourcebytes <= 0 && (resourcebody == "application/json"
-                            || resourcebody == "text/plain"
-                            || resourcebody == "application/json; charset=UTF-8"))
-        dp_style = 1;
+    // Delay cleanup slightly if posted (allow asyncs to read strings)
+    ev.think     = webhook_cleanup;
+    ev.nextthink = time + (posted ? 3.0 : 0.1);
+};
 
-    // Compute bytes from what we actually have (safe even if dp_style)
-    bytes = strlen(resourcebody);
+// Schedule the deferred POST with a swappable PREP (entity-only)
+void(void(entity) prepfn, string content) webhook_post_deferred =
+{
+    local entity ev = spawn();
+
+    ev.classname      = "webhook_event";
+    ev.message        = strzone(content);
+    ev.webhook_prepfn = prepfn;
+    ev.nextthink      = time + 0.5;
+    ev.think          = webhook_do_post;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ===========================
+// Match POST (JSON) — single knob
+// ===========================
+
+// Empty => OFF. Non-empty => ON.
+string clanring_matchpost_url;
+
+// sensible defaults when ON
+const float MATCHPOST_DEFAULT_PRETTY   = 0; // compact JSON by default (avoid 1KB QC string cap)
+const float MATCHPOST_DEFAULT_DEFERRED = 1; // send via tiny deferred event
+
+float  matchpost_seq;
+float  matchpost_debug = 1; // turn on previews while fixing
+
+// ---- diagnostics helpers (no cvars) ----
+string(string s, float maxlen) mp_trunc =
+{
+    if (!s) return "";
+    if (strlen(s) <= maxlen) return s;
+    return strcat(substring(s, 0, maxlen), "...");
+};
+
+// Read the first N bytes of a file safely (for previews only)
+string(string p, float cap) mp_readfile_head =
+{
+    local float f = fopen(p, FILE_READ);
+    if (f < 0) return "";
+    local string s = "", line;
+    while (strlen(s) < cap) { line = fgets(f); if (line == "") break; s = strcat(s, line); }
+    fclose(f);
+    if (strlen(s) > cap) s = substring(s, 0, cap);
+    return s;
+};
+
+// Compact preview helper for payload/response
+void(string label, string s, float maxshow) mp_preview =
+{
+    bprint(sprintf("[matchpost] %s bytes=%g\n", label, s ? strlen(s) : 0));
+    if (s && strlen(s) > 0)
+        bprint(sprintf("[matchpost] %s preview: %s\n", label, mp_trunc(s, maxshow)));
+};
+
+/* (removed) We no longer read the pretty file for POSTs; we send compact builder output. */
+
+// Keep only the JSON portion (from first '{' or '[' to the last '}' or ']')
+string(string s) mp_json_only =
+{
+    if (!s) return "";
+    local float n = strlen(s), i = 0, j = n - 1;
+    local string ch;
+    // find first '{' or '['
+    while (i < n)
+    {
+        ch = substring(s, i, 1);
+        if (ch == "{" || ch == "[") break;
+        i = i + 1;
+    }
+    if (i >= n) return s; // nothing found; let server complain
+    // find last '}' or ']'
+    while (j >= i)
+    {
+        ch = substring(s, j, 1);
+        if (ch == "}" || ch == "]") break;
+        j = j - 1;
+    }
+    if (j < i) return s; // malformed; let server complain
+    return substring(s, i, (j - i + 1));
+};
+
+// Write helper (must be before mp_save_payload_for_debug for some QC compilers)
+void(string path, string data) mp_writefile =
+{
+    local filestream fh = fopen(path, FILE_WRITE);
+    if (!fh) { bprint(sprintf("[matchpost] fopen failed: '%s'\n", path)); return; }
+    fputs(fh, data ? data : "");
+    fclose(fh);
+    bprint(sprintf("[matchpost] wrote '%s'\n", path));
+};
+
+// Resolve a relative file (like "json/foo.json") to something the engine's fopen() can see.
+// Order: fs_gamedir -> (fs_basedir + '/' + game) -> (game + '/') -> "id1/" fallback.
+string(string rel) mp_resolve_for_engine =
+{
+    if (!rel || rel == "") return rel;
+    local string gdir = cvar_string("fs_gamedir");
+    local string bdir = cvar_string("fs_basedir");
+    local string mod  = cvar_string("game");
+    // Prefer an absolute fs_gamedir if available
+    if (gdir && gdir != "")
+        return strcat(gdir, "/", rel);
+    // Next: base dir + game
+    if (bdir && bdir != "" && mod && mod != "")
+        return strcat(bdir, "/", mod, "/", rel);
+    // Next: just the game subdir
+    if (mod && mod != "")
+        return strcat(mod, "/", rel);
+    // Fallback: id1
+    return strcat("id1/", rel);
+};
+
+// For quick diffs: persist what we actually send
+void(string data) mp_save_payload_for_debug =
+{
+    mp_writefile("json/matchpost_payload.txt", data ? data : "");
+};
+
+// super-light "OK" sniff (works even when status==0)
+float(string body) mp_body_looks_ok =
+{
+    if (!body) return 0;
+    if (strstrofs(body, "\"ok\":true", 0) >= 0) return 1;
+    if (strstrofs(body, "\"status\":\"ok\"", 0) >= 0) return 1;
+    return 0;
+};
+
+// DP-style 3-arg callback. Normalize+forward into the canonical handler only.
+void(float id, float status, string data) uri_get_callback =
+{
+    // Forward into the 4-arg canonical handler for unified logic.
+    URI_Get_Callback(id, status, data ? data : "", data ? strlen(data) : 0);
+}
+
+// --- keep the callback from ever being stripped by aggressive QC optimizers ---
+void() _mp_bind_callback_ref =
+{
+    // never runs; forces a reference to the symbol so the engine can find it by name
+    if (time < -999999)
+    {
+        uri_get_callback(0, 0, "");
+        URI_Get_Callback(0, 0, "", 0); // match fteextensions signature (last arg is __int)
+    }
+};
+
+// fteextensions.qc callback signature:
+//   void(float reqid, float responsecode, string resourcebody, __int resourcebytes)
+void(float reqid, float responsecode, string resourcebody, __int resourcebytes) URI_Get_Callback =
+{
+    local float L, bytes;
+    // Prefer engine-provided byte count; else strlen()
+    if (resourcebytes > 0) bytes = resourcebytes; else bytes = resourcebody ? strlen(resourcebody) : 0;
 
     // --- Test GET (9001) ----------------------------------------------------
     if (reqid == 9001)
     {
-        if (dp_style)
-        {
-            bprint(sprintf("GET %f OK, type=%s\n", reqid, resourcebody));
-        }
-        else
-        {
-            bprint(sprintf("GET %f OK, bytes=%g\n", reqid, bytes));
-            L = strlen(resourcebody);
-            if (L > 200) L = 200;
-            bprint(substring(resourcebody, 0, L));
-            bprint("\n");
-        }
+        bprint(sprintf("GET %f status=%g bytes=%g\n", reqid, responsecode, bytes));
+        L = bytes; if (L > 200) L = 200;
+        if (L > 0) { bprint(substring(resourcebody, 0, L)); bprint("\n"); }
         return;
     }
 
     // --- Test POST (9002) ---------------------------------------------------
     if (reqid == 9002)
     {
-        if (dp_style)
-        {
-            bprint(sprintf("POST %f OK, type=%s\n", reqid, resourcebody));
-        }
-        else
-        {
-            bprint(sprintf("POST %f OK, bytes=%g\n", reqid, bytes));
-            L = strlen(resourcebody);
-            if (L > 200) L = 200;
-            bprint(substring(resourcebody, 0, L));
-            bprint("\n");
-        }
+        bprint(sprintf("POST %f status=%g bytes=%g\n", reqid, responsecode, bytes));
+        L = bytes; if (L > 200) L = 200;
+        if (L > 0) { bprint(substring(resourcebody, 0, L)); bprint("\n"); }
         return;
     }
 
     // --- Webhook posts (9100–9199) -----------------------------------------
     if (reqid >= 9100 && reqid < 9200)
     {
-        if (responsecode >= 200 && responsecode < 300)
-        {
+        if (responsecode >= 200 && responsecode < 300) {
             dprint(sprintf("WEBHOOK %f OK (%g)\n", reqid, responsecode));
-        }
-        else if (responsecode == 429)
-        {
+        } else if (responsecode == 429) {
             bprint(sprintf("WEBHOOK %f rate-limited (429). Consider slowing or batching.\n", reqid));
-        }
-        else
-        {
+        } else {
             dprint(sprintf("WEBHOOK %f HTTP %g (bytes=%g)\n", reqid, responsecode, bytes));
-            if (!dp_style)
-            {
-                L = strlen(resourcebody);
-                if (L > 200) L = 200;
-                dprint(substring(resourcebody, 0, L));
-                dprint("\n");
-            }
+            L = bytes; if (L > 200) L = 200;
+            if (L > 0) { dprint(substring(resourcebody, 0, L)); dprint("\n"); }
         }
         return;
     }
 
+    // --- MATCH posts (9300–9399) ------------------------------------------
+    if (reqid >= 9300 && reqid < 9400) {
+        bprint(sprintf("MATCHPOST %f status=%g bytes=%g\n", reqid, responsecode, bytes));
+        L = bytes; if (L > 200) L = 200;
+        if (L > 0) bprint(sprintf("MATCHPOST %f preview: %s\n", reqid, substring(resourcebody, 0, L)));
+        mp_writefile("json/matchpost_last.txt", resourcebody ? resourcebody : "");
+
+        // Decide OK/FAIL (fallback sniff when status==0)
+        if (responsecode >= 200 && responsecode < 300)
+            bprint("MATCHPOST RESULT: OK (HTTP 2xx)\n");
+        else if (responsecode == 0 && mp_body_looks_ok(resourcebody))
+            bprint("MATCHPOST RESULT: OK (status=0 but body looks OK)\n");
+        else if (responsecode == 0)
+            bprint("MATCHPOST RESULT: UNKNOWN/FAIL (status=0)\n");
+        else
+            bprint(sprintf("MATCHPOST RESULT: FAIL (HTTP %g)\n", responsecode));
+        return;
+    }
+
     // --- Default path -------------------------------------------------------
-    if (dp_style)
+    if (matchpost_debug)
     {
-        dprint(sprintf("URI %f OK, type=%s, status=%g\n", reqid, resourcebody, responsecode));
+        dprint(sprintf("URI %f status=%g bytes=%g\n", reqid, responsecode, bytes));
+        L = bytes; if (L > 200) L = 200;
+        if (L > 0) { dprint(substring(resourcebody, 0, L)); dprint("\n"); }
     }
-    else
+};
+
+string(string url) mp_sanitize_url =
+{
+    if (!url) return "";
+    if (substring(url, 0, 1) == "@")
+        url = substring(url, 1, strlen(url) - 1);
+    while (strlen(url) > 0 && substring(url, 0, 1) == " ")
+        url = substring(url, 1, strlen(url) - 1);
+    while (strlen(url) > 0 && substring(url, strlen(url)-1, 1) == " ")
+        url = substring(url, 0, strlen(url) - 1);
+    return url;
+};
+
+// ---------- core send (immediate) ----------
+void(string payload) match_post_json =
+{
+    local string url = mp_sanitize_url(clanring_matchpost_url);
+    if (url == "") { bprint("[matchpost] OFF (empty URL)\n"); return; }
+    if (!(substring(url,0,8)=="https://" || substring(url,0,7)=="http://"))
+    { bprint("[matchpost] invalid URL scheme; use http:// or https://\n"); return; }
+
+    // Ensure ?wait=true for easier debugging.
+    if (strstrofs(url,"?",0) < 0)            url = strcat(url,"?wait=true");
+    else if (strstrofs(url,"wait=",0) < 0)   url = strcat(url,"&wait=true");
+
+    matchpost_seq = matchpost_seq + 1;
+    local float id = 9300 + matchpost_seq;
+
+    // ============== FILE MODE ==============
+    if (payload && substring(payload,0,1) == "@")
     {
-        dprint(sprintf("URI %f status=%g, bytes=%g\n", reqid, responsecode, bytes));
-        L = strlen(resourcebody);
-        if (L > 200) L = 200;
-        dprint(substring(resourcebody, 0, L));
-        dprint("\n");
+        local string rel = substring(payload,1,strlen(payload)-1);
+
+        // Gather cvars
+        local string gdir = cvar_string("fs_gamedir");
+        local string bdir = cvar_string("fs_basedir");
+        local string mod  = cvar_string("game");
+
+        bprint(sprintf("[matchpost] post-file rel='%s'\n", rel));
+        bprint(sprintf("[matchpost]   fs_gamedir='%s'\n", gdir ? gdir : ""));
+        bprint(sprintf("[matchpost]   fs_basedir='%s'\n", bdir ? bdir : ""));
+        bprint(sprintf("[matchpost]   game='%s'\n",      mod  ? mod  : ""));
+
+        // Build candidate list (as PF_uri_get does raw fopen, we must hand real paths).
+        local string cand[10]; local float n = 0;
+        // Try as-is first (works if server CWD == game root or rel is absolute)
+        cand[n++] = rel;
+        // gdir + rel
+        if (gdir && gdir!="") { cand[n++] = strcat(gdir, "/", rel); }
+        // bdir/game + rel
+        if (bdir && bdir!="" && mod && mod!="") { cand[n++] = strcat(bdir, "/", mod, "/", rel); }
+        // If rel lacks "data/", try adding it
+        if (!(strlen(rel) >= 5 && substring(rel,0,5)=="data/"))
+        {
+            if (gdir && gdir!="") cand[n++] = strcat(gdir, "/data/", rel);
+            if (bdir && bdir!="" && mod && mod!="") cand[n++] = strcat(bdir, "/", mod, "/data/", rel);
+            if (mod && mod!="") cand[n++] = strcat(mod, "/data/", rel);
+            cand[n++] = strcat("data/", rel);
+        }
+        // If rel has "data/", try the sibling without it
+        if (strlen(rel) >= 5 && substring(rel,0,5)=="data/")
+        {
+            local string nodata = substring(rel,5,strlen(rel)-5);
+            if (gdir && gdir!="") cand[n++] = strcat(gdir, "/", nodata);
+            if (bdir && bdir!="" && mod && mod!="") cand[n++] = strcat(bdir, "/", mod, "/", nodata);
+            if (mod && mod!="") cand[n++] = strcat(mod, "/", nodata);
+            cand[n++] = nodata;
+        }
+
+        // Try each candidate. The first one the engine accepts wins.
+        local float i, ok = 0;
+        for (i = 0; i < n; i = i + 1)
+        {
+            local string p = cand[i];
+            if (!p || p == "") continue;
+
+            // Optional: QC-side fopen check (helps spot typos early)
+            local float chk = fopen(p, FILE_READ);
+            if (chk < 0) { dprint(sprintf("[matchpost] QC fopen failed: '%s'\n", p)); }
+            else
+            {
+                // Show a tiny head so we know we’re pointing at the JSON file we just wrote
+                local string head = mp_readfile_head(p, 160);
+                if (strlen(head) > 0)
+                {
+                    bprint(sprintf("[matchpost] file head bytes=%g\n", strlen(head)));
+                    bprint(sprintf("[matchpost] file head preview: %s\n", head));
+                }
+                fclose(chk);
+            }
+
+            bprint(sprintf("[matchpost] dispatch id=%g (file try %g): @%s\n", id, i, p));
+            ok = uri_get(url, id, "application/json", strcat("@", p));
+            if (ok) { bprint(sprintf("[matchpost] engine accepted transfer id=%g\n", id)); break; }
+        }
+
+        if (!ok) bprint("[matchpost] engine rejected transfer (transport not accepted)\n");
+        return;
     }
+
+    // ============== STRING MODE (fallback) ==============
+    {
+        local string body = mp_json_only(payload);
+        mp_preview("payload (json-only)", body, 160);
+
+        // For big bodies, write to a temp file and recurse into file mode.
+        if (strlen(body) > 900)
+        {
+            local string tmp = "json/matchpost_send.json";
+            mp_writefile(tmp, body);
+            // Re-enter file mode using the same resolver path.
+            match_post_json(strcat("@", tmp));
+            return;
+        }
+
+        bprint(sprintf("[matchpost] dispatch id=%g bytes=%g (inline)\n", id, strlen(body)));
+        ok = uri_get(url, id, "application/json", body);
+        if (!ok) bprint("[matchpost] engine rejected transfer (inline)\n");
+        else     bprint(sprintf("[matchpost] engine accepted transfer id=%g\n", id));
+        if (matchpost_debug) mp_save_payload_for_debug(strlen(body) > 512 ? substring(body,0,512) : body);
+    }
+};
+
+// ---------- deferred send ----------
+void() match_post_do_send =
+{
+    if (self.message != "")
+    {
+        bprint(sprintf("[matchpost] deferred send bytes=%g\n", strlen(self.message)));
+        // Show a short preview of what we're about to POST (debug only)
+        if (matchpost_debug) mp_preview("deferred payload", self.message, 160);
+        match_post_json(self.message);
+        strunzone(self.message);
+    }
+    remove(self);
+};
+void(string payload) match_post_json_deferred =
+{
+    local entity ev = spawn();
+    ev.classname = "matchpost_event";
+    ev.message   = strzone(payload);
+    ev.nextthink = time + 0.5;
+    ev.think     = match_post_do_send;
+    bprint(sprintf("[matchpost] queued deferred payload bytes=%g\n", strlen(payload)));
+    // Preview what we just queued (debug only)
+    if (matchpost_debug) mp_preview("queued payload", payload, 160);
 };
 
 // Trim trailing spaces/tabs from a string (ASCII-safe)

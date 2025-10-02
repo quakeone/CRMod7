@@ -36,6 +36,7 @@ void () UnHookPlayer;
 void (entity player, float reset) TeamCaptureDropFlagOfPlayer;
 void () respawn;
 void () DropRune;
+void () Request_Poll_Recount;
 
 //
 //  F I N D  T E L E P O R T
@@ -1270,6 +1271,10 @@ void (entity client) observer_disconnect_notify =
     	e = find(e, classname, "clanring_camera");
     }
     // CRMOD END
+
+    // Re-evaluate any active request vote against the current roster.
+    // This resolves immediately if a majority is already met after a disconnect.
+    Request_Poll_Recount();
 };
 
 //
