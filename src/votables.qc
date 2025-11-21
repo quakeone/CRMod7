@@ -1166,7 +1166,11 @@ void() votables_select_fraglimit =
 	{
 		if (!(clanring_playmode & CLANRING_MATCH_MODE))
 		{
-			sprint(self, "Command valid in match modes only\n");
+			{
+				local float mode; local string szmode;
+				mode = options_get_mode(); szmode = strings_get_mode(mode);
+				sprint(self, sprintf("Command valid in match modes only (current: %s)\n", szmode));
+			}
 			return;
 		}
 		if (clanring_state & CLANRING_MATCH_STARTED)
@@ -1299,7 +1303,11 @@ void() votables_select_timelimit =
 	{
 		if (!(clanring_playmode & CLANRING_MATCH_MODE))
 		{
-			sprint(self, "Command valid in match modes only\n");
+			{
+				local float mode; local string szmode;
+				mode = options_get_mode(); szmode = strings_get_mode(mode);
+				sprint(self, sprintf("Command valid in match modes only (current: %s)\n", szmode));
+			}
 			return;
 		}
 		if (clanring_state & CLANRING_MATCH_STARTED)
@@ -1426,7 +1434,11 @@ void() votables_select_overtime =
 {
 	if (!(clanring_playmode & CLANRING_MATCH_MODE))
 	{
-		sprint(self, "Command valid in match mode only\n");
+		{
+			local float mode; local string szmode;
+			mode = options_get_mode(); szmode = strings_get_mode(mode);
+			sprint(self, sprintf("Command valid in match mode only (current: %s)\n", szmode));
+		}
 		return;
 	}
 	if (clanring_state & CLANRING_MATCH_STARTED)

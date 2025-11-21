@@ -2764,7 +2764,12 @@ void() match_rpickup =
     local float i;
 
     if (!teamplay)
-    { sprint(self, "Command valid in team modes only\n"); return; }
+    {
+        local float mode; local string szmode;
+        mode = options_get_mode(); szmode = strings_get_mode(mode);
+        sprint(self, sprintf("Command valid in team modes only (current: %s)\n", szmode));
+        return;
+    }
     if (clanring_state & CLANRING_MATCH_STARTED)
     { sprint(self, "Cannot reshuffle during a live match\n"); return; }
 
@@ -2818,7 +2823,7 @@ void() match_rpickup =
 // Vote/Admin entry point
 void() match_request_rpickup =
 {
-    if (!teamplay) { sprint(self, "Command valid in team modes only\n"); return; }
+    if (!teamplay) { local float m; local string sm; m = options_get_mode(); sm = strings_get_mode(m); sprint(self, sprintf("Command valid in team modes only (current: %s)\n", sm)); return; }
     if (clanring_state & CLANRING_MATCH_STARTED)
     { sprint(self, "Cannot reshuffle during a live match\n"); return; }
 
@@ -3319,7 +3324,9 @@ void() match_show_rockets =
 
     if (!teamplay)
     {
-        sprint(self, "Command valid in match mode only\n");
+        local float mode; local string szmode;
+        mode = options_get_mode(); szmode = strings_get_mode(mode);
+        sprint(self, sprintf("Command valid in match mode only (current: %s)\n", szmode));
         return;
     }
     if (!(self.style & CLANRING_OBSERVER))

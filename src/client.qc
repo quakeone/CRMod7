@@ -359,10 +359,17 @@ void() IntermissionThink =
         if ((self.warp_map) && ((self.warp_map) == self.impulse))
         {
             map_choices[self.warp_map] -= 1;
-            // After decrement, report how many more are needed for this map
-            bprint(sprintf("%s \bREMOVED\b their vote for %s %s (%s more needed to pass)\n",
-                           self.netname, myVoteMapName, myVoteMapTitle,
-                           strings_ftos_gold(votes_needed_for_slot(self.warp_map))));
+            // After decrement, report status; if already passing, say so explicitly
+            {
+                local float need1 = votes_needed_for_slot(self.warp_map);
+                if (need1 > 0)
+                    bprint(sprintf("%s \bREMOVED\b their vote for %s %s (%s more needed to pass)\n",
+                                   self.netname, myVoteMapName, myVoteMapTitle,
+                                   strings_ftos_gold(need1)));
+                else
+                    bprint(sprintf("%s \bREMOVED\b their vote for %s %s (Vote passed)\n",
+                                   self.netname, myVoteMapName, myVoteMapTitle));
+            }
             self.warp_map = 0;
             self.impulse = 0;
             self.centerTime = 0;	//Update now.
@@ -377,9 +384,16 @@ void() IntermissionThink =
             string prevVoteMapName  = strzone(argv(0));
             string prevVoteMapTitle = strzone(redify(argv(1)));
             map_choices[self.warp_map] -= 1;
-            bprint(sprintf("%s \bREMOVED\b their vote for %s %s (%s more needed to pass)\n",
-                           self.netname, prevVoteMapName, prevVoteMapTitle,
-                           strings_ftos_gold(votes_needed_for_slot(self.warp_map))));
+            {
+                local float need2 = votes_needed_for_slot(self.warp_map);
+                if (need2 > 0)
+                    bprint(sprintf("%s \bREMOVED\b their vote for %s %s (%s more needed to pass)\n",
+                                   self.netname, prevVoteMapName, prevVoteMapTitle,
+                                   strings_ftos_gold(need2)));
+                else
+                    bprint(sprintf("%s \bREMOVED\b their vote for %s %s (Vote passed)\n",
+                                   self.netname, prevVoteMapName, prevVoteMapTitle));
+            }
             self.warp_map = 0;
             centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[1], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);
             strunzone(prevVoteMapName);
@@ -388,10 +402,17 @@ void() IntermissionThink =
 
         self.warp_map = self.impulse;
         map_choices[self.warp_map] += 1;
-        // Also show the updated "needed" after incrementing
-        bprint(sprintf("%s voted for %s %s (%s more needed to pass)\n",
-                       self.netname, myVoteMapName, myVoteMapTitle,
-                       strings_ftos_gold(votes_needed_for_slot(self.warp_map))));
+        // Also show the updated status after incrementing; if threshold met, say "Vote passed"
+        {
+            local float need3 = votes_needed_for_slot(self.warp_map);
+            if (need3 > 0)
+                bprint(sprintf("%s voted for %s %s (%s more needed to pass)\n",
+                               self.netname, myVoteMapName, myVoteMapTitle,
+                               strings_ftos_gold(need3)));
+            else
+                bprint(sprintf("%s voted for %s %s - Vote passed\n",
+                               self.netname, myVoteMapName, myVoteMapTitle));
+        }
 
         strunzone(myVoteMapName);
         strunzone(myVoteMapTitle);

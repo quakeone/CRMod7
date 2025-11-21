@@ -263,11 +263,13 @@ void() console_show_score =
 {
 	 string temp;//R00k moved up here
 
-	if (!(clanring_playmode & CLANRING_MATCH_MODE))
-	{
-		cprint("Command valid in match mode only\n");
-		return;
-	}
+    if (!(clanring_playmode & CLANRING_MATCH_MODE))
+    {
+        float mode; string szmode;
+        mode = options_get_mode(); szmode = strings_get_mode(mode);
+        cprint(sprintf("Command valid in match mode only (current: %s)\n", szmode));
+        return;
+    }
 	if (!(clanring_state & (CLANRING_MATCH_STARTED | CLANRING_MATCH_OVER)))
 	{
 		if (clanring_state & CLANRING_TIMER_STARTED)

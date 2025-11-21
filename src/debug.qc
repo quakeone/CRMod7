@@ -396,7 +396,11 @@ void() debug_teams =
 
 	if (!(clanring_playmode && CLANRING_MATCH_MODE) || !teamplay)
 	{
-		sprint(self, "Valid in match mode only\n");
+		{
+			local float mode; local string szmode;
+			mode = options_get_mode(); szmode = strings_get_mode(mode);
+			sprint(self, sprintf("Valid in match mode only (current: %s)\n", szmode));
+		}
 		return;
 	}
 	pteam = clanring_sentinel.next_team;

@@ -783,11 +783,14 @@ void() stats_show_teamstats =
 	local entity pteam;
 	local string s;
 
-	if (!(teamplay && (clanring_playmode & CLANRING_MATCH_MODE)))
-	{
-		sprint(self, "Teamstats valid in match mode only\n");
-		return;
-	}
+    if (!(teamplay && (clanring_playmode & CLANRING_MATCH_MODE)))
+    {
+        local float mode; local string szmode;
+        mode = options_get_mode();
+        szmode = strings_get_mode(mode);
+        sprint(self, sprintf("Teamstats valid in match mode only (current: %s)\n", szmode));
+        return;
+    }
 	if (!clanring_sentinel.next_team)
 	{
 		sprint(self, "No teams\n");
@@ -1146,7 +1149,7 @@ float (entity p) Q1_PER_Calc_Eff =
 	// Store as negative so a quick dump shows deductions clearly
 	p.per_penalties = round2d(-penalties_raw);
 	
-	return round2d(combat_raw + resources_raw + objectives_raw - penalties_raw);
+	return max(0, round2d(combat_raw + resources_raw + objectives_raw - penalties_raw));
 };
 
 // ---------------------------------------------
