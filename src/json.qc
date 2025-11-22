@@ -1020,7 +1020,14 @@ void(string entry) json_append_lastscores =
 {
     float rf, wf;
     string s = "", line;
-    float CAP_OLD = 7; // keep this many previous entries; new one makes total <= 8
+    float CAP_OLD = 9;          // keep this many previous entries; new one makes total <= 10
+    float OBJ_MAX = 768;        // max bytes per single JSON object we will build/parse
+    float READ_TAIL_MAX = 880;  // fallback tail clamp (old behavior)
+
+    // Reused locals (QuakeC has function-scope locals; no shadowing)
+    float o0, o1;
+    string ttxt, tmap, tmode, thost, tdate;
+    float si;
 
     // ---------- Collect metadata ----------
     string mapn = mapname; if (!mapn || mapn == "") mapn = "unknown";
@@ -1055,89 +1062,278 @@ void(string entry) json_append_lastscores =
     string z_entry = strzone(entry);
     string z_date  = strzone(date_tmp);
 
-    // ---------- Read existing file (keep last 7), NO minify ----------
-    string p_txt[7], p_map[7], p_mode[7], p_host[7], p_date[7];
+    // ---------- Read existing file (keep last 9), TRUE STREAM PARSE ----------
+    string p_txt[9], p_map[9], p_mode[9], p_host[9], p_date[9];
     float keep = 0;
 
     rf = fopen("json/lastscores.json", FILE_READ);
     if (rf < 0) rf = fopen("lastscores.json", FILE_READ);
     if (rf >= 0)
     {
-        while (1) { line = fgets(rf); if (line == "") break; s = strcat(s, line); }
-        fclose(rf);
+        float seen_total = 0;
+        float bytes_total = 0;
 
-        s = strzone(s);
+        // streaming object build state
+        string obj = "";
+        float started = 0;
+        float depth = 0;
+        float in_str = 0;
+        float esc = 0;
+        float overflow = 0;
+        float obj_len = 0;
 
-        float pos = 0;
-
-        while (js_array_next_span(s, pos))
+        while (1)
         {
-            float o0 = js_obj_start, o1 = js_obj_end;
+            line = fgets(rf);
+            if (line == "") break;
 
-            string ttxt  = ""; string tmap  = ""; string tmode = ""; string thost = ""; string tdate = "";
+            // Stabilize fgets tempstring before per-char work
+            string zline = strzone(line);
+            bytes_total = bytes_total + strlen(zline);
 
-            if (js_obj_find_qstring_span(s, o0, o1, "text") || js_obj_find_qstring_span_fallback(s, o0, o1, "text"))
-                ttxt  = js_qstring_copy(s, js_val_start, js_val_len);
-            if (js_obj_find_qstring_span(s, o0, o1, "map")  || js_obj_find_qstring_span_fallback(s, o0, o1, "map"))
-                tmap  = js_qstring_copy(s, js_val_start, js_val_len);
-            if (js_obj_find_qstring_span(s, o0, o1, "mode") || js_obj_find_qstring_span_fallback(s, o0, o1, "mode"))
-                tmode = js_qstring_copy(s, js_val_start, js_val_len);
-            if (js_obj_find_qstring_span(s, o0, o1, "host") || js_obj_find_qstring_span_fallback(s, o0, o1, "host"))
-                thost = js_qstring_copy(s, js_val_start, js_val_len);
-            if (js_obj_find_qstring_span(s, o0, o1, "date") || js_obj_find_qstring_span_fallback(s, o0, o1, "date"))
-                tdate = js_qstring_copy(s, js_val_start, js_val_len);
-
-            if (ttxt && ttxt != "")
+            float li = 0, ln = strlen(zline);
+            while (li < ln)
             {
-                if (keep < CAP_OLD)
+                string ch = substring(zline, li, 1);
+
+                // If we're inside an object, append bytes (unless overflowed).
+                if (started)
                 {
-                    p_txt[keep]  = ttxt;  p_map[keep]  = tmap;
-                    p_mode[keep] = tmode; p_host[keep] = thost; p_date[keep] = tdate;
-                    keep = keep + 1;
-                }
-                else
-                {
-                    // free oldest, shift left generically, append newest at end
-                    float si;
-                    strunzone(p_txt[0]);  strunzone(p_map[0]);  strunzone(p_mode[0]);  strunzone(p_host[0]);  strunzone(p_date[0]);
-                    for (si = 0; si < CAP_OLD - 1; si = si + 1)
+                    if (!overflow)
                     {
-                        p_txt[si]  = p_txt[si+1];
-                        p_map[si]  = p_map[si+1];
-                        p_mode[si] = p_mode[si+1];
-                        p_host[si] = p_host[si+1];
-                        p_date[si] = p_date[si+1];
+                        obj = strcat(obj, ch);
+                        obj_len = obj_len + 1;
+                        if (obj_len > OBJ_MAX) overflow = 1;
                     }
-                    p_txt[CAP_OLD-1]  = ttxt;
-                    p_map[CAP_OLD-1]  = tmap;
-                    p_mode[CAP_OLD-1] = tmode;
-                    p_host[CAP_OLD-1] = thost;
-                    p_date[CAP_OLD-1] = tdate;
                 }
-            }
-            else
-            {
-                // discard zoned empties (were not kept)
-                if (ttxt)  strunzone(ttxt);
-                if (tmap)  strunzone(tmap);
-                if (tmode) strunzone(tmode);
-                if (thost) strunzone(thost);
-                if (tdate) strunzone(tdate);
+
+                // tracking string literal state
+                if (in_str)
+                {
+                    if (esc) esc = 0;
+                    else if (ch == "\\") esc = 1;    // escape
+                    else if (ch == "\"") in_str = 0; // closing quote
+                    li = li + 1; continue;
+                }
+                if (ch == "\"") { in_str = 1; li = li + 1; continue; }
+
+                // object boundaries
+                if (ch == "{")
+                {
+                    if (!started)
+                    {
+                        started = 1;
+                        depth = 1;
+                        overflow = 0;
+                        obj_len = 1;
+                        obj = "{";
+                    }
+                    else depth = depth + 1;
+
+                    li = li + 1;
+                    continue;
+                }
+                if (ch == "}" && started)
+                {
+                    depth = depth - 1;
+                    if (depth <= 0)
+                    {
+                        // object complete
+                        started = 0;
+                        depth = 0;
+                        seen_total = seen_total + 1;
+
+                        if (!overflow)
+                        {
+                            string zobj = strzone(obj);
+                            o0 = 0; o1 = strlen(zobj);
+
+                            ttxt = ""; tmap = ""; tmode = ""; thost = ""; tdate = "";
+
+                            if (js_obj_find_qstring_span(zobj, o0, o1, "text") || js_obj_find_qstring_span_fallback(zobj, o0, o1, "text"))
+                                ttxt  = js_qstring_copy(zobj, js_val_start, js_val_len);
+                            if (js_obj_find_qstring_span(zobj, o0, o1, "map")  || js_obj_find_qstring_span_fallback(zobj, o0, o1, "map"))
+                                tmap  = js_qstring_copy(zobj, js_val_start, js_val_len);
+                            if (js_obj_find_qstring_span(zobj, o0, o1, "mode") || js_obj_find_qstring_span_fallback(zobj, o0, o1, "mode"))
+                                tmode = js_qstring_copy(zobj, js_val_start, js_val_len);
+                            if (js_obj_find_qstring_span(zobj, o0, o1, "host") || js_obj_find_qstring_span_fallback(zobj, o0, o1, "host"))
+                                thost = js_qstring_copy(zobj, js_val_start, js_val_len);
+                            if (js_obj_find_qstring_span(zobj, o0, o1, "date") || js_obj_find_qstring_span_fallback(zobj, o0, o1, "date"))
+                                tdate = js_qstring_copy(zobj, js_val_start, js_val_len);
+
+                            if (ttxt && ttxt != "")
+                            {
+                                if (keep < CAP_OLD)
+                                {
+                                    p_txt[keep]  = ttxt;  p_map[keep]  = tmap;
+                                    p_mode[keep] = tmode; p_host[keep] = thost; p_date[keep] = tdate;
+                                    keep = keep + 1;
+                                }
+                                else
+                                {
+                                    // free oldest, shift left, append newest
+                                    strunzone(p_txt[0]);  strunzone(p_map[0]);  strunzone(p_mode[0]);
+                                    strunzone(p_host[0]); strunzone(p_date[0]);
+
+                                    for (si = 0; si < CAP_OLD - 1; si = si + 1)
+                                    {
+                                        p_txt[si]  = p_txt[si+1];
+                                        p_map[si]  = p_map[si+1];
+                                        p_mode[si] = p_mode[si+1];
+                                        p_host[si] = p_host[si+1];
+                                        p_date[si] = p_date[si+1];
+                                    }
+                                    p_txt[CAP_OLD-1]  = ttxt;
+                                    p_map[CAP_OLD-1]  = tmap;
+                                    p_mode[CAP_OLD-1] = tmode;
+                                    p_host[CAP_OLD-1] = thost;
+                                    p_date[CAP_OLD-1] = tdate;
+                                }
+                            }
+                            else
+                            {
+                                if (ttxt)  strunzone(ttxt);
+                                if (tmap)  strunzone(tmap);
+                                if (tmode) strunzone(tmode);
+                                if (thost) strunzone(thost);
+                                if (tdate) strunzone(tdate);
+                            }
+
+                            strunzone(zobj);
+                        }
+
+                        // reset builder
+                        obj = "";
+                        obj_len = 0;
+                        overflow = 0;
+                    }
+
+                    li = li + 1;
+                    continue;
+                }
+
+                li = li + 1;
             }
 
-            pos = js_it_next;
+            strunzone(zline);
         }
 
-        strunzone(s);
+        fclose(rf);
+
+        // ---- Fallback if stream parse saw nothing but file had content ----
+        if (seen_total == 0 && bytes_total > 0)
+        {
+            float rf2 = fopen("json/lastscores.json", FILE_READ);
+            if (rf2 < 0) rf2 = fopen("lastscores.json", FILE_READ);
+            if (rf2 >= 0)
+            {
+                float tail_trimmed = 0;
+                string zs = strzone(""); // zoned tail buffer
+
+                while (1)
+                {
+                    line = fgets(rf2);
+                    if (line == "") break;
+
+                    string tmp = strcat(zs, line);
+                    float Ltmp = strlen(tmp);
+                    if (Ltmp > READ_TAIL_MAX)
+                    {
+                        tmp = substring(tmp, Ltmp - READ_TAIL_MAX, READ_TAIL_MAX);
+                        tail_trimmed = 1;
+                    }
+
+                    tmp = strzone(tmp);
+                    strunzone(zs);
+                    zs = tmp;
+                }
+                fclose(rf2);
+
+                s = zs; // stable zoned tail
+
+                if (tail_trimmed)
+                {
+                    float fi = strstrofs(s, "{", 0);
+                    if (fi > 0) s = substring(s, fi, strlen(s) - fi);
+                    string s2 = strzone(s);
+                    strunzone(s);
+                    s = s2;
+                }
+
+                float pos = 0;
+                while (js_array_next_span(s, pos))
+                {
+                    o0 = js_obj_start; o1 = js_obj_end;
+
+                    ttxt = ""; tmap = ""; tmode = ""; thost = ""; tdate = "";
+
+                    if (js_obj_find_qstring_span(s, o0, o1, "text") || js_obj_find_qstring_span_fallback(s, o0, o1, "text"))
+                        ttxt  = js_qstring_copy(s, js_val_start, js_val_len);
+                    if (js_obj_find_qstring_span(s, o0, o1, "map")  || js_obj_find_qstring_span_fallback(s, o0, o1, "map"))
+                        tmap  = js_qstring_copy(s, js_val_start, js_val_len);
+                    if (js_obj_find_qstring_span(s, o0, o1, "mode") || js_obj_find_qstring_span_fallback(s, o0, o1, "mode"))
+                        tmode = js_qstring_copy(s, js_val_start, js_val_len);
+                    if (js_obj_find_qstring_span(s, o0, o1, "host") || js_obj_find_qstring_span_fallback(s, o0, o1, "host"))
+                        thost = js_qstring_copy(s, js_val_start, js_val_len);
+                    if (js_obj_find_qstring_span(s, o0, o1, "date") || js_obj_find_qstring_span_fallback(s, o0, o1, "date"))
+                        tdate = js_qstring_copy(s, js_val_start, js_val_len);
+
+                    if (ttxt && ttxt != "")
+                    {
+                        if (keep < CAP_OLD)
+                        {
+                            p_txt[keep]  = ttxt;  p_map[keep]  = tmap;
+                            p_mode[keep] = tmode; p_host[keep] = thost; p_date[keep] = tdate;
+                            keep = keep + 1;
+                        }
+                        else
+                        {
+                            strunzone(p_txt[0]);  strunzone(p_map[0]);  strunzone(p_mode[0]);
+                            strunzone(p_host[0]); strunzone(p_date[0]);
+
+                            for (si = 0; si < CAP_OLD - 1; si = si + 1)
+                            {
+                                p_txt[si]  = p_txt[si+1];
+                                p_map[si]  = p_map[si+1];
+                                p_mode[si] = p_mode[si+1];
+                                p_host[si] = p_host[si+1];
+                                p_date[si] = p_date[si+1];
+                            }
+                            p_txt[CAP_OLD-1]  = ttxt;
+                            p_map[CAP_OLD-1]  = tmap;
+                            p_mode[CAP_OLD-1] = tmode;
+                            p_host[CAP_OLD-1] = thost;
+                            p_date[CAP_OLD-1] = tdate;
+                        }
+                    }
+                    else
+                    {
+                        if (ttxt)  strunzone(ttxt);
+                        if (tmap)  strunzone(tmap);
+                        if (tmode) strunzone(tmode);
+                        if (thost) strunzone(thost);
+                        if (tdate) strunzone(tdate);
+                    }
+
+                    pos = js_it_next;
+                }
+
+                strunzone(s);
+            }
+        }
     }
 
-    // ---------- Rewrite full array (cap <= 8) ----------
+    // ---------- Rewrite full array (cap <= 10) ----------
     wf = fopen("json/lastscores.json", FILE_WRITE);
     if (wf < 0) wf = fopen("lastscores.json", FILE_WRITE);
     if (wf < 0)
     {
         dprint("*** ERROR: cannot write lastscores.json\n");
-        float qi; for (qi = 0; qi < keep; qi = qi + 1) { strunzone(p_txt[qi]); strunzone(p_map[qi]); strunzone(p_mode[qi]); strunzone(p_host[qi]); strunzone(p_date[qi]); }
+        float qi;
+        for (qi = 0; qi < keep; qi = qi + 1)
+        {
+            strunzone(p_txt[qi]); strunzone(p_map[qi]); strunzone(p_mode[qi]); strunzone(p_host[qi]); strunzone(p_date[qi]);
+        }
         strunzone(z_map); strunzone(z_mode); strunzone(z_host); strunzone(z_entry); strunzone(z_date);
         return;
     }
@@ -1150,8 +1346,10 @@ void(string entry) json_append_lastscores =
         if (idxw > 0) fputs(wf, ",");
         fputs(wf, "{");
 
-        // Short keys first (robust for older readers)
-        if (p_date[idxw] && p_date[idxw] != "") { fputs(wf, "\"date\":\""); json_write_escaped_to_file(wf, p_date[idxw]); fputs(wf, "\","); }
+        if (p_date[idxw] && p_date[idxw] != "")
+        {
+            fputs(wf, "\"date\":\""); json_write_escaped_to_file(wf, p_date[idxw]); fputs(wf, "\",");
+        }
         fputs(wf, "\"map\":\"");  json_write_escaped_to_file(wf, p_map[idxw]);  fputs(wf, "\",");
         fputs(wf, "\"mode\":\""); json_write_escaped_to_file(wf, p_mode[idxw]); fputs(wf, "\",");
         fputs(wf, "\"host\":\""); json_write_escaped_to_file(wf, p_host[idxw]); fputs(wf, "\",");
@@ -1161,14 +1359,14 @@ void(string entry) json_append_lastscores =
         strunzone(p_txt[idxw]); strunzone(p_map[idxw]); strunzone(p_mode[idxw]); strunzone(p_host[idxw]); strunzone(p_date[idxw]);
     }
 
-    if (z_entry && z_entry != "") // append newest; total entries now <= CAP_OLD + 1 (8)
+    if (!json_is_blank(z_entry)) // append newest; total entries now <= CAP_OLD + 1 (10)
     {
         if (keep > 0) fputs(wf, ",");
         fputs(wf, "{");
-        fputs(wf, "\"date\":\""); json_write_escaped_to_file(wf, z_date); fputs(wf, "\",");
-        fputs(wf, "\"map\":\"");  json_write_escaped_to_file(wf, z_map);  fputs(wf, "\",");
-        fputs(wf, "\"mode\":\""); json_write_escaped_to_file(wf, z_mode); fputs(wf, "\",");
-        fputs(wf, "\"host\":\""); json_write_escaped_to_file(wf, z_host); fputs(wf, "\",");
+        fputs(wf, "\"date\":\""); json_write_escaped_to_file(wf, z_date);  fputs(wf, "\",");
+        fputs(wf, "\"map\":\"");  json_write_escaped_to_file(wf, z_map);   fputs(wf, "\",");
+        fputs(wf, "\"mode\":\""); json_write_escaped_to_file(wf, z_mode);  fputs(wf, "\",");
+        fputs(wf, "\"host\":\""); json_write_escaped_to_file(wf, z_host);  fputs(wf, "\",");
         fputs(wf, "\"text\":\""); json_write_escaped_to_file(wf, z_entry); fputs(wf, "\"}");
     }
 
@@ -1178,6 +1376,7 @@ void(string entry) json_append_lastscores =
     // Free inputs
     strunzone(z_map); strunzone(z_mode); strunzone(z_host); strunzone(z_entry); strunzone(z_date);
 };
+
 
 // 1) Build JSON to an in-memory string (auto-compact if pretty is too large)
 
@@ -1253,7 +1452,7 @@ void(float pretty, float deferred) json_post_current_match =
                    gdir ? gdir : "", bdir ? bdir : "", mod ? mod : ""));
 
     // Candidate list (most engines actually write file into <gamedir>/data/…)
-    local string cand[6]; local float n = 0;
+    local string cand[8]; local float n = 0;
     if (gdir && gdir != "")
     {
         cand[n++] = strcat(gdir, "/data/", rel_write); // <gdir>/data/json/...
@@ -1339,142 +1538,228 @@ void () utils_show_last_scores =
     sprint(self, "\n");
     if (f < 0) { sprint(self, "[no lastscores found]\n"); return; }
 
-    // Load entire file (keep original bytes; DO NOT json_minify here)
-    string s = "", line;
-    while (1) { line = fgets(f); if (line == "") break; s = strcat(s, line); }
-    fclose(f);
-    s = strzone(s); // keep buffer stable against tempstring churn
+    // TRUE streaming parse (avoid QC ~1KB string cap)
+    float OBJ_MAX = 768;
+    string line;
 
-    float pos = 0;
+    // reused locals (QC has function-scope locals; no shadowing)
+    float o0, o1;
 
-    while (js_array_next_span(s, pos))
+    float seen_total = 0;
+
+    // streaming object build state
+    string obj = "";
+    float started = 0;
+    float depth = 0;
+    float in_str = 0;
+    float esc = 0;
+    float overflow = 0;
+    float obj_len = 0;
+
+    while (1)
     {
-        float o0 = js_obj_start, o1 = js_obj_end;
+        line = fgets(f);
+        if (line == "") break;
 
-        // ---- Find each key and snapshot spans ----
-        float d_found = 0, d0 = 0, dl = 0;
-        if (js_obj_find_qstring_span(s, o0, o1, "date")) { d_found = 1; d0 = js_val_start; dl = js_val_len; }
-        else if (js_obj_find_qstring_span_fallback(s, o0, o1, "date")) { d_found = 1; d0 = js_val_start; dl = js_val_len; }
+        // stabilize fgets tempstring
+        string zline = strzone(line);
+        float li = 0, ln = strlen(zline);
 
-        float m_found = 0, m0 = 0, ml = 0;
-        if (js_obj_find_qstring_span(s, o0, o1, "map")) { m_found = 1; m0 = js_val_start; ml = js_val_len; }
-        else if (js_obj_find_qstring_span_fallback(s, o0, o1, "map")) { m_found = 1; m0 = js_val_start; ml = js_val_len; }
-
-        float mo_found = 0, mo0 = 0, mol = 0;
-        if (js_obj_find_qstring_span(s, o0, o1, "mode")) { mo_found = 1; mo0 = js_val_start; mol = js_val_len; }
-        else if (js_obj_find_qstring_span_fallback(s, o0, o1, "mode")) { mo_found = 1; mo0 = js_val_start; mol = js_val_len; }
-
-        float t_found = 0, t0 = 0, tl = 0;
-        if (js_obj_find_qstring_span(s, o0, o1, "text")) { t_found = 1; t0 = js_val_start; tl = js_val_len; }
-        else if (js_obj_find_qstring_span_fallback(s, o0, o1, "text")) { t_found = 1; t0 = js_val_start; tl = js_val_len; }
-
-        // ---- Copy short values (decoded) ----
-        string tdate = ""; if (d_found) tdate = js_qstring_copy(s, d0, dl);
-        string tmap  = ""; if (m_found) tmap  = js_qstring_copy(s, m0, ml);
-        string tmode = ""; if (mo_found) tmode = js_qstring_copy(s, mo0, mol);
-
-        // ---- Friendly "when" label ----
-        // Expect tdate as "MM-DD-YYYY HH:MM" or "MM-DD-YYYY HH.MM"
-        string when = "Unknown Date";
-        if (tdate && strlen(tdate) >= 10)
+        while (li < ln)
         {
-            string dpart = substring(tdate, 0, 10); // MM-DD-YYYY
+            string ch = substring(zline, li, 1);
+
+            // if we're inside an object, append bytes unless overflowed
+            if (started)
+            {
+                if (!overflow)
+                {
+                    obj = strcat(obj, ch);
+                    obj_len = obj_len + 1;
+                    if (obj_len > OBJ_MAX) overflow = 1;
+                }
+            }
+
+            // string literal state
+            if (in_str)
+            {
+                if (esc) esc = 0;
+                else if (ch == "\\") esc = 1;
+                else if (ch == "\"") in_str = 0;
+                li = li + 1; continue;
+            }
+            if (ch == "\"") { in_str = 1; li = li + 1; continue; }
+
+            // object boundaries outside strings
+            if (ch == "{")
+            {
+                if (!started)
+                {
+                    started = 1;
+                    depth = 1;
+                    overflow = 0;
+                    obj_len = 1;
+                    obj = "{";
+                }
+                else depth = depth + 1;
+
+                li = li + 1; continue;
+            }
+
+            if (ch == "}" && started)
+            {
+                depth = depth - 1;
+                if (depth <= 0)
+                {
+                    // object complete
+                    started = 0;
+                    depth = 0;
+                    seen_total = seen_total + 1;
+
+                    if (!overflow)
+                    {
+                        string zobj = strzone(obj);
+                        o0 = 0; o1 = strlen(zobj);
+
+                        // ---- Find spans inside this single object ----
+                        float d_found = 0, d0 = 0, dl = 0;
+                        if (js_obj_find_qstring_span(zobj, o0, o1, "date")) { d_found = 1; d0 = js_val_start; dl = js_val_len; }
+                        else if (js_obj_find_qstring_span_fallback(zobj, o0, o1, "date")) { d_found = 1; d0 = js_val_start; dl = js_val_len; }
+
+                        float m_found = 0, m0 = 0, ml = 0;
+                        if (js_obj_find_qstring_span(zobj, o0, o1, "map")) { m_found = 1; m0 = js_val_start; ml = js_val_len; }
+                        else if (js_obj_find_qstring_span_fallback(zobj, o0, o1, "map")) { m_found = 1; m0 = js_val_start; ml = js_val_len; }
+
+                        float mo_found = 0, mo0 = 0, mol = 0;
+                        if (js_obj_find_qstring_span(zobj, o0, o1, "mode")) { mo_found = 1; mo0 = js_val_start; mol = js_val_len; }
+                        else if (js_obj_find_qstring_span_fallback(zobj, o0, o1, "mode")) { mo_found = 1; mo0 = js_val_start; mol = js_val_len; }
+
+                        float t_found = 0, t0 = 0, tl = 0;
+                        if (js_obj_find_qstring_span(zobj, o0, o1, "text")) { t_found = 1; t0 = js_val_start; tl = js_val_len; }
+                        else if (js_obj_find_qstring_span_fallback(zobj, o0, o1, "text")) { t_found = 1; t0 = js_val_start; tl = js_val_len; }
+
+                        // ---- Copy short values (decoded) ----
+                        string tdate = ""; if (d_found)  tdate = js_qstring_copy(zobj, d0, dl);
+                        string tmap  = ""; if (m_found)  tmap  = js_qstring_copy(zobj, m0, ml);
+                        string tmode = ""; if (mo_found) tmode = js_qstring_copy(zobj, mo0, mol);
+
+                        // ---- Friendly "when" label ----
+                        string when = "Unknown Date";
+                        if (tdate && strlen(tdate) >= 10)
+                        {
+                            string dpart = substring(tdate, 0, 10);
             float y = stof(substring(dpart, 6, 4));
             float m = stof(substring(dpart, 0, 2));
             float d = stof(substring(dpart, 3, 2));
 
             float hh = 0, mm = 0;
-            if (strlen(tdate) >= 16)
-            {
-                string tpart = substring(tdate, 11, 5); // HH:MM or HH.MM
+                            if (strlen(tdate) >= 16)
+                            {
+                                string tpart = substring(tdate, 11, 5);
                 string sep = substring(tpart, 2, 1);
                 hh = stof(substring(tpart, 0, 2));
                 if (sep == ":" || sep == ".") mm = stof(substring(tpart, 3, 2));
             }
 
-            float nowY = stof(strftime(TRUE, "%Y"));
-            float nowM = stof(strftime(TRUE, "%m"));
-            float nowD = stof(strftime(TRUE, "%d"));
-            float nowH = stof(strftime(TRUE, "%H"));
-            float nowMin = stof(strftime(TRUE, "%M"));
+                            float nowY = stof(strftime(TRUE, "%Y"));
+                            float nowM = stof(strftime(TRUE, "%m"));
+                            float nowD = stof(strftime(TRUE, "%d"));
+                            float nowH = stof(strftime(TRUE, "%H"));
+                            float nowMin = stof(strftime(TRUE, "%M"));
 
-            if (nowY == y && nowM == m && nowD == d)
-            {
-                float deltaMin = (nowH * 60 + nowMin) - (hh * 60 + mm);
-                if (deltaMin < 0) deltaMin = 0;
+                            if (nowY == y && nowM == m && nowD == d)
+                            {
+                                float deltaMin = (nowH * 60 + nowMin) - (hh * 60 + mm);
+                                if (deltaMin < 0) deltaMin = 0;
 
-                if (deltaMin == 0)      when = "Just Now";
-                else if (deltaMin == 1) when = "1 Minute Ago";
-                else if (deltaMin == 2) when = "2 Minutes Ago";
-                else if (deltaMin < 60) when = strcat(ftos(deltaMin), " Minutes Ago");
-                else
-                {
-                    float dh = floor(deltaMin / 60);
-                    if (dh == 1) when = "1 Hour Ago";
-                    else         when = strcat(ftos(dh), " Hours Ago");
+                                if (deltaMin == 0)      when = "Just Now";
+                                else if (deltaMin == 1) when = "1 Minute Ago";
+                                else if (deltaMin == 2) when = "2 Minutes Ago";
+                                else if (deltaMin < 60) when = strcat(ftos(deltaMin), " Minutes Ago");
+                                else
+                                {
+                                    float dh = floor(deltaMin / 60);
+                                    if (dh == 1) when = "1 Hour Ago";
+                                    else         when = strcat(ftos(dh), " Hours Ago");
+                                }
+                            }
+                            else
+                            {
+                                float days = (nowY - y) * 365 + (nowM - m) * 30 + (nowD - d);
+                                if (days < 0) days = 0;
+
+                                if (days == 0)      when = tdate;
+                                else if (days == 1) when = "1 Day Ago";
+                                else if (days < 7)  when = strcat(ftos(days), " Days Ago");
+                                else if (days < 14) when = "1 Week Ago";
+                                else if (days < 21) when = "2 Weeks Ago";
+                                else if (days < 30) { float w = floor(days / 7); when = strcat(ftos(w), " Weeks Ago"); }
+                                else if (days < 60) when = "1 Month Ago";
+                                else if (days < 365)
+                                {
+                                    float mo = floor(days / 30);
+                                    when = (mo == 1) ? "1 Month Ago" : strcat(ftos(mo), " Months Ago");
+                                }
+                                else if (days < 730)  when = "1 Year Ago";
+                                else if (days < 1095) when = "2 Years Ago";
+                                else
+                                {
+                                    float yr = floor(days / 365);
+                                    when = (yr == 1) ? "1 Year Ago" : strcat(ftos(yr), " Years Ago");
+                                }
+                            }
+                        }
+
+                        // ---- Header ----
+                        sprint(self, strcat(format_match_header(when, strlen(tmap) ? tmap : "unknown",
+                                                               strlen(tmode) ? tmode : "dm"), "\n"));
+
+                        // ---- Body ("text") ----
+                        if (t_found)
+                        {
+                            sprint(self, "Score: ");
+
+                            string ttext = js_qstring_copy(zobj, t0, tl);
+                            if (ttext)
+                            {
+                                // chunked sprint to avoid long-string truncation
+                                float off = 0, L = strlen(ttext);
+                                while (off < L)
+                                {
+                                    float nout = (L - off > 128) ? 128 : (L - off);
+                                    sprint(self, substring(ttext, off, nout));
+                                    off = off + nout;
+                                }
+                                strunzone(ttext);
+                            }
+                            sprint(self, "\n");
+                        }
+                        else sprint(self, "(no text)\n");
+
+                        sprint(self, "\n"); // blank line between entries
+
+                        if (tdate) strunzone(tdate);
+                        if (tmap)  strunzone(tmap);
+                        if (tmode) strunzone(tmode);
+
+                        strunzone(zobj);
+                    }
+
+                    // reset builder
+                    obj = ""; obj_len = 0; overflow = 0;
                 }
+
+                li = li + 1; continue;
             }
-            else
-            {
-                float days = (nowY - y) * 365 + (nowM - m) * 30 + (nowD - d);
-                if (days < 0) days = 0;
 
-                if (days == 0)      when = tdate;
-                else if (days == 1) when = "1 Day Ago";
-                else if (days < 7)  when = strcat(ftos(days), " Days Ago");
-                else if (days < 14) when = "1 Week Ago";
-                else if (days < 21) when = "2 Weeks Ago";
-                else if (days < 30) { float w = floor(days / 7); when = strcat(ftos(w), " Weeks Ago"); }
-                else if (days < 60) when = "1 Month Ago";
-                else if (days < 365)
-                {
-                    float mo = floor(days / 30);
-                    when = (mo == 1) ? "1 Month Ago" : strcat(ftos(mo), " Months Ago");
-                }
-                else if (days < 730)  when = "1 Year Ago";
-                else if (days < 1095) when = "2 Years Ago";
-                else
-                {
-                    float yr = floor(days / 365);
-                    when = (yr == 1) ? "1 Year Ago" : strcat(ftos(yr), " Years Ago");
-                }
-            }
+            li = li + 1;
         }
 
-        // ---- Header ----
-        sprint(self, strcat(format_match_header(when, strlen(tmap) ? tmap : "unknown", strlen(tmode) ? tmode : "dm"), "\n"));
-
-        // ---- Body ("text") ----
-        if (t_found)
-        {
-            // Prefix first body line (the score line) with "Score: "
-            sprint(self, "Score: ");
-
-            // Decode and print ONLY to this client
-            string ttext = js_qstring_copy(s, t0, tl);
-            if (ttext)
-            {
-                sprint(self, ttext);
-                strunzone(ttext);
-            }
-
-            if (tl <= 0 || substring(s, t0 + tl - 1, 1) != "\n") sprint(self, "\n");
-        }
-        else
-        {
-            sprint(self, "(no text)\n");
-        }
-
-        // >>> Extra blank line between entries (and after the last one)
-        sprint(self, "\n");
-
-        // Cleanup small zoned strings
-        if (tdate) strunzone(tdate);
-        if (tmap)  strunzone(tmap);
-        if (tmode) strunzone(tmode);
-
-        pos = js_it_next;
+        strunzone(zline);
     }
 
-    strunzone(s);
+    fclose(f);
+
+    if (seen_total == 0)
+        sprint(self, "[no lastscores found]\n");
 };
