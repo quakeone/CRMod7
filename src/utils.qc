@@ -2677,7 +2677,7 @@ void(entity ev) webhook_stats_info =
     local string mmss_tmp;      // temp "mm:ss" pre-zone
     local string ss_str;        // seconds (zero-padded)
 
-    float maxlen; maxlen = 900;
+    float maxlen; maxlen = 1900;
 
     // Resolve + sanitize URL
     url = clanring_statsdiscordurl;
@@ -2695,7 +2695,7 @@ void(entity ev) webhook_stats_info =
     // Header (piecewise)
     // -------------------------
     msg = strzone("**Match statistics**\n");
-    APPEND_SAFE(utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %H:%M")));
+    APPEND_SAFE(utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p")));
     APPEND_SAFE("\n");
     APPEND_SAFE(utils_dequake_for_discord(infokey(world, "hostname")));
     APPEND_SAFE("\n");
@@ -2704,15 +2704,26 @@ void(entity ev) webhook_stats_info =
 
     // Modes (no label/brackets)
     {
-        local string modes; local float has_specific;
-        modes = ""; has_specific = 0;
+        local string modes;
 
-        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) { modes = strcat(modes, "CTF ");      has_specific = 1; }
-        if (clanring_playmode & CLANRING_CA_MODE)          { modes = strcat(modes, "CA ");       has_specific = 1; }
-        if (clanring_playmode & CLANRING_WIPEOUT_MODE)     { modes = strcat(modes, "Wipeout ");  has_specific = 1; }
-        if (!has_specific && mode_is_arena())              { modes = strcat(modes, "Arena "); }
-        if (modes == "")                                   { modes = "Std"; }
-        else if (substring(modes, strlen(modes)-1, 1) == " ") modes = substring(modes, 0, strlen(modes)-1);
+        // Arena family first
+        if      (clanring_playmode & CLANRING_RA_MODE)          modes = "Rocket Arena";
+        else if (clanring_playmode & CLANRING_CA_MODE)          modes = "Clan Arena";
+        else if (clanring_playmode & CLANRING_WIPEOUT_MODE)     modes = "Wipeout";
+        else if (clanring_playmode & CLANRING_DMM4_MODE)        modes = "DMM4";
+        else if (clanring_playmode & CLANRING_AIRSHOT_MODE)     modes = "Airshot";
+        else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+        {
+            if      (clanring_playmode & CLANRING_MATCH_MODE)    modes = "CTF Match";
+            else if (clanring_playmode & CLANRING_PRACTICE_MODE) modes = "CTF Practice";
+            else                                                 modes = "CTF Normal";
+        }
+        else
+        {
+            if      (clanring_playmode & CLANRING_MATCH_MODE)    modes = "DM Match";
+            else if (clanring_playmode & CLANRING_PRACTICE_MODE) modes = "DM Practice";
+            else                                                 modes = "DM FFA";
+        }
 
         APPEND_SAFE(modes);
         APPEND_SAFE("\n\n");
@@ -2736,7 +2747,7 @@ void(entity ev) webhook_stats_info =
         else p = find(world, classname, "player");
         while (p && lines < maxlines)
         {
-            if (!(p.style & CLANRING_OBSERVER) && !(mode_is_arena() && p.next_team == world))
+            if (!(p.style & CLANRING_OBSERVER))
             {
                 kfrac = p.true_kills;
                 ktot  = kfrac + p.mangle_z;
@@ -2765,8 +2776,8 @@ void(entity ev) webhook_stats_info =
     APPEND_SAFE("\n**K/D, damage, ewep**\n");
     APPEND_SAFE("```\n");
     {
-        local float k_seen, k_inc, k_obs, k_arena, k_limit;
-        k_seen = k_inc = k_obs = k_arena = k_limit = 0;
+        local float k_seen, k_inc, k_obs, k_limit;
+        k_seen = k_inc = k_obs = k_limit = 0;
 
         lines = 0; maxlines = 16;
         if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
@@ -2776,7 +2787,6 @@ void(entity ev) webhook_stats_info =
             k_seen += 1;
 
             if (p.style & CLANRING_OBSERVER) { k_obs += 1; }
-            else if (mode_is_arena() && p.next_team == world) { k_arena += 1; }
             else
             {
                 nm = utils_dequake_for_discord(p.netname);
