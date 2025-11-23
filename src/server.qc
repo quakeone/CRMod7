@@ -199,6 +199,7 @@ void () clanring_exec_configs;
 void () clanring_precache_matchsounds;
 void () votables_disable_item;
 void () SUB_regen;
+float() QuadControl_CountSpawners;
 void (float value) clanring_set_teamplay;
 void (float value) clanring_set_fraglimit;
 void () stats_reset_player;
@@ -332,7 +333,7 @@ void(float ghost) G1v1_UpdateQuadAlpha =
 
 void() AutoGhostQuad_Refresh =
 {
-    local float active, want_ghost;
+    local float active, want_ghost, quad_spawners;
 
     // Only relevant in DM normal
     if (!InDMNormalMode())
@@ -343,6 +344,17 @@ void() AutoGhostQuad_Refresh =
             g1v1_in_effect = FALSE;
             g1v1_quad_ghosted = FALSE;
             // do not alter setquad here; mode change should preserve current setting
+        }
+        return;
+    }
+
+    quad_spawners = QuadControl_CountSpawners();
+    if (quad_spawners <= 0)
+    {
+        if (g1v1_in_effect)
+        {
+            g1v1_in_effect = FALSE;
+            g1v1_quad_ghosted = FALSE;
         }
         return;
     }

@@ -228,6 +228,9 @@ void(entity item, string itemname, float timeleft) SendObserverItemTimer
 // Count Quad spawners in the current level (cached)
 float() QuadControl_CountSpawners =
 {
+    // -1 means we've already determined there are no quad spawners
+    if (g_quad_spawner_count < 0)
+        return 0;
     if (g_quad_spawner_count > 0)
         return g_quad_spawner_count;
 
@@ -239,6 +242,13 @@ float() QuadControl_CountSpawners =
         g_quad_spawner_count = g_quad_spawner_count + 1;
         e = find(e, classname, "item_artifact_super_damage");
     }
+
+    // Cache the "none present" case so we don't scan every tick on quad-less maps
+    if (g_quad_spawner_count == 0)
+        g_quad_spawner_count = -1;
+
+    if (g_quad_spawner_count < 0)
+        return 0;
     return g_quad_spawner_count;
 };
 
