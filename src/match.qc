@@ -67,6 +67,26 @@ void() match_clear_leavemealone =
     setorigin(self, self.origin);
 };
 
+// Only allow leave-me-alone during DM/CTF match prewar (non-arena)
+float() leavemealone_mode_allows =
+{
+    if (!(clanring_playmode & CLANRING_MATCH_MODE))
+        return FALSE;
+    if (clanring_state & CLANRING_MATCH_STARTED)
+        return FALSE;
+    if (mode_is_arena())
+        return FALSE;
+    if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+        return TRUE;
+
+    // Disallow in other specialized match types
+    if (clanring_playmode & (CLANRING_AIRSHOT_MODE | CLANRING_DMM4_MODE | CLANRING_WIPEOUT_MODE | CLANRING_CA_MODE | CLANRING_RA_MODE))
+        return FALSE;
+
+    // Base DM match prewar
+    return TRUE;
+};
+
 //TODO: Make this dynamic
 static string pausehint[6] =
 {
@@ -2900,7 +2920,7 @@ while (player)
             if (!(player.style & (CLANRING_OBSERVER | CLANRING_READY)) && (player.style & CLANRING_CONNECTED))
             {
                 if (player == self)
-                    bprint3("‹ ", player.netname, "\n");
+                    bprint3(" ", player.netname, "\n");
                 else
                     bprint3("  ", player.netname, "\n");
             }

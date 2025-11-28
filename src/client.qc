@@ -1035,10 +1035,18 @@ void() PutClientInServer =
          
     self.origin = self.oldorigin = spot.origin; //R00k: update oldorigin so we dont respawn where we died.
     setorigin(self, spot.origin);	    //R00k: change our origin and relink our edict.
+
+    // If leavemealone isn't permitted in this mode, force it off before finishing spawn.
+    registercvar("cr_allow_leavemealone", "1");
+    if (self.leavemealone)
+    {
+        if ((cvar("cr_allow_leavemealone") < 1) || !leavemealone_mode_allows())
+            match_clear_leavemealone();
+    }
     
     self.lefty 		= 0;
     self.jump_flag 	= 0; // clear jump velocity to prevent falling damage
-
+ 
     // oh, this is a hack!
     if (modelindex_eyes == 0) //R00k: hasn't been done yet
     {
@@ -3784,44 +3792,42 @@ void(string cmd) SV_ParseClientCommand =
             // Global off switch
             registercvar("cr_allow_leavemealone", "1");
             local float allow_lma = cvar("cr_allow_leavemealone");
-            if (allow_lma < 1)
-            {
-                sprint(self, sprintf("Leave-me-alone command is disabled on this server (cvar value: %g)\n", allow_lma));
-                return;
-            }
+            local float is_on = self.leavemealone;
+            local float allow_mode = leavemealone_mode_allows();
 
-            // Prewar only; Rocket Arena blocked
-            if (match_in_progress())
-            {
-                sprint(self, "Cannot use leave-me-alone during a match\n");
-                return;
-            }
-            if (clanring_playmode & CLANRING_RA_MODE) // keep RA lobby logic clean
-            {
-                sprint(self, "Leave-me-alone is not available in Rocket Arena\n");
-                return;
-            }
-
-            // Observers cannot use leavemealone
-            if (self.style & CLANRING_OBSERVER)
+            // Observers cannot enable it, but allow them to clear if somehow set
+            if (!is_on && (self.style & CLANRING_OBSERVER))
             {
                 sprint(self, "Observers cannot use leave-me-alone\n");
                 return;
             }
 
-            // Per-client 5s cooldown
-            if (time < self.next_lma_toggle)
+            // Enabling path: obey server gates
+            if (!is_on)
             {
-                local float remain;
-                remain = self.next_lma_toggle - time;
-                if (remain < 0) remain = 0;
-                sprint(self, strcat("Please wait ", ftos(ceil(remain)), " seconds before using leave-me-alone again\n"));
-                return;
-            }
+                if (!allow_mode)
+                {
+                    sprint(self, "Leave-me-alone is only available in DM/CTF match prewar\n");
+                    return;
+                }
 
-            // Toggle OFF -> ON (become intangible)
-            if (!self.leavemealone)
-            {
+                if (allow_lma < 1)
+                {
+                    sprint(self, sprintf("Leave-me-alone command is disabled on this server (cvar value: %g)\n", allow_lma));
+                    return;
+                }
+
+                // Per-client 5s cooldown
+                if (time < self.next_lma_toggle)
+                {
+                    local float remain;
+                    remain = self.next_lma_toggle - time;
+                    if (remain < 0) remain = 0;
+                    sprint(self, strcat("Please wait ", ftos(ceil(remain)), " seconds before using leave-me-alone again\n"));
+                    return;
+                }
+
+                // Toggle OFF -> ON (become intangible)
                 self.leavemealone = 1;
                 self.solid = SOLID_TRIGGER; // intangible to players/projectiles; bbox maintained elsewhere
                 setorigin(self, self.origin); // relink
@@ -3842,7 +3848,7 @@ void(string cmd) SV_ParseClientCommand =
                 return;
             }
 
-            // Toggle ON -> OFF (return to solid). Prevent popping inside others.
+            // Disable path: always allow turning it off, even if feature is now blocked
             if (AnySolidPlayerInRadius(self, 32))
             {
                 sprint(self, "Can't turn off leave-me-alone here, someone is too close\n");

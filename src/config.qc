@@ -63,11 +63,13 @@ void(string command, string value) config_command =
 			clanring_tdm_ticrate = stof(value);
 			break;
 		}
-		case "cr_allow_leavemealone":
-		{
-			cvar_set("cr_allow_leavemealone", value);
-			break;
-		}
+        case "cr_allow_leavemealone":
+        {
+            cvar_set("cr_allow_leavemealone", value);
+            if (stof(value) < 1)
+                utils_do_players(match_clear_leavemealone);
+            break;
+        }
 		case "setadmin":
 		{
 			array_password[0] = stof(value);
