@@ -2738,8 +2738,8 @@ void(entity ev) webhook_stats_info =
 
     #define PCT_STR(_frac,_tot) ( (_tot) > 0 ? sprintf("%g%%", floor(100 * (_frac) / (_tot))) : "N/A" )
 
-    // ---- Efficiency (kill% / weap%) ----
-    APPEND_SAFE("**Efficiency (kill% / weap%)**\n");
+    // ---- Efficiency (kill% / weap% | bul nls rox lg | fpm) ----
+    APPEND_SAFE("**Efficiency (kill% / weap% | bul nls rox lg | fpm)**\n");
     APPEND_SAFE("```\n");
     {
         lines = 0; maxlines = 16;
@@ -2749,21 +2749,52 @@ void(entity ev) webhook_stats_info =
         {
             if (!(p.style & CLANRING_OBSERVER))
             {
+                // kill + weapon accuracy
                 kfrac = p.true_kills;
                 ktot  = kfrac + p.mangle_z;
 
                 wtot  = p.dest1_x + p.dest1_y + p.dest1_z + p.dest_x;
                 wfrac = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
 
-                // ZONE tempstrings so later tempstrings (like names) don't alias them
-                killpct = strzone(PCT_STR(kfrac, ktot));
-                weappct = strzone(PCT_STR(wfrac, wtot));
+                // per-weapon detail + frags per minute
+                local float fpm_val;
+                local string pct_bul, pct_nail, pct_rox, pct_lg, fpm_str;
 
-                nm   = utils_dequake_for_discord(p.netname);
-                line = sprintf("%s / %s    %s\n", killpct, weappct, nm);
+                fpm_val = 0;
+                if (p.join_time > 0)
+                {
+                    v = clanring_sentinel.matchTime;
+                    if (v <= 0) v = time;
+                    v = v - p.join_time;
+                    if (v > 0) fpm_val = p.true_kills * 60 / v;
+                }
+
+                // ZONE tempstrings so later tempstrings (like names) don't alias them
+                killpct = strzone(sprintf("%4s", PCT_STR(kfrac, ktot)));
+                weappct = strzone(sprintf("%4s", PCT_STR(wfrac, wtot)));
+
+                pct_bul  = strzone(sprintf("%4s", PCT_STR(p.dest2_x, p.dest1_x)));
+                pct_nail = strzone(sprintf("%4s", PCT_STR(p.dest2_y, p.dest1_y)));
+                pct_rox  = strzone(sprintf("%4s", PCT_STR(p.dest_y,  p.dest_x)));
+                pct_lg   = strzone(sprintf("%4s", PCT_STR(p.dest2_z, p.dest1_z)));
+                fpm_str  = strzone(sprintf("%4.1f", fpm_val));
+
+                zname = strzone(utils_dequake_for_discord(p.netname));
+                line = sprintf("%s / %s | %s %s %s %s | %s    ",
+                               killpct, weappct,
+                               pct_bul, pct_nail, pct_rox, pct_lg,
+                               fpm_str);
                 APPEND_SAFE(line);
+                APPEND_SAFE(zname);
+                APPEND_SAFE("\n");
                 strunzone(killpct);
                 strunzone(weappct);
+                strunzone(pct_bul);
+                strunzone(pct_nail);
+                strunzone(pct_rox);
+                strunzone(pct_lg);
+                strunzone(fpm_str);
+                strunzone(zname);
                 lines = lines + 1;
                 if (strlen(msg) > (maxlen - 120)) break;
             }
