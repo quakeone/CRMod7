@@ -1231,7 +1231,7 @@ void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 
 	// ---- Resources atomic terms ----
 	TRY_PUSH( 2.0 * p.totalquad,
-	          sprintf("Quads taken (%g)", p.totalquad) );
+	          sprintf("Quad control time (%gs total; %g quad pickups)", floor(p.totalquad + 0.5), p.clanring_qdwep_z) );
 	TRY_PUSH( 5.0 * p.clanring_ptwep_z,
 	          sprintf("Pents taken (%g)", p.clanring_ptwep_z) );
 	TRY_PUSH( 1.0 * p.stats_item_ring,
