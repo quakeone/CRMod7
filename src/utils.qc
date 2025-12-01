@@ -2806,7 +2806,7 @@ void(entity ev) webhook_stats_info =
     APPEND_SAFE("```\n");
 
     // ---- K/D, damage, ewep ----
-    APPEND_SAFE("\n**K/D, damage, ewep**\n");
+    APPEND_SAFE("\n**K/D | dmg given, dmg taken | ewep**\n");
     APPEND_SAFE("```\n");
     {
         local float k_seen, k_inc, k_obs, k_limit;
@@ -2823,7 +2823,7 @@ void(entity ev) webhook_stats_info =
             else
             {
                 nm = utils_dequake_for_discord(p.netname);
-                APPEND_SAFE(sprintf("K/D %g/%g  Dmg %g/%g  Ewep %g    %s\n",
+                APPEND_SAFE(sprintf("%g/%g | %g %g | %g    %s\n",
                                     p.true_kills, p.mangle_z,
                                     p.dmg_given,  p.dmg_taken,
                                     p.ewep,
