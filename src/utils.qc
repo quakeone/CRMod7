@@ -2667,7 +2667,9 @@ void(entity ev) webhook_stats_info =
 
     // shared scratch
     local string nm;
+    local string hdr_time;
     local float m, s;
+    local float hourpos;
     local float mins_norm, per_min, v;
     local float b1, b2, b3, b4, b5;
 
@@ -2696,8 +2698,14 @@ void(entity ev) webhook_stats_info =
     // -------------------------
     // Header (piecewise)
     // -------------------------
-    msg = strzone("**Match statistics**\n");
-    APPEND_SAFE(utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p")));
+    msg = strzone("\n**Match Statistics**\n");
+    hdr_time = utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p"));
+    if (substring(hdr_time, 0, 1) == "0")
+        hdr_time = substring(hdr_time, 1, strlen(hdr_time) - 1);
+    hourpos = strstrofs(hdr_time, " ", 0);
+    if (hourpos >= 0 && substring(hdr_time, hourpos + 1, 1) == "0")
+        hdr_time = strcat(substring(hdr_time, 0, hourpos + 1), substring(hdr_time, hourpos + 2, strlen(hdr_time) - (hourpos + 2)));
+    APPEND_SAFE(hdr_time);
     APPEND_SAFE("\n");
     APPEND_SAFE(utils_dequake_for_discord(infokey(world, "hostname")));
     APPEND_SAFE("\n");
