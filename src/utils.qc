@@ -2659,6 +2659,7 @@ void(entity ev) webhook_stats_info =
     local string url, msg;
     local entity p;
     local float lines, maxlines;
+    local float use_find; // choose player iteration strategy (arena uses find())
 
     // efficiency helpers
     local float kfrac, ktot, wfrac, wtot;
@@ -2678,6 +2679,7 @@ void(entity ev) webhook_stats_info =
     local string ss_str;        // seconds (zero-padded)
 
     float maxlen; maxlen = 1900;
+    use_find = mode_is_arena() || !(clanring_playmode & CLANRING_MATCH_MODE);
 
     // Resolve + sanitize URL
     url = clanring_statsdiscordurl;
@@ -2743,8 +2745,8 @@ void(entity ev) webhook_stats_info =
     APPEND_SAFE("```\n");
     {
         lines = 0; maxlines = 16;
-        if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-        else p = find(world, classname, "player");
+        if (use_find) p = find(world, classname, "player");
+        else p = clanring_sentinel.next_player;
         while (p && lines < maxlines)
         {
             if (!(p.style & CLANRING_OBSERVER))
@@ -2798,7 +2800,7 @@ void(entity ev) webhook_stats_info =
                 lines = lines + 1;
                 if (strlen(msg) > (maxlen - 120)) break;
             }
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
         }
     }
     APPEND_SAFE("```\n");
@@ -2811,8 +2813,8 @@ void(entity ev) webhook_stats_info =
         k_seen = k_inc = k_obs = k_limit = 0;
 
         lines = 0; maxlines = 16;
-        if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-        else p = find(world, classname, "player");
+        if (use_find) p = find(world, classname, "player");
+        else p = clanring_sentinel.next_player;
         while (p && lines < maxlines)
         {
             k_seen += 1;
@@ -2829,7 +2831,7 @@ void(entity ev) webhook_stats_info =
                 k_inc += 1; lines += 1;
                 if (strlen(msg) > (maxlen - 120)) { k_limit += 1; break; }
             }
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
         }
     }
     APPEND_SAFE("```\n");
@@ -2843,8 +2845,8 @@ void(entity ev) webhook_stats_info =
             b_seen = b_inc = b_obs = b_noteam = b_limit = 0;
 
             lines = 0; maxlines = 16;
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-            else p = find(world, classname, "player");
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
 
             while (p && lines < maxlines)
             {
@@ -2894,7 +2896,7 @@ void(entity ev) webhook_stats_info =
                     if (strlen(msg) > (maxlen - 120)) { b_limit += 1; break; }
                 }
 
-                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
         }
         // close if opened
@@ -2907,8 +2909,8 @@ void(entity ev) webhook_stats_info =
             it_seen = it_inc = it_obs = it_noteam = it_limit = 0;
 
             lines = 0; maxlines = 16;
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-            else p = find(world, classname, "player");
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
 
             while (p && lines < maxlines)
             {
@@ -2952,8 +2954,8 @@ void(entity ev) webhook_stats_info =
             b1 = b2 = b3 = b4 = b5 = -9999;
             e1 = e2 = e3 = e4 = e5 = world;
 
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-            else p = find(world, classname, "player");
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
             while (p)
             {
                 if (!(p.style & CLANRING_OBSERVER) && p.next_team != world && p.join_time > 0)
@@ -2968,7 +2970,7 @@ void(entity ev) webhook_stats_info =
                     else if (v > b4) { b5=b4; e5=e4; b4=v; e4=p; }
                     else if (v > b5) { b5=v; e5=p; }
                 }
-                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
 
             if (e1 && e1 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("1) %5.1f    %s\n", b1, utils_dequake_for_discord(e1.netname))); }
@@ -3127,8 +3129,8 @@ void(entity ev) webhook_stats_info =
         {
             local float opened4; opened4 = 0;
             lines = 0; maxlines = 16;
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-            else p = find(world, classname, "player");
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
 
             while (p && lines < maxlines)
             {
@@ -3168,7 +3170,7 @@ void(entity ev) webhook_stats_info =
                     lines = lines + 1;
                     if (strlen(msg) > (maxlen - 120)) break;
                 }
-                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
         }
         if (opened4) APPEND_SAFE("```\n");
