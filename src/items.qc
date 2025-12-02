@@ -481,6 +481,9 @@ void() health_touch =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
 
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
+
 	if (other.classname != "player")
 		return;
 
@@ -674,6 +677,9 @@ void() armor_touch =
 
 	if (other.health <= 0)
 		return;
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;
@@ -1148,6 +1154,9 @@ void() ammo_touch =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
     // END_MOD
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;
@@ -1694,6 +1703,9 @@ void () powerup_pickup =
 	if (other.style & CLANRING_OBSERVER)
 		return;
 
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
+
 	if (other.classname != "player")
 		return;
 
@@ -1795,6 +1807,9 @@ void() powerup_touch =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
     // END_MOD
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;
@@ -2041,6 +2056,9 @@ void() BackpackTouch =
 
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;
@@ -2641,6 +2659,9 @@ void() Team_Ammo_Touch=
 				return;
 		}
 	}
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;

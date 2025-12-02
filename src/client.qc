@@ -3849,6 +3849,14 @@ void(string cmd) SV_ParseClientCommand =
             }
 
             // Disable path: always allow turning it off, even if feature is now blocked
+            // BUT: check if we are stuck in a wall first!
+            tracebox(self.origin, self.mins, self.maxs, self.origin, MOVE_NORMAL, self);
+            if (trace_startsolid || trace_allsolid)
+            {
+                sprint(self, "Can't turn off leave-me-alone: you are inside a solid object.\n");
+                return;
+            }
+
             if (AnySolidPlayerInRadius(self, 32))
             {
                 sprint(self, "Can't turn off leave-me-alone here, someone is too close\n");
