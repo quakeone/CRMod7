@@ -10,6 +10,112 @@
 //  P R O T O T Y P E S
 //
 void(float frac, float tot) stats_print_percent3;
+string(float want_match_record) stats_format_captime_record;
+float(float team) ctf_trial_get_top_record;
+float(float team) ctf_match_get_top_record;
+
+//
+//  Format capture-time record line, with disk fallback if needed.
+//
+string(float want_match_record) stats_format_captime_record =
+{
+    local float have_mem, best_team, best_time;
+    local string best_name, line;
+
+    best_name = "";
+    have_mem = FALSE;
+    best_time = 0;
+    best_team = 0;
+
+    local float i;
+
+    if (want_match_record)
+    {
+        for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i = i + 1)
+        {
+            if (playerrecord2[i].statvalue > 0 && playerrecord2[i].player && playerrecord2[i].player != "")
+            {
+                if (!have_mem || playerrecord2[i].statvalue < best_time)
+                {
+                    have_mem = TRUE;
+                    best_time = playerrecord2[i].statvalue;
+                    best_team = playerrecord2[i].teamcolor;
+                    best_name = playerrecord2[i].player;
+                }
+            }
+        }
+    }
+    else
+    {
+        for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i = i + 1)
+        {
+            if (playerrecord[i].statvalue > 0 && playerrecord[i].player && playerrecord[i].player != "")
+            {
+                if (!have_mem || playerrecord[i].statvalue < best_time)
+                {
+                    have_mem = TRUE;
+                    best_time = playerrecord[i].statvalue;
+                    best_team = playerrecord[i].teamcolor;
+                    best_name = playerrecord[i].player;
+                }
+            }
+        }
+    }
+
+    if (have_mem)
+    {
+        return sprintf("%s %s %-16s\n",
+                       utils_get_time(best_time),
+                       get_team_letter(best_team),
+                       best_name);
+    }
+
+    // Fallback: consult disk stats (latest saved records)
+    best_time = 0;
+    best_team = 0;
+
+    local float team_idx;
+    for (team_idx = 0; team_idx < 2; team_idx = team_idx + 1)
+    {
+        float team_color;
+        if (team_idx == 0) team_color = RED; else team_color = BLUE;
+
+        float found;
+        if (want_match_record)
+            found = ctf_match_get_top_record(team_color);
+        else
+            found = ctf_trial_get_top_record(team_color);
+
+        if (found && tt_top_time > 0)
+        {
+            if (!have_mem || tt_top_time < best_time)
+            {
+                if (best_name != "" && have_mem)
+                    strunzone(best_name);
+                have_mem = TRUE;
+                best_time = tt_top_time;
+                best_team = team_color;
+                if (tt_top_player && tt_top_player != "")
+                    best_name = strzone(tt_top_player);
+                else
+                    best_name = "";
+            }
+        }
+    }
+
+    if (have_mem)
+    {
+        line = sprintf("%s %s %-16s\n",
+                       utils_get_time(best_time),
+                       get_team_letter(best_team),
+                       best_name);
+        if (best_name != "")
+            strunzone(best_name);
+        return line;
+    }
+
+    return "[no record]\n";
+};
 
 //
 //  R E S E T  P L A Y E R
@@ -534,9 +640,9 @@ void() stats_show_fstats =
 		}
 	}
 	sprint(self,"\n");
-	mtr = sprintf("%s %s %-16s\n", utils_get_time(playerrecord2[0].statvalue), get_team_letter(playerrecord2[0].teamcolor), playerrecord2[0].player);
+	mtr = stats_format_captime_record(TRUE);
 	sprint(self, mapname, " match capture-time record: ", mtr);
-	ttr = sprintf("%s %s %-16s\n", utils_get_time(playerrecord[0].statvalue), get_team_letter(playerrecord[0].teamcolor), playerrecord[0].player);
+	ttr = stats_format_captime_record(FALSE);
 	sprint(self, mapname, " trial capture-time record: ", ttr);
 	sprint(self,"\n");
 };
