@@ -14,6 +14,7 @@ void() match_bprint_score;
 // Returns 1 if a top time-trial record exists for (current map, team).
 // On success, sets tt_top_time (float seconds) and tt_top_player (string).
 float(float team) ctf_trial_get_top_record;
+float(float team) ctf_match_get_top_record;
 
 // Returns 1 if a top time-trial record exists for (current map, team).
 // On success, sets tt_top_time (float seconds) and tt_top_player (string).
@@ -82,6 +83,98 @@ float(float team) ctf_trial_get_top_record =
                         // We can't unread; the next loop iteration will treat it as the player line.
                         // (This matches previous behavior.)
                         // No action needed.
+                    }
+                }
+
+                if (time_value > 0 && time_value < best_time && team_color == team)
+                {
+                    best_time = time_value;
+                    // ensure a zoned copy since file scope ends after close
+                    if (best_player != "") strunzone(best_player);
+                    best_player = strzone(player_name);
+                }
+            }
+            fclose(f);
+            if (best_time < 999999) have_mem = TRUE; // we found one on disk
+        }
+    }
+
+    if (have_mem)
+    {
+        tt_top_time = best_time;
+        tt_top_player = best_player;
+        return TRUE;
+    }
+
+    tt_top_time = 0;
+    tt_top_player = "";
+    return FALSE;
+};
+
+// Returns 1 if a top match capture record exists for (current map, team).
+// On success, sets tt_top_time (float seconds) and tt_top_player (string).
+float(float team) ctf_match_get_top_record =
+{
+    local float i, best_time, have_mem;
+    local string best_player;
+
+    best_time = 999999;
+    best_player = "";
+    have_mem = FALSE;
+
+    // Look at in-memory match records first (playerrecord2)
+    for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i = i + 1)
+    {
+        if (playerrecord2[i].statvalue > 0 && playerrecord2[i].teamcolor == team)
+        {
+            if (playerrecord2[i].statvalue < best_time)
+            {
+                best_time = playerrecord2[i].statvalue;
+                best_player = playerrecord2[i].player; // pointer; already zoned by loader
+                have_mem = TRUE;
+            }
+        }
+    }
+
+    // If nothing in memory, fall back to reading from disk
+    if (!have_mem)
+    {
+        local string filename = sprintf("%s_captimes_match.crx", mapname);
+        local filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
+        if (f < 0)
+            f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
+
+        if (f >= 0)
+        {
+            local string line, player_name, meta_line;
+            local float team_color, time_value;
+
+            while (TRUE)
+            {
+                line = fgets(f);
+                if (!line) break;
+
+                // Player line
+                if (line == "" || substring(line,0,2) == "//") // skip blank/comment
+                    continue;
+
+                player_name = strtrim(line);
+
+                // Team and time lines
+                line = fgets(f); if (!line) break;
+                team_color = stof(line);
+
+                line = fgets(f); if (!line) break;
+                time_value = stof(line);
+
+                // Optional meta line (consume if present)
+                meta_line = fgets(f);
+                if (meta_line)
+                {
+                    local float argc = tokenize(meta_line);
+                    if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
+                    {
+                        // Not a meta line; next loop will treat it as player
                     }
                 }
 
@@ -325,7 +418,7 @@ void(entity player, float reset) TeamCaptureDropFlagOfPlayer =
 void() TeamCaptureFlagTouch =
 {
 	local entity p;
-	local float compare, i=0,j=0;
+	local float compare, i=0, j=0, have_top;
 	
 	// CRX v2: Snapshot match timer BEFORE any other logic
 	local float match_seconds_remaining;
@@ -405,32 +498,30 @@ void() TeamCaptureFlagTouch =
 				compare = (time - other.lefty);//stop the clock
 				if (other.lefty > 0)
 				{
-					// Unified TT/match capture time banner
-					// TT (prematch) shows diff vs #1; match/normal keeps legacy time-only
+					// Unified TT/match capture time banner (mirrors time-trial output)
 					bprint("\bcapture time ");
 					bprint("[");
 					utils_bprint_time_plain(compare);  // White numbers for capture time
 					bprint("]");
-
-					if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
+					// Include (+/- diff vs record) when we have a top time
+					have_top = 0;
+					if (clanring_playmode & CLANRING_MATCH_MODE)
 					{
-						// Prewar Time Trial: include (+/- diff vs record … by …)
-						if (ctf_trial_get_top_record(other.team))
-						{
-							bprint(" ");
-							utils_bprint_signed_time_diff(compare - tt_top_time);  // Gold numbers for diff
-							bprint(" vs record [");
-							utils_bprint_time_plain(tt_top_time);  // White numbers for record
-							bprint("] by ");
-							bprint(tt_top_player);
-						}
+						if (clanring_state & CLANRING_MATCH_STARTED)
+							have_top = ctf_match_get_top_record(other.team);
+						else
+							have_top = ctf_trial_get_top_record(other.team);
 					}
 					else
+						have_top = ctf_trial_get_top_record(other.team);
+					if (have_top)
 					{
-						// Match/normal mode: keep legacy gold time display
-						bprint("\x90");
-						utils_bprint_time(compare);
-						bprint("\x91");
+						bprint(" ");
+						utils_bprint_signed_time_diff(compare - tt_top_time);  // Gold numbers for diff
+						bprint(" vs record [");
+						utils_bprint_time_plain(tt_top_time);  // White numbers for record
+						bprint("] by ");
+						bprint(tt_top_player);
 					}
 					bprint("\n");
 
