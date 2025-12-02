@@ -1020,8 +1020,8 @@ void(string entry) json_append_lastscores =
 {
     float rf, wf;
     string s = "", line;
-    float CAP_OLD = 9;          // keep this many previous entries; new one makes total <= 10
-    float OBJ_MAX = 768;        // max bytes per single JSON object we will build/parse
+    float CAP_OLD = 12;          // keep this many previous entries
+    float OBJ_MAX = 896;        // max bytes per single JSON object we will build/parse
     float READ_TAIL_MAX = 880;  // fallback tail clamp (old behavior)
 
     // Reused locals (QuakeC has function-scope locals; no shadowing)
@@ -1062,8 +1062,8 @@ void(string entry) json_append_lastscores =
     string z_entry = strzone(entry);
     string z_date  = strzone(date_tmp);
 
-    // ---------- Read existing file (keep last 9), TRUE STREAM PARSE ----------
-    string p_txt[9], p_map[9], p_mode[9], p_host[9], p_date[9];
+    // ---------- Read existing file (keep last CAP_OLD), TRUE STREAM PARSE ----------
+    string p_txt[12], p_map[12], p_mode[12], p_host[12], p_date[12];
     float keep = 0;
 
     rf = fopen("json/lastscores.json", FILE_READ);
@@ -1332,18 +1332,27 @@ void(string entry) json_append_lastscores =
         float qi;
         for (qi = 0; qi < keep; qi = qi + 1)
         {
-            strunzone(p_txt[qi]); strunzone(p_map[qi]); strunzone(p_mode[qi]); strunzone(p_host[qi]); strunzone(p_date[qi]);
+            strunzone(p_txt[qi]); strunzone(p_map[qi]); strunzone(p_mode[qi]);
+            strunzone(p_host[qi]); strunzone(p_date[qi]);
         }
-        strunzone(z_map); strunzone(z_mode); strunzone(z_host); strunzone(z_entry); strunzone(z_date);
+        strunzone(z_map); strunzone(z_mode); strunzone(z_host);
+        strunzone(z_entry); strunzone(z_date);
         return;
     }
 
-    // Manually write array & objects so we can stream-escape "text"
-    fputs(wf, "[");
+    // IMPORTANT: write one object per line so fgets() in QC never hits STRINGTEMP_LENGTH
+    fputs(wf, "[\n");
+
     float idxw;
+    float wrote_any = 0;
+
+    // Old entries first
     for (idxw = 0; idxw < keep; idxw = idxw + 1)
     {
-        if (idxw > 0) fputs(wf, ",");
+        if (wrote_any)
+            fputs(wf, ",\n");
+        wrote_any = 1;
+
         fputs(wf, "{");
 
         if (p_date[idxw] && p_date[idxw] != "")
@@ -1356,12 +1365,17 @@ void(string entry) json_append_lastscores =
         fputs(wf, "\"text\":\""); json_write_escaped_to_file(wf, p_txt[idxw]);  fputs(wf, "\"}");
 
         // free as we go
-        strunzone(p_txt[idxw]); strunzone(p_map[idxw]); strunzone(p_mode[idxw]); strunzone(p_host[idxw]); strunzone(p_date[idxw]);
+        strunzone(p_txt[idxw]); strunzone(p_map[idxw]); strunzone(p_mode[idxw]);
+        strunzone(p_host[idxw]); strunzone(p_date[idxw]);
     }
 
-    if (!json_is_blank(z_entry)) // append newest; total entries now <= CAP_OLD + 1 (10)
+    // Append newest (if any); total entries now <= CAP_OLD + 1
+    if (!json_is_blank(z_entry))
     {
-        if (keep > 0) fputs(wf, ",");
+        if (wrote_any)
+            fputs(wf, ",\n");
+        wrote_any = 1;
+
         fputs(wf, "{");
         fputs(wf, "\"date\":\""); json_write_escaped_to_file(wf, z_date);  fputs(wf, "\",");
         fputs(wf, "\"map\":\"");  json_write_escaped_to_file(wf, z_map);   fputs(wf, "\",");
@@ -1370,11 +1384,12 @@ void(string entry) json_append_lastscores =
         fputs(wf, "\"text\":\""); json_write_escaped_to_file(wf, z_entry); fputs(wf, "\"}");
     }
 
-    fputs(wf, "]");
+    fputs(wf, "\n]");
     fclose(wf);
 
     // Free inputs
-    strunzone(z_map); strunzone(z_mode); strunzone(z_host); strunzone(z_entry); strunzone(z_date);
+    strunzone(z_map); strunzone(z_mode); strunzone(z_host);
+    strunzone(z_entry); strunzone(z_date);
 };
 
 
@@ -1539,13 +1554,14 @@ void () utils_show_last_scores =
     if (f < 0) { sprint(self, "[no lastscores found]\n"); return; }
 
     // TRUE streaming parse (avoid QC ~1KB string cap)
-    float OBJ_MAX = 768;
+    float OBJ_MAX = 896;    // must stay under STRINGTEMP_LENGTH (~1024)
     string line;
 
     // reused locals (QC has function-scope locals; no shadowing)
     float o0, o1;
 
     float seen_total = 0;
+    float overflowed_objs = 0;
 
     // streaming object build state
     string obj = "";
@@ -1569,15 +1585,15 @@ void () utils_show_last_scores =
         {
             string ch = substring(zline, li, 1);
 
-            // if we're inside an object, append bytes unless overflowed
+            // if we're inside an object, append bytes with OBJ_MAX guard
             if (started)
             {
-                if (!overflow)
-                {
+                if (!overflow && obj_len < OBJ_MAX)
                     obj = strcat(obj, ch);
-                    obj_len = obj_len + 1;
-                    if (obj_len > OBJ_MAX) overflow = 1;
-                }
+
+                obj_len = obj_len + 1;
+                if (obj_len > OBJ_MAX)
+                    overflow = 1;
             }
 
             // string literal state
@@ -1616,7 +1632,12 @@ void () utils_show_last_scores =
                     depth = 0;
                     seen_total = seen_total + 1;
 
-                    if (!overflow)
+                    if (overflow)
+                    {
+                        // don't try to render truncated JSON
+                        overflowed_objs = overflowed_objs + 1;
+                    }
+                    else
                     {
                         string zobj = strzone(obj);
                         o0 = 0; o1 = strlen(zobj);
@@ -1648,18 +1669,18 @@ void () utils_show_last_scores =
                         if (tdate && strlen(tdate) >= 10)
                         {
                             string dpart = substring(tdate, 0, 10);
-            float y = stof(substring(dpart, 6, 4));
-            float m = stof(substring(dpart, 0, 2));
-            float d = stof(substring(dpart, 3, 2));
+                            float y = stof(substring(dpart, 6, 4));
+                            float m = stof(substring(dpart, 0, 2));
+                            float d = stof(substring(dpart, 3, 2));
 
-            float hh = 0, mm = 0;
+                            float hh = 0, mm = 0;
                             if (strlen(tdate) >= 16)
                             {
                                 string tpart = substring(tdate, 11, 5);
-                string sep = substring(tpart, 2, 1);
-                hh = stof(substring(tpart, 0, 2));
-                if (sep == ":" || sep == ".") mm = stof(substring(tpart, 3, 2));
-            }
+                                string sep = substring(tpart, 2, 1);
+                                hh = stof(substring(tpart, 0, 2));
+                                if (sep == ":" || sep == ".") mm = stof(substring(tpart, 3, 2));
+                            }
 
                             float nowY = stof(strftime(TRUE, "%Y"));
                             float nowM = stof(strftime(TRUE, "%m"));
@@ -1762,4 +1783,7 @@ void () utils_show_last_scores =
 
     if (seen_total == 0)
         sprint(self, "[no lastscores found]\n");
+    else if (overflowed_objs > 0)
+        sprint(self, sprintf("[note] %g lastscores entries were too large to display (> %g bytes)\n",
+                             overflowed_objs, OBJ_MAX));
 };
