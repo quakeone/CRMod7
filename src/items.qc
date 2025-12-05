@@ -2048,7 +2048,7 @@ PLAYER BACKPACKS
 void() BackpackTouch =
 {
 	local string s;
-	local float best, new, acount;
+	local float best, new, acount, bswitch;
 	local entity stemp;
 
 	if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
@@ -2065,6 +2065,11 @@ void() BackpackTouch =
 
 	if (other.health <= 0)
 		return;
+
+	if (infokey(other, "b_switch") != "")
+		bswitch = infokeyf(other, "b_switch");
+	else
+		bswitch = infokeyf(other, "w_switch");
 
 	if (clanring_playmode & CLANRING_AIRSHOT_MODE)
 	{
@@ -2157,7 +2162,7 @@ void() BackpackTouch =
 	//old = other.items;
 	if (!(other.items & new))
 	{
-		if ((other.style & CLANRING_SMART_WEAPON)&&(!(infokeyf(other, "w_switch"))))	// b_switch ??
+		if ((other.style & CLANRING_SMART_WEAPON) && (!bswitch))	
 			Deathmatch_Weapon (other, new);
 	}
 	other.items = (other.items | new);
@@ -2212,7 +2217,7 @@ void() BackpackTouch =
 
 	if (( other.weapon == best ) && ( other.weapon != IT_HOOK ))
 	{
-		if ((other.style & CLANRING_SMART_WEAPON)&&(!(infokeyf(other, "w_switch"))))
+		if ((other.style & CLANRING_SMART_WEAPON) && (!bswitch))
 			self.weapon = W_BestWeapon();
 	}
 	W_SetCurrentAmmo();
