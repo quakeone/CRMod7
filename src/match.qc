@@ -2974,6 +2974,18 @@ void() match_help =
 //
 void() match_show_not_ready =
 {
+    // Block during countdown or once the match has begun
+    if (clanring_state & CLANRING_MATCH_STARTED)
+    {
+        sprint(self, "ready? cannot be used during a match\n");
+        return;
+    }
+    if (clanring_state & CLANRING_TIMER_STARTED)
+    {
+        sprint(self, "ready? cannot be used during countdown\n");
+        return;
+    }
+
     // Check cooldown (5 seconds)
     if (time - self.ready_check_time < 5)
     {
