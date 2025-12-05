@@ -175,6 +175,7 @@ float   clanring_overtime;          // length of auto-overtime; 0 if none
 float   clanring_nextcheck;         // used for periodic checks
 float   clanring_nextcheck2;	    // used for frequent periodic checks
 entity  clanring_request;           // used to control voting
+float   clanring_vote_retry_time;   // next time global "vote in progress" spam message may repeat
 float   clanring_level;             // number of current level in user level order
 float   clanring_levelcount;        // used to scan through list in levels.cfg
 float   clanring_lastcount;         // used to detect end-of-file in levels.cfg
