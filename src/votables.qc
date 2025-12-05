@@ -1999,7 +1999,10 @@ void() votables_do_abortmatch =
 		arena_match_end();
 	}
 	else
+	{
+		clanring_match_aborted = TRUE;
 		match_end();
+	}
 };
 
 void() votables_request_abortmatch =
