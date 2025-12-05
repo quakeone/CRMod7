@@ -1605,7 +1605,8 @@ void() stats_autodump =
             msg = strcat(msg, sprintf("%s set a new match capture record!\n", clanring_new_record_player));
 
         // Defer the post: PREP = webhook_stats_info, CONTENT = msg
-        webhook_post_deferred(webhook_stats_info, msg);
+        if (!(clanring_timelimit > 0 && match_aborted_too_early()))
+            webhook_post_deferred(webhook_stats_info, msg);
 
 };
 

@@ -198,6 +198,7 @@ float   clanring_maxteams;			// maximum number of teams
 float   clanring_numteams;			// number of teams
 float   clanring_maxsize;           // maximum allowed team size
 entity  clanring_match_timer;       // used to time match
+float   clanring_match_aborted;     // TRUE when the current match was ended early
 // --- Quad control observer announcements ---
 float QUAD_RESPAWN_TIME = 60;     // seconds between quad respawns (standard QW)
 float g_quad_spawner_count;       // number of Quad spawners on the map (cached)
@@ -676,6 +677,9 @@ float ra_wins;
 entity ra_lastspawn;
 //float tele_num_spawns;
 .float nextspawn;
+
+// Cross-unit helpers
+float() match_aborted_too_early;    // from match.qc
 
 float COLOR_BLUE = 13;
 float COLOR_RED = 4;

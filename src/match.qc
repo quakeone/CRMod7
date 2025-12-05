@@ -51,6 +51,7 @@ void() PlayerDead;
 void() weapon_prewar_cleanup;
 void() weapon_prewar_animate_think;
 void() weapon_prewar_setup;
+float() match_aborted_too_early;
 // Random Pickup (reshuffle teams without repeats per roster)
 void() match_rpickup;
 void() match_request_rpickup;
@@ -136,6 +137,7 @@ float(float remN, float dec_idx) rs_multinomial_with_dec_from_work;
 void() match_init_world =
 {
     clanring_numteams = 0;
+    clanring_match_aborted = FALSE;
     clanring_sentinel.next_team = world;
     clanring_sentinel.movetarget = world;
     clanring_sentinel.frags = CLANRING_NEGINF;
@@ -267,6 +269,7 @@ void() match_reset =
 {
     clanring_state = clanring_state - (clanring_state & CLANRING_MATCH_WAIT);
     clanring_state = clanring_state - (clanring_state & CLANRING_NULL_FLAG);
+    clanring_match_aborted = FALSE;
 
     // prevent items from respawning
     utils_do_items(match_item_reset);
@@ -401,6 +404,41 @@ void() match_bprint_score =
         announce6(clanring_szthe, clanring_second_place.netname, " has ", score, " frag", temp);
     }
     match_update_score_info();
+};
+
+// Decide whether an aborted match ended before enough time elapsed to log lastscores
+float() match_aborted_too_early =
+{
+    local float total_secs, remaining_secs, elapsed_secs, quarter_secs;
+
+    if (!clanring_match_aborted)
+        return FALSE;
+
+    // Only treat matches with an active timer as "timed" for this guard
+    if (clanring_match_timer == world)
+        return FALSE;
+
+    total_secs = clanring_timelimit * 60;
+    if (total_secs <= 0)
+        return FALSE;
+
+    remaining_secs = 0;
+    if (clanring_match_timer != world)
+    {
+        remaining_secs = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
+        if (remaining_secs < 0)
+            remaining_secs = 0;
+    }
+
+    elapsed_secs = total_secs - remaining_secs;
+    if (elapsed_secs < 0)
+        elapsed_secs = 0;
+
+    quarter_secs = total_secs * 0.25;
+    if (quarter_secs <= 0)
+        return FALSE;
+
+    return (elapsed_secs < quarter_secs);
 };
 
 //
@@ -928,6 +966,7 @@ void() match_end =
             sprint(self, "No match in progress\n");
             return;
         }
+        clanring_match_aborted = TRUE;
         match_unpause();
         clanring_numteams = 0;
     }
@@ -1000,7 +1039,8 @@ void() match_end =
     // Backup all statistics so that they don't go away
     //stats_copy_statistics();
     match_bprint_score();//R00k adding here again, this will be closest to their cursor so it will be the first thing they want to read.
-    match_log_score();   // persist a compact summary for /lastscores
+    if (!match_aborted_too_early())
+        match_log_score();   // persist a compact summary for /lastscores
     utils_do_match_spawns(spawns_restore_model);
     utils_do_items(SUB_regen);// respawn all items (R00k:9/1/2024)
 
@@ -1664,6 +1704,8 @@ void() match_start_timer =
 {
     if (clanring_state & CLANRING_TIMER_STARTED)
         return;
+
+    clanring_match_aborted = FALSE;
 
     clanring_match_timer = spawn();
     clanring_match_timer.classname = "clanring_match_timer";
