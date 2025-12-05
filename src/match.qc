@@ -37,6 +37,7 @@ void() match_enter_ghost_code;
 void() match_start_unpause_countdown;
 void() match_unpause;
 void(entity ghostent) match_restore_ghost;
+float() match_is_imbalanced;
 void() spawns_restore_model;
 void() votables_disable_item;
 void () votables_force_start;
@@ -1206,6 +1207,34 @@ float () match_get_maxsize =
         pteam = pteam.next_team;
     }
     return clanring_maxsize;
+};
+
+// Returns TRUE when any teams have different counts (match-mode imbalance)
+float() match_is_imbalanced =
+{
+    local entity pteam;
+    local float found, baseline;
+
+    if (!teamplay)
+        return FALSE;
+
+    pteam = clanring_sentinel.next_team;
+    while (pteam)
+    {
+        if (pteam.count > 0)
+        {
+            if (!found)
+            {
+                found = TRUE;
+                baseline = pteam.count;
+            }
+            else if (pteam.count != baseline)
+                return TRUE;
+        }
+        pteam = pteam.next_team;
+    }
+
+    return FALSE;
 };
 
 //
@@ -2482,23 +2511,39 @@ void() match_request_unlock =
         return;
     }
 
-    // Do it right away if we're an administrator, otherwise vote
+    // Admins unlock immediately
     if (self.style & CLANRING_ADMINISTRATOR)
     {
         match_unlock();
+        return;
     }
-    else
+
+    // Auto-approve unlock requests when teams are imbalanced
+    if (teamplay && match_is_imbalanced())
     {
         if (self.style & CLANRING_READY)
         {
-            if (vote_init("\ballow new players to join\b", "", match_unlock))
-                vote_yes();
+            announce("Teams imbalanced; unlocking match");
+            match_unlock();
         }
         else
         {
             sprint(self, "unlock comand available to match\n");
             sprint(self, "participants and administrators only\n");
         }
+        return;
+    }
+
+    // Otherwise, run the normal vote path
+    if (self.style & CLANRING_READY)
+    {
+        if (vote_init("\ballow new players to join\b", "", match_unlock))
+            vote_yes();
+    }
+    else
+    {
+        sprint(self, "unlock comand available to match\n");
+        sprint(self, "participants and administrators only\n");
     }
 };
 
