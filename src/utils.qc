@@ -2626,6 +2626,81 @@ string(string s) Webhook_TruncateForDiscord =
     return strcat(substring(s, 0, keep), suffix);
 };
 
+// Count ``` fences in a string
+float(string s) Webhook_CountFences =
+{
+    local float count, pos;
+
+    count = 0;
+    pos = 0;
+    while (TRUE)
+    {
+        pos = strstrofs(s, "```", pos);
+        if (pos < 0) break;
+        count = count + 1;
+        pos = pos + 3;
+    }
+
+    return count;
+};
+
+// Split helper: prefer section boundaries and avoid cutting ``` fences
+float(string s, float limit) Webhook_FindSplitPos =
+{
+    local float split_pos, search_start;
+    local float n;
+
+    n = strlen(s);
+    if (limit < 1) limit = 1;
+    if (n <= limit) return n;
+
+    split_pos = -1;
+    search_start = limit - 200;
+    if (search_start < 100) search_start = 100;
+
+    {
+        local float i;
+        for (i = limit - 1; i > search_start; i = i - 1)
+        {
+            if (substring(s, i, 1) == "\n")
+            {
+                local string nextch;
+                nextch = substring(s, i + 1, 1);
+                if (nextch == "*" || nextch == "`")
+                {
+                    split_pos = i + 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (split_pos < 0)
+    {
+        local float j;
+        for (j = limit - 1; j > 0; j = j - 1)
+        {
+            if (substring(s, j, 1) == "\n")
+            {
+                split_pos = j + 1;
+                break;
+            }
+        }
+    }
+
+    if (split_pos < 0) split_pos = limit;
+
+    while (split_pos > 0)
+    {
+        if (split_pos >= 2 && substring(s, split_pos - 2, 3) == "```") { split_pos = split_pos - 2; continue; }
+        if (split_pos >= 1 && substring(s, split_pos - 1, 3) == "```") { split_pos = split_pos - 1; continue; }
+        break;
+    }
+
+    if (split_pos < 1) split_pos = min(limit, n);
+    return split_pos;
+};
+
 // ------------------------------------------------------------
 // PREP functions
 // ------------------------------------------------------------
@@ -2648,6 +2723,31 @@ void(entity ev) webhook_captime_info =
 
     if (strstrofs(content, "```", 0) < 0) content = strcat("```text\n", content, "```");
     content = Webhook_TruncateForDiscord(content);
+
+    if (ev.hook_payload) strunzone(ev.hook_payload);
+    ev.hook_payload = Webhook_MakeContentPayloadZ(content);
+};
+
+// Forward declaration (defined later in sender pipeline section)
+void() webhook_do_post;
+
+// Prep function for stats continuation parts (ev.message already contains the chunk)
+void(entity ev) webhook_stats_continuation_info =
+{
+    local string url, content;
+
+    content = ev.message;  // already zoned by caller
+
+    url = clanring_statsdiscordurl;
+    if (url == "") url = cvar_string("webhook_stats_url");
+    url = Webhook_SanitizeURL(url);
+    if (url == "") return;
+
+    if (strstrofs(url, "?", 0) < 0)           url = strcat(url, "?wait=true");
+    else if (strstrofs(url, "wait=", 0) < 0)  url = strcat(url, "&wait=true");
+
+    if (ev.hook_url) strunzone(ev.hook_url);
+    ev.hook_url = strzone(url);
 
     if (ev.hook_payload) strunzone(ev.hook_payload);
     ev.hook_payload = Webhook_MakeContentPayloadZ(content);
@@ -2680,7 +2780,7 @@ void(entity ev) webhook_stats_info =
     local string mmss_tmp;      // temp "mm:ss" pre-zone
     local string ss_str;        // seconds (zero-padded)
 
-    float maxlen; maxlen = 1900;
+    float maxlen; maxlen = 8000;  // build full message, then split later
     use_find = mode_is_arena() || !(clanring_playmode & CLANRING_MATCH_MODE);
 
     // Resolve + sanitize URL
@@ -3184,18 +3284,126 @@ void(entity ev) webhook_stats_info =
         if (opened4) APPEND_SAFE("```\n");
     }
 
-    // Normalize newlines/tabs, cap, and store JSON payload (zoned)
+    // Normalize newlines/tabs, then split into multiple Discord messages if needed
     {
         local string prepared;
+        local float discord_limit;
+        local float part_num, delay_offset;
+        local float carry_code;
+        local entity continuation_ev;
+
         prepared = strreplace("\r\n", "\n", msg);
         prepared = strreplace("\r", "\n", prepared);
         prepared = strreplace("\t", "    ", prepared);
-        prepared = Webhook_TruncateForDiscord(prepared);
 
-        if (ev.hook_payload) strunzone(ev.hook_payload);
-        ev.hook_payload = Webhook_MakeContentPayloadZ(prepared);
+        discord_limit = 1900;  // safe limit under Discord's 2000
+
+        part_num = 1;
+        delay_offset = 0;
+        carry_code = 0;
+
+        while (strlen(prepared) > 0)
+        {
+            local string prefix, chunk_body, chunk_send, remainder, suffix;
+            local float prefix_len, split_pos, fence_count;
+            local float end_in_code, suffix_len;
+
+            if (carry_code) { prefix = "```\n"; prefix_len = 4; }
+            else { prefix = ""; prefix_len = 0; }
+
+            split_pos = Webhook_FindSplitPos(prepared, discord_limit - prefix_len);
+            chunk_body = substring(prepared, 0, split_pos);
+
+            fence_count = Webhook_CountFences(chunk_body);
+            end_in_code = carry_code;
+            if (fence_count - floor(fence_count / 2) * 2 == 1)
+                end_in_code = carry_code ? 0 : 1;
+
+            suffix = "";
+            suffix_len = 0;
+
+            if (end_in_code)
+            {
+                if (strlen(chunk_body) > 0 && substring(chunk_body, strlen(chunk_body) - 1, 1) == "\n")
+                {
+                    suffix = "```";
+                    suffix_len = 3;
+                }
+                else
+                {
+                    suffix = "\n```";
+                    suffix_len = 4;
+                }
+
+                if (split_pos + prefix_len + suffix_len > discord_limit)
+                {
+                    split_pos = Webhook_FindSplitPos(prepared, discord_limit - prefix_len - suffix_len);
+                    chunk_body = substring(prepared, 0, split_pos);
+
+                    fence_count = Webhook_CountFences(chunk_body);
+                    end_in_code = carry_code;
+                    if (fence_count - floor(fence_count / 2) * 2 == 1)
+                        end_in_code = carry_code ? 0 : 1;
+
+                    if (end_in_code)
+                    {
+                        if (strlen(chunk_body) > 0 && substring(chunk_body, strlen(chunk_body) - 1, 1) == "\n")
+                            suffix = "```";
+                        else
+                            suffix = "\n```";
+                    }
+                    else
+                    {
+                        suffix = "";
+                    }
+                }
+            }
+
+            chunk_send = prefix;
+            chunk_send = strcat(chunk_send, chunk_body);
+            if (end_in_code) chunk_send = strcat(chunk_send, suffix);
+
+            remainder = substring(prepared, split_pos, strlen(prepared) - split_pos);
+
+            if (end_in_code)
+            {
+                if (strlen(remainder) >= 3 && substring(remainder, 0, 3) == "```")
+                {
+                    remainder = substring(remainder, 3, strlen(remainder) - 3);
+                    if (strlen(remainder) > 0 && substring(remainder, 0, 1) == "\n")
+                        remainder = substring(remainder, 1, strlen(remainder) - 1);
+                    end_in_code = 0;
+                }
+                else if (strlen(remainder) >= 4 && substring(remainder, 0, 4) == "\n```")
+                {
+                    remainder = substring(remainder, 4, strlen(remainder) - 4);
+                    if (strlen(remainder) > 0 && substring(remainder, 0, 1) == "\n")
+                        remainder = substring(remainder, 1, strlen(remainder) - 1);
+                    end_in_code = 0;
+                }
+            }
+
+            if (part_num == 1)
+            {
+                if (ev.hook_payload) strunzone(ev.hook_payload);
+                ev.hook_payload = Webhook_MakeContentPayloadZ(chunk_send);
+            }
+            else
+            {
+                continuation_ev = spawn();
+                continuation_ev.classname = "webhook_event";
+                continuation_ev.message = strzone(chunk_send);
+                continuation_ev.webhook_prepfn = webhook_stats_continuation_info;
+                continuation_ev.nextthink = time + 0.5 + delay_offset;
+                continuation_ev.think = webhook_do_post;
+                delay_offset = delay_offset + 0.5;
+            }
+
+            prepared = remainder;
+            part_num = part_num + 1;
+            carry_code = end_in_code;
+        }
     }
-
     if (msg) strunzone(msg);
     #undef PCT_STR
 };
