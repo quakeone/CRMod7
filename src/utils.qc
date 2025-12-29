@@ -2616,7 +2616,7 @@ string(string s) Webhook_TruncateForDiscord =
     local float max, n, keep;
     local string suffix;
 
-    max = 950;            // headroom for JSON + headers
+    max = 1900;            // headroom for JSON + headers
     n   = strlen(s);
     if (n <= max) return s;
 
@@ -2760,6 +2760,7 @@ void(entity ev) webhook_stats_info =
     local entity p;
     local float lines, maxlines;
     local float use_find; // choose player iteration strategy (arena uses find())
+    local float is_arena;
 
     // efficiency helpers
     local float kfrac, ktot, wfrac, wtot;
@@ -2781,7 +2782,8 @@ void(entity ev) webhook_stats_info =
     local string ss_str;        // seconds (zero-padded)
 
     float maxlen; maxlen = 8000;  // build full message, then split later
-    use_find = mode_is_arena() || !(clanring_playmode & CLANRING_MATCH_MODE);
+    is_arena = mode_is_arena();
+    use_find = is_arena || !(clanring_playmode & CLANRING_MATCH_MODE);
 
     // Resolve + sanitize URL
     url = clanring_statsdiscordurl;
@@ -2857,7 +2859,8 @@ void(entity ev) webhook_stats_info =
         else p = clanring_sentinel.next_player;
         while (p && lines < maxlines)
         {
-            if (!(p.style & CLANRING_OBSERVER))
+            if ((is_arena && p.next_team != world) ||
+                (!is_arena && !(p.style & CLANRING_OBSERVER)))
             {
                 // kill + weapon accuracy
                 kfrac = p.true_kills;
@@ -2927,8 +2930,8 @@ void(entity ev) webhook_stats_info =
         {
             k_seen += 1;
 
-            if (p.style & CLANRING_OBSERVER) { k_obs += 1; }
-            else
+            if ((is_arena && p.next_team != world) ||
+                (!is_arena && !(p.style & CLANRING_OBSERVER)))
             {
                 nm = utils_dequake_for_discord(p.netname);
                 APPEND_SAFE(sprintf("%g/%g | %g %g | %g    %s\n",
@@ -2939,6 +2942,7 @@ void(entity ev) webhook_stats_info =
                 k_inc += 1; lines += 1;
                 if (strlen(msg) > (maxlen - 120)) { k_limit += 1; break; }
             }
+            else if (p.style & CLANRING_OBSERVER) { k_obs += 1; }
             if (use_find) p = find(p, classname, "player"); else p = p.next_player;
         }
     }
