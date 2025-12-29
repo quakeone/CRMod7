@@ -342,6 +342,9 @@ void() tdeath_touch =
     /* -------- player-vs-player telefrag logic -------- */
     if (other.classname == "player" && self.owner.classname == "player")
 	{
+		// CRMOD: leave-me-alone protection
+		if (other.leavemealone || self.owner.leavemealone)
+			return;
         /* Who arrived later?  (tp_time is 0 for campers who never teleported) */
         float other_is_later = (other.tp_time > self.tfrag_time);
 

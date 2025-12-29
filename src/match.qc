@@ -37,6 +37,7 @@ void() match_enter_ghost_code;
 void() match_start_unpause_countdown;
 void() match_unpause;
 void(entity ghostent) match_restore_ghost;
+float() match_is_imbalanced;
 void() spawns_restore_model;
 void() votables_disable_item;
 void () votables_force_start;
@@ -51,6 +52,7 @@ void() PlayerDead;
 void() weapon_prewar_cleanup;
 void() weapon_prewar_animate_think;
 void() weapon_prewar_setup;
+float() match_aborted_too_early;
 // Random Pickup (reshuffle teams without repeats per roster)
 void() match_rpickup;
 void() match_request_rpickup;
@@ -65,6 +67,26 @@ void() match_clear_leavemealone =
     if (self.solid == SOLID_TRIGGER)
         self.solid = SOLID_SLIDEBOX;
     setorigin(self, self.origin);
+};
+
+// Only allow leave-me-alone during DM/CTF match prewar (non-arena)
+float() leavemealone_mode_allows =
+{
+    if (!(clanring_playmode & CLANRING_MATCH_MODE))
+        return FALSE;
+    if (clanring_state & CLANRING_MATCH_STARTED)
+        return FALSE;
+    if (mode_is_arena())
+        return FALSE;
+    if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+        return TRUE;
+
+    // Disallow in other specialized match types
+    if (clanring_playmode & (CLANRING_AIRSHOT_MODE | CLANRING_DMM4_MODE | CLANRING_WIPEOUT_MODE | CLANRING_CA_MODE | CLANRING_RA_MODE))
+        return FALSE;
+
+    // Base DM match prewar
+    return TRUE;
 };
 
 //TODO: Make this dynamic
@@ -116,6 +138,7 @@ float(float remN, float dec_idx) rs_multinomial_with_dec_from_work;
 void() match_init_world =
 {
     clanring_numteams = 0;
+    clanring_match_aborted = FALSE;
     clanring_sentinel.next_team = world;
     clanring_sentinel.movetarget = world;
     clanring_sentinel.frags = CLANRING_NEGINF;
@@ -247,6 +270,7 @@ void() match_reset =
 {
     clanring_state = clanring_state - (clanring_state & CLANRING_MATCH_WAIT);
     clanring_state = clanring_state - (clanring_state & CLANRING_NULL_FLAG);
+    clanring_match_aborted = FALSE;
 
     // prevent items from respawning
     utils_do_items(match_item_reset);
@@ -381,6 +405,41 @@ void() match_bprint_score =
         announce6(clanring_szthe, clanring_second_place.netname, " has ", score, " frag", temp);
     }
     match_update_score_info();
+};
+
+// Decide whether an aborted match ended before enough time elapsed to log lastscores
+float() match_aborted_too_early =
+{
+    local float total_secs, remaining_secs, elapsed_secs, quarter_secs;
+
+    if (!clanring_match_aborted)
+        return FALSE;
+
+    // Only treat matches with an active timer as "timed" for this guard
+    if (clanring_match_timer == world)
+        return FALSE;
+
+    total_secs = clanring_timelimit * 60;
+    if (total_secs <= 0)
+        return FALSE;
+
+    remaining_secs = 0;
+    if (clanring_match_timer != world)
+    {
+        remaining_secs = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
+        if (remaining_secs < 0)
+            remaining_secs = 0;
+    }
+
+    elapsed_secs = total_secs - remaining_secs;
+    if (elapsed_secs < 0)
+        elapsed_secs = 0;
+
+    quarter_secs = total_secs * 0.25;
+    if (quarter_secs <= 0)
+        return FALSE;
+
+    return (elapsed_secs < quarter_secs);
 };
 
 //
@@ -908,6 +967,7 @@ void() match_end =
             sprint(self, "No match in progress\n");
             return;
         }
+        clanring_match_aborted = TRUE;
         match_unpause();
         clanring_numteams = 0;
     }
@@ -980,7 +1040,8 @@ void() match_end =
     // Backup all statistics so that they don't go away
     //stats_copy_statistics();
     match_bprint_score();//R00k adding here again, this will be closest to their cursor so it will be the first thing they want to read.
-    match_log_score();   // persist a compact summary for /lastscores
+    if (!match_aborted_too_early())
+        match_log_score();   // persist a compact summary for /lastscores
     utils_do_match_spawns(spawns_restore_model);
     utils_do_items(SUB_regen);// respawn all items (R00k:9/1/2024)
 
@@ -1146,6 +1207,34 @@ float () match_get_maxsize =
         pteam = pteam.next_team;
     }
     return clanring_maxsize;
+};
+
+// Returns TRUE when any teams have different counts (match-mode imbalance)
+float() match_is_imbalanced =
+{
+    local entity pteam;
+    local float found, baseline;
+
+    if (!teamplay)
+        return FALSE;
+
+    pteam = clanring_sentinel.next_team;
+    while (pteam)
+    {
+        if (pteam.count > 0)
+        {
+            if (!found)
+            {
+                found = TRUE;
+                baseline = pteam.count;
+            }
+            else if (pteam.count != baseline)
+                return TRUE;
+        }
+        pteam = pteam.next_team;
+    }
+
+    return FALSE;
 };
 
 //
@@ -1644,6 +1733,8 @@ void() match_start_timer =
 {
     if (clanring_state & CLANRING_TIMER_STARTED)
         return;
+
+    clanring_match_aborted = FALSE;
 
     clanring_match_timer = spawn();
     clanring_match_timer.classname = "clanring_match_timer";
@@ -2420,23 +2511,39 @@ void() match_request_unlock =
         return;
     }
 
-    // Do it right away if we're an administrator, otherwise vote
+    // Admins unlock immediately
     if (self.style & CLANRING_ADMINISTRATOR)
     {
         match_unlock();
+        return;
     }
-    else
+
+    // Auto-approve unlock requests when teams are imbalanced
+    if (teamplay && match_is_imbalanced())
     {
         if (self.style & CLANRING_READY)
         {
-            if (vote_init("\ballow new players to join\b", "", match_unlock))
-                vote_yes();
+            announce("Teams imbalanced; unlocking match");
+            match_unlock();
         }
         else
         {
             sprint(self, "unlock comand available to match\n");
             sprint(self, "participants and administrators only\n");
         }
+        return;
+    }
+
+    // Otherwise, run the normal vote path
+    if (self.style & CLANRING_READY)
+    {
+        if (vote_init("\ballow new players to join\b", "", match_unlock))
+            vote_yes();
+    }
+    else
+    {
+        sprint(self, "unlock comand available to match\n");
+        sprint(self, "participants and administrators only\n");
     }
 };
 
@@ -2867,6 +2974,18 @@ void() match_help =
 //
 void() match_show_not_ready =
 {
+    // Block during countdown or once the match has begun
+    if (clanring_state & CLANRING_MATCH_STARTED)
+    {
+        sprint(self, "ready? cannot be used during a match\n");
+        return;
+    }
+    if (clanring_state & CLANRING_TIMER_STARTED)
+    {
+        sprint(self, "ready? cannot be used during countdown\n");
+        return;
+    }
+
     // Check cooldown (5 seconds)
     if (time - self.ready_check_time < 5)
     {
@@ -2900,7 +3019,7 @@ while (player)
             if (!(player.style & (CLANRING_OBSERVER | CLANRING_READY)) && (player.style & CLANRING_CONNECTED))
             {
                 if (player == self)
-                    bprint3("‹ ", player.netname, "\n");
+                    bprint3(" ", player.netname, "\n");
                 else
                     bprint3("  ", player.netname, "\n");
             }

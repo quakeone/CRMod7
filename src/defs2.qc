@@ -175,6 +175,7 @@ float   clanring_overtime;          // length of auto-overtime; 0 if none
 float   clanring_nextcheck;         // used for periodic checks
 float   clanring_nextcheck2;	    // used for frequent periodic checks
 entity  clanring_request;           // used to control voting
+float   clanring_vote_retry_time;   // next time global "vote in progress" spam message may repeat
 float   clanring_level;             // number of current level in user level order
 float   clanring_levelcount;        // used to scan through list in levels.cfg
 float   clanring_lastcount;         // used to detect end-of-file in levels.cfg
@@ -197,6 +198,7 @@ float   clanring_maxteams;			// maximum number of teams
 float   clanring_numteams;			// number of teams
 float   clanring_maxsize;           // maximum allowed team size
 entity  clanring_match_timer;       // used to time match
+float   clanring_match_aborted;     // TRUE when the current match was ended early
 // --- Quad control observer announcements ---
 float QUAD_RESPAWN_TIME = 60;     // seconds between quad respawns (standard QW)
 float g_quad_spawner_count;       // number of Quad spawners on the map (cached)
@@ -675,6 +677,9 @@ float ra_wins;
 entity ra_lastspawn;
 //float tele_num_spawns;
 .float nextspawn;
+
+// Cross-unit helpers
+float() match_aborted_too_early;    // from match.qc
 
 float COLOR_BLUE = 13;
 float COLOR_RED = 4;

@@ -586,6 +586,10 @@ void() votables_set_gametype_mode_map =
 	if (newmapname == "")
 		newmapname = mapname;
 
+	// If we changed into a mode that doesn't permit leave-me-alone, clear it now
+	if (!leavemealone_mode_allows())
+		utils_do_players(match_clear_leavemealone);
+
 	changelevel (newmapname);
 };
 
@@ -1995,7 +1999,10 @@ void() votables_do_abortmatch =
 		arena_match_end();
 	}
 	else
+	{
+		clanring_match_aborted = TRUE;
 		match_end();
+	}
 };
 
 void() votables_request_abortmatch =

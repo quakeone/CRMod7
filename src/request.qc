@@ -20,6 +20,8 @@
 	See file, 'gnu_gpl.txt', for details.
 */
 
+float VOTE_IN_PROGRESS_SPAM_COOLDOWN = 3; // seconds
+
 void() Request_Poll_Cleanup =
 {
 	local entity trash_disco;	
@@ -384,7 +386,15 @@ float (string captiona, string captionb, void() passfunc, string pollname = "") 
 
 	if (clanring_request != world)
 	{
-		bprint("\n\bThere is already a vote in progress to ", clanring_request.noise1, clanring_request.noise2, "\n");
+		if (time >= clanring_vote_retry_time)
+		{
+			bprint("\n\bThere is already a vote in progress to ", clanring_request.noise1, clanring_request.noise2, "\n");
+			clanring_vote_retry_time = time + VOTE_IN_PROGRESS_SPAM_COOLDOWN;
+		}
+		else
+		{
+			sprint(self, "\n\bThere is already a vote in progress.\n");
+		}
 		return FALSE;
 	}
 

@@ -2659,6 +2659,7 @@ void(entity ev) webhook_stats_info =
     local string url, msg;
     local entity p;
     local float lines, maxlines;
+    local float use_find; // choose player iteration strategy (arena uses find())
 
     // efficiency helpers
     local float kfrac, ktot, wfrac, wtot;
@@ -2666,7 +2667,9 @@ void(entity ev) webhook_stats_info =
 
     // shared scratch
     local string nm;
+    local string hdr_time;
     local float m, s;
+    local float hourpos;
     local float mins_norm, per_min, v;
     local float b1, b2, b3, b4, b5;
 
@@ -2678,6 +2681,7 @@ void(entity ev) webhook_stats_info =
     local string ss_str;        // seconds (zero-padded)
 
     float maxlen; maxlen = 1900;
+    use_find = mode_is_arena() || !(clanring_playmode & CLANRING_MATCH_MODE);
 
     // Resolve + sanitize URL
     url = clanring_statsdiscordurl;
@@ -2694,8 +2698,14 @@ void(entity ev) webhook_stats_info =
     // -------------------------
     // Header (piecewise)
     // -------------------------
-    msg = strzone("**Match statistics**\n");
-    APPEND_SAFE(utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p")));
+    msg = strzone("\n**Match Statistics**\n");
+    hdr_time = utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p"));
+    if (substring(hdr_time, 0, 1) == "0")
+        hdr_time = substring(hdr_time, 1, strlen(hdr_time) - 1);
+    hourpos = strstrofs(hdr_time, " ", 0);
+    if (hourpos >= 0 && substring(hdr_time, hourpos + 1, 1) == "0")
+        hdr_time = strcat(substring(hdr_time, 0, hourpos + 1), substring(hdr_time, hourpos + 2, strlen(hdr_time) - (hourpos + 2)));
+    APPEND_SAFE(hdr_time);
     APPEND_SAFE("\n");
     APPEND_SAFE(utils_dequake_for_discord(infokey(world, "hostname")));
     APPEND_SAFE("\n");
@@ -2738,50 +2748,81 @@ void(entity ev) webhook_stats_info =
 
     #define PCT_STR(_frac,_tot) ( (_tot) > 0 ? sprintf("%g%%", floor(100 * (_frac) / (_tot))) : "N/A" )
 
-    // ---- Efficiency (kill% / weap%) ----
-    APPEND_SAFE("**Efficiency (kill% / weap%)**\n");
+    // ---- Efficiency (kill% / weap% | bul nls rox lg | fpm) ----
+    APPEND_SAFE("**Efficiency (kill% / weap% | bul nls rox lg | fpm)**\n");
     APPEND_SAFE("```\n");
     {
         lines = 0; maxlines = 16;
-        if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-        else p = find(world, classname, "player");
+        if (use_find) p = find(world, classname, "player");
+        else p = clanring_sentinel.next_player;
         while (p && lines < maxlines)
         {
             if (!(p.style & CLANRING_OBSERVER))
             {
+                // kill + weapon accuracy
                 kfrac = p.true_kills;
                 ktot  = kfrac + p.mangle_z;
 
                 wtot  = p.dest1_x + p.dest1_y + p.dest1_z + p.dest_x;
                 wfrac = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
 
-                // ZONE tempstrings so later tempstrings (like names) don't alias them
-                killpct = strzone(PCT_STR(kfrac, ktot));
-                weappct = strzone(PCT_STR(wfrac, wtot));
+                // per-weapon detail + frags per minute
+                local float fpm_val;
+                local string pct_bul, pct_nail, pct_rox, pct_lg, fpm_str;
 
-                nm   = utils_dequake_for_discord(p.netname);
-                line = sprintf("%s / %s    %s\n", killpct, weappct, nm);
+                fpm_val = 0;
+                if (p.join_time > 0)
+                {
+                    v = clanring_sentinel.matchTime;
+                    if (v <= 0) v = time;
+                    v = v - p.join_time;
+                    if (v > 0) fpm_val = p.true_kills * 60 / v;
+                }
+
+                // ZONE tempstrings so later tempstrings (like names) don't alias them
+                killpct = strzone(sprintf("%4s", PCT_STR(kfrac, ktot)));
+                weappct = strzone(sprintf("%4s", PCT_STR(wfrac, wtot)));
+
+                pct_bul  = strzone(sprintf("%4s", PCT_STR(p.dest2_x, p.dest1_x)));
+                pct_nail = strzone(sprintf("%4s", PCT_STR(p.dest2_y, p.dest1_y)));
+                pct_rox  = strzone(sprintf("%4s", PCT_STR(p.dest_y,  p.dest_x)));
+                pct_lg   = strzone(sprintf("%4s", PCT_STR(p.dest2_z, p.dest1_z)));
+                fpm_str  = strzone(sprintf("%4.1f", fpm_val));
+
+                zname = strzone(utils_dequake_for_discord(p.netname));
+                line = sprintf("%s / %s | %s %s %s %s | %s    ",
+                               killpct, weappct,
+                               pct_bul, pct_nail, pct_rox, pct_lg,
+                               fpm_str);
                 APPEND_SAFE(line);
+                APPEND_SAFE(zname);
+                APPEND_SAFE("\n");
                 strunzone(killpct);
                 strunzone(weappct);
+                strunzone(pct_bul);
+                strunzone(pct_nail);
+                strunzone(pct_rox);
+                strunzone(pct_lg);
+                strunzone(fpm_str);
+                strunzone(zname);
                 lines = lines + 1;
                 if (strlen(msg) > (maxlen - 120)) break;
             }
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
         }
     }
     APPEND_SAFE("```\n");
 
     // ---- K/D, damage, ewep ----
-    APPEND_SAFE("\n**K/D, damage, ewep**\n");
+    APPEND_SAFE("\n**K/D | dmg given, dmg taken | ewep**\n");
     APPEND_SAFE("```\n");
     {
         local float k_seen, k_inc, k_obs, k_limit;
         k_seen = k_inc = k_obs = k_limit = 0;
 
         lines = 0; maxlines = 16;
-        if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-        else p = find(world, classname, "player");
+        if (use_find) p = find(world, classname, "player");
+        else p = clanring_sentinel.next_player;
         while (p && lines < maxlines)
         {
             k_seen += 1;
@@ -2790,7 +2831,7 @@ void(entity ev) webhook_stats_info =
             else
             {
                 nm = utils_dequake_for_discord(p.netname);
-                APPEND_SAFE(sprintf("K/D %g/%g  Dmg %g/%g  Ewep %g    %s\n",
+                APPEND_SAFE(sprintf("%g/%g | %g %g | %g    %s\n",
                                     p.true_kills, p.mangle_z,
                                     p.dmg_given,  p.dmg_taken,
                                     p.ewep,
@@ -2798,7 +2839,7 @@ void(entity ev) webhook_stats_info =
                 k_inc += 1; lines += 1;
                 if (strlen(msg) > (maxlen - 120)) { k_limit += 1; break; }
             }
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
         }
     }
     APPEND_SAFE("```\n");
@@ -2812,8 +2853,8 @@ void(entity ev) webhook_stats_info =
             b_seen = b_inc = b_obs = b_noteam = b_limit = 0;
 
             lines = 0; maxlines = 16;
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-            else p = find(world, classname, "player");
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
 
             while (p && lines < maxlines)
             {
@@ -2863,7 +2904,7 @@ void(entity ev) webhook_stats_info =
                     if (strlen(msg) > (maxlen - 120)) { b_limit += 1; break; }
                 }
 
-                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
         }
         // close if opened
@@ -2876,8 +2917,8 @@ void(entity ev) webhook_stats_info =
             it_seen = it_inc = it_obs = it_noteam = it_limit = 0;
 
             lines = 0; maxlines = 16;
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-            else p = find(world, classname, "player");
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
 
             while (p && lines < maxlines)
             {
@@ -2921,8 +2962,8 @@ void(entity ev) webhook_stats_info =
             b1 = b2 = b3 = b4 = b5 = -9999;
             e1 = e2 = e3 = e4 = e5 = world;
 
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-            else p = find(world, classname, "player");
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
             while (p)
             {
                 if (!(p.style & CLANRING_OBSERVER) && p.next_team != world && p.join_time > 0)
@@ -2937,7 +2978,7 @@ void(entity ev) webhook_stats_info =
                     else if (v > b4) { b5=b4; e5=e4; b4=v; e4=p; }
                     else if (v > b5) { b5=v; e5=p; }
                 }
-                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
 
             if (e1 && e1 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("1) %5.1f    %s\n", b1, utils_dequake_for_discord(e1.netname))); }
@@ -2971,7 +3012,7 @@ void(entity ev) webhook_stats_info =
                 T[2]  = res_term / per_mins;                                                 // hard-to-kill bonus
                 T[3]  = (2.5 * ep.stats_powerup_denial_quad) / per_mins;                     // enemy Quad kills
 
-                T[4]  = (2.0 * ep.totalquad) / per_mins;                                     // Quads taken
+                T[4]  = (2.0 * ep.totalquad) / per_mins;                                     // Quad control time
                 T[5]  = (5.0 * ep.clanring_ptwep_z) / per_mins;                              // Pents taken
                 T[6]  = (1.0 * ep.stats_item_ring) / per_mins;                               // Rings
                 T[7]  = (0.30 * ep.stats_item_redarmor) / per_mins;                          // RA
@@ -3009,6 +3050,12 @@ void(entity ev) webhook_stats_info =
                     }
                 }
 
+                // quad control helper: show seconds held + pickup count
+                local float quad_secs = floor(ep.totalquad + 0.5);
+                local float quad_takes = ep.clanring_qdwep_z;
+                local string quad_pickup_word; quad_pickup_word = "quad pickups";
+                if (quad_takes == 1) quad_pickup_word = "quad pickup";
+
                 // heading: keep within same fence
                 APPEND_SAFE(sprintf("\nwhy %s led PER:\n", utils_dequake_for_discord(ep.netname)));
 
@@ -3019,7 +3066,7 @@ void(entity ev) webhook_stats_info =
                     else if (i1 == 1)  APPEND_SAFE(sprintf("  1) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r1v));
                     else if (i1 == 2)  APPEND_SAFE(sprintf("  1) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r1v));
                     else if (i1 == 3)  APPEND_SAFE(sprintf("  1) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r1v));
-                    else if (i1 == 4)  APPEND_SAFE(sprintf("  1) Quads taken (%g) (+%3.1f/min)\n", ep.totalquad, r1v));
+                    else if (i1 == 4)  APPEND_SAFE(sprintf("  1) Quad control time (%gs total; %g %s) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, r1v));
                     else if (i1 == 5)  APPEND_SAFE(sprintf("  1) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r1v));
                     else if (i1 == 6)  APPEND_SAFE(sprintf("  1) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r1v));
                     else if (i1 == 7)  APPEND_SAFE(sprintf("  1) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r1v));
@@ -3041,7 +3088,7 @@ void(entity ev) webhook_stats_info =
                     else if (i2 == 1)  APPEND_SAFE(sprintf("  2) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r2v));
                     else if (i2 == 2)  APPEND_SAFE(sprintf("  2) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r2v));
                     else if (i2 == 3)  APPEND_SAFE(sprintf("  2) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r2v));
-                    else if (i2 == 4)  APPEND_SAFE(sprintf("  2) Quads taken (%g) (+%3.1f/min)\n", ep.totalquad, r2v));
+                    else if (i2 == 4)  APPEND_SAFE(sprintf("  2) Quad control time (%gs total; %g %s) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, r2v));
                     else if (i2 == 5)  APPEND_SAFE(sprintf("  2) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r2v));
                     else if (i2 == 6)  APPEND_SAFE(sprintf("  2) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r2v));
                     else if (i2 == 7)  APPEND_SAFE(sprintf("  2) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r2v));
@@ -3063,7 +3110,7 @@ void(entity ev) webhook_stats_info =
                     else if (i3 == 1)  APPEND_SAFE(sprintf("  3) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r3v));
                     else if (i3 == 2)  APPEND_SAFE(sprintf("  3) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r3v));
                     else if (i3 == 3)  APPEND_SAFE(sprintf("  3) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r3v));
-                    else if (i3 == 4)  APPEND_SAFE(sprintf("  3) Quads taken (%g) (+%3.1f/min)\n", ep.totalquad, r3v));
+                    else if (i3 == 4)  APPEND_SAFE(sprintf("  3) Quad control time (%gs total; %g %s) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, r3v));
                     else if (i3 == 5)  APPEND_SAFE(sprintf("  3) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r3v));
                     else if (i3 == 6)  APPEND_SAFE(sprintf("  3) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r3v));
                     else if (i3 == 7)  APPEND_SAFE(sprintf("  3) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r3v));
@@ -3090,8 +3137,8 @@ void(entity ev) webhook_stats_info =
         {
             local float opened4; opened4 = 0;
             lines = 0; maxlines = 16;
-            if (clanring_playmode & CLANRING_MATCH_MODE) p = clanring_sentinel.next_player;
-            else p = find(world, classname, "player");
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
 
             while (p && lines < maxlines)
             {
@@ -3131,7 +3178,7 @@ void(entity ev) webhook_stats_info =
                     lines = lines + 1;
                     if (strlen(msg) > (maxlen - 120)) break;
                 }
-                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player; else p = find(p, classname, "player");
+                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
         }
         if (opened4) APPEND_SAFE("```\n");

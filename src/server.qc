@@ -199,6 +199,7 @@ void () clanring_exec_configs;
 void () clanring_precache_matchsounds;
 void () votables_disable_item;
 void () SUB_regen;
+float() QuadControl_CountSpawners;
 void (float value) clanring_set_teamplay;
 void (float value) clanring_set_fraglimit;
 void () stats_reset_player;
@@ -215,6 +216,7 @@ float(string a, string b) utils_str_eq;
 float(string s) utils_semver_to_code;
 void() utils_dedupe_disconnect_log;
 void() utils_namewatch_think;
+void() utils_refresh_overlay_if_renamed;
 float(string player_name) utils_is_in_last_disconnects;
 float(string player_name) utils_name_has_player;
 void () score_init_world;
@@ -332,7 +334,7 @@ void(float ghost) G1v1_UpdateQuadAlpha =
 
 void() AutoGhostQuad_Refresh =
 {
-    local float active, want_ghost;
+    local float active, want_ghost, quad_spawners;
 
     // Only relevant in DM normal
     if (!InDMNormalMode())
@@ -343,6 +345,17 @@ void() AutoGhostQuad_Refresh =
             g1v1_in_effect = FALSE;
             g1v1_quad_ghosted = FALSE;
             // do not alter setquad here; mode change should preserve current setting
+        }
+        return;
+    }
+
+    quad_spawners = QuadControl_CountSpawners();
+    if (quad_spawners <= 0)
+    {
+        if (g1v1_in_effect)
+        {
+            g1v1_in_effect = FALSE;
+            g1v1_quad_ghosted = FALSE;
         }
         return;
     }
@@ -2881,6 +2894,30 @@ void () clanring_periodic_checks =
         }
     }
 
+	// If player renamed, sync overlays/typing buffers so the new name sticks
+	if (self.netname && (!self.oldname || !utils_str_eq(self.netname, self.oldname)))
+	{
+		// Keep any pending restore name (typing) in sync with the new netname
+		if (self.name_before_typing)
+		{
+			strunzone(self.name_before_typing);
+			self.name_before_typing = strzone(self.netname);
+		}
+
+		// If we're not showing a typing banner, push the new name/overlay now
+		if (!(self.style & CLANRING_TYPING_CLIENT))
+		{
+			if (self.name_ready)
+				utils_refresh_overlay_if_renamed();
+			else
+				updatename(self, self.netname);
+		}
+
+		if (self.oldname)
+			strunzone(self.oldname);
+		self.oldname = strzone(self.netname);
+	}
+
     //Regenerate suicides 20% per second.
     if (self.cnt < CLANRING_MAX_SUICIDES)
         self.cnt = self.cnt + 0.2;
@@ -2912,6 +2949,10 @@ void () clanring_periodic_checks =
             {
                 strunzone(self.movetarget.oldname);
                 self.movetarget.oldname = strzone(self.movetarget.netname);
+                observer_update_player_observer_key(self);
+            }
+            else if (!utils_str_eq(infokey(self, "observing"), self.movetarget.netname))
+            {
                 observer_update_player_observer_key(self);
             }
         }

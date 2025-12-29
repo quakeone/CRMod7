@@ -228,6 +228,9 @@ void(entity item, string itemname, float timeleft) SendObserverItemTimer
 // Count Quad spawners in the current level (cached)
 float() QuadControl_CountSpawners =
 {
+    // -1 means we've already determined there are no quad spawners
+    if (g_quad_spawner_count < 0)
+        return 0;
     if (g_quad_spawner_count > 0)
         return g_quad_spawner_count;
 
@@ -239,6 +242,13 @@ float() QuadControl_CountSpawners =
         g_quad_spawner_count = g_quad_spawner_count + 1;
         e = find(e, classname, "item_artifact_super_damage");
     }
+
+    // Cache the "none present" case so we don't scan every tick on quad-less maps
+    if (g_quad_spawner_count == 0)
+        g_quad_spawner_count = -1;
+
+    if (g_quad_spawner_count < 0)
+        return 0;
     return g_quad_spawner_count;
 };
 
@@ -471,6 +481,9 @@ void() health_touch =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
 
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
+
 	if (other.classname != "player")
 		return;
 
@@ -664,6 +677,9 @@ void() armor_touch =
 
 	if (other.health <= 0)
 		return;
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;
@@ -1138,6 +1154,9 @@ void() ammo_touch =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
     // END_MOD
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;
@@ -1684,6 +1703,9 @@ void () powerup_pickup =
 	if (other.style & CLANRING_OBSERVER)
 		return;
 
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
+
 	if (other.classname != "player")
 		return;
 
@@ -1785,6 +1807,9 @@ void() powerup_touch =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
     // END_MOD
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;
@@ -2023,7 +2048,7 @@ PLAYER BACKPACKS
 void() BackpackTouch =
 {
 	local string s;
-	local float best, new, acount;
+	local float best, new, acount, bswitch;
 	local entity stemp;
 
 	if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
@@ -2032,11 +2057,19 @@ void() BackpackTouch =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
 
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
+
 	if (other.classname != "player")
 		return;
 
 	if (other.health <= 0)
 		return;
+
+	if (infokey(other, "b_switch") != "")
+		bswitch = infokeyf(other, "b_switch");
+	else
+		bswitch = infokeyf(other, "w_switch");
 
 	if (clanring_playmode & CLANRING_AIRSHOT_MODE)
 	{
@@ -2129,7 +2162,7 @@ void() BackpackTouch =
 	//old = other.items;
 	if (!(other.items & new))
 	{
-		if ((other.style & CLANRING_SMART_WEAPON)&&(!(infokeyf(other, "w_switch"))))	// b_switch ??
+		if ((other.style & CLANRING_SMART_WEAPON) && (!bswitch))	
 			Deathmatch_Weapon (other, new);
 	}
 	other.items = (other.items | new);
@@ -2184,7 +2217,7 @@ void() BackpackTouch =
 
 	if (( other.weapon == best ) && ( other.weapon != IT_HOOK ))
 	{
-		if ((other.style & CLANRING_SMART_WEAPON)&&(!(infokeyf(other, "w_switch"))))
+		if ((other.style & CLANRING_SMART_WEAPON) && (!bswitch))
 			self.weapon = W_BestWeapon();
 	}
 	W_SetCurrentAmmo();
@@ -2631,6 +2664,9 @@ void() Team_Ammo_Touch=
 				return;
 		}
 	}
+
+	// CRMOD: leave-me-alone
+	if (other.leavemealone) return;
 
 	if (other.classname != "player")
 		return;
