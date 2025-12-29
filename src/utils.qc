@@ -738,14 +738,11 @@ void(float t) utils_bprint_time_splitcolor =
     // punctuation stays white
     bprint(".");
 
-    // centiseconds (no leading zero) - all gold
+    // centiseconds (always two digits) - all gold
     tens = floor(cs / 10);
     ones = cs - tens * 10;
 
-    if (tens > 0)
-    {
-        bprint(strings_ftos_gold(tens));
-    }
+    bprint(strings_ftos_gold(tens));
     bprint(strings_ftos_gold(ones));
 };
 
