@@ -2481,8 +2481,6 @@ void() webhook_stats_buf_end =
     webhook_stats_len = 0;
     webhook_stats_max = 0;
 };
-        else                 out = zcat(out, ch);
-    }
 
 // JSON-escape into a *zoned* string (uses strreplace for efficiency)
 string(string s) json_escape_zoned_simple =
@@ -2824,7 +2822,7 @@ void(entity ev) webhook_stats_info =
     // Header (piecewise)
     // -------------------------
     webhook_stats_buf_begin(maxlen);
-    APPEND_SAFE("\n**Match Statistics**\n");
+    APPEND_SAFE("\n## Match Statistics\n");
     hdr_time = utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p"));
     if (substring(hdr_time, 0, 1) == "0")
         hdr_time = substring(hdr_time, 1, strlen(hdr_time) - 1);
@@ -2835,7 +2833,50 @@ void(entity ev) webhook_stats_info =
     APPEND_SAFE("\n");
     APPEND_SAFE(utils_dequake_for_discord(infokey(world, "hostname")));
     APPEND_SAFE("\n");
-    APPEND_SAFE(utils_dequake_for_discord(mapname));  // just the map name
+    // Enhanced header: "20 min 3v3 match on kaboom" or "15 of 20 min 3v3 match on kaboom"
+    {
+        local string match_desc;
+        local float elapsed_mins, remaining_secs, tl;
+        local string time_str;
+        local string time_str_z, map_str_z;
+        
+        // Get timelimit (fall back to cvar if clanring_timelimit is 0)
+        tl = clanring_timelimit;
+        if (tl <= 0) tl = cvar("timelimit");
+        if (tl <= 0) tl = 20; // default fallback
+        
+        // Calculate elapsed time if timer is available
+        if (clanring_match_timer != world && tl > 0)
+        {
+            remaining_secs = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
+            if (remaining_secs < 0) remaining_secs = 0;
+            elapsed_mins = floor((tl * 60 - remaining_secs) / 60);
+            if (elapsed_mins < 1) elapsed_mins = 1;  // Show at least 1 minute
+            
+            // Show "X of Y min" if match ended early.
+            if (remaining_secs > 0 && elapsed_mins < tl)
+                time_str = sprintf("%g of %g min", elapsed_mins, tl);
+            else
+                time_str = sprintf("%g min", tl);
+        }
+        else
+            time_str = sprintf("%g min", tl);
+
+        // Zone strings to avoid tempstring aliasing.
+        time_str_z = strzone(time_str);
+        map_str_z = strzone(utils_dequake_for_discord(mapname));
+        
+        if (clanring_maxsize > 0 && teamplay)
+            match_desc = sprintf("%s %gv%g match on %s", time_str_z, clanring_maxsize, clanring_maxsize, map_str_z);
+        else if (clanring_maxsize > 0)
+            match_desc = sprintf("%s %gv%g on %s", time_str_z, clanring_maxsize, clanring_maxsize, map_str_z);
+        else
+            match_desc = sprintf("%s match on %s", time_str_z, map_str_z);
+        APPEND_SAFE(match_desc);
+
+        if (time_str_z) strunzone(time_str_z);
+        if (map_str_z) strunzone(map_str_z);
+    }
     APPEND_SAFE("\n");
 
     // Modes (no label/brackets)
@@ -2862,9 +2903,114 @@ void(entity ev) webhook_stats_info =
         }
 
         APPEND_SAFE(modes);
-        APPEND_SAFE("\n\n");
+        APPEND_SAFE("\n");
     }
 
+    // Team scores (for team games) - show winning team first
+    if (teamplay && clanring_sentinel.next_team)
+    {
+        local entity pteam, best_team;
+        local float best_score, num_teams, i;
+        local string tname, tscore;
+        
+        // Count teams
+        num_teams = 0;
+        pteam = clanring_sentinel.next_team;
+        while (pteam) { num_teams = num_teams + 1; pteam = pteam.next_team; }
+        
+        APPEND_SAFE("\n");
+        
+        // Output teams in descending score order (simple selection sort)
+        for (i = 0; i < num_teams; i = i + 1)
+        {
+            best_team = world;
+            best_score = -999999;
+            pteam = clanring_sentinel.next_team;
+            while (pteam)
+            {
+                // Find highest-scoring team not yet printed (use .cnt as printed flag)
+                if ((pteam.cnt == 0) && (pteam.frags > best_score))
+                {
+                    best_score = pteam.frags;
+                    best_team = pteam;
+                }
+                pteam = pteam.next_team;
+            }
+            if (best_team != world)
+            {
+                best_team.cnt = 1; // mark as printed
+                tname = utils_rstrip(strings_get_teamname2(best_team.height));
+                tscore = ftos(best_team.frags);
+                APPEND_SAFE(sprintf("%s: %s\n", tname, tscore));
+            }
+        }
+        // Reset printed flags
+        pteam = clanring_sentinel.next_team;
+        while (pteam) { pteam.cnt = 0; pteam = pteam.next_team; }
+    }
+
+    // Individual player scoreboard (always show) - sorted by frags descending
+    {
+        local float plines, num_players;
+        local entity best_player;
+        local string pname, pteamname;
+        
+        // Count eligible players and reset printed flags
+        num_players = 0;
+        if (use_find) p = find(world, classname, "player");
+        else p = clanring_sentinel.next_player;
+        while (p)
+        {
+            if (!(p.style & CLANRING_OBSERVER))
+            {
+                p.cnt = 0; // reset printed flag
+                num_players = num_players + 1;
+            }
+            if (use_find) p = find(p, classname, "player");
+            else p = p.next_player;
+        }
+        
+        APPEND_SAFE("\n**Scoreboard**\n");
+        APPEND_SAFE("```\n");
+        plines = 0;
+        
+        // Output players in descending score order (selection sort)
+        for (i = 0; i < num_players && plines < 16; i = i + 1)
+        {
+            best_player = world;
+            best_score = -999999;
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
+            while (p)
+            {
+                if (!(p.style & CLANRING_OBSERVER) && (p.cnt == 0) && (p.frags > best_score))
+                {
+                    best_score = p.frags;
+                    best_player = p;
+                }
+                if (use_find) p = find(p, classname, "player");
+                else p = p.next_player;
+            }
+            if (best_player != world)
+            {
+                best_player.cnt = 1; // mark as printed
+                pname = strzone(utils_dequake_for_discord(best_player.netname));
+                if (teamplay && best_player.next_team != world)
+                    pteamname = utils_rstrip(strings_get_teamname3(best_player.next_team.height));
+                else
+                    pteamname = "";
+                
+                if (pteamname != "")
+                    APPEND_SAFE(sprintf("%-12s %-6s %g\n", pname, pteamname, best_player.frags));
+                else
+                    APPEND_SAFE(sprintf("%-12s %g\n", pname, best_player.frags));
+                
+                strunzone(pname);
+                plines = plines + 1;
+            }
+        }
+        APPEND_SAFE("```\n");
+    }
     // New CTF record note
     if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
     {
