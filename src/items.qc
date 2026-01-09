@@ -304,7 +304,7 @@ void(string msg, entity subject) QuadControl_AnnounceObservers =
     p = find(world, classname, "player");
     while (p)
     {
-        if (p.style & CLANRING_OBSERVER)
+        if ((p.style & CLANRING_OBSERVER) && !(p.oflags & OBSERVER_COMMENTARY))
         {
             sprint(p, subject.netname);
             sprint(p, " ");
@@ -326,8 +326,8 @@ void(entity picker) QuadControl_MaybeAnnounce =
     taken = picker.clanring_qdwep_z;
     share = taken / possible;
 
-    // One-time "majority" milestone (>50%)
-    if ((share > 0.5) && (!picker.quad_majority_announced))
+    // One-time "majority" milestone (>50%), but only after at least 3 quads possible
+    if ((possible >= 3) && (share > 0.5) && (!picker.quad_majority_announced))
     {
         local string msg = sprintf("has the majority of Quads so far (%g/%g)", taken, possible);
         QuadControl_AnnounceObservers(msg, picker);
