@@ -3669,6 +3669,22 @@ void() match_verify_team =
 
     if (!(self.style & CLANRING_READY))
     {
+        // In prewar CTF time trials, allowing team/color changes while carrying a flag can
+        // create bogus near-zero capture times (e.g. 0.05) via ghost-flag touches.
+        // If a player changes teams while holding a flag, force-drop/return it and reset TT timers.
+        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+        {
+            if (self.flag_carrier || (self.items & (IT_KEY1 | IT_KEY2)))
+            {
+                if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
+                    TeamCaptureDropFlagOfPlayer(self, 1); // prewar: return to base
+                else
+                    TeamCaptureDropFlagOfPlayer(self, 0); // in-play: drop at origin
+                self.lefty = 0;
+                self.flag_since = 0;
+            }
+        }
+
         self.height = (self.team - 1);
         //R00k Feeble attempt to deter observers using teamcolors to send mm2 messages
         //to playing clients. IE Coaching
