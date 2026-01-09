@@ -2854,7 +2854,9 @@ void(entity ev) webhook_stats_info =
             if (elapsed_mins < 1) elapsed_mins = 1;  // Show at least 1 minute
             
             // Show "X of Y min" if match ended early.
-            if (remaining_secs > 0 && elapsed_mins < tl)
+            // Round up if less than 60 seconds remain (match essentially complete)
+            if (remaining_secs > 0 && remaining_secs < 60) elapsed_mins = tl;
+            if (remaining_secs >= 60 && elapsed_mins < tl)
                 time_str = sprintf("%g of %g min", elapsed_mins, tl);
             else
                 time_str = sprintf("%g min", tl);
@@ -3120,6 +3122,63 @@ void(entity ev) webhook_stats_info =
 
     if (!mode_is_arena())
     {
+        // ---- Quad stats (quads time eff% opp self tm) ----
+        {
+            local float opened_quad; opened_quad = 0;
+            local float q_seen, q_inc, q_obs, q_noteam, q_limit;
+            q_seen = q_inc = q_obs = q_noteam = q_limit = 0;
+
+            lines = 0; maxlines = 16;
+            if (use_find) p = find(world, classname, "player");
+            else p = clanring_sentinel.next_player;
+
+            while (p && lines < maxlines)
+            {
+                q_seen += 1;
+
+                if (p.style & CLANRING_OBSERVER) { q_obs += 1; }
+                else if (p.next_team == world)   { q_noteam += 1; }
+                else
+                {
+                    if (!opened_quad) {
+                        APPEND_SAFE("\n**Quad stats (quads time eff% opp self tm)**\n\n");
+                        APPEND_SAFE("```\n");
+                        opened_quad = 1;
+                    }
+                    // quad efficiency percentage
+                    local float q_eff_pct = 0;
+                    if (p.clanring_qdwep_y > 0)
+                        q_eff_pct = floor(100 * p.clanring_qdwep_x / p.clanring_qdwep_y);
+
+                    // zone name to avoid tempstring aliasing
+                    nm    = utils_dequake_for_discord(p.netname);
+                    zname = strzone(nm);
+
+                    // one-shot formatted line
+                    line = sprintf(
+                        "%g %gs %g%% %g %g %g    %s\n",
+                        p.clanring_qdwep_z,          // quads taken
+                        floor(p.totalquad + 0.5),    // hold time (seconds)
+                        q_eff_pct,                   // efficiency %
+                        p.clanring_qdkill_x,         // enemy kills while quad
+                        p.clanring_qdkill_z,         // self deaths while quad
+                        p.clanring_qdkill_y,         // team kills while quad
+                        zname
+                    );
+
+                    APPEND_SAFE(line);
+                    strunzone(zname);
+
+                    q_inc += 1; lines += 1;
+                    if (webhook_stats_len > (maxlen - 120)) { q_limit += 1; break; }
+                }
+
+                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
+            }
+        }
+        // close if opened
+        if (opened_quad) APPEND_SAFE("```\n");
+
         // ---- Bad stats (paks self% team% lava axe fall) ----
         {
             local float opened; opened = 0;
