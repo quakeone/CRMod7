@@ -2843,6 +2843,7 @@ void(entity ev) webhook_stats_info =
         // Get timelimit (fall back to cvar if clanring_timelimit is 0)
         tl = clanring_timelimit;
         if (tl <= 0) tl = cvar("timelimit");
+        // Get timelimit: match modes use clanring_timelimit, normal/FFA uses timelimit cvar
         if (tl <= 0) tl = 20; // default fallback
         
         // Calculate elapsed time if timer is available
@@ -2972,6 +2973,7 @@ void(entity ev) webhook_stats_info =
             else p = p.next_player;
         }
         
+        // Don't post stats for solo matches (only 1 player)
         APPEND_SAFE("\n**Scoreboard**\n");
         APPEND_SAFE("```\n");
         plines = 0;
@@ -3124,6 +3126,7 @@ void(entity ev) webhook_stats_info =
     {
         // ---- Quad stats (quads time eff% opp self tm) ----
         {
+        // ---- Quad stats (quads time eff% opp self tm) ----
             local float opened_quad; opened_quad = 0;
             local float q_seen, q_inc, q_obs, q_noteam, q_limit;
             q_seen = q_inc = q_obs = q_noteam = q_limit = 0;
@@ -3175,6 +3178,7 @@ void(entity ev) webhook_stats_info =
 
                 if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
+            // close if opened
         }
         // close if opened
         if (opened_quad) APPEND_SAFE("```\n");
