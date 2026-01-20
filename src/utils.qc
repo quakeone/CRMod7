@@ -2412,6 +2412,11 @@ float (entity p) Q1_PER_Calc_Eff;            // PER helper
 // Private, non-serverinfo storage for webhook URL configured via clanring.cfg
 string clanring_captimesdiscordurl;
 string clanring_statsdiscordurl;
+
+// Google Sheets integration for captime records
+string clanring_googlesheetsurl;      // Google Apps Script web app URL
+string clanring_googlesheetsapikey;   // API key for authentication
+float  clanring_googlesheets_valid;   // TRUE if last validation succeeded
 float webhook_seq;
 strbuf webhook_stats_buf;
 float webhook_stats_len;
@@ -4042,6 +4047,13 @@ void(float reqid, float responsecode, string resourcebody, __int resourcebytes) 
             bprint("MATCHPOST RESULT: UNKNOWN/FAIL (status=0)\n");
         else
             bprint(sprintf("MATCHPOST RESULT: FAIL (HTTP %g)\n", responsecode));
+        return;
+    }
+
+    // --- Google Sheets requests (200-204) -----------------------------------
+    if (reqid >= 200 && reqid <= 204)
+    {
+        gsheets_callback(reqid, responsecode, resourcebody);
         return;
     }
 

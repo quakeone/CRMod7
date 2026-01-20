@@ -43,6 +43,7 @@ items.qc
 json.qc
 console.qc
 config.qc
+googlesheets.qc
 options.qc
 subs.qc
 combat.qc

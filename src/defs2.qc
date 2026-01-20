@@ -856,3 +856,14 @@ void() CTF_GhostFlagTouch;
 .void(entity) webhook_prepfn;   // single-slot; PREP reads ev.message
 .string hook_url;                   // prepared URL
 .string hook_payload;               // prepared JSON payload
+
+// Google Sheets integration forward declarations
+float() gsheets_enabled;
+float() gsheets_configured;
+void() gsheets_validate;
+void() gsheets_read_capture_stats;
+void(float is_match, float rank, string player, float teamcolor, float captime, string rec_date, string mt_str) gsheets_write_record;
+void(float reqid, float status, string body) gsheets_callback;
+string(string json, string key) gsheets_json_get_string;
+float(string json, string key) gsheets_json_get_number;
+void(string arr, float recordset) gsheets_parse_record_array;

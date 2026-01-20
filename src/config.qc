@@ -34,6 +34,24 @@ void(string command, string value) config_command =
 		clanring_matchpost_url = strzone(value);
 		break;
 	}
+		case "googlesheetsurl":
+		{
+			// Google Apps Script web app URL for captime records
+			if (clanring_googlesheetsurl != string_null && clanring_googlesheetsurl != "")
+				strunzone(clanring_googlesheetsurl);
+			clanring_googlesheetsurl = strzone(value);
+			clanring_googlesheets_valid = FALSE; // Require re-validation
+			break;
+		}
+		case "googlesheetsapikey":
+		{
+			// API key for Google Sheets authentication
+			if (clanring_googlesheetsapikey != string_null && clanring_googlesheetsapikey != "")
+				strunzone(clanring_googlesheetsapikey);
+			clanring_googlesheetsapikey = strzone(value);
+			clanring_googlesheets_valid = FALSE; // Require re-validation
+			break;
+		}
 
 		case "matchsoundson":
 		{
@@ -982,6 +1000,15 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 }
 void () read_capture_stats =
 {
+	// Try Google Sheets first if configured (don't wait for async validation)
+	dprint(sprintf("gsheets_configured: url='%s' key='%s'\n", clanring_googlesheetsurl, clanring_googlesheetsapikey));
+	if (gsheets_configured())
+	{
+		gsheets_read_capture_stats();
+		return;
+	}
+	
+	// Fallback to local files
 	reset_records(0);
 	read_player_stats(sprintf("%s_captimes.crx", mapname), RECORD_LOW, 0);
 	reset_records(2);
@@ -1068,11 +1095,35 @@ void (string filename, float recordset) write_player_stats =
 
 void () write_capture_stats =
 {
-	write_player_stats(sprintf("%s_captimes.crx", mapname), 0);
+	if (!gsheets_enabled())
+		write_player_stats(sprintf("%s_captimes.crx", mapname), 0);
+	
+	// Sync to Google Sheets if configured
+	if (gsheets_configured())
+	{
+		float i;
+		for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i++)
+		{
+			if (playerrecord[i].statvalue > 0)
+				gsheets_write_record(FALSE, i + 1, playerrecord[i].player, playerrecord[i].teamcolor, playerrecord[i].statvalue, playerrecord[i].rec_date, "");
+		}
+	}
 };
 void () write_capture_stats_match =
 {
-	write_player_stats(sprintf("%s_captimes_match.crx", mapname), 2);
+	if (!gsheets_enabled())
+		write_player_stats(sprintf("%s_captimes_match.crx", mapname), 2);
+	
+	// Sync to Google Sheets if configured
+	if (gsheets_configured())
+	{
+		float i;
+		for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i++)
+		{
+			if (playerrecord2[i].statvalue > 0)
+				gsheets_write_record(TRUE, i + 1, playerrecord2[i].player, playerrecord2[i].teamcolor, playerrecord2[i].statvalue, playerrecord2[i].rec_date, playerrecord2[i].rec_mt_str);
+		}
+	}
 };
 void () write_longrange_stats =
 {
@@ -1162,6 +1213,7 @@ void() clanring_exec_configs =
 	}
 
 	clanring_main_config();
+	gsheets_validate(); // Validate Google Sheets connection if configured
 	clanring_warp_config();
 	clanring_map_config();
 	clanring_nextlevel_config();
