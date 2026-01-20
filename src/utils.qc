@@ -2788,6 +2788,7 @@ void(entity ev) webhook_stats_info =
     local float lines, maxlines;
     local float use_find; // choose player iteration strategy (arena uses find())
     local float is_arena;
+    local float eligible_players;
 
     // efficiency helpers
     local float kfrac, ktot, wfrac, wtot;
@@ -2812,6 +2813,21 @@ void(entity ev) webhook_stats_info =
     float maxlen; maxlen = 8000;  // build full message, then split later
     is_arena = mode_is_arena();
     use_find = is_arena || !(clanring_playmode & CLANRING_MATCH_MODE);
+
+    // Skip Discord stats if there are fewer than two eligible players.
+    eligible_players = 0;
+    if (use_find) p = find(world, classname, "player");
+    else p = clanring_sentinel.next_player;
+    while (p)
+    {
+        if ((is_arena && p.next_team != world) ||
+            (!is_arena && !(p.style & CLANRING_OBSERVER)))
+            eligible_players = eligible_players + 1;
+        if (use_find) p = find(p, classname, "player");
+        else p = p.next_player;
+    }
+    if (eligible_players < 2)
+        return;
 
     // Resolve + sanitize URL
     url = clanring_statsdiscordurl;
