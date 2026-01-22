@@ -2855,21 +2855,27 @@ void(entity ev) webhook_stats_info =
     APPEND_SAFE(utils_dequake_for_discord(infokey(world, "hostname")));
     APPEND_SAFE("\n");
     // Enhanced header: "20 min 3v3 match on kaboom" or "15 of 20 min 3v3 match on kaboom"
+    // For non-match modes (normal/FFA), shows "10 min game on kaboom"
     {
         local string match_desc;
         local float elapsed_mins, remaining_secs, tl;
         local string time_str;
         local string time_str_z, map_str_z;
-        
+        local float is_match_mode;
+        local string game_type;
+
+        is_match_mode = (clanring_playmode & CLANRING_MATCH_MODE);
+        game_type = is_match_mode ? "match" : "game";
+
         // Get timelimit (fall back to cvar if clanring_timelimit is 0)
         tl = clanring_timelimit;
         if (tl <= 0) tl = cvar("timelimit");
-        // Get timelimit: match modes use clanring_timelimit, normal/FFA uses timelimit cvar
         if (tl <= 0) tl = 20; // default fallback
-        
-        // Calculate elapsed time if timer is available
-        if (clanring_match_timer != world && tl > 0)
+
+        // Calculate elapsed time
+        if (is_match_mode && clanring_match_timer != world && tl > 0)
         {
+            // Match mode: use match timer to calculate elapsed time
             remaining_secs = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
             if (remaining_secs < 0) remaining_secs = 0;
             elapsed_mins = floor((tl * 60 - remaining_secs) / 60);
@@ -2883,6 +2889,13 @@ void(entity ev) webhook_stats_info =
             else
                 time_str = sprintf("%g min", tl);
         }
+        else if (!is_match_mode)
+        {
+            // Normal/FFA mode: use server time to calculate actual elapsed time
+            elapsed_mins = floor(time / 60);
+            if (elapsed_mins < 1) elapsed_mins = 1;  // Show at least 1 minute
+            time_str = sprintf("%g min", elapsed_mins);
+        }
         else
             time_str = sprintf("%g min", tl);
 
@@ -2891,11 +2904,11 @@ void(entity ev) webhook_stats_info =
         map_str_z = strzone(utils_dequake_for_discord(mapname));
         
         if (clanring_maxsize > 0 && teamplay)
-            match_desc = sprintf("%s %gv%g match on %s", time_str_z, clanring_maxsize, clanring_maxsize, map_str_z);
+            match_desc = sprintf("%s %gv%g %s on %s", time_str_z, clanring_maxsize, clanring_maxsize, game_type, map_str_z);
         else if (clanring_maxsize > 0)
             match_desc = sprintf("%s %gv%g on %s", time_str_z, clanring_maxsize, clanring_maxsize, map_str_z);
         else
-            match_desc = sprintf("%s match on %s", time_str_z, map_str_z);
+            match_desc = sprintf("%s %s on %s", time_str_z, game_type, map_str_z);
         APPEND_SAFE(match_desc);
 
         if (time_str_z) strunzone(time_str_z);
