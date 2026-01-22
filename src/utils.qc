@@ -2015,26 +2015,20 @@ float () prematch_rules =
 float () crx_get_match_secs_remaining =
 {
     local float secs;
-    local float tl;
 
     secs = -1;
 
     if ((clanring_playmode & CLANRING_MATCH_MODE) && (clanring_state & CLANRING_MATCH_STARTED))
     {
-        // 1) Primary: use clanring_sentinel.matchTime (authoritative match time tracker)
-        tl = cvar("timelimit"); // minutes
-        if (tl > 0 && clanring_sentinel.matchTime > 0)
+        // Primary: use clanring_match_timer which is maintained by match_timer_think2
+        // lip = minutes remaining, count = seconds remaining (0-59)
+        if (clanring_match_timer != world && clanring_match_timer.lip >= 0)
         {
-            // matchTime tracks current time during match
-            // Calculate remaining from timelimit
-            local float total_secs = tl * 60;
-            local float elapsed = clanring_sentinel.matchTime;
-            secs = total_secs - elapsed;
-            if (secs < 0) secs = 0; // clamp to zero
+            secs = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
         }
-        
-        // 2) Fallback: use boss countdown if matchTime is not available
-        if (secs <= 0 && boss != world && boss.lip >= 0)
+
+        // Fallback for arena modes: use boss countdown
+        if (secs < 0 && boss != world && boss.lip >= 0)
             secs = (boss.lip * 60) + boss.count;
     }
 
