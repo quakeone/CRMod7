@@ -247,19 +247,23 @@ void(float is_match, float rank, string player, float teamcolor,
 		date_url != "" ? "&date=" : "",
 		date_url != "" ? date_url : "");
 	if (url != "") url = strzone(url);
-	string json = sprintf(
-		"{\"map\":\"%s\",\"is_match\":%s,\"rank\":%g,\"player\":\"%s\",\"player_qhex\":\"%s\",\"teamcolor\":%g,\"time\":%g,\"date\":\"%s\",\"mt_str\":\"%s\",\"server\":\"%s\"}",
+	string json_head = sprintf(
+		"{\"map\":\"%s\",\"is_match\":%s,\"rank\":%g,\"player\":\"%s\",\"player_qhex\":\"%s\",\"teamcolor\":%g,\"time\":%g,",
 		map_safe,
 		is_match ? "true" : "false",
 		rank,
 		player_safe,
 		player_qhex ? player_qhex : "",
 		teamcolor,
-		captime,
+		captime
+	);
+	string json_tail = sprintf(
+		"\"date\":\"%s\",\"mt_str\":\"%s\",\"server\":\"%s\"}",
 		rec_date_safe,
 		mt_str_safe,
 		hostname_safe
 	);
+	string json = strcat(json_head, json_tail);
 	if (json != "") json = strzone(json);
 	
 	if (map_safe != "") strunzone(map_safe);
