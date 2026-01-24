@@ -829,6 +829,9 @@ string crx_meta_mt_str;
 .float leavemealone;       // 0/1 flag
 .float next_lma_toggle;    // cooldown timestamp
 
+// --- vote menu cooldown ---
+.float next_vote_time;     // cooldown for vote menu changes
+
 // Utility: fast proximity check to avoid re-solidifying inside others
 float(entity center, float rad) AnySolidPlayerInRadius =
 {

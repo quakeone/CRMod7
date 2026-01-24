@@ -333,7 +333,17 @@ void() IntermissionThink =
 
     if ((self.impulse > 0) && (self.impulse < 6))
     {
+        // 2 second cooldown for removing or changing votes (after first vote cycle)
+        if (self.warp_map && self.next_vote_time > time)
+        {
+            self.impulse = 0;
+            return;
+        }
+
         stuffcmd(self, "play buttons/switch04.wav\n");
+        // Set cooldown after first cycle: when removing/changing OR re-voting after removal
+        if (self.warp_map || self.next_vote_time)
+            self.next_vote_time = time + 2;
         tokenize(vote_map_choices[self.impulse]);
 
         string myVoteMapName = strzone(argv(0));
