@@ -2985,6 +2985,7 @@ void(entity ev) webhook_stats_info =
         local float plines, num_players;
         local entity best_player;
         local string pname, pteamname;
+        local float ping_ms;
         
         // Count eligible players and reset printed flags
         num_players = 0;
@@ -3004,6 +3005,11 @@ void(entity ev) webhook_stats_info =
         // Don't post stats for solo matches (only 1 player)
         APPEND_SAFE("\n**Scoreboard**\n");
         APPEND_SAFE("```\n");
+        if (teamplay)
+            APPEND_SAFE(sprintf("%-12s %-6s %5s %4s\n", "Name", "Team", "Frags", "Ping"));
+        else
+            APPEND_SAFE(sprintf("%-12s %5s %4s\n", "Name", "Frags", "Ping"));
+        APPEND_SAFE("\n");
         plines = 0;
         
         // Output players in descending score order (selection sort)
@@ -3032,10 +3038,12 @@ void(entity ev) webhook_stats_info =
                 else
                     pteamname = "";
                 
+                ping_ms = floor(best_player.ping_time + 0.5);
+                
                 if (pteamname != "")
-                    APPEND_SAFE(sprintf("%-12s %-6s %g\n", pname, pteamname, best_player.frags));
+                    APPEND_SAFE(sprintf("%-12s %-6s %5.0f %4.0f\n", pname, pteamname, best_player.frags, ping_ms));
                 else
-                    APPEND_SAFE(sprintf("%-12s %g\n", pname, best_player.frags));
+                    APPEND_SAFE(sprintf("%-12s %5.0f %4.0f\n", pname, best_player.frags, ping_ms));
                 
                 strunzone(pname);
                 plines = plines + 1;
