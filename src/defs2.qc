@@ -567,6 +567,7 @@ typedef struct
 	string rec_date;        // wall-clock timestamp when record was set (ISO-like)
 	float  rec_mt_remain;   // match seconds remaining when set (or -1 if N/A)
 	string rec_mt_str;      // pretty "M:SS" (or "H:MM:SS") remaining (or "")
+	float  rec_ping;        // ping in ms when record was set (or -1 if N/A)
 }playerrecord_t;
 
 float PLAYER_RECORDS_MAX_COUNT = 3;
@@ -824,6 +825,7 @@ string _crx_peek_line;
 string crx_meta_date;
 float  crx_meta_mt_remain;
 string crx_meta_mt_str;
+float  crx_meta_ping;
 
 // --- leave-me-alone (prewar) ---
 .float leavemealone;       // 0/1 flag
@@ -865,7 +867,7 @@ float() gsheets_enabled;
 float() gsheets_configured;
 void() gsheets_validate;
 void() gsheets_read_capture_stats;
-void(float is_match, float rank, string player, float teamcolor, float captime, string rec_date, string mt_str) gsheets_write_record;
+void(float is_match, float rank, string player, float teamcolor, float captime, string rec_date, string mt_str, float ping) gsheets_write_record;
 void(float reqid, float status, string body) gsheets_callback;
 string(string json, string key) gsheets_json_get_string;
 float(string json, string key) gsheets_json_get_number;

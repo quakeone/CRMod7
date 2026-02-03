@@ -84,7 +84,7 @@ function readRecords(mapName) {
 
 /**
  * Write or update a record
- * Data format: {map, is_match, rank, player, player_qhex, teamcolor, time, date, mt_str}
+ * Data format: {map, is_match, rank, player, player_qhex, teamcolor, time, date, mt_str, ping}
  */
 function writeRecord(data) {
   if (!data.map || !data.player || data.rank < 1 || data.rank > 3) {
@@ -119,22 +119,28 @@ function writeRecord(data) {
       return jsonResponse({error: "Invalid time"}, 400);
     }
     if (!isFinite(existingTime) || existingTime === 0 || newTime < existingTime) {
-      // Columns: A=Rank, B=Player, C=TeamColor, D=Time, E=Date, F=MatchTimeStr, G=Server, H=PlayerQHex
-      const server = data.server || data.hostname || "";
-      const playerQHex = data.player_qhex || "";
-      const existingDate = sheet.getRange(recordRow, 5).getValue();
-      const existingMtStr = sheet.getRange(recordRow, 6).getValue();
-      const finalDate = data.date || existingDate || "";
-      const finalMtStr = data.mt_str || existingMtStr || "";
-      sheet.getRange(recordRow, 2, 1, 7).setValues([[
-        data.player,
-        data.teamcolor,
-        newTime,
-        finalDate,
-        finalMtStr,
-        server,
-        playerQHex
-      ]]);
+    // Columns: A=Rank, B=Player, C=TeamColor, D=Time, E=Date, F=MatchTimeStr, G=Server, H=PlayerQHex, I=Ping
+    const server = data.server || data.hostname || "";
+    const playerQHex = data.player_qhex || "";
+    const existingDate = sheet.getRange(recordRow, 5).getValue();
+    const existingMtStr = sheet.getRange(recordRow, 6).getValue();
+    const existingPing = Number(sheet.getRange(recordRow, 9).getValue());
+    const incomingPing = Number(data.ping);
+    const finalDate = data.date || existingDate || "";
+    const finalMtStr = data.mt_str || existingMtStr || "";
+    const finalPing = (isFinite(incomingPing) && incomingPing > 0)
+      ? incomingPing
+      : ((isFinite(existingPing) && existingPing > 0) ? existingPing : "");
+    sheet.getRange(recordRow, 2, 1, 8).setValues([[
+      data.player,
+      data.teamcolor,
+      newTime,
+      finalDate,
+      finalMtStr,
+      server,
+      playerQHex,
+      finalPing
+    ]]);
       
       return jsonResponse({status: "updated", rank: data.rank, map: data.map, server: server, time: newTime});
     }
@@ -161,13 +167,14 @@ function getOrCreateSheet() {
   const firstCell = sheet.getRange(1, 1).getValue();
   if (firstCell === "") {
     // Add header row
-    sheet.getRange(1, 1, 1, 8).setValues([["Map", "Name", "Color", "Record Time", "Date", "Time In Match", "Server", "Hex Name"]]);
-    sheet.getRange(1, 1, 1, 8).setFontWeight("bold");
+    sheet.getRange(1, 1, 1, 9).setValues([["Map", "Name", "Color", "Record Time", "Date", "Time In Match", "Server", "Hex Name", "Ping"]]);
+    sheet.getRange(1, 1, 1, 9).setFontWeight("bold");
     
     // Set min widths for Date, Server, and Hex Name (approx 30 chars = 250px)
     sheet.setColumnWidth(5, 250); // Date (Col E)
     sheet.setColumnWidth(7, 250); // Server (Col G)
     sheet.setColumnWidth(8, 250); // Hex Name (Col H)
+    sheet.setColumnWidth(9, 80);  // Ping (Col I)
   }
   
   return sheet;
@@ -231,18 +238,18 @@ function createMapSection(sheet, mapName) {
   // Row 5: "MATCH"
   // Row 6-8: Rank 1, 2, 3 (match)
   const sectionData = [
-    [mapName, "", "", "", "", "", "", ""],
-    ["TRIAL", "", "", "", "", "", "", ""],
-    ["1", "", "", "", "", "", "", ""],
-    ["2", "", "", "", "", "", "", ""],
-    ["3", "", "", "", "", "", "", ""],
-    ["MATCH", "", "", "", "", "", "", ""],
-    ["1", "", "", "", "", "", "", ""],
-    ["2", "", "", "", "", "", "", ""],
-    ["3", "", "", "", "", "", "", ""]
+    [mapName, "", "", "", "", "", "", "", ""],
+    ["TRIAL", "", "", "", "", "", "", "", ""],
+    ["1", "", "", "", "", "", "", "", ""],
+    ["2", "", "", "", "", "", "", "", ""],
+    ["3", "", "", "", "", "", "", "", ""],
+    ["MATCH", "", "", "", "", "", "", "", ""],
+    ["1", "", "", "", "", "", "", "", ""],
+    ["2", "", "", "", "", "", "", "", ""],
+    ["3", "", "", "", "", "", "", "", ""]
   ];
   
-  sheet.getRange(startRow, 1, 9, 8).setValues(sectionData);
+  sheet.getRange(startRow, 1, 9, 9).setValues(sectionData);
   
   // Bold the headers
   sheet.getRange(startRow, 1).setFontWeight("bold");
@@ -259,7 +266,7 @@ function readSectionRecords(sheet, startRow, count) {
   const records = [];
   
   try {
-    const data = sheet.getRange(startRow, 1, count, 8).getValues();
+    const data = sheet.getRange(startRow, 1, count, 9).getValues();
     
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
@@ -272,7 +279,8 @@ function readSectionRecords(sheet, startRow, count) {
           time: row[3] || 0,
           date: row[4] || "",
           mt_str: row[5] || "",
-          server: row[6] || ""
+          server: row[6] || "",
+          ping: row[8] || ""
         });
       }
     }
@@ -305,7 +313,8 @@ function testScript() {
     teamcolor: 4,
     time: 15.5,
     date: "2026-01-19",
-    mt_str: ""
+    mt_str: "",
+    ping: 42
   };
   
   const result = writeRecord(testData);

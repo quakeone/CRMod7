@@ -10,6 +10,7 @@ void () write_capture_stats_match;
 void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_record;
 void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_record2;
 void() match_bprint_score;
+float(entity e) client_ping;
 
 // Returns 1 if a top time-trial record exists for (current map, team).
 // On success, sets tt_top_time (float seconds) and tt_top_player (string).
@@ -538,7 +539,16 @@ void() TeamCaptureFlagTouch =
 							crx_meta_mt_remain = -1;
 							if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
 							crx_meta_mt_str = "";
-                            check_player_low_record(compare, other.team, other.netname);
+							crx_meta_ping = -1;
+							if (other.ping_time > 0)
+								crx_meta_ping = floor(other.ping_time + 0.5);
+							else
+							{
+								local float ping_ms;
+								ping_ms = client_ping(other);
+								crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
+							}
+														check_player_low_record(compare, other.team, other.netname);
                             if (new_player_record > 0)
 							{
 								if (new_player_record == 1)
@@ -588,7 +598,16 @@ void() TeamCaptureFlagTouch =
 								crx_meta_mt_remain = match_seconds_remaining;
 								if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
 								crx_meta_mt_str = strzone(match_time_str);
-                                check_player_low_record2(compare, other.team, other.netname);
+								crx_meta_ping = -1;
+								if (other.ping_time > 0)
+									crx_meta_ping = floor(other.ping_time + 0.5);
+								else
+								{
+									local float ping_ms;
+									ping_ms = client_ping(other);
+									crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
+								}
+																check_player_low_record2(compare, other.team, other.netname);
                                 if (new_player_record > 0)
 								{
 									new_player_record_match = new_player_record;
@@ -1677,7 +1696,16 @@ void() CTF_GhostFlagTouch =
 			crx_meta_mt_remain = -1;
 			if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
 			crx_meta_mt_str = "";
-			check_player_low_record(compare, other.team, other.netname);
+			crx_meta_ping = -1;
+			if (other.ping_time > 0)
+				crx_meta_ping = floor(other.ping_time + 0.5);
+			else
+			{
+				local float ping_ms;
+				ping_ms = client_ping(other);
+				crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
+			}
+						check_player_low_record(compare, other.team, other.netname);
 			if (new_player_record > 0)
 			{
 				if (new_player_record == 1)

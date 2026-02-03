@@ -2146,30 +2146,65 @@ string format_rec_date(string d)
     return strcat(mm, "-", dd, "-", yyyy, " ", timepart, (tz != "" ? strcat(" ", tz) : ""));
 }
 
+string format_rec_meta(string rec_date, string rec_mt_str, float rec_ping, float include_mt)
+{
+    local string out;
+    local float has;
+
+    out = "";
+    has = FALSE;
+
+    if (rec_date != "" || (include_mt && rec_mt_str != "") || rec_ping >= 0)
+    {
+        out = " (";
+        if (rec_date != "")
+        {
+            out = strcat(out, format_rec_date(rec_date));
+            has = TRUE;
+        }
+        if (include_mt && rec_mt_str != "")
+        {
+            if (has) out = strcat(out, ", ");
+            out = strcat(out, "at ", rec_mt_str, " remaining");
+            has = TRUE;
+        }
+        if (rec_ping > 0)
+        {
+            if (has) out = strcat(out, ", ");
+            out = strcat(out, "ping ", ftos(floor(rec_ping + 0.5)), "ms");
+            has = TRUE;
+        }
+        out = strcat(out, ")");
+    }
+    return out;
+}
+
 void () CaptureHighScores_sprint =
 {
-    string s1 = "", s2 = "", s3 = "", s4 = "", ts1 = "", ts2 = "", ts3 = "";
+    string s1 = "", s2 = "", s3 = "", s4 = "", ts1 = "", ts2 = "", ts3 = "", meta = "";
 
     if (playerrecord[0].statvalue > 0)
     {
         s1 = sprintf("\1  %s %s %-16s", utils_get_time(playerrecord[0].statvalue), get_team_letter(playerrecord[0].teamcolor), playerrecord[0].player);
-        // CRX v2: Add metadata if available (trial record: date only)
-        if (playerrecord[0].rec_date != "")
-            s1 = sprintf("%s  (%s)", s1, format_rec_date(playerrecord[0].rec_date));
+        meta = format_rec_meta(playerrecord[0].rec_date, "", playerrecord[0].rec_ping, FALSE);
+        if (meta != "")
+            s1 = strcat(s1, meta);
         s1 = strcat(s1, "\n");
         
         if (playerrecord[1].statvalue > 0)
         {
             s2 = sprintf("\2  %s %s %-16s", utils_get_time(playerrecord[1].statvalue), get_team_letter(playerrecord[1].teamcolor), playerrecord[1].player);
-            if (playerrecord[1].rec_date != "")
-                s2 = sprintf("%s  (%s)", s2, format_rec_date(playerrecord[1].rec_date));
+            meta = format_rec_meta(playerrecord[1].rec_date, "", playerrecord[1].rec_ping, FALSE);
+            if (meta != "")
+                s2 = strcat(s2, meta);
             s2 = strcat(s2, "\n");
             
             if (playerrecord[2].statvalue > 0)
             {
                 s3 = sprintf("\3  %s %s %-16s", utils_get_time(playerrecord[2].statvalue), get_team_letter(playerrecord[2].teamcolor), playerrecord[2].player);
-                if (playerrecord[2].rec_date != "")
-                    s3 = sprintf("%s  (%s)", s3, format_rec_date(playerrecord[2].rec_date));
+                meta = format_rec_meta(playerrecord[2].rec_date, "", playerrecord[2].rec_ping, FALSE);
+                if (meta != "")
+                    s3 = strcat(s3, meta);
                 s3 = strcat(s3, "\n");
             }
         }
@@ -2182,49 +2217,39 @@ void () CaptureHighScores_sprint =
     if (playerrecord2[0].statvalue > 0)
     {
         ts1 = sprintf("\1  %s %s %-16s", utils_get_time(playerrecord2[0].statvalue), get_team_letter(playerrecord2[0].teamcolor), playerrecord2[0].player);
-        // CRX v2: Add metadata if available (match record: date + match time remaining)
-        if (playerrecord2[0].rec_date != "" || playerrecord2[0].rec_mt_str != "")
-        {
-            ts1 = sprintf("%s  (%s", ts1, format_rec_date(playerrecord2[0].rec_date));
-            if (playerrecord2[0].rec_mt_str != "")
-                ts1 = sprintf("%s, at %s remaining", ts1, playerrecord2[0].rec_mt_str);
-            ts1 = strcat(ts1, ")");
-        }
+        meta = format_rec_meta(playerrecord2[0].rec_date, playerrecord2[0].rec_mt_str, playerrecord2[0].rec_ping, TRUE);
+        if (meta != "")
+            ts1 = strcat(ts1, meta);
         ts1 = strcat(ts1, "\n");
         
         if (playerrecord2[1].statvalue > 0)
         {
             ts2 = sprintf("\2  %s %s %-16s", utils_get_time(playerrecord2[1].statvalue), get_team_letter(playerrecord2[1].teamcolor), playerrecord2[1].player);
-            if (playerrecord2[1].rec_date != "" || playerrecord2[1].rec_mt_str != "")
-            {
-                ts2 = sprintf("%s  (%s", ts2, format_rec_date(playerrecord2[1].rec_date));
-                if (playerrecord2[1].rec_mt_str != "")
-                    ts2 = sprintf("%s, at %s remaining", ts2, playerrecord2[1].rec_mt_str);
-                ts2 = strcat(ts2, ")");
-            }
+            meta = format_rec_meta(playerrecord2[1].rec_date, playerrecord2[1].rec_mt_str, playerrecord2[1].rec_ping, TRUE);
+            if (meta != "")
+                ts2 = strcat(ts2, meta);
             ts2 = strcat(ts2, "\n");
             
             if (playerrecord2[2].statvalue > 0)
             {
                 ts3 = sprintf("\3  %s %s %-16s", utils_get_time(playerrecord2[2].statvalue), get_team_letter(playerrecord2[2].teamcolor), playerrecord2[2].player);
-                if (playerrecord2[2].rec_date != "" || playerrecord2[2].rec_mt_str != "")
-                {
-                    ts3 = sprintf("%s  (%s", ts3, format_rec_date(playerrecord2[2].rec_date));
-                    if (playerrecord2[2].rec_mt_str != "")
-                        ts3 = sprintf("%s, at %s remaining", ts3, playerrecord2[2].rec_mt_str);
-                    ts3 = strcat(ts3, ")");
-                }
+                meta = format_rec_meta(playerrecord2[2].rec_date, playerrecord2[2].rec_mt_str, playerrecord2[2].rec_ping, TRUE);
+                if (meta != "")
+                    ts3 = strcat(ts3, meta);
                 ts3 = strcat(ts3, "\n");
             }
         }
         s4 = sprintf("%s%s%s", ts1, ts2, ts3);
-    }	else
-	{
-		s4 = "No match capture times set\n";
-	}
-	sprint(self, sprintf("\bTime Trial Leaders\b for %s:\n", mapname), s1, s2, s3, "\bMatch Times\b:\n", s4, "\n");
-	return;
+    }
+    else
+    {
+        s4 = "No match capture times set\n";
+    }
+    sprint(self, sprintf("\bTime Trial Leaders\b for %s:\n", mapname), s1, s2, s3, "\bMatch Times\b:\n", s4, "\n");
+    return;
 };
+
+
 
 void () AirshotHighScores_sprint =
 {

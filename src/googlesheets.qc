@@ -208,7 +208,7 @@ void() gsheets_read_capture_stats =
 // is_match: TRUE for match record, FALSE for trial record
 //
 void(float is_match, float rank, string player, float teamcolor, 
-     float captime, string rec_date, string mt_str) gsheets_write_record =
+     float captime, string rec_date, string mt_str, float ping) gsheets_write_record =
 {
 	if (!gsheets_enabled())
 		return;
@@ -247,8 +247,8 @@ void(float is_match, float rank, string player, float teamcolor,
 		date_url != "" ? "&date=" : "",
 		date_url != "" ? date_url : "");
 	if (url != "") url = strzone(url);
-	string json_head = sprintf(
-		"{\"map\":\"%s\",\"is_match\":%s,\"rank\":%g,\"player\":\"%s\",\"player_qhex\":\"%s\",\"teamcolor\":%g,\"time\":%g,",
+	string json = sprintf(
+		"{\"map\":\"%s\",\"is_match\":%s,\"rank\":%g,\"player\":\"%s\",\"player_qhex\":\"%s\",\"teamcolor\":%g,\"time\":%g",
 		map_safe,
 		is_match ? "true" : "false",
 		rank,
@@ -257,13 +257,9 @@ void(float is_match, float rank, string player, float teamcolor,
 		teamcolor,
 		captime
 	);
-	string json_tail = sprintf(
-		"\"date\":\"%s\",\"mt_str\":\"%s\",\"server\":\"%s\"}",
-		rec_date_safe,
-		mt_str_safe,
-		hostname_safe
-	);
-	string json = strcat(json_head, json_tail);
+	if (ping > 0)
+		json = strcat(json, sprintf(",\"ping\":%g", floor(ping + 0.5)));
+	json = strcat(json, sprintf(",\"date\":\"%s\",\"mt_str\":\"%s\",\"server\":\"%s\"}", rec_date_safe, mt_str_safe, hostname_safe));
 	if (json != "") json = strzone(json);
 	
 	if (map_safe != "") strunzone(map_safe);
@@ -354,6 +350,7 @@ void(string arr, float recordset) gsheets_parse_record_array =
 		float captime = gsheets_json_get_number(obj, "time");
 		string rec_date = gsheets_json_get_string(obj, "date");
 		string mt_str = gsheets_json_get_string(obj, "mt_str");
+		float ping = gsheets_json_get_number(obj, "ping");
 		
 		if (player != "" && captime > 0)
 		{
@@ -362,6 +359,10 @@ void(string arr, float recordset) gsheets_parse_record_array =
 			crx_meta_date = strzone(rec_date);
 			if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
 			crx_meta_mt_str = strzone(mt_str);
+			if (ping > 0)
+				crx_meta_ping = ping;
+			else
+				crx_meta_ping = -1;
 			
 			if (recordset == 2)
 				check_player_low_record2(captime, teamcolor, player);

@@ -908,6 +908,7 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 	crx_meta_mt_remain = -1;
 	if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
 	crx_meta_mt_str = "";
+	crx_meta_ping = -1;
 	while (TRUE)
 	{
 		// read first line of a record (player name),
@@ -937,6 +938,7 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 		crx_meta_mt_remain = -1;
 		if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
 		crx_meta_mt_str = "";
+		crx_meta_ping = -1;
 
 		// Look ahead one line for an optional "# meta ..." line.
 		// If it's not meta, cache it for the next loop.
@@ -965,6 +967,11 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 					else if (key == "mt_str") {
 						if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
 						crx_meta_mt_str = strzone(val);
+					}
+					else if (key == "ping")
+					{
+						crx_meta_ping = stof(val);
+						if (crx_meta_ping <= 0) crx_meta_ping = -1;
 					}
 					k += 2;
 				}
@@ -1061,6 +1068,8 @@ void (string filename, float recordset) write_player_stats =
 						extra = sprintf("# meta v2 %s", playerrecord2[i].rec_date);
 						if (playerrecord2[i].rec_mt_remain >= 0)
 							extra = sprintf("%s mt %g mt_str %s", extra, playerrecord2[i].rec_mt_remain, playerrecord2[i].rec_mt_str);
+						if (playerrecord2[i].rec_ping > 0)
+							extra = sprintf("%s ping %g", extra, playerrecord2[i].rec_ping);
 						fputs(f, extra); fputs(f, "\n");
 					}
 					i += 1;
@@ -1082,6 +1091,8 @@ void (string filename, float recordset) write_player_stats =
 					{
 						extra = sprintf("# meta v2 %s", playerrecord[i].rec_date);
 						// mt_* intentionally omitted for trial records
+						if (playerrecord[i].rec_ping > 0)
+							extra = sprintf("%s ping %g", extra, playerrecord[i].rec_ping);
 						fputs(f, extra); fputs(f, "\n");
 					}
 					i += 1;
@@ -1105,7 +1116,7 @@ void () write_capture_stats =
 		for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i++)
 		{
 			if (playerrecord[i].statvalue > 0)
-				gsheets_write_record(FALSE, i + 1, playerrecord[i].player, playerrecord[i].teamcolor, playerrecord[i].statvalue, playerrecord[i].rec_date, "");
+				gsheets_write_record(FALSE, i + 1, playerrecord[i].player, playerrecord[i].teamcolor, playerrecord[i].statvalue, playerrecord[i].rec_date, "", playerrecord[i].rec_ping);
 		}
 	}
 };
@@ -1121,7 +1132,7 @@ void () write_capture_stats_match =
 		for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i++)
 		{
 			if (playerrecord2[i].statvalue > 0)
-				gsheets_write_record(TRUE, i + 1, playerrecord2[i].player, playerrecord2[i].teamcolor, playerrecord2[i].statvalue, playerrecord2[i].rec_date, playerrecord2[i].rec_mt_str);
+				gsheets_write_record(TRUE, i + 1, playerrecord2[i].player, playerrecord2[i].teamcolor, playerrecord2[i].statvalue, playerrecord2[i].rec_date, playerrecord2[i].rec_mt_str, playerrecord2[i].rec_ping);
 		}
 	}
 };

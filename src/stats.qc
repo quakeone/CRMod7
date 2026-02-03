@@ -19,13 +19,14 @@ float(float team) ctf_match_get_top_record;
 //
 string(float want_match_record) stats_format_captime_record =
 {
-    local float have_mem, best_team, best_time;
+    local float have_mem, best_team, best_time, best_ping;
     local string best_name, line;
 
     best_name = "";
     have_mem = FALSE;
     best_time = 0;
     best_team = 0;
+    best_ping = -1;
 
     local float i;
 
@@ -41,6 +42,7 @@ string(float want_match_record) stats_format_captime_record =
                     best_time = playerrecord2[i].statvalue;
                     best_team = playerrecord2[i].teamcolor;
                     best_name = playerrecord2[i].player;
+                    best_ping = playerrecord2[i].rec_ping;
                 }
             }
         }
@@ -57,6 +59,7 @@ string(float want_match_record) stats_format_captime_record =
                     best_time = playerrecord[i].statvalue;
                     best_team = playerrecord[i].teamcolor;
                     best_name = playerrecord[i].player;
+                    best_ping = playerrecord[i].rec_ping;
                 }
             }
         }
@@ -64,6 +67,12 @@ string(float want_match_record) stats_format_captime_record =
 
     if (have_mem)
     {
+        if (best_ping > 0)
+            return sprintf("%s %s %-16s (ping %gms)\n",
+                           utils_get_time(best_time),
+                           get_team_letter(best_team),
+                           best_name,
+                           best_ping);
         return sprintf("%s %s %-16s\n",
                        utils_get_time(best_time),
                        get_team_letter(best_team),
@@ -105,10 +114,17 @@ string(float want_match_record) stats_format_captime_record =
 
     if (have_mem)
     {
-        line = sprintf("%s %s %-16s\n",
-                       utils_get_time(best_time),
-                       get_team_letter(best_team),
-                       best_name);
+        if (best_ping > 0)
+            line = sprintf("%s %s %-16s (ping %gms)\n",
+                           utils_get_time(best_time),
+                           get_team_letter(best_team),
+                           best_name,
+                           best_ping);
+        else
+            line = sprintf("%s %s %-16s\n",
+                           utils_get_time(best_time),
+                           get_team_letter(best_team),
+                           best_name);
         if (best_name != "")
             strunzone(best_name);
         return line;
@@ -1781,13 +1797,13 @@ void reset_records(float which) {
 		if (playerrecord2[i].rec_date!="")   strunzone(playerrecord2[i].rec_date);
 		if (playerrecord2[i].rec_mt_str!="") strunzone(playerrecord2[i].rec_mt_str);
 		playerrecord2[i].player=playerrecord2[i].rec_date=playerrecord2[i].rec_mt_str="";
-		playerrecord2[i].statvalue=0; playerrecord2[i].teamcolor=0; playerrecord2[i].rec_mt_remain=-1;
+		playerrecord2[i].statvalue=0; playerrecord2[i].teamcolor=0; playerrecord2[i].rec_mt_remain=-1; playerrecord2[i].rec_ping=-1;
 	} else for (i=0;i<PLAYER_RECORDS_MAX_COUNT;i++){
 		if (playerrecord[i].player!="")   strunzone(playerrecord[i].player);
 		if (playerrecord[i].rec_date!="") strunzone(playerrecord[i].rec_date);
 		if (playerrecord[i].rec_mt_str!="") strunzone(playerrecord[i].rec_mt_str);
 		playerrecord[i].player=playerrecord[i].rec_date=playerrecord[i].rec_mt_str="";
-		playerrecord[i].statvalue=0; playerrecord[i].teamcolor=0; playerrecord[i].rec_mt_remain=-1;
+		playerrecord[i].statvalue=0; playerrecord[i].teamcolor=0; playerrecord[i].rec_mt_remain=-1; playerrecord[i].rec_ping=-1;
 	}
 }
 
@@ -1812,6 +1828,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 			playerrecord[i].rec_date  = (crx_meta_date != "") ? strzone(crx_meta_date) : "";
 			playerrecord[i].rec_mt_remain = -1;
 			playerrecord[i].rec_mt_str = "";
+			playerrecord[i].rec_ping = (crx_meta_ping > 0) ? crx_meta_ping : -1;
 			tmp = (i+1);
 			break;
 		}
@@ -1831,6 +1848,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 				playerrecord[j].rec_date    = (playerrecord[j-1].rec_date != "") ? strzone(playerrecord[j-1].rec_date) : "";
 				playerrecord[j].rec_mt_str  = "";
 				playerrecord[j].rec_mt_remain = -1;
+				playerrecord[j].rec_ping = playerrecord[(j-1)].rec_ping;
 
 				j -= 1;
 			}
@@ -1845,6 +1863,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 			playerrecord[i].rec_date  = (crx_meta_date != "") ? strzone(crx_meta_date) : "";
 			playerrecord[i].rec_mt_remain = -1;
 			playerrecord[i].rec_mt_str = "";
+			playerrecord[i].rec_ping = (crx_meta_ping > 0) ? crx_meta_ping : -1;
 			tmp = (i+1);
 			break;
 		}
@@ -1876,6 +1895,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 			playerrecord2[i].rec_date      = (crx_meta_date != "")   ? strzone(crx_meta_date)   : "";
 			playerrecord2[i].rec_mt_remain = crx_meta_mt_remain;
 			playerrecord2[i].rec_mt_str    = (crx_meta_mt_str != "") ? strzone(crx_meta_mt_str) : "";
+			playerrecord2[i].rec_ping = (crx_meta_ping > 0) ? crx_meta_ping : -1;
 			tmp = (i+1);
 			break;
 		}
@@ -1895,6 +1915,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 				playerrecord2[j].rec_date    = (playerrecord2[j-1].rec_date != "") ? strzone(playerrecord2[j-1].rec_date) : "";
 				playerrecord2[j].rec_mt_remain = playerrecord2[(j-1)].rec_mt_remain;
 				playerrecord2[j].rec_mt_str  = (playerrecord2[j-1].rec_mt_str != "") ? strzone(playerrecord2[j-1].rec_mt_str) : "";
+				playerrecord2[j].rec_ping = playerrecord2[(j-1)].rec_ping;
 
 				j -= 1;
 			}
@@ -1909,6 +1930,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 			playerrecord2[i].rec_date      = (crx_meta_date != "")   ? strzone(crx_meta_date)   : "";
 			playerrecord2[i].rec_mt_remain = crx_meta_mt_remain;
 			playerrecord2[i].rec_mt_str    = (crx_meta_mt_str != "") ? strzone(crx_meta_mt_str) : "";
+			playerrecord2[i].rec_ping = (crx_meta_ping > 0) ? crx_meta_ping : -1;
 			tmp = (i+1);
 			break;
 		}
@@ -1939,6 +1961,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 			playerrecord[i].rec_date  = (crx_meta_date != "") ? strzone(crx_meta_date) : "";
 			playerrecord[i].rec_mt_remain = -1;
 			playerrecord[i].rec_mt_str = "";
+			playerrecord[i].rec_ping = (crx_meta_ping > 0) ? crx_meta_ping : -1;
 			tmp = (i+1);
 			break;
 		}
@@ -1958,6 +1981,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 				playerrecord[j].rec_date    = (playerrecord[j-1].rec_date != "") ? strzone(playerrecord[j-1].rec_date) : "";
 				playerrecord[j].rec_mt_str  = "";
 				playerrecord[j].rec_mt_remain = -1;
+				playerrecord[j].rec_ping = playerrecord[(j-1)].rec_ping;
 
 				j -= 1;
 			}
@@ -1972,6 +1996,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 			playerrecord[i].rec_date  = (crx_meta_date != "") ? strzone(crx_meta_date) : "";
 			playerrecord[i].rec_mt_remain = -1;
 			playerrecord[i].rec_mt_str = "";
+			playerrecord[i].rec_ping = (crx_meta_ping > 0) ? crx_meta_ping : -1;
 			tmp = (i+1);
 			break;
 		}
@@ -2002,6 +2027,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 			playerrecord2[i].rec_date      = (crx_meta_date != "")   ? strzone(crx_meta_date)   : "";
 			playerrecord2[i].rec_mt_remain = crx_meta_mt_remain;
 			playerrecord2[i].rec_mt_str    = (crx_meta_mt_str != "") ? strzone(crx_meta_mt_str) : "";
+			playerrecord2[i].rec_ping = (crx_meta_ping > 0) ? crx_meta_ping : -1;
 			tmp = (i+1);
 			break;
 		}
@@ -2021,6 +2047,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 				playerrecord2[j].rec_date    = (playerrecord2[j-1].rec_date != "") ? strzone(playerrecord2[j-1].rec_date) : "";
 				playerrecord2[j].rec_mt_remain = playerrecord2[(j-1)].rec_mt_remain;
 				playerrecord2[j].rec_mt_str  = (playerrecord2[j-1].rec_mt_str != "") ? strzone(playerrecord2[j-1].rec_mt_str) : "";
+				playerrecord2[j].rec_ping = playerrecord2[(j-1)].rec_ping;
 
 				j -= 1;
 			}
@@ -2035,6 +2062,7 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_high_r
 			playerrecord2[i].rec_date      = (crx_meta_date != "")   ? strzone(crx_meta_date)   : "";
 			playerrecord2[i].rec_mt_remain = crx_meta_mt_remain;
 			playerrecord2[i].rec_mt_str    = (crx_meta_mt_str != "") ? strzone(crx_meta_mt_str) : "";
+			playerrecord2[i].rec_ping = (crx_meta_ping > 0) ? crx_meta_ping : -1;
 			tmp = (i+1);
 			break;
 		}
