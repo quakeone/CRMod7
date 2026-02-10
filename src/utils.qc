@@ -2783,6 +2783,7 @@ void(entity ev) webhook_stats_info =
     local float use_find; // choose player iteration strategy (arena uses find())
     local float is_arena;
     local float eligible_players;
+    local float total_frags;
 
     // efficiency helpers
     local float kfrac, ktot, wfrac, wtot;
@@ -2808,19 +2809,26 @@ void(entity ev) webhook_stats_info =
     is_arena = mode_is_arena();
     use_find = is_arena || !(clanring_playmode & CLANRING_MATCH_MODE);
 
-    // Skip Discord stats if there are fewer than two eligible players.
+    // Skip Discord stats if there are fewer than two eligible players,
+    // or if every player has 0 frags (idle/afk game).
     eligible_players = 0;
+    total_frags = 0;
     if (use_find) p = find(world, classname, "player");
     else p = clanring_sentinel.next_player;
     while (p)
     {
         if ((is_arena && p.next_team != world) ||
             (!is_arena && !(p.style & CLANRING_OBSERVER)))
+        {
             eligible_players = eligible_players + 1;
+            total_frags = total_frags + p.frags;
+        }
         if (use_find) p = find(p, classname, "player");
         else p = p.next_player;
     }
     if (eligible_players < 2)
+        return;
+    if (total_frags <= 0)
         return;
 
     // Resolve + sanitize URL
@@ -3176,7 +3184,7 @@ void(entity ev) webhook_stats_info =
                 q_seen += 1;
 
                 if (p.style & CLANRING_OBSERVER) { q_obs += 1; }
-                else if (p.next_team == world)   { q_noteam += 1; }
+                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world))   { q_noteam += 1; }
                 else
                 {
                     if (!opened_quad) {
@@ -3298,7 +3306,7 @@ void(entity ev) webhook_stats_info =
                 it_seen += 1;
 
                 if (p.style & CLANRING_OBSERVER) { it_obs += 1; }
-                else if (p.next_team == world)   { it_noteam += 1; }
+                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world))   { it_noteam += 1; }
                 else
                 {
                     if (!opened2) {
@@ -3322,8 +3330,7 @@ void(entity ev) webhook_stats_info =
                     if (webhook_stats_len > (maxlen - 120)) { it_limit += 1; break; }
                 }
 
-                if (clanring_playmode & CLANRING_MATCH_MODE) p = p.next_player;
-                else p = find(p, classname, "player");
+                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
         }
         if (opened2) APPEND_SAFE("```\n");
@@ -3343,6 +3350,7 @@ void(entity ev) webhook_stats_info =
                 {
                     mins_norm = max(1, (time - p.join_time) / 60);
                     per_min   = Q1_PER_Calc_Eff(p) / mins_norm;
+                    if (per_min < 0.1) per_min = 0.1;
                     v = per_min;
 
                     if (v > b1) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=b1; e2=e1; b1=v; e1=p; }
@@ -3378,6 +3386,17 @@ void(entity ev) webhook_stats_info =
                 local float dmg_tokill = (ep.mangle_z > 0) ? (ep.dmg_taken / ep.mangle_z) : ep.dmg_taken;
                 local float resilience = dmg_tokill / dmg_min;
                 local float res_term   = res_coeff * max(0, pow(resilience, 1.2) - 1);
+                local float quad_mins  = ep.totalquad / 60;
+                local float quad_eff   = 0;
+                local float quad_eff_scale = 0;
+                local float quad_term  = 0;
+                local float quad_eff_pct = 0;
+                if (ep.clanring_qdwep_y > 0)
+                    quad_eff = ep.clanring_qdwep_x / ep.clanring_qdwep_y;
+                quad_eff_scale = bound(0.5, quad_eff / 0.22, 1.25);
+                if (quad_mins > 0)
+                    quad_term = 10.0 * pow(quad_mins, 0.5) * quad_eff_scale;
+                quad_eff_pct = floor(100 * quad_eff + 0.5);
 
                 local float T[20]; local float base, vv;
                 T[0]  = (0.9 * kd_spread * pow(fabs(kd_spread), 0.1125)) / per_mins;         // big KD spread
@@ -3385,7 +3404,7 @@ void(entity ev) webhook_stats_info =
                 T[2]  = res_term / per_mins;                                                 // hard-to-kill bonus
                 T[3]  = (2.5 * ep.stats_powerup_denial_quad) / per_mins;                     // enemy Quad kills
 
-                T[4]  = (2.0 * ep.totalquad) / per_mins;                                     // Quad control time
+                T[4]  = quad_term / per_mins;                                                 // Quad control conversion
                 T[5]  = (5.0 * ep.clanring_ptwep_z) / per_mins;                              // Pents taken
                 T[6]  = (1.0 * ep.stats_item_ring) / per_mins;                               // Rings
                 T[7]  = (0.30 * ep.stats_item_redarmor) / per_mins;                          // RA
@@ -3423,7 +3442,7 @@ void(entity ev) webhook_stats_info =
                     }
                 }
 
-                // quad control helper: show seconds held + pickup count
+                // quad control helper: show seconds held + pickup count + conversion quality
                 local float quad_secs = floor(ep.totalquad + 0.5);
                 local float quad_takes = ep.clanring_qdwep_z;
                 local string quad_pickup_word; quad_pickup_word = "quad pickups";
@@ -3439,7 +3458,7 @@ void(entity ev) webhook_stats_info =
                     else if (i1 == 1)  APPEND_SAFE(sprintf("  1) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r1v));
                     else if (i1 == 2)  APPEND_SAFE(sprintf("  1) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r1v));
                     else if (i1 == 3)  APPEND_SAFE(sprintf("  1) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r1v));
-                    else if (i1 == 4)  APPEND_SAFE(sprintf("  1) Quad control time (%gs total; %g %s) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, r1v));
+                    else if (i1 == 4)  APPEND_SAFE(sprintf("  1) quad control conversion (%gs total; %g %s; %g%% eff) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, quad_eff_pct, r1v));
                     else if (i1 == 5)  APPEND_SAFE(sprintf("  1) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r1v));
                     else if (i1 == 6)  APPEND_SAFE(sprintf("  1) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r1v));
                     else if (i1 == 7)  APPEND_SAFE(sprintf("  1) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r1v));
@@ -3461,7 +3480,7 @@ void(entity ev) webhook_stats_info =
                     else if (i2 == 1)  APPEND_SAFE(sprintf("  2) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r2v));
                     else if (i2 == 2)  APPEND_SAFE(sprintf("  2) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r2v));
                     else if (i2 == 3)  APPEND_SAFE(sprintf("  2) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r2v));
-                    else if (i2 == 4)  APPEND_SAFE(sprintf("  2) Quad control time (%gs total; %g %s) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, r2v));
+                    else if (i2 == 4)  APPEND_SAFE(sprintf("  2) quad control conversion (%gs total; %g %s; %g%% eff) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, quad_eff_pct, r2v));
                     else if (i2 == 5)  APPEND_SAFE(sprintf("  2) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r2v));
                     else if (i2 == 6)  APPEND_SAFE(sprintf("  2) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r2v));
                     else if (i2 == 7)  APPEND_SAFE(sprintf("  2) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r2v));
@@ -3483,7 +3502,7 @@ void(entity ev) webhook_stats_info =
                     else if (i3 == 1)  APPEND_SAFE(sprintf("  3) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r3v));
                     else if (i3 == 2)  APPEND_SAFE(sprintf("  3) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r3v));
                     else if (i3 == 3)  APPEND_SAFE(sprintf("  3) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r3v));
-                    else if (i3 == 4)  APPEND_SAFE(sprintf("  3) Quad control time (%gs total; %g %s) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, r3v));
+                    else if (i3 == 4)  APPEND_SAFE(sprintf("  3) quad control conversion (%gs total; %g %s; %g%% eff) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, quad_eff_pct, r3v));
                     else if (i3 == 5)  APPEND_SAFE(sprintf("  3) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r3v));
                     else if (i3 == 6)  APPEND_SAFE(sprintf("  3) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r3v));
                     else if (i3 == 7)  APPEND_SAFE(sprintf("  3) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r3v));

@@ -2212,20 +2212,25 @@ void(entity player) match_remove_player =
     local string teamname;
     local entity pteam;
     local float player_still_on_team;
+    local float should_announce;
 
     if (player.next_team == world)
         return;
 
     teamname = player.next_team.netname;
+    should_announce = (player.style & CLANRING_CONNECTED);
 
    // Check if player is becoming an observer or disconnecting
    if ((player.style & CLANRING_OBSERVER) || (player.team == 0))
    {
        // Player is becoming observer or disconnecting - print leaving message
-       if (teamname == "")          // ---- player had no team ----
-           announce2(player.netname, " left the game.");   // 2-piece print
-       else                         // ---- normal team message ----
-           announce4(player.netname, " left the ", teamname, ".");
+       if (should_announce)
+       {
+           if (teamname == "")          // ---- player had no team ----
+               announce2(player.netname, " left the game.");   // 2-piece print
+           else                         // ---- normal team message ----
+               announce4(player.netname, " left the ", teamname, ".");
+       }
    }
    else
    {
@@ -2243,7 +2248,7 @@ void(entity player) match_remove_player =
        }
 
        // Only print leaving message if player is not staying on a team
-       if (!player_still_on_team)
+       if (!player_still_on_team && should_announce)
        {
            if (teamname == "")          // ---- player had no team ----
                announce2(player.netname, " left the game.");   // 2-piece print

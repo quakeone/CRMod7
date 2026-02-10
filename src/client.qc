@@ -35,6 +35,9 @@ void() votables_request_q14ever;   // new: single-command toggle+auto-start
 void() votables_request_set_prediction;
 void () client_typing_on;
 void () client_typing_off;
+void () CaptureHighScores_sprint;
+void () AirshotHighScores_sprint;
+string format_rec_meta(string rec_date, string rec_mt_str, float rec_ping, float include_mt);
 
 // Entity field declarations
 .float just_suicided; // set briefly when a death is a self-kill/suicide
@@ -3236,6 +3239,136 @@ float (string s) FindNumericalInput =
     return pass;
 }
 
+// Read top 3 records from a captimes .crx file (disk-only; does not touch live in-memory records).
+string (string stats_filename, float include_mt, string empty_msg) captimes_read_top3_from_file =
+{
+    local filestream f;
+    local string out, line, player_name, maybe, rec_date, rec_mt_str, meta, prefix;
+    local string key, val;
+    local float argc, argc2, team_color, time_value, rec_ping, count, p, k;
+
+    out = "";
+    line = "";
+    player_name = "";
+    maybe = "";
+    rec_date = "";
+    rec_mt_str = "";
+    meta = "";
+    prefix = "";
+    key = "";
+    val = "";
+    argc = 0;
+    argc2 = 0;
+    team_color = 0;
+    time_value = 0;
+    rec_ping = -1;
+    count = 0;
+    p = 0;
+    k = 0;
+
+    f = fopen(sprintf("stats/%s", stats_filename), FILE_READ);
+    if (f < 0)
+        f = fopen(sprintf("data/stats/%s", stats_filename), FILE_READ);
+    if (f < 0)
+        return strcat(empty_msg, "\n");
+
+    _crx_peek_line = ""; // clear stale lookahead cache
+    while (count < 3)
+    {
+        if (_crx_peek_line != "")
+        {
+            line = _crx_peek_line;
+            _crx_peek_line = "";
+        }
+        else
+        {
+            line = fgets(f);
+        }
+        if (!line) break;
+
+        argc = tokenize(line);
+        if (!argc) continue;
+        if (argv(0) == "//" || argv(0) == "#") continue;
+
+        player_name = strtrim(line);
+
+        line = fgets(f); if (!line) break;
+        team_color = stof(line);
+
+        line = fgets(f); if (!line) break;
+        time_value = stof(line);
+
+        rec_date = "";
+        rec_mt_str = "";
+        rec_ping = -1;
+
+        maybe = fgets(f);
+        if (maybe)
+        {
+            argc2 = tokenize(maybe);
+            if (argc2 >= 3 && argv(0) == "#" && strtolower(argv(1)) == "meta")
+            {
+                p = 2;
+                if (argc2 >= 4 && strtolower(argv(2)) == "v2")
+                    p = 3;
+
+                if (argc2 > p)
+                    rec_date = argv(p);
+
+                k = p + 1;
+                while (k + 1 < argc2)
+                {
+                    key = strtolower(argv(k));
+                    val = argv(k + 1);
+                    if (key == "mt_str")
+                        rec_mt_str = val;
+                    else if (key == "ping")
+                    {
+                        rec_ping = stof(val);
+                        if (rec_ping <= 0) rec_ping = -1;
+                    }
+                    k = k + 2;
+                }
+            }
+            else
+            {
+                _crx_peek_line = maybe; // feed non-meta line back into next loop
+            }
+        }
+
+        if (time_value <= 0)
+            continue;
+
+        if (count == 0) prefix = "\1";
+        else if (count == 1) prefix = "\2";
+        else prefix = "\3";
+
+        line = sprintf("%s  %s %s %-16s", prefix, utils_get_time(time_value), get_team_letter(team_color), player_name);
+        meta = format_rec_meta(rec_date, rec_mt_str, rec_ping, include_mt);
+        if (meta != "")
+            line = strcat(line, meta);
+
+        out = strcat(out, line, "\n");
+        count = count + 1;
+    }
+
+    fclose(f);
+    _crx_peek_line = "";
+
+    if (out == "")
+        return strcat(empty_msg, "\n");
+    return out;
+};
+
+void (string wanted_map) captimes_show_map_sprint =
+{
+    local string trial_lines, match_lines;
+
+    trial_lines = captimes_read_top3_from_file(sprintf("%s_captimes.crx", wanted_map), FALSE, "No capture times set");
+    match_lines = captimes_read_top3_from_file(sprintf("%s_captimes_match.crx", wanted_map), TRUE, "No match capture times set");
+    sprint(self, sprintf("\bTime Trial Leaders\b for %s:\n", wanted_map), trial_lines, "\bMatch Times\b:\n", match_lines, "\n");
+};
+
 void(string cmd) SV_ParseClientCommand =
 {
     local float args, modecmd, mapnumber=0;
@@ -3383,6 +3516,43 @@ void(string cmd) SV_ParseClientCommand =
         case "afkoff":
             client_afk_off();
             return;
+
+        case "captimes":
+        case "highscores":
+        {
+            // New map lookup form: "cmd captimes <mapname>" (all modes)
+            if ((clanring_playmode & CLANRING_MATCH_MODE) && (clanring_state & CLANRING_MATCH_STARTED) && !(clanring_state & CLANRING_MATCH_OVER))
+            {
+                sprint(self, "cmd captimes <mapname> is not available during match.\n");
+                return;
+            }
+
+            if (arg1 == "")
+            {
+                if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+                    CaptureHighScores_sprint();
+                else if (clanring_playmode & CLANRING_AIRSHOT_MODE)
+                    AirshotHighScores_sprint();
+                return;
+            }
+
+            local string wanted_map;
+            wanted_map = strzone(strtolower(arg1));
+
+            if (wanted_map == ""
+                || strstrofs(wanted_map, "/", 0) >= 0
+                || strstrofs(wanted_map, "\\", 0) >= 0
+                || strstrofs(wanted_map, "..", 0) >= 0)
+            {
+                sprint(self, "Invalid map name for captimes.\n");
+                strunzone(wanted_map);
+                return;
+            }
+
+            captimes_show_map_sprint(wanted_map);
+            strunzone(wanted_map);
+            return;
+        }
 
         case "typingon":
             client_typing_on();

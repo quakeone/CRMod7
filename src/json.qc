@@ -914,7 +914,7 @@ void() json_emit_match_document =
                   local float tot_done  = tot_enemy + p.clanring_badstats_y + p.clanring_badstats_z;
                   local float self_pct  = json_pct(p.clanring_badstats_y,  tot_done);
                   local float team_pct  = json_pct(p.clanring_badstats_z,  tot_done);
-                  local float per_val   = 0; if (p.join_time > 0){ local float s2 = time - p.join_time; if (s2 > 1) per_val = Q1_PER_Calc_Eff(p) / (s2 / 60); }
+                  local float per_val = 0.1; if (p.join_time > 0){ local float s2 = time - p.join_time; if (s2 > 1) per_val = Q1_PER_Calc_Eff(p) / (s2 / 60); if (per_val < 0.1) per_val = 0.1; }
 
                   json_begin_object();
                     json_kv_string("name", p.netname);

@@ -597,7 +597,7 @@ void () observer_start =
 
 	// Add "left the game" message for normal DM and CTF modes
 	local float was_playing = !(self.style & CLANRING_OBSERVER);
-	if (was_playing && !mode_is_arena() && !(clanring_playmode & CLANRING_MATCH_MODE))
+	if (was_playing && (self.style & CLANRING_CONNECTED) && !mode_is_arena() && !(clanring_playmode & CLANRING_MATCH_MODE))
 	{
 		if ((clanring_playmode & CLANRING_NORMAL_MODE) &&
 			(!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) || (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)))

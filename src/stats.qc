@@ -1184,13 +1184,31 @@ float(float x) round2d =
 //  It is broken down as follows:
 //
 //  * Combat            kill-death spread + damage spread + "hard to kill" bonus + Quad Kill (enemy) bonus
-//  * Resources         powerup pickups + armour/mega taken + weapon pickups
+//  * Resources         quad control conversion + powerup pickups + armour/mega taken + weapon pickups
 //  * Objectives (CTF)  captures, carries time, base/carrier defense, returns
 //  * Penalties         Teamkills, team?damage, dropped RL/LG paks, extra pen. for Quad-TK
 //
+float (entity p) Q1_PER_QuadControlTerm =
+{
+    local float quad_mins, qd_eff, eff_scale;
+
+    quad_mins = p.totalquad / 60;
+    if (quad_mins <= 0)
+        return 0;
+
+    if (p.clanring_qdwep_y > 0)
+        qd_eff = p.clanring_qdwep_x / p.clanring_qdwep_y;
+    else
+        qd_eff = 0;
+
+    // Reward quad control, but with diminishing returns and conversion quality.
+    eff_scale = bound(0.5, qd_eff / 0.22, 1.25);
+    return 10.0 * pow(quad_mins, 0.5) * eff_scale;
+};
+
 float (entity p) Q1_PER_Calc_Eff =
 {
-    float kd_spread, dmg_spread, dmg_tokill, dmg_min, resilience, res_coeff, res_term;
+    float kd_spread, dmg_spread, dmg_tokill, dmg_min, resilience, res_coeff, res_term, quad_term;
     float combat_raw, resources_raw, objectives_raw, penalties_raw;
     
     // Combat (Kills/Deaths, Damage, Resilience, and bonuses)
@@ -1208,7 +1226,8 @@ float (entity p) Q1_PER_Calc_Eff =
     // We'll treat resilience as *bonus-only*: no penalty for being below baseline.
     dmg_tokill = (p.mangle_z > 0) ? (p.dmg_taken / p.mangle_z) : p.dmg_taken;
     resilience = dmg_tokill / dmg_min;  // 1.0 == baseline 'took about enough damage to die once'
-    res_term  = res_coeff * max(0, pow(resilience, 1.2) - 1);
+    res_term   = res_coeff * max(0, pow(resilience, 1.2) - 1);
+	quad_term  = Q1_PER_QuadControlTerm(p);
 
     combat_raw =
         0.9 * kd_spread * pow(fabs(kd_spread), 0.1125)  // killstats: kills-deaths, using a 0.9 multiplier, and super-linearly scaled @ ^1.1125
@@ -1221,7 +1240,7 @@ float (entity p) Q1_PER_Calc_Eff =
     // ============================================
    
     resources_raw =
-        2.0 * p.totalquad
+        quad_term
       + 5.0 * p.clanring_ptwep_z                  // Pents taken
       + 1.0 * p.stats_item_ring
       + 0.30 * p.stats_item_redarmor
@@ -1271,7 +1290,7 @@ float (entity p) Q1_PER_Calc_Eff =
 	// Store as negative so a quick dump shows deductions clearly
 	p.per_penalties = round2d(-penalties_raw);
 	
-	return max(0, round2d(combat_raw + resources_raw + objectives_raw - penalties_raw));
+	return round2d(combat_raw + resources_raw + objectives_raw - penalties_raw);
 };
 
 // ---------------------------------------------
@@ -1309,6 +1328,7 @@ float(entity p) PER_HasNontrivialActivity =
 void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 {
 	local float dmg_min, res_coeff, kd_spread, dmg_spread, dmg_tokill, resilience, res_term;
+	local float quad_term, q_eff_pct;
 	local float v, top1, top2, top3;
 	local string r1, r2, r3;
 	local float min_show; // ignore tiny noise terms
@@ -1326,6 +1346,11 @@ void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 	dmg_tokill = (p.mangle_z > 0) ? (p.dmg_taken / p.mangle_z) : p.dmg_taken;
 	resilience = dmg_tokill / dmg_min;
 	res_term   = res_coeff * max(0, pow(resilience, 1.2) - 1);
+	quad_term  = Q1_PER_QuadControlTerm(p);
+	if (p.clanring_qdwep_y > 0)
+		q_eff_pct = floor((100 * p.clanring_qdwep_x / p.clanring_qdwep_y) + 0.5);
+	else
+		q_eff_pct = 0;
 
 	// insertion helper (inline) — maintain top1/top2/top3 by value
 	#define TRY_PUSH(_val, _label) \
@@ -1352,8 +1377,8 @@ void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 	          sprintf("enemy Quad kills (%g)", p.stats_powerup_denial_quad) );
 
 	// ---- Resources atomic terms ----
-	TRY_PUSH( 2.0 * p.totalquad,
-	          sprintf("Quad control time (%gs total; %g quad pickups)", floor(p.totalquad + 0.5), p.clanring_qdwep_z) );
+	TRY_PUSH( quad_term,
+	          sprintf("quad control conversion (%gs total; %g quad pickups; %g%% eff)", floor(p.totalquad + 0.5), p.clanring_qdwep_z, q_eff_pct) );
 	TRY_PUSH( 5.0 * p.clanring_ptwep_z,
 	          sprintf("Pents taken (%g)", p.clanring_ptwep_z) );
 	TRY_PUSH( 1.0 * p.stats_item_ring,
@@ -1404,7 +1429,7 @@ void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 			+ 2.5 * p.stats_powerup_denial_quad
 			+ res_term;
 		resources_raw =
-			  2.0 * p.totalquad
+			  quad_term
 			+ 5.0 * p.clanring_ptwep_z
 			+ 1.0 * p.stats_item_ring
 			+ 0.30 * p.stats_item_redarmor
@@ -1479,6 +1504,7 @@ void() stats_show_per =
             short_and_empty = (match_secs < 60) && (!PER_HasNontrivialActivity(p));
 
             final_per = Q1_PER_Calc_Eff(p) / mins_norm;
+            if (final_per < 0.1) final_per = 0.1;
 
             if (p == self)
                 sprint(self, sprintf("\x90%5.1f\x91 ü %s\n", final_per, p.netname));
