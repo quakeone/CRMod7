@@ -758,6 +758,11 @@ void() misc_shadowcontroller_use;
 void() shadow_fade_in;
 void() shadow_fade_out;
 void() match_clear_leavemealone;
+float(entity e) frogbot_is_bot_client;
+void() frogbot_init_world;
+void() frogbot_preserve_dynamic_sources;
+void() frogbot_client_frame;
+void(string arg0, string arg1, string arg2, string arg3) frogbot_handle_client_cmd;
 
 // from Custents
 // variable for healing trigger
@@ -833,6 +838,94 @@ float  crx_meta_ping;
 
 // --- vote menu cooldown ---
 .float next_vote_time;     // cooldown for vote menu changes
+
+// --- Frogbot route marker fields (.bot map files) ---
+.float fb_marker_index;
+.float fb_goal;
+.float fb_zone;
+.float fb_marker_flags;
+.entity fb_dynsource;
+.float fb_last_visit_time;
+.float fb_is_bot_client;
+.float fb_bot_bootstrap;
+.string fb_bot_name;
+.entity fb_prev_marker;
+.entity fb_current_marker;
+.entity fb_target_marker;
+.float fb_target_path_index;
+.float fb_target_path_flags;
+.entity fb_failed_from_marker;
+.entity fb_failed_to_marker;
+.float fb_failed_until;
+.float fb_last_progress_time;
+.float fb_last_target_distance;
+.float fb_stuck_count;
+.float fb_next_route_log_time;
+.float fb_next_move_log_time;
+.entity fb_enemy_target;
+.float fb_next_enemy_scan_time;
+.float fb_last_enemy_seen_time;
+.float fb_next_combat_log_time;
+.float fb_strafe_dir;
+.float fb_next_strafe_swap_time;
+.float fb_next_jump_time;
+.float fb_target_path_hint;
+.float fb_target_rj_delay;
+.float fb_rj_pending;
+.float fb_rj_fire_time;
+.float fb_rj_pitch;
+.float fb_rj_yaw;
+.entity fb_path0;
+.entity fb_path1;
+.entity fb_path2;
+.entity fb_path3;
+.entity fb_path4;
+.entity fb_path5;
+.entity fb_path6;
+.entity fb_path7;
+.float fb_pathflags0;
+.float fb_pathflags1;
+.float fb_pathflags2;
+.float fb_pathflags3;
+.float fb_pathflags4;
+.float fb_pathflags5;
+.float fb_pathflags6;
+.float fb_pathflags7;
+.float fb_pathhint0;
+.float fb_pathhint1;
+.float fb_pathhint2;
+.float fb_pathhint3;
+.float fb_pathhint4;
+.float fb_pathhint5;
+.float fb_pathhint6;
+.float fb_pathhint7;
+.float fb_rj_pitch0;
+.float fb_rj_pitch1;
+.float fb_rj_pitch2;
+.float fb_rj_pitch3;
+.float fb_rj_pitch4;
+.float fb_rj_pitch5;
+.float fb_rj_pitch6;
+.float fb_rj_pitch7;
+.float fb_rj_yaw0;
+.float fb_rj_yaw1;
+.float fb_rj_yaw2;
+.float fb_rj_yaw3;
+.float fb_rj_yaw4;
+.float fb_rj_yaw5;
+.float fb_rj_yaw6;
+.float fb_rj_yaw7;
+.float fb_rj_delay0;
+.float fb_rj_delay1;
+.float fb_rj_delay2;
+.float fb_rj_delay3;
+.float fb_rj_delay4;
+.float fb_rj_delay5;
+.float fb_rj_delay6;
+.float fb_rj_delay7;
+.float fb_route_goal_cost;
+.float fb_blocked_until;
+.float fb_blocked_hits;
 
 // Utility: fast proximity check to avoid re-solidifying inside others
 float(entity center, float rad) AnySolidPlayerInRadius =

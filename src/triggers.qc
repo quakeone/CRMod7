@@ -471,6 +471,7 @@ void() teleport_touch =
 	}
 
 	setorigin(other, t.origin);
+	frogbot_post_teleport_transition(other, self, t);
 	other.tp_time = time;
 	other.angles = t.mangle;
 	other.flags = other.flags - other.flags & FL_ONGROUND;	

@@ -22,6 +22,7 @@ void() UnHookPlayer;
 void() utils_update_server_time;
 void() utils_save_disconnect_log;
 void(float ghost) G1v1_UpdateQuadAlpha;
+float() frogbot_kick_all_for_mode_switch;
 
 //
 //  S E N D  A L I A S E S
@@ -378,6 +379,10 @@ void() votables_set_gametype_mode_map =
 		return;
 
 	local string newmapname = "", request_mapname = "";
+	local float mode_switch_requested;
+	local float kicked_mode_switch;
+
+	mode_switch_requested = ((request_gametype >= 0) || (request_mode >= 0));
 
 	if (request_gametype >= 0)
 	{
@@ -589,6 +594,15 @@ void() votables_set_gametype_mode_map =
 	// If we changed into a mode that doesn't permit leave-me-alone, clear it now
 	if (!leavemealone_mode_allows())
 		utils_do_players(match_clear_leavemealone);
+
+	// Keep bots on pure map switches, but remove them for mode/gametype changes.
+	if (mode_switch_requested)
+	{
+		kicked_mode_switch = frogbot_kick_all_for_mode_switch();
+		cvar_set("frogbot_purge_next_map", "1");
+		bprint(sprintf("Frogbot debug: mode-switch request type=%g mode=%g map=%s kicked_now=%g\n",
+		               request_gametype, request_mode, newmapname, kicked_mode_switch));
+	}
 
 	changelevel (newmapname);
 };

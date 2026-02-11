@@ -68,7 +68,7 @@ float(float ballot) Request_Poll_Votes_Needed =
 	{
 		while (bingo)
 		{
-			if (bingo.style & CLANRING_CONNECTED)
+			if ((bingo.style & CLANRING_CONNECTED) && !frogbot_is_bot_client(bingo))
 			{
 				if (bingo.style & CLANRING_AFK_CLIENT)
 				{
@@ -98,7 +98,7 @@ float(float ballot) Request_Poll_Votes_Needed =
 		{
 			while (bingo)
 			{
-				if (bingo.style & CLANRING_CONNECTED)
+				if ((bingo.style & CLANRING_CONNECTED) && !frogbot_is_bot_client(bingo))
 				{
 					if (bingo.style & CLANRING_AFK_CLIENT)
 					{

@@ -780,6 +780,9 @@ void () clanring_init_world =
     }
 
     W_Precache ();
+
+    // Preserve dynamic bot-route sources before arena/mode init mutates entities.
+    frogbot_preserve_dynamic_sources();
     // show mode
     mode = options_get_mode();
     szmode = strings_get_mode(mode);
@@ -809,6 +812,7 @@ void () clanring_init_world =
     utils_make_scheduled_event(clanring_remove_start_teleport, 3);
     // keep name overlays in sync if players rename mid-status (AFK/Ready/etc)
     utils_make_scheduled_event(utils_namewatch_think, 1);
+    frogbot_init_world();
 
     // woods set serverinfo mod name
     forceinfokey(world, "mod", clanring_version_info);
@@ -963,6 +967,13 @@ void () clanring_set_aliases =
     temp = self;
     self = self.owner;
 
+    if (frogbot_is_bot_client(self))
+    {
+        self = temp;
+        remove(self);
+        return;
+    }
+
     // Check for binds
     if (self.style & CLANRING_FOUND_BINDINGS)
     {
@@ -1087,6 +1098,12 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias pos_show cmd pos_show\n");
     stuffcmd(self, "alias pos_origin cmd pos_origin\n");
     stuffcmd(self, "alias pos_angles cmd pos_angles\n");
+    stuffcmd(self, "alias botadd cmd botadd\n");
+    stuffcmd(self, "alias botkick cmd botkick\n");
+    stuffcmd(self, "alias botkickall cmd botkickall\n");
+    stuffcmd(self, "alias botroutes cmd botroutes\n");
+    stuffcmd(self, "alias bots cmd bots\n");
+    stuffcmd(self, "alias botver cmd botver\n");
     stuffcmd(self, "alias lastplayers impulse 188\n");
     
     self.style = self.style | CLANRING_FOUND_BINDINGS;
@@ -1416,17 +1433,24 @@ string() server_find_myClient =
 void () clanring_client_connect =
 {
     local string text = "";
-        
+    local float is_bot;
+
+    is_bot = frogbot_is_bot_client(self);
+    self.fb_is_bot_client = is_bot;
+
     if (parm10 & CLANRING_NEW_CLIENT)
     {
         // This is a new client (just connected over the network)
         // Show the MOTD unless this player was here recently (in 'last').
         // EXEMPTION: if the name contains "player" anywhere, always show MOTD.
-        if ( utils_name_has_player(self.netname)
-          || !utils_is_in_last_disconnects(self.netname) )
-            motd_create();
+        if (!is_bot)
+        {
+            if ( utils_name_has_player(self.netname)
+              || !utils_is_in_last_disconnects(self.netname) )
+                motd_create();
 
-        utils_make_scheduled_event(clanring_init_think, 0.5);
+            utils_make_scheduled_event(clanring_init_think, 0.5);
+        }
         // Get rid of the new client flag
         parm10	= parm10 - (parm10 & CLANRING_NEW_CLIENT);
         
@@ -1444,7 +1468,8 @@ void () clanring_client_connect =
         self.afk_time = time + 20;
 
         text = server_find_myClient();  //This also sets self.client
-        bprint (self.netname," has connected", text);
+        if (!is_bot)
+            bprint (self.netname," has connected", text);
     }
     else 
     {
@@ -1459,7 +1484,8 @@ void () clanring_client_connect =
     }
 
     // send aliases if necessary
-    utils_make_scheduled_event(clanring_send_ignore_this, 1);
+    if (!is_bot)
+        utils_make_scheduled_event(clanring_send_ignore_this, 1);
 
     //utils_make_scheduled_event(clanring_send_detect, 0.8);
 
@@ -1793,6 +1819,7 @@ void () clanring_help_misc =
     sprint(self, " autoweapon - toggle smartweapon\n");
     sprint(self, " autopause  - toggle auto pausing\n");
     sprint(self, " last       - show recently disconnected players\n");
+    sprint(self, " bots       - show frogbot status\n");
 };
 
 //
@@ -1839,6 +1866,8 @@ void () clanring_commands =
         sprint(self, " \bghostlist\b    \bnextcam\b\n");
         sprint(self, " \bhelp-admin\b   \boptions\b\n");
         sprint(self, " \bips\b          \bsafepractice\b\n");
+        sprint(self, " \bbotadd\b       \bbotkick\b\n");
+        sprint(self, " \bbotkickall\b   \bbotroutes\b\n");
         sprint(self, "\n");
     }
     //clanring_help_change ();
@@ -1915,6 +1944,8 @@ void () misc_commands =
         sprint(self, " \blast\b\n");
         sprint(self, " \bmotd\b\n");
         sprint(self, " \brules\b\n");
+        sprint(self, " \bbotroutes\b\n");
+        sprint(self, " \bbots\b\n");
         sprint(self, "\n");
 };
 
@@ -2880,8 +2911,26 @@ void () clanring_periodic_checks =
         return;
 
     local float inactive, c;
+    local float is_bot;
 
-    if (!(self.style & CLANRING_ADMINISTRATOR))
+    is_bot = frogbot_is_bot_client(self);
+
+    if (is_bot)
+    {
+        if (self.fb_bot_name != "")
+        {
+            self.netname = self.fb_bot_name;
+            updatename(self, self.fb_bot_name);
+            if (self.oldname != self.fb_bot_name)
+            {
+                if (self.oldname)
+                    strunzone(self.oldname);
+                self.oldname = strzone(self.fb_bot_name);
+            }
+        }
+    }
+
+    if (!is_bot && !(self.style & CLANRING_ADMINISTRATOR))
     {
         if (utils_illegal_name (self.netname))
         {
@@ -2895,7 +2944,7 @@ void () clanring_periodic_checks =
     }
 
 	// If player renamed, sync overlays/typing buffers so the new name sticks
-	if (self.netname && (!self.oldname || !utils_str_eq(self.netname, self.oldname)))
+	if (!is_bot && self.netname && (!self.oldname || !utils_str_eq(self.netname, self.oldname)))
 	{
 		// Keep any pending restore name (typing) in sync with the new netname
 		if (self.name_before_typing)
@@ -3003,7 +3052,9 @@ void () clanring_periodic_checks =
 
     self.ping_time = client_ping(self);
 
-    check_client_status();
+    if (!is_bot)
+    {
+        check_client_status();
 
     inactive = time - self.afk_time;//Seconds of inactivity
 
@@ -3072,6 +3123,7 @@ void () clanring_periodic_checks =
             if (clanring_afk_timeout > 0)//Only print afk if kick is enabled
                 sprint(self, "Press FIRE or JUMP to disable '\bafk\b' status.\n");
         }
+    }
     }
     //R00k: Moved here from PlayerPreThink
     if (mode_is_arena())
@@ -3186,6 +3238,13 @@ void () clanring_start_frame =
                 {
                     if (player.style & CLANRING_CONNECTED)
                     {
+                        if (frogbot_is_bot_client(player))
+                        {
+                            player.finaldest_x = time;
+                            player.plag = FALSE;
+                        }
+                        else
+                        {
                         if (time > player.finaldest_x + 5)
                         {
                             // send out ping to test for disconnected players
@@ -3205,6 +3264,7 @@ void () clanring_start_frame =
                         {
                             clanring_kick_mode = KICK_LAGOUT;
                             clanring_kick_player (player);
+                        }
                         }
                     }
                     else

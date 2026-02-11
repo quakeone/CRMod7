@@ -5,6 +5,7 @@
 fteextensions.qc
 defs.qc
 defs2.qc
+frogbot.qc
 newflags.qc
 math.qc
 array.qc

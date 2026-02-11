@@ -58,6 +58,7 @@ void() noclass =
 // ELOHIM_MOD - need these prototypes
 void() weapon_touch;
 void() ammo_touch;
+float(entity ent) frogbot_capture_dynamic_source;
 // END_MOD
 
 /*
@@ -163,13 +164,15 @@ void() StartItem =
 		}
 		else
 		{
-			remove(self);
+			if (!frogbot_capture_dynamic_source(self))
+				remove(self);
 		}
 		return;
 	}
 	else if ((clanring_playmode & CLANRING_CA_MODE) || (clanring_playmode & CLANRING_RA_MODE))
 	{
-		remove(self);
+		if (!frogbot_capture_dynamic_source(self))
+			remove(self);
 		return;
 	}
 

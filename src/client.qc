@@ -1325,6 +1325,25 @@ void() PlayerDeathThink =
         if (!(clanring_playmode & CLANRING_WIPEOUT_MODE) || ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0)))
             return;
     }
+
+    // Bots have no physical button input, so force the normal dead->respawn flow.
+    if (frogbot_is_bot_client(self))
+    {
+        if (self.deadflag == DEAD_DEAD)
+        {
+            if (cvar("frogbot_debug") > 0)
+                print(sprintf("Frogbot debug: deaththink ent=%g dead->respawnable\n", num_for_edict(self)));
+            self.deadflag = DEAD_RESPAWNABLE;
+            return;
+        }
+
+        if (cvar("frogbot_debug") > 0)
+            print(sprintf("Frogbot debug: deaththink ent=%g respawn()\n", num_for_edict(self)));
+        self.button0 = self.button1 = self.button2 = 0;
+        respawn();
+        return;
+    }
+
     // wait for all buttons released
     if (self.deadflag == DEAD_DEAD)
     {
@@ -1605,6 +1624,9 @@ void() PlayerPreThink =
         self.movement = '0 0 0';//FIXME?
         return;
     }
+
+    if (frogbot_is_bot_client(self))
+        frogbot_client_frame();
 
     self.deathtype = "";	//R00k - wrong obituary messages fix by Zoid
 
@@ -2298,10 +2320,13 @@ called when a player disconnects from a server
 */
 void() ClientDisconnect =
 {
+    local float is_bot;
     // ELOHIM_MOD - check to see if we've already done this
     // (can happen since elohim_kick_player calls ClientDisconnect directly
     if (!(self.style & CLANRING_CONNECTED))
         return;
+
+    is_bot = frogbot_is_bot_client(self);
 
     // ELOHIM_MOD - check for null name
     if (utils_illegal_name (self.netname))
@@ -2315,7 +2340,7 @@ void() ClientDisconnect =
         setsize (self, VEC_HULL_MIN, VEC_HULL_MAX);
     }
 
-    if (!self.plag)
+    if (!self.plag && !is_bot)
     {
         if (kick_target != self)
         {
@@ -2334,7 +2359,7 @@ void() ClientDisconnect =
         }
     }
     // ELOHIM_MOD - play gib sound if client was kicked for suiciding
-    if (!(clanring_playmode & CLANRING_MATCH_MODE) || !(clanring_state & CLANRING_MATCH_STARTED) || !(self.style & CLANRING_OBSERVER))//R00k: dont make a sound when match is going, unless a player disconnected.
+    if (!is_bot && (!(clanring_playmode & CLANRING_MATCH_MODE) || !(clanring_state & CLANRING_MATCH_STARTED) || !(self.style & CLANRING_OBSERVER)))//R00k: dont make a sound when match is going, unless a player disconnected.
     {
         if (self.cnt < 0)
             sound (self, CHAN_BODY, "player/gib.wav", 1, ATTN_NONE);
@@ -2363,7 +2388,7 @@ void() ClientDisconnect =
     clanring_client_disconnect ();
     
     // Log the disconnect for the 'last' command
-    if (self.netname != "")
+    if (!is_bot && self.netname != "")
     {
         utils_log_disconnect(self.netname, utils_server_time());
     }
@@ -2383,6 +2408,7 @@ void() ClientDisconnect =
     // Clean up zoned strings to prevent memory leaks
     if (self.name_ready) { strunzone(self.name_ready); self.name_ready = string_null; }
     if (self.name_before_typing) { strunzone(self.name_before_typing); self.name_before_typing = string_null; }
+    if (self.fb_bot_name) { strunzone(self.fb_bot_name); self.fb_bot_name = string_null; }
     self.had_ready_before_typing = 0;
     self.netname	= string_null;
 };
@@ -3182,6 +3208,9 @@ void () check_client_status =
 {
     if (!(self.style & CLANRING_CONNECTED))
         return;
+
+    if (frogbot_is_bot_client(self))
+        return;
         
     local string chat_status = infokey(self, "chat");
     
@@ -3372,7 +3401,7 @@ void (string wanted_map) captimes_show_map_sprint =
 void(string cmd) SV_ParseClientCommand =
 {
     local float args, modecmd, mapnumber=0;
-    local string arg0 = "", arg1 = "", arg2 = "";
+    local string arg0 = "", arg1 = "", arg2 = "", arg3 = "";
 
     if (!(self.style & CLANRING_CONNECTED))
     {
@@ -3387,6 +3416,8 @@ void(string cmd) SV_ParseClientCommand =
         arg1 = argv(1);
     if (args > 2)
         arg2 = argv(2);
+    if (args > 3)
+        arg3 = argv(3);
 
     switch (arg0)
     {
@@ -3515,6 +3546,15 @@ void(string cmd) SV_ParseClientCommand =
 
         case "afkoff":
             client_afk_off();
+            return;
+
+        case "frogbot":
+        case "botadd":
+        case "botkick":
+        case "botkickall":
+        case "botroutes":
+        case "bots":
+            frogbot_handle_client_cmd(arg0, arg1, arg2, arg3);
             return;
 
         case "captimes":
