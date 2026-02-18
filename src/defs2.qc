@@ -843,8 +843,12 @@ float  crx_meta_ping;
 .float fb_marker_index;
 .float fb_goal;
 .float fb_zone;
+.float fb_subzone;
+.entity fb_zone_head;
+.entity fb_zone_next;
 .float fb_marker_flags;
 .entity fb_dynsource;
+.entity fb_dynlive; // live entity resolved from preserved dynsource snapshots
 .float fb_last_visit_time;
 .float fb_is_bot_client;
 .float fb_bot_bootstrap;
@@ -863,8 +867,32 @@ float  crx_meta_ping;
 .float fb_next_route_log_time;
 .float fb_next_move_log_time;
 .entity fb_enemy_target;
+.float fb_enemy_power_flags;
+.float fb_enemy_power_seen_time;
+.float fb_enemy_quad_until;
+.float fb_enemy_pent_until;
+.float fb_enemy_power_threat;
+.float fb_next_powerup_call_time;
 .float fb_next_enemy_scan_time;
 .float fb_last_enemy_seen_time;
+.float fb_next_teammsg_time;
+.float fb_ctf_role;
+.float fb_ctf_role_until;
+.float fb_ctf_next_role_eval;
+.float fb_ctf_last_state_sig;
+.entity fb_ctf_focus_ent;
+.entity fb_ctf_escort_target;
+.entity fb_ctf_last_enemy_carrier_marker;
+.float fb_ctf_next_msg_time;
+.float fb_ctf_next_objective_refresh;
+.float fb_ctf_escort_hold_until;
+.float fb_ctf_prev_own_state;
+.float fb_ctf_prev_enemy_state;
+.entity fb_ctf_prev_enemy_carrier;
+.entity fb_ctf_prev_friendly_carrier;
+.float fb_ctf_hook_burst_until;
+.float fb_ctf_next_hook_burst_time;
+.float fb_team_has_contact;
 .float fb_next_combat_log_time;
 .float fb_strafe_dir;
 .float fb_next_strafe_swap_time;
@@ -875,6 +903,11 @@ float  crx_meta_ping;
 .float fb_rj_fire_time;
 .float fb_rj_pitch;
 .float fb_rj_yaw;
+.float fb_combat_escape_until;
+.float fb_next_combat_escape_time;
+.float fb_camp_until;
+.float fb_next_camp_time;
+.entity fb_camp_marker;
 .entity fb_path0;
 .entity fb_path1;
 .entity fb_path2;
@@ -926,6 +959,70 @@ float  crx_meta_ping;
 .float fb_route_goal_cost;
 .float fb_blocked_until;
 .float fb_blocked_hits;
+.float fb_next_desire_refresh;
+.float fb_total_armor;
+.float fb_total_damage;
+.float fb_firepower;
+.float fb_desire_armor1;
+.float fb_desire_armor2;
+.float fb_desire_armorInv;
+.float fb_desire_health0;
+.float fb_desire_mega_health;
+.float fb_desire_supershotgun;
+.float fb_desire_nailgun;
+.float fb_desire_supernailgun;
+.float fb_desire_grenadelauncher;
+.float fb_desire_rocketlauncher;
+.float fb_desire_lightning;
+.float fb_desire_rockets;
+.float fb_desire_cells;
+.float fb_desire_nails;
+.float fb_desire_shells;
+
+// --- Frogbot aim skill / volatility fields ---
+.float fb_skill_level;
+.float fb_aim_volatility;
+.float fb_min_fire_time;
+.float fb_last_hurt_time;
+.float fb_aim_rnd_pitch;
+.float fb_aim_rnd_yaw;
+.float fb_aim_rnd_time;
+.float fb_vol_min;
+.float fb_vol_max;
+.float fb_vol_initial;
+.float fb_vol_reduce;
+.float fb_vol_ownspeed_thresh;
+.float fb_vol_ownspeed;
+.float fb_vol_enemyspeed_thresh;
+.float fb_vol_enemyspeed;
+.float fb_vol_enemydir;
+.float fb_vol_pain;
+.float fb_vol_self_midair;
+.float fb_vol_opp_midair;
+.float fb_aim_pitch_scale;
+.float fb_aim_pitch_min;
+.float fb_aim_pitch_max;
+.float fb_aim_pitch_mult;
+.float fb_aim_yaw_scale;
+.float fb_aim_yaw_min;
+.float fb_aim_yaw_max;
+.float fb_aim_yaw_mult;
+.float fb_awareness_delay;
+.float fb_skill_lookahead_time;
+.float fb_skill_prediction_error;
+.entity fb_prev_combat_target;
+.vector fb_prev_enemy_vel;
+
+// Missile dodge fields (bot-side)
+.entity fb_dodge_missile;        // tracked incoming missile
+.float  fb_dodge_react_time;     // skill-based reaction delay (0.5-1.0s)
+.float  fb_dodge_amount;         // skill-based dodge intensity (0.3-1.0)
+.float  fb_next_dodge_log_time;  // debug log throttle
+
+// Missile dodge fields (missile-side)
+.vector fb_missile_forward;      // stored on rocket: firing v_forward
+.vector fb_missile_right;        // stored on rocket: firing v_right
+.float  fb_missile_spawntime;    // stored on rocket: time of spawn
 
 // Utility: fast proximity check to avoid re-solidifying inside others
 float(entity center, float rad) AnySolidPlayerInRadius =

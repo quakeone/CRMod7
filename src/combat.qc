@@ -309,12 +309,12 @@ void(entity targ, entity attacker) Killed =
 
 					if (targ.airborn_pos > 650)
 					{
-						bprint("\b[\bDEEPˆ‰SPACE\b]\b\n");
+						bprint("\b[\bDEEPï¿½ï¿½SPACE\b]\b\n");
 						as_sound = 2;
 					}
 					else if (targ.airborn_pos > 500)
 					{
-						bprint("\b[\b…Moon…Shot…\b]\b\n");
+						bprint("\b[\bï¿½Moonï¿½Shotï¿½\b]\b\n");
 						as_sound = 3;
 					}
 					else if (targ.airborn_pos > 300)
@@ -506,7 +506,7 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 
 	if ((targ.plag)&&(attacker.classname=="player"))
 	{
-		centerprint(attacker,"\bClanring\b Lag Protection \bActivated");
+		centerprint(attacker,"\bClanring\bï¿½Lag Protectionï¿½\bActivated");
 		return;
 	}
 	
@@ -608,10 +608,14 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 	
 	if ((attacker.classname == "player") && (targ.classname == "player"))
 	{
-		attacker.enemy_hurt_time = time + 10;	//R00k: Used for stats; this is the bonus-window from last time they hurt/killed your teammate. bonus for killing them within this time. 
+		attacker.enemy_hurt_time = time + 10;	//R00k: Used for stats; this is the bonus-window from last time they hurt/killed your teammate. bonus for killing them within this time.
 		attacker.enemy_target = targ;			//Keep track of who is being hurt
 		targ.enemy = attacker;					//R00k: Used for cameras/stats
 	}
+
+	// Frogbot: track when bot last took damage (for aim volatility)
+	if (targ.fb_is_bot_client)
+		targ.fb_last_hurt_time = time;
 	
 	teamdamage = TRUE;
 	

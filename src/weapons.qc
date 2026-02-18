@@ -538,6 +538,21 @@ void() W_FireRocket =
 	setsize (missile, '0 0 0', '0 0 0');		
 	setorigin(missile, self.origin + v_forward*8 + '0 0 16');
 
+	// Store firing vectors for bot missile dodge
+	if (vlen(missile.velocity) > 0)
+	{
+		missile.fb_missile_forward = normalize(missile.velocity);
+		makevectors(vectoangles(missile.velocity));
+		missile.fb_missile_right = v_right;
+		makevectors(self.v_angle);
+	}
+	else
+	{
+		missile.fb_missile_forward = v_forward;
+		missile.fb_missile_right = v_right;
+	}
+	missile.fb_missile_spawntime = time;
+
     // ELOHIM_MOD - check for rocket jump
 	missile.state = 1;
 	if (!(self.flags & (FL_ONGROUND | FL_JUMPRELEASED)))
@@ -809,6 +824,22 @@ void() W_FireGrenade =
 	setmodel (missile, "progs/grenade.mdl");
 	setsize (missile, '0 0 0', '0 0 0');		
 	setorigin (missile, self.origin);
+
+	// Store firing vectors for bot missile dodge
+	if (vlen(missile.velocity) > 0)
+	{
+		missile.fb_missile_forward = normalize(missile.velocity);
+		makevectors(vectoangles(missile.velocity));
+		missile.fb_missile_right = v_right;
+		makevectors(self.v_angle);
+	}
+	else
+	{
+		missile.fb_missile_forward = v_forward;
+		missile.fb_missile_right = v_right;
+	}
+	missile.fb_missile_spawntime = time;
+
 	self.stats_gl_tot = self.stats_gl_tot + 120; // stats
 };
 

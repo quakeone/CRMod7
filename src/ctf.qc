@@ -544,9 +544,9 @@ void() TeamCaptureFlagTouch =
 								crx_meta_ping = floor(other.ping_time + 0.5);
 							else
 							{
-								local float ping_ms;
-								ping_ms = client_ping(other);
-								crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
+								local float ping_ms_tt;
+								ping_ms_tt = client_ping(other);
+								crx_meta_ping = (ping_ms_tt > 0) ? floor(ping_ms_tt + 0.5) : -1;
 							}
 														check_player_low_record(compare, other.team, other.netname);
                             if (new_player_record > 0)
@@ -603,9 +603,9 @@ void() TeamCaptureFlagTouch =
 									crx_meta_ping = floor(other.ping_time + 0.5);
 								else
 								{
-									local float ping_ms;
-									ping_ms = client_ping(other);
-									crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
+									local float ping_ms_match;
+									ping_ms_match = client_ping(other);
+									crx_meta_ping = (ping_ms_match > 0) ? floor(ping_ms_match + 0.5) : -1;
 								}
 																check_player_low_record2(compare, other.team, other.netname);
                                 if (new_player_record > 0)
