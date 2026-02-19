@@ -1021,6 +1021,10 @@ float  crx_meta_ping;
 .float fb_next_loc_report_time;   // next periodic location report time
 .string fb_last_loc_name;         // last reported location (avoid spam)
 
+// DM6 door interaction fields
+.entity fb_door_entity;           // marker -> actual func_door link
+.float fb_dm6_door_active;        // runtime: bot is actively shooting the DM6 door
+
 // Missile dodge fields (bot-side)
 .entity fb_dodge_missile;        // tracked incoming missile
 .float  fb_dodge_react_time;     // skill-based reaction delay (0.5-1.0s)

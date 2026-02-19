@@ -42,7 +42,7 @@
     - [~] CTF objective system (roles/escort/carrier/comms + optional hook transit in; rollout validation/polish pending)
 
     Lower priority parity items:
-    - [ ] DM6 door-specific logic parity
+    - [x] DM6 door-specific logic parity
     - [ ] Path debug/editor tooling parity
     - [ ] Physics prediction parity
     - [ ] Bot command queue parity
@@ -95,6 +95,8 @@ float FROGBOT_CTF_ROLE_ATTACK = 1;
 float FROGBOT_CTF_ROLE_DEFEND = 2;
 float FROGBOT_CTF_ROLE_ESCORT = 3;
 float FROGBOT_CTF_ROLE_ROAM = 4;
+
+entity dm6_door;    // global pointer to DM6 door marker entity (KTX: gedict_t *dm6_door)
 
 float frogbot_routes_loaded;
 float frogbot_route_load_errors;
@@ -202,6 +204,15 @@ entity(entity bot) frogbot_find_nearest_visible_marker;
 entity(entity bot) frogbot_find_nearest_route_marker;
 entity(entity bot) frogbot_find_nearest_visible_route_marker;
 float(entity bot, entity marker, entity next_marker) frogbot_camp_route_bonus;
+
+// DM6 door logic forward declarations
+float(entity marker, float path_flags) frogbot_dm6_door_closed;
+void(entity bot) frogbot_dm6_marker_touch;
+float(entity bot) frogbot_dm6_look_at_door;
+void(entity bot) frogbot_dm6_fire_at_door;
+void(entity bot) frogbot_dm6_select_weapon;
+float(entity bot, entity target_marker) frogbot_dm6_goal_suppress;
+float(entity bot) frogbot_dm6_camp_logic;
 
 float(entity e) frogbot_is_bot_client =
 {
@@ -1135,6 +1146,7 @@ void() frogbot_clear_routes =
     frogbot_route_load_errors = 0;
     frogbot_routes_loaded = FALSE;
     frogbot_map_death_height = FROGBOT_DEFAULT_MAP_DEATH_HEIGHT;
+    dm6_door = world;
     frogbot_route_potential_ready = FALSE;
     frogbot_route_relax_iterations = 0;
     frogbot_route_goal_count = 0;
@@ -3758,6 +3770,7 @@ void(entity bot) frogbot_clear_runtime_targets =
     bot.fb_camp_until = 0;
     bot.fb_next_camp_time = time;
     bot.fb_camp_marker = world;
+    bot.fb_dm6_door_active = 0;
 };
 
 void(entity bot) frogbot_reset_runtime_state =
@@ -4672,6 +4685,14 @@ float(entity bot, entity marker, entity next_marker, float path_flags, entity zo
 
     bonus = 0;
 
+    // DM6: heavily penalize routes through the closed door
+    if (frogbot_dm6_door_closed(next_marker, path_flags))
+        return -FROGBOT_ROUTE_COST_INF;
+
+    // DM6: suppress goal desire when heading through door zone toward dangerous enemy
+    if ((path_flags & FROGBOT_PATH_DM6_DOOR) && frogbot_dm6_goal_suppress(bot, next_marker))
+        return -FROGBOT_ROUTE_COST_INF;
+
     if (next_marker.fb_goal > 0)
         bonus = bonus + cvar("frogbot_goal_bias");
 
@@ -5343,6 +5364,25 @@ float(entity bot, entity combat_target) frogbot_update_camp_state =
         return FALSE;
     if (bot.fb_combat_escape_until > time)
         return FALSE;
+
+    // DM6: KTX-style proximity camp near RA with good loadout
+    if (strtolower(mapname) == "dm6" && frogbot_dm6_camp_logic(bot))
+    {
+        camp_marker = frogbot_find_anchor_marker(bot, bot.origin, 200);
+        if (camp_marker != world)
+        {
+            hold_min = cvar("frogbot_camp_hold_min");
+            hold_max = cvar("frogbot_camp_hold_max");
+            if (hold_min <= 0)
+                hold_min = 3;
+            if (hold_max < hold_min)
+                hold_max = hold_min + 2;
+            bot.fb_camp_marker = camp_marker;
+            bot.fb_camp_until = time + hold_min + random() * (hold_max - hold_min);
+            bot.fb_next_camp_time = bot.fb_camp_until + retry_time + random() * retry_time;
+            return TRUE;
+        }
+    }
 
     hp_armor = bot.health + bot.armorvalue;
     if (hp_armor < 120 && bot.fb_total_damage < 160)
@@ -7324,6 +7364,207 @@ void(entity bot) frogbot_apply_stationary_combat =
     frogbot_apply_combat_controls(bot, combat_target, '0 0 0', FROGBOT_MOVE_SPEED_CLOSE);
 };
 
+// ============================================================================
+// DM6 Door Logic (ported from KTX src/maps_map_dm6.c)
+// ============================================================================
+
+// Returns TRUE if a path through the DM6 door is currently blocked.
+// KTX equivalent: DM6DoorClosed()
+float(entity marker, float path_flags) frogbot_dm6_door_closed =
+{
+    if (dm6_door == world || dm6_door.fb_door_entity == world)
+        return FALSE;
+    // Bot is at the door marker itself and door is not shootable (closed/dead)
+    if (marker == dm6_door && !dm6_door.fb_door_entity.takedamage)
+        return TRUE;
+    // Path goes through the door zone and door hasn't opened yet
+    // (KTX hardcoded geometry check: origin_x > -64 means door is in closed position)
+    if ((path_flags & FROGBOT_PATH_DM6_DOOR) && dm6_door.fb_door_entity.origin_x > -64)
+        return TRUE;
+    return FALSE;
+};
+
+// When bot reaches a marker on a DM6_DOOR path, detect door and set active state.
+// KTX equivalent: DM6MarkerTouchLogic()
+void(entity bot) frogbot_dm6_marker_touch =
+{
+    local vector spot;
+
+    if (dm6_door == world || dm6_door.fb_door_entity == world)
+        return;
+    if (!(bot.fb_target_path_flags & FROGBOT_PATH_DM6_DOOR))
+        return;
+    if (!dm6_door.fb_door_entity.takedamage)
+        return;
+
+    // Trace from bot eye to the door entity center
+    spot = dm6_door.fb_door_entity.origin;
+    spot_z = spot_z + dm6_door.fb_door_entity.size_z * 0.5;
+    traceline(bot.origin + bot.view_ofs, spot, TRUE, bot);
+    if (trace_fraction < 1 && trace_ent == dm6_door.fb_door_entity)
+        bot.fb_dm6_door_active = TRUE;
+};
+
+// When bot has dm6_door_active set, override look target to face the door.
+// Returns TRUE if bot should skip normal combat aim.
+// KTX equivalent: DM6LookAtDoor()
+float(entity bot) frogbot_dm6_look_at_door =
+{
+    local vector aim_delta;
+    local vector aim;
+
+    if (!bot.fb_dm6_door_active)
+        return FALSE;
+    if (dm6_door == world || dm6_door.fb_door_entity == world)
+    {
+        bot.fb_dm6_door_active = FALSE;
+        return FALSE;
+    }
+    // If the door is no longer shootable, clear and bail
+    if (!dm6_door.fb_door_entity.takedamage)
+    {
+        bot.fb_dm6_door_active = FALSE;
+        return FALSE;
+    }
+
+    aim_delta = dm6_door.fb_door_entity.origin - bot.origin;
+    aim_delta_z = aim_delta_z + dm6_door.fb_door_entity.size_z * 0.5;
+    aim = vectoangles(aim_delta);
+    bot.v_angle = aim;
+    bot.angles = aim;
+    bot.fixangle = TRUE;
+    return TRUE;
+};
+
+// Adjust aim downward to hit door center mass.
+// If door is no longer shootable, clears the active state.
+// KTX equivalent: DM6FireAtDoor()
+void(entity bot) frogbot_dm6_fire_at_door =
+{
+    local vector aim;
+
+    if (dm6_door == world || dm6_door.fb_door_entity == world)
+    {
+        bot.fb_dm6_door_active = FALSE;
+        return;
+    }
+    if (!dm6_door.fb_door_entity.takedamage)
+    {
+        bot.fb_dm6_door_active = FALSE;
+        return;
+    }
+
+    // KTX: offset aim -38 units Z for center mass
+    aim = bot.v_angle;
+    aim_x = aim_x + 38;  // pitch is inverted: positive = look down
+    bot.v_angle = aim;
+    bot.angles = aim;
+    bot.fixangle = TRUE;
+};
+
+// Select cheap weapon for shooting the door open (avoid wasting rockets).
+// KTX equivalent: DM6SelectWeaponToOpenDoor()
+void(entity bot) frogbot_dm6_select_weapon =
+{
+    local entity oself;
+    local float picked;
+
+    picked = 0;
+    if ((bot.items & IT_SHOTGUN) && bot.ammo_shells >= 1)
+        picked = IT_SHOTGUN;
+    else if ((bot.items & IT_NAILGUN) && bot.ammo_nails >= 1)
+        picked = IT_NAILGUN;
+    else if ((bot.items & IT_SUPER_NAILGUN) && bot.ammo_nails >= 2)
+        picked = IT_SUPER_NAILGUN;
+    else if ((bot.items & IT_SUPER_SHOTGUN) && bot.ammo_shells >= 2)
+        picked = IT_SUPER_SHOTGUN;
+    else if ((bot.items & IT_LIGHTNING) && bot.ammo_cells >= 1)
+        picked = IT_LIGHTNING;
+
+    if (picked && picked != bot.weapon)
+    {
+        bot.weapon = picked;
+        oself = self;
+        self = bot;
+        W_SetCurrentAmmo();
+        self = oself;
+    }
+};
+
+// Suppress goal desire when heading through door zone toward powerful enemy.
+// Returns TRUE if the goal should be suppressed.
+// KTX equivalent: DM6DoorLogic()
+float(entity bot, entity target_marker) frogbot_dm6_goal_suppress =
+{
+    local entity enemy;
+
+    if (dm6_door == world || dm6_door.fb_door_entity == world)
+        return FALSE;
+    // Only suppress when the door is not open
+    if (dm6_door.fb_door_entity.takedamage || dm6_door.fb_door_entity.origin_x <= -64)
+        return FALSE;
+    // Check if target marker is in zone 1 (LG room side of DM6)
+    if (target_marker.fb_zone != 1)
+        return FALSE;
+
+    // Look for a dangerous enemy visible to the bot
+    enemy = bot.fb_enemy_target;
+    if (enemy == world)
+        return FALSE;
+    if (enemy.fb_firepower < 50)
+        return FALSE;
+    if (!frogbot_target_visible(bot, enemy))
+        return FALSE;
+
+    return TRUE;
+};
+
+// KTX-style DM6 camp logic: bot near RA with good loadout camps with high probability.
+// Returns TRUE if conditions are met; caller handles actual camp activation.
+// KTX equivalent: DM6CampLogic()
+float(entity bot) frogbot_dm6_camp_logic =
+{
+    local entity item;
+    local float near_ra;
+
+    if (bot.health <= 80)
+        return FALSE;
+    if (bot.armorvalue <= 100)
+        return FALSE;
+    if (!((bot.items & IT_ROCKET_LAUNCHER) || (bot.items & IT_LIGHTNING)))
+        return FALSE;
+
+    // Check ammo: need >15 cells or >3 rockets
+    if (bot.ammo_cells <= 15 && bot.ammo_rockets <= 3)
+        return FALSE;
+
+    // Check proximity to Red Armor
+    near_ra = FALSE;
+    item = find(world, classname, "item_armorInv");
+    while (item)
+    {
+        if (fabs(item.origin_z - bot.origin_z) < 64 && vlen(item.origin - bot.origin) < 200)
+        {
+            near_ra = TRUE;
+            break;
+        }
+        item = find(item, classname, "item_armorInv");
+    }
+
+    if (!near_ra)
+        return FALSE;
+
+    // 90% probability (KTX)
+    if (random() > 0.9)
+        return FALSE;
+
+    return TRUE;
+};
+
+// ============================================================================
+// End DM6 Door Logic
+// ============================================================================
+
 void() frogbot_client_frame =
 {
     local vector delta;
@@ -7753,6 +7994,9 @@ void() frogbot_client_frame =
     self.button0 = 0;
     self.button1 = 0;
 
+    // DM6 door: detect when bot should start shooting the door
+    frogbot_dm6_marker_touch(self);
+
     if (!combat_enabled)
     {
         if (cvar("frogbot_debug") >= 2 && self.fb_next_combat_log_time <= time)
@@ -7762,7 +8006,18 @@ void() frogbot_client_frame =
         }
     }
 
-    if (combat_target != world)
+    // DM6 door: override combat to shoot the door open
+    if (frogbot_dm6_look_at_door(self))
+    {
+        frogbot_dm6_select_weapon(self);
+        frogbot_dm6_fire_at_door(self);
+        self.button0 = 1;
+        makevectors(self.v_angle);
+        self.movement_x = move_speed * (normalize(delta) * v_forward);
+        self.movement_y = move_speed * (normalize(delta) * v_right);
+        self.movement_z = 0;
+    }
+    else if (combat_target != world)
     {
         frogbot_apply_combat_controls(self, combat_target, delta, move_speed);
     }
@@ -8421,6 +8676,39 @@ float(string requested_map, float verbose, entity notify_target) frogbot_load_ro
 
             marker_flags = frogbot_decode_marker_flags(flags_text);
             marker.fb_marker_flags = marker.fb_marker_flags | marker_flags;
+
+            // DM6 door marker initialization (KTX: link marker to shootable func_door)
+            if (marker_flags & FROGBOT_MARKER_IS_DM6_DOOR)
+            {
+                dm6_door = marker;
+                marker.solid = SOLID_TRIGGER;
+                local entity door_ent;
+                door_ent = find(world, classname, "door");
+                while (door_ent)
+                {
+                    if (door_ent.max_health > 0 && vlen(door_ent.origin - marker.origin) < 400)
+                    {
+                        marker.fb_door_entity = door_ent;
+                        break;
+                    }
+                    door_ent = find(door_ent, classname, "door");
+                }
+                if (marker.fb_door_entity == world)
+                {
+                    // Try func_door classname as well
+                    door_ent = find(world, classname, "func_door");
+                    while (door_ent)
+                    {
+                        if (door_ent.max_health > 0 && vlen(door_ent.origin - marker.origin) < 400)
+                        {
+                            marker.fb_door_entity = door_ent;
+                            break;
+                        }
+                        door_ent = find(door_ent, classname, "func_door");
+                    }
+                }
+            }
+
             continue;
         }
 

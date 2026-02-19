@@ -1224,6 +1224,8 @@ void() clanring_exec_configs =
 	}
 
 	clanring_main_config();
+	print("Loading Frogbot Configuration File: \"configs/frogbot.cfg\"\n");
+	exec_clanring_cfg("configs/frogbot.cfg");
 	gsheets_validate(); // Validate Google Sheets connection if configured
 	clanring_warp_config();
 	clanring_map_config();
