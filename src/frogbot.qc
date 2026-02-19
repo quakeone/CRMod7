@@ -9380,6 +9380,38 @@ void(string arg1) frogbot_command_routes =
     frogbot_load_routes(sub, TRUE, self);
 };
 
+void() frogbot_command_ready =
+{
+    local entity p, oself;
+    local float count;
+
+    if (!(clanring_playmode & CLANRING_MATCH_MODE))
+    {
+        sprint(self, "Not in match mode\n");
+        return;
+    }
+
+    count = 0;
+    oself = self;
+    p = find(world, classname, "player");
+    while (p)
+    {
+        if (p.fb_is_bot_client && !(p.style & CLANRING_READY))
+        {
+            self = p;
+            match_ready();
+            count = count + 1;
+        }
+        p = find(p, classname, "player");
+    }
+    self = oself;
+
+    if (count)
+        sprint(self, sprintf("%g bot(s) readied up\n", count));
+    else
+        sprint(self, "All bots are already ready\n");
+};
+
 void() frogbot_print_help =
 {
     sprint(self, "Frogbot commands:\n");
@@ -9388,6 +9420,7 @@ void() frogbot_print_help =
     sprint(self, " botroutes [status|reload|where|map] - route file status/load\n");
     sprint(self, " botver                       - print frogbot build tag\n");
     sprint(self, " bots                         - bot + route status\n");
+    sprint(self, " ready                        - ready up all unready bots\n");
 };
 
 void(string arg0, string arg1, string arg2, string arg3) frogbot_handle_client_cmd =
@@ -9448,6 +9481,12 @@ void(string arg0, string arg1, string arg2, string arg3) frogbot_handle_client_c
     if (cmd == "botkick" || cmd == "kick")
     {
         frogbot_request_kick(a1);
+        return;
+    }
+
+    if (cmd == "ready")
+    {
+        frogbot_command_ready();
         return;
     }
 

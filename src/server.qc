@@ -4,7 +4,7 @@
 // This is the main file for CRMod++.  CRMod++ was derived from the
 // Elohim server, which is why everything is still called "elohim".
 //
-// Developed by J.P. Grossman (a.k.a. ùMephistopheles) and Paul Baker
+// Developed by J.P. Grossman (a.k.a. ï¿½Mephistopheles) and Paul Baker
 //
 // All code by J.P. Grossman unless otherwise commented.
 //
@@ -305,7 +305,7 @@ float() CountActivePlayersDM =
 
 float() InDMNormalMode =
 {
-    // "Normal" (FFA) only — exclude arena/CTF/etc.
+    // "Normal" (FFA) only ï¿½ exclude arena/CTF/etc.
     if (!(clanring_playmode & CLANRING_NORMAL_MODE))
         return FALSE;
     if (clanring_playmode & (CLANRING_CAPTURE_THE_FLAG
@@ -467,7 +467,7 @@ void () restore_afk_status =
     remove(self); // Clean up the scheduled event entity
 }
 
-//woods —
+//woods ï¿½
 /*
 mode: dm, ctf, ra, ca, wipeout, airshot, dmm4
 playmode: match, ffa, practice
@@ -1780,8 +1780,8 @@ void () clanring_help_change =
     sprint(self, "\n");
     sprint(self, " type \bwarp\b to change maps\n");
     sprint(self, "\n");
-    //sprint(self, "Ôï ãèáîçå ìåöåìó¬ åîôåò ôèå îáíå ïæ\n");
-    //sprint(self, "ôèå ìåöåì éî ôèå ãïîóïìå®\n");
+    //sprint(self, "ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½\n");
+    //sprint(self, "ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½\n");
 };
 
 //
@@ -2046,124 +2046,124 @@ void () clanring_show_rules =
     local float temp;
 
     if (clanring_playmode & CLANRING_DMM4_MODE)
-        sprint(self, "Ž 1v1 duel  mode Ž\n");
+        sprint(self, "ï¿½ 1v1 duel  mode ï¿½\n");
     else if (clanring_playmode & CLANRING_AIRSHOT_MODE)
-        sprint(self, "Ž  airshot mode  Ž\n");
+        sprint(self, "ï¿½  airshot mode  ï¿½\n");
     else if (clanring_playmode & CLANRING_WIPEOUT_MODE)
-        sprint(self, "Ž wipeout modeŽ\n");
+        sprint(self, "ï¿½ wipeout modeï¿½\n");
     else if (clanring_playmode & CLANRING_CA_MODE)
-        sprint(self, "Žclan arena  modeŽ\n");
+        sprint(self, "ï¿½clan arena  modeï¿½\n");
     else if (clanring_playmode & CLANRING_RA_MODE)
-        sprint(self, "Žrocket arena modeŽ\n");
+        sprint(self, "ï¿½rocket arena modeï¿½\n");
     else if (clanring_playmode & CLANRING_MATCH_MODE)
     {
         if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            sprint(self, "ŽCRCTF match modeŽ\n");
+            sprint(self, "ï¿½CRCTF match modeï¿½\n");
         else
-            sprint(self, "ŽCRMod match modeŽ\n");
+            sprint(self, "ï¿½CRMod match modeï¿½\n");
     }
     else if (clanring_playmode & CLANRING_PRACTICE_MODE)
     {
         if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            sprint(self, "Žctf practice modeŽ\n");
+            sprint(self, "ï¿½ctf practice modeï¿½\n");
         else
-            sprint(self, "Žpractice modeŽ\n");
+            sprint(self, "ï¿½practice modeï¿½\n");
     }
     else
     {
         if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            sprint(self, "ŽPublic CTF modeŽ\n");
+            sprint(self, "ï¿½Public CTF modeï¿½\n");
         else
         {
             if (teamplay)
-                sprint(self, "ŽPublic Team DeathMatch modeŽ\n");
+                sprint(self, "ï¿½Public Team DeathMatch modeï¿½\n");
             else
-                sprint(self, "ŽFFA DeathMatch modeŽ\n");
+                sprint(self, "ï¿½FFA DeathMatch modeï¿½\n");
         }
     }
     temp = cvar("deathmatch");
-    sprint(self, "deathmatch®®®");
+    sprint(self, "deathmatchï¿½ï¿½ï¿½");
     utils_print_float(temp);
     temp = cvar("teamplay");
-    sprint(self, "teamplay®®®®®");
+    sprint(self, "teamplayï¿½ï¿½ï¿½ï¿½ï¿½");
     utils_print_float(temp);
     if (!(clanring_playmode & CLANRING_MATCH_MODE))
         temp = cvar("timelimit");
     else
         temp = clanring_timelimit;
 
-    sprint(self, "timelimit®®®®");
+    sprint(self, "timelimitï¿½ï¿½ï¿½ï¿½");
     utils_print_float(temp);
     temp = cvar("fraglimit");
-    sprint(self, "fraglimit®®®®");
+    sprint(self, "fraglimitï¿½ï¿½ï¿½ï¿½");
     utils_print_float(temp);
     if (clanring_playmode & CLANRING_MATCH_MODE)
     {
         if (clanring_overtime > 0)
         {
-            sprint(self, "overtime®®®®®");
+            sprint(self, "overtimeï¿½ï¿½ï¿½ï¿½ï¿½");
             utils_print_float(clanring_overtime);
         }
         else
         {
             if (clanring_overtime == 0)
-                sprint(self, "overtime®®®®®disabled\n");
+                sprint(self, "overtimeï¿½ï¿½ï¿½ï¿½ï¿½disabled\n");
             else
-                sprint(self, "overtime®®®®®sudden death\n");
+                sprint(self, "overtimeï¿½ï¿½ï¿½ï¿½ï¿½sudden death\n");
         }
     }
     else
     {
         temp = cvar("noexit");
-        sprint(self, "noexit®®®®®®®");
+        sprint(self, "noexitï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
         utils_print_float(temp);
     }
 
-    sprint(self, "quad®®®®®®®®®");
+    sprint(self, "quadï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 
     if (clanring_playmode & CLANRING_NO_QUAD)
         sprint(self, "\bOFF\n");
     else
         sprint(self, "on\n");
 
-    sprint(self, "pent®®®®®®®®®");
+    sprint(self, "pentï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
     if (clanring_playmode & CLANRING_NO_PENT)
         sprint(self, "\bOFF\n");
     else
         sprint(self, "on\n");
 
-    sprint(self, "ring®®®®®®®®®");
+    sprint(self, "ringï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
     if (clanring_playmode & CLANRING_NO_RING)
         sprint(self, "\bOFF\n");
     else
         sprint(self, "on\n");
 
     if (clanring_gameconfig & CLANRING_POWERUP_DROP)
-        sprint(self, "powerupDrops®", "on\n");
+        sprint(self, "powerupDropsï¿½", "on\n");
 
     if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
     {
-        sprint(self, "runes®®®®®®®®");
+        sprint(self, "runesï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
         if (clanring_playmode & CLANRING_RUNES)
             sprint(self, "on\n");
         else
             sprint(self, "\bOFF\n");
     }
     //R00k: we *can* have the hook enabled in non-CTF modes too! :)
-    sprint(self, "hook®®®®®®®®®");
+    sprint(self, "hookï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
     if (clanring_playmode & CLANRING_NO_HOOK)
         sprint(self, "\bOFF\n");
     else
         sprint(self, "on\n");
 
     if (clanring_playmode & CLANRING_NO_SPOOGE)
-        sprint(self, "no spooge®®®®on\n");
+        sprint(self, "no spoogeï¿½ï¿½ï¿½ï¿½on\n");
 
     if (self.style & CLANRING_SMART_WEAPON)
-        sprint(self, "autoweapon®®®on\n");
+        sprint(self, "autoweaponï¿½ï¿½ï¿½on\n");
 
     if (!(clanring_playmode & CLANRING_MATCH_MODE))
-        sprint(self, "next®map®®®®®",nextmap,"\n");
+        sprint(self, "nextï¿½mapï¿½ï¿½ï¿½ï¿½ï¿½",nextmap,"\n");
 
     sprint(self, "\n");
 };
@@ -2203,19 +2203,19 @@ void () clanring_show_rules_prematch =
     if (timervar > 3)
     {
         if (clanring_playmode & CLANRING_DMM4_MODE)
-            s1 = "Ž  d u e l mode  Ž\n\n";
+            s1 = "ï¿½  d u e l mode  ï¿½\n\n";
         else if (clanring_playmode & CLANRING_AIRSHOT_MODE)
-            s1 = "Ž  airshot mode  Ž\n\n";
+            s1 = "ï¿½  airshot mode  ï¿½\n\n";
         else if (clanring_playmode & CLANRING_WIPEOUT_MODE)
-            s1 = "Žclan arena wipeoutŽ\n\n";
+            s1 = "ï¿½clan arena wipeoutï¿½\n\n";
         else if (clanring_playmode & CLANRING_CA_MODE)
-            s1 = "Žclan arena  modeŽ\n\n";
+            s1 = "ï¿½clan arena  modeï¿½\n\n";
         else if (clanring_playmode & CLANRING_RA_MODE)
-            s1 = "Žrocket arena modeŽ\n\n";
+            s1 = "ï¿½rocket arena modeï¿½\n\n";
         else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            s1 = "Žcrctf match modeŽ\n\n";
+            s1 = "ï¿½crctf match modeï¿½\n\n";
         else
-            s1 = "Žcrmod match modeŽ\n\n";
+            s1 = "ï¿½crmod match modeï¿½\n\n";
 
         if (!(clanring_playmode & CLANRING_CA_MODE) && !(clanring_playmode & CLANRING_RA_MODE))
         {
@@ -2348,15 +2348,15 @@ void () clanring_admins =
         sprint(self, "There are no administrators\n");
         return;
     }
-    sprint(self, "\n Ãïäå ü      Îáíå\n");
-    sprint(self, "­­­­­­«­­­­­­­­­­­­­­­­­\n");
+    sprint(self, "\nï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½\n");
+    sprint(self, "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½\n");
     e = find(world, classname, "player");
     while (e)
     {
         if ((e.style & CLANRING_CONNECTED) && (e.style & CLANRING_ADMINISTRATOR))
         {
             s = ftos(e.clanring_hack_count);
-            sprint5(self, "   ", s, "  ü ", e.netname, "\n");
+            sprint5(self, "   ", s, "  ï¿½ ", e.netname, "\n");
         }
         e = find(e, classname, "player");
     }
@@ -3098,7 +3098,7 @@ void () clanring_periodic_checks =
         {
             if (self.style & CLANRING_READY)
             {
-                if (inactive > 120)
+                if (inactive > 120 && !self.fb_is_bot_client)
                     match_notready(); //Un-ready players that are idle for a couple minutes.
             }
         }
