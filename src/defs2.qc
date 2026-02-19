@@ -903,6 +903,11 @@ float  crx_meta_ping;
 .float fb_rj_fire_time;
 .float fb_rj_pitch;
 .float fb_rj_yaw;
+.float fb_hook_climb_state;       // 0=inactive, 1=switching, 2=firing, 3=pulling, 4=releasing
+.float fb_hook_climb_start_time;  // sequence start (for global timeout)
+.float fb_hook_climb_target_z;    // target marker z-height
+.float fb_hook_climb_prev_weapon; // weapon to restore after climb
+.vector fb_hook_climb_aim;        // aim angles for the hook shot
 .float fb_combat_escape_until;
 .float fb_next_combat_escape_time;
 .float fb_camp_until;
@@ -1007,11 +1012,14 @@ float  crx_meta_ping;
 .float fb_aim_yaw_min;
 .float fb_aim_yaw_max;
 .float fb_aim_yaw_mult;
+.float fb_requested_color;      // 0=auto, 1-13=specific color
 .float fb_awareness_delay;
 .float fb_skill_lookahead_time;
 .float fb_skill_prediction_error;
 .entity fb_prev_combat_target;
 .vector fb_prev_enemy_vel;
+.float fb_next_loc_report_time;   // next periodic location report time
+.string fb_last_loc_name;         // last reported location (avoid spam)
 
 // Missile dodge fields (bot-side)
 .entity fb_dodge_missile;        // tracked incoming missile

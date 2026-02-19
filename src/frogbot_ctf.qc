@@ -612,6 +612,308 @@ entity(entity bot, entity friendly_carrier, entity enemy_carrier) frogbot_ctf_pi
     return world;
 };
 
+// ---------------------------------------------------------------------------
+// Hook climbing -- use grappling hook to reach elevated markers
+// ---------------------------------------------------------------------------
+
+void() UnHookPlayer;
+
+float(entity bot) frogbot_can_hook_climb =
+{
+    if (!frogbot_ctf_objectives_enabled(bot))
+        return FALSE;
+    if (cvar("frogbot_hook_climb") <= 0)
+        return FALSE;
+    if (clanring_playmode & CLANRING_NO_HOOK)
+        return FALSE;
+    if (!(bot.items & IT_HOOK))
+        return FALSE;
+    if (bot.waterlevel > 1)
+        return FALSE;
+    if (bot.deadflag != DEAD_NO || bot.health <= 0)
+        return FALSE;
+    if (bot.fb_rj_pending)
+        return FALSE;
+    if (bot.flags & FL_WATERJUMP)
+        return FALSE;
+    return TRUE;
+};
+
+vector(entity bot, entity target_marker) frogbot_hook_climb_aim =
+{
+    local vector aim_point;
+    local vector dir;
+    local vector ang;
+
+    // Primary: aim at a point above the target marker
+    aim_point = target_marker.origin + '0 0 32';
+    traceline(bot.origin + '0 0 16', aim_point, TRUE, bot);
+    if (trace_fraction < 1)
+    {
+        // Blocked -- the surface we hit IS a valid hook target
+        dir = trace_endpos - (bot.origin + '0 0 16');
+        ang = vectoangles(dir);
+        return ang;
+    }
+
+    // Clear LOS to target -- try to find ceiling above target
+    traceline(target_marker.origin, target_marker.origin + '0 0 512', TRUE, bot);
+    if (trace_fraction < 1)
+    {
+        // Found ceiling -- aim at it
+        dir = trace_endpos - (bot.origin + '0 0 16');
+        ang = vectoangles(dir);
+        return ang;
+    }
+
+    // Fallback: steep upward aim in direction of target
+    dir = target_marker.origin - bot.origin;
+    ang = vectoangles(dir);
+    ang_x = -65; // steep upward pitch
+    return ang;
+};
+
+void(entity bot) frogbot_hook_climb_abort =
+{
+    local entity oself;
+
+    if (bot.hook_out)
+    {
+        oself = self;
+        self = bot;
+        if (bot.weapon == IT_HOOK)
+        {
+            bot.button0 = 0; // triggers HookVanish via HookPull
+        }
+        // Force vanish before any weapon restore to avoid orphaned hook state.
+        UnHookPlayer();
+        self = oself;
+    }
+
+    if (bot.fb_hook_climb_prev_weapon > 0)
+    {
+        bot.weapon = bot.fb_hook_climb_prev_weapon;
+        oself = self;
+        self = bot;
+        W_SetCurrentAmmo();
+        self = oself;
+    }
+
+    bot.fb_hook_climb_state = 0;
+    bot.fb_hook_climb_start_time = 0;
+    bot.fb_hook_climb_target_z = 0;
+    bot.fb_hook_climb_prev_weapon = 0;
+    bot.fb_hook_climb_aim = '0 0 0';
+    bot.fb_last_progress_time = time;
+};
+
+float(entity bot, entity combat_target, float combat_has_los,
+      float combat_dist, vector route_delta, float route_dist,
+      float path_flags) frogbot_ctf_apply_hook_climb =
+{
+    local float delta_z;
+    local float target_dist;
+    local entity target_marker;
+    local vector aim;
+    local entity oself;
+
+    // --- Abort conditions (checked every frame when active) ---
+    if (bot.fb_hook_climb_state > 0)
+    {
+        // Close combat -- abort, bot is vulnerable mid-climb
+        if (combat_target != world && combat_has_los && combat_dist <= 300)
+        {
+            frogbot_hook_climb_abort(bot);
+            return FALSE;
+        }
+        // In water, dead, or global timeout (4 seconds)
+        if (bot.waterlevel > 1 || bot.deadflag != DEAD_NO)
+        {
+            frogbot_hook_climb_abort(bot);
+            return FALSE;
+        }
+        if (time - bot.fb_hook_climb_start_time > 4)
+        {
+            frogbot_hook_climb_abort(bot);
+            return FALSE;
+        }
+        // Target marker no longer valid
+        if (!frogbot_is_marker_entity(bot.fb_target_marker))
+        {
+            frogbot_hook_climb_abort(bot);
+            return FALSE;
+        }
+    }
+
+    target_marker = bot.fb_target_marker;
+
+    // --- State 0: Inactive -- check whether to start ---
+    if (bot.fb_hook_climb_state == 0)
+    {
+        if (!(path_flags & FROGBOT_PATH_ROCKET_JUMP))
+            return FALSE;
+        if (!frogbot_can_hook_climb(bot))
+            return FALSE;
+
+        // If bot can also RJ: prefer hook only when health is borderline
+        if (frogbot_can_rj_now(bot))
+        {
+            if (cvar("frogbot_hook_climb_prefer") <= 0)
+            {
+                if (bot.health + bot.armorvalue >= 130)
+                    return FALSE;
+            }
+        }
+
+        delta_z = route_delta_z;
+        if (delta_z < 64)
+            return FALSE;
+        if (route_dist < 10 || route_dist > 300)
+            return FALSE;
+        if (!frogbot_is_marker_entity(target_marker))
+            return FALSE;
+
+        // Start the climb
+        bot.fb_hook_climb_prev_weapon = bot.weapon;
+        bot.fb_hook_climb_target_z = target_marker.origin_z;
+        bot.fb_hook_climb_start_time = time;
+        bot.fb_hook_climb_aim = frogbot_hook_climb_aim(bot, target_marker);
+        bot.fb_hook_climb_state = 1;
+    }
+
+    // --- State 1: Switching weapon (1 frame) ---
+    if (bot.fb_hook_climb_state == 1)
+    {
+        bot.weapon = IT_HOOK;
+        oself = self;
+        self = bot;
+        W_SetCurrentAmmo();
+        self = oself;
+
+        aim = bot.fb_hook_climb_aim;
+        bot.v_angle = aim;
+        bot.angles = aim;
+        bot.fixangle = TRUE;
+        bot.movement = '0 0 0';
+
+        bot.fb_hook_climb_state = 2;
+        bot.fb_last_progress_time = time;
+        return TRUE;
+    }
+
+    // --- State 2: Firing hook ---
+    if (bot.fb_hook_climb_state == 2)
+    {
+        aim = bot.fb_hook_climb_aim;
+        bot.v_angle = aim;
+        bot.angles = aim;
+        bot.fixangle = TRUE;
+        bot.button0 = 1;
+        bot.movement = '0 0 0';
+        bot.fb_last_progress_time = time;
+
+        if (bot.hook_out)
+        {
+            bot.fb_hook_climb_state = 3;
+            return TRUE;
+        }
+
+        // Timeout after 0.5s if hook never fires
+        if (time - bot.fb_hook_climb_start_time > 0.5)
+        {
+            frogbot_hook_climb_abort(bot);
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+    // --- State 3: Being pulled ---
+    if (bot.fb_hook_climb_state == 3)
+    {
+        aim = bot.fb_hook_climb_aim;
+        bot.v_angle = aim;
+        bot.angles = aim;
+        bot.fixangle = TRUE;
+        bot.button0 = 1;
+        bot.movement_x = 120; // small forward for lateral correction
+        bot.movement_y = 0;
+        bot.movement_z = 0;
+        bot.fb_last_progress_time = time;
+
+        // Release conditions
+        if (bot.origin_z >= bot.fb_hook_climb_target_z - 32)
+        {
+            bot.fb_hook_climb_state = 4;
+            return TRUE;
+        }
+        if (frogbot_is_marker_entity(target_marker))
+        {
+            target_dist = vlen(bot.origin - target_marker.origin);
+            if (target_dist < 96)
+            {
+                bot.fb_hook_climb_state = 4;
+                return TRUE;
+            }
+        }
+        if (bot.origin_z > bot.fb_hook_climb_target_z + 48)
+        {
+            bot.fb_hook_climb_state = 4;
+            return TRUE;
+        }
+        // Pull phase > 2.5 seconds
+        if (time - bot.fb_hook_climb_start_time > 2.5)
+        {
+            bot.fb_hook_climb_state = 4;
+            return TRUE;
+        }
+
+        // Hook disappeared unexpectedly
+        if (!bot.hook_out)
+        {
+            frogbot_hook_climb_abort(bot);
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+    // --- State 4: Releasing ---
+    if (bot.fb_hook_climb_state == 4)
+    {
+        bot.button0 = 0; // triggers HookVanish through HookPull check
+
+        // Aim toward target marker at level pitch, push forward
+        if (frogbot_is_marker_entity(target_marker))
+        {
+            aim = vectoangles(target_marker.origin - bot.origin);
+            aim_x = 0;
+            bot.v_angle = aim;
+            bot.angles = aim;
+            bot.fixangle = TRUE;
+        }
+        bot.movement_x = 200;
+        bot.movement_y = 0;
+        bot.movement_z = 0;
+
+        if (!bot.hook_out)
+        {
+            bot.fb_next_jump_time = time + 0.3;
+            frogbot_hook_climb_abort(bot);
+            return FALSE;
+        }
+
+        // Give it 2 more frames then force cleanup
+        if (time - bot.fb_hook_climb_start_time > 4)
+        {
+            bot.fb_next_jump_time = time + 0.3;
+            frogbot_hook_climb_abort(bot);
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+    return FALSE;
+};
+
 float(entity bot, entity combat_target, float combat_has_los, float combat_dist, vector route_delta, float route_dist) frogbot_ctf_apply_hook_transit =
 {
     local float in_close_duel;
@@ -622,6 +924,8 @@ float(entity bot, entity combat_target, float combat_has_los, float combat_dist,
     local float burst_gap;
     local vector aim;
 
+    if (bot.fb_hook_climb_state > 0)
+        return FALSE;
     if (!frogbot_ctf_objectives_enabled(bot))
         return FALSE;
     if (cvar("frogbot_ctf_hook_transit") <= 0)
@@ -994,7 +1298,14 @@ void(entity bot, float own_state, float enemy_state, entity own_flag, entity ene
 
         // Carrier asks for cover exactly on transition to carrying.
         if (!sent && friendly_carrier == bot && prev_friendly_carrier != bot)
-            sent = frogbot_ctf_team_msg(bot, "cover me");
+        {
+            local string cover_loc;
+            cover_loc = frogbot_get_location(bot.origin);
+            if (cover_loc != "")
+                sent = frogbot_ctf_team_msg(bot, sprintf("cover me at %s", cover_loc));
+            else
+                sent = frogbot_ctf_team_msg(bot, "cover me");
+        }
 
         // Return call when own flag just dropped.
         if (!sent && own_state == FLAG_DROPPED && prev_own_state != FLAG_DROPPED)
@@ -1019,7 +1330,14 @@ void(entity bot, float own_state, float enemy_state, entity own_flag, entity ene
             if (!should_call)
                 should_call = frogbot_ctf_is_priority_responder(bot, carrier_marker, carrier_quota, FALSE);
             if (should_call)
-                sent = frogbot_ctf_team_msg(bot, "enemy carrier");
+            {
+                local string ec_loc;
+                ec_loc = frogbot_get_location(enemy_carrier.origin);
+                if (ec_loc != "")
+                    sent = frogbot_ctf_team_msg(bot, sprintf("enemy carrier at %s", ec_loc));
+                else
+                    sent = frogbot_ctf_team_msg(bot, "enemy carrier");
+            }
         }
 
         // Secure call when our flag returns to base.
@@ -1706,6 +2024,11 @@ void(entity bot) frogbot_ctf_reset_runtime_state =
     bot.fb_ctf_next_msg_time = time + random() * 2;
     bot.fb_ctf_next_objective_refresh = time + random() * 0.2;
     bot.fb_ctf_escort_hold_until = 0;
+    bot.fb_hook_climb_state = 0;
+    bot.fb_hook_climb_start_time = 0;
+    bot.fb_hook_climb_target_z = 0;
+    bot.fb_hook_climb_prev_weapon = 0;
+    bot.fb_hook_climb_aim = '0 0 0';
 };
 
 void() frogbot_ctf_init_world =
@@ -1722,4 +2045,6 @@ void() frogbot_ctf_init_world =
     registercvar("frogbot_ctf_comms", "1");
     registercvar("frogbot_ctf_comms_cooldown", "10");
     registercvar("frogbot_ctf_hook_transit", "0");
+    registercvar("frogbot_hook_climb", "1");
+    registercvar("frogbot_hook_climb_prefer", "0");
 };

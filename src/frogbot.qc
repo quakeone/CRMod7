@@ -29,7 +29,7 @@
     High impact parity items:
     - [x] Missile dodging
     - [x] Combat jumping and evasion (dodge/rj + threat-driven escape logic)
-    - [~] Teamplay comms (basic say_team spot/help/lost with anti-spam throttle)
+    - [~] Teamplay comms (say_team spot/help/lost with anti-spam throttle + .loc location reports)
     - [x] Item desire logic
     - [x] Fire safety checks (splash self-damage avoidance)
 
@@ -109,6 +109,7 @@ float frogbot_next_teammsg_global_time;
 float frogbot_vote_add_count;
 float frogbot_vote_add_skill;
 float frogbot_vote_add_has_custom_skill;
+float frogbot_vote_add_color;
 float frogbot_vote_kick_mode;
 float frogbot_vote_kick_index;
 float frogbot_zone_cache_ready;
@@ -138,6 +139,15 @@ float frogbot_zone_goal_eta_rj[300];
 entity frogbot_zone_goal_marker[300];
 entity frogbot_zone_goal_marker_rj[300];
 entity frogbot_markers[300];
+
+// Location system
+float LOC_MAX = 64;
+float loc_count;
+float loc_is_nq;         // TRUE = NQ bounding box, FALSE = QW point
+vector loc_mins[64];
+vector loc_maxs[64];      // NQ: box maxs. QW: unused (same as mins)
+string loc_names[64];
+float loc_sums[64];       // NQ: sum of box dimensions for distance calc
 
 void() Teamplay_Select_Team;
 void() teamplay_ready_player;
@@ -174,6 +184,9 @@ float(entity bot, entity source, string dynamic_classname, float raw_desire) fro
 float(entity bot, entity marker, entity next_marker, float path_flags, float current_bonus) frogbot_ctf_route_score_bonus;
 float(entity bot, entity target, float score, float has_los) frogbot_ctf_target_score_adjust;
 float(entity bot, entity combat_target, float combat_has_los, float combat_dist, vector route_delta, float route_dist) frogbot_ctf_apply_hook_transit;
+float(entity bot) frogbot_can_hook_climb;
+void(entity bot) frogbot_hook_climb_abort;
+float(entity bot, entity combat_target, float combat_has_los, float combat_dist, vector route_delta, float route_dist, float path_flags) frogbot_ctf_apply_hook_climb;
 float(float health, float armor_value, float armor_type) frogbot_total_strength;
 float(entity bot, entity target) frogbot_is_enemy_client;
 float(entity p) frogbot_rune_scale_res;
@@ -329,6 +342,347 @@ float(entity bot, string msg) frogbot_team_say =
     bot.fb_next_teammsg_time = time + cooldown;
     frogbot_next_teammsg_global_time = time + global_cooldown;
     return TRUE;
+};
+
+// ---------------------------------------------------------------------------
+// Location system — load .loc files and look up position names
+// ---------------------------------------------------------------------------
+
+void() frogbot_clear_locations =
+{
+    local float i;
+
+    i = 0;
+    while (i < loc_count)
+    {
+        if (loc_names[i] != "")
+            strunzone(loc_names[i]);
+        loc_names[i] = "";
+        i = i + 1;
+    }
+    loc_count = 0;
+};
+
+// Apply QW name transforms: strip $loc_name_ prefix, $loc_name_separator → "-", $. → "-"
+string(string raw) frogbot_loc_qw_fixname =
+{
+    local float len;
+    local float i;
+    local string ch;
+    local string out;
+    local string prefix;
+
+    // Strip $loc_name_ prefix if present
+    prefix = "$loc_name_";
+    len = strlen(raw);
+    if (len > 10 && substring(raw, 0, 10) == prefix)
+        raw = substring(raw, 10, len - 10);
+
+    // Replace $loc_name_separator and $. with "-"
+    out = "";
+    len = strlen(raw);
+    i = 0;
+    while (i < len)
+    {
+        if (i + 1 < len && substring(raw, i, 2) == "$.")
+        {
+            out = strcat(out, "-");
+            i = i + 2;
+            continue;
+        }
+        if (i + 20 < len && substring(raw, i, 20) == "$loc_name_separator")
+        {
+            out = strcat(out, "-");
+            i = i + 20;
+            continue;
+        }
+        ch = substring(raw, i, 1);
+        out = strcat(out, ch);
+        i = i + 1;
+    }
+
+    return out;
+};
+
+// Parse a single NQ line: x1, y1, z1, x2, y2, z2, "Name"
+float(string line) frogbot_loc_parse_nq =
+{
+    local float argc;
+    local float i;
+    local float vals[6];
+    local string name_part;
+    local float tmp;
+    local vector mins;
+    local vector maxs;
+
+    // tokenize_console handles quoted strings
+    argc = tokenize_console(line);
+    if (argc < 7)
+        return FALSE;
+
+    // First 6 tokens should be numbers (with commas stripped)
+    // NQ format: x1, y1, z1, x2, y2, z2, "Name"
+    // tokenize_console splits on commas, so tokens may have trailing commas
+    i = 0;
+    while (i < 6)
+    {
+        vals[i] = stof(argv(i));
+        i = i + 1;
+    }
+
+    // Remaining tokens form the name
+    name_part = argv(6);
+    i = 7;
+    while (i < argc)
+    {
+        name_part = strcat(name_part, " ", argv(i));
+        i = i + 1;
+    }
+
+    if (name_part == "")
+        return FALSE;
+
+    mins_x = vals[0];
+    mins_y = vals[1];
+    mins_z = vals[2];
+    maxs_x = vals[3];
+    maxs_y = vals[4];
+    maxs_z = vals[5];
+
+    // Swap if needed so mins < maxs
+    if (mins_x > maxs_x)
+    { tmp = mins_x; mins_x = maxs_x; maxs_x = tmp; }
+    if (mins_y > maxs_y)
+    { tmp = mins_y; mins_y = maxs_y; maxs_y = tmp; }
+    if (mins_z > maxs_z)
+    { tmp = mins_z; mins_z = maxs_z; maxs_z = tmp; }
+
+    // Extend Z by +/- 32 like the engine does
+    mins_z = mins_z - 32;
+    maxs_z = maxs_z + 32;
+
+    if (loc_count >= LOC_MAX)
+        return FALSE;
+
+    loc_mins[loc_count] = mins;
+    loc_maxs[loc_count] = maxs;
+    loc_names[loc_count] = strzone(name_part);
+    loc_sums[loc_count] = (maxs_x - mins_x) + (maxs_y - mins_y) + (maxs_z - mins_z);
+    loc_count = loc_count + 1;
+    return TRUE;
+};
+
+// Parse a single QW line: x y z location-name (coords at 8x scale)
+float(string line) frogbot_loc_parse_qw =
+{
+    local float argc;
+    local vector pt;
+    local string name_part;
+    local float i;
+
+    argc = tokenize(line);
+    if (argc < 4)
+        return FALSE;
+
+    pt_x = stof(argv(0)) / 8;
+    pt_y = stof(argv(1)) / 8;
+    pt_z = stof(argv(2)) / 8;
+
+    // Remaining tokens form the name
+    name_part = argv(3);
+    i = 4;
+    while (i < argc)
+    {
+        name_part = strcat(name_part, " ", argv(i));
+        i = i + 1;
+    }
+
+    name_part = frogbot_loc_qw_fixname(name_part);
+
+    if (name_part == "")
+        return FALSE;
+
+    if (loc_count >= LOC_MAX)
+        return FALSE;
+
+    loc_mins[loc_count] = pt;
+    loc_maxs[loc_count] = pt;
+    loc_names[loc_count] = strzone(name_part);
+    loc_sums[loc_count] = 0;
+    loc_count = loc_count + 1;
+    return TRUE;
+};
+
+void() frogbot_load_locations =
+{
+    local string path;
+    local filestream f;
+    local string line;
+    local float format_detected;
+    local float parsed;
+
+    frogbot_clear_locations();
+
+    path = strcat("locs/", mapname, ".loc");
+    f = fopen(path, FILE_READ);
+    if (f < 0)
+    {
+        if (cvar("frogbot_debug") >= 2)
+            print(sprintf("Frogbot locs: no file %s\n", path));
+        return;
+    }
+
+    format_detected = FALSE;
+
+    while ((line = fgets(f)))
+    {
+        // Skip empty lines and comments
+        if (line == "")
+            continue;
+        if (substring(line, 0, 2) == "//")
+            continue;
+
+        // Auto-detect format on first data line
+        if (!format_detected)
+        {
+            if (strstrofs(line, ",", 0) >= 0)
+                loc_is_nq = TRUE;
+            else
+                loc_is_nq = FALSE;
+            format_detected = TRUE;
+        }
+
+        if (loc_is_nq)
+            parsed = frogbot_loc_parse_nq(line);
+        else
+            parsed = frogbot_loc_parse_qw(line);
+
+        if (loc_count >= LOC_MAX)
+            break;
+    }
+
+    fclose(f);
+
+    if (loc_count > 0)
+        print(sprintf("Frogbot locs: loaded %g locations from %s (%s format)\n",
+                       loc_count, path, loc_is_nq ? "NQ" : "QW"));
+};
+
+string(vector pos) frogbot_get_location =
+{
+    local float i;
+    local float best_dist;
+    local float best_idx;
+    local float dist;
+    local vector d;
+
+    if (loc_count <= 0)
+        return "";
+
+    best_dist = 999999999;
+    best_idx = -1;
+
+    if (loc_is_nq)
+    {
+        // NQ: Manhattan-like distance to bounding box
+        local vector lmins;
+        local vector lmaxs;
+        i = 0;
+        while (i < loc_count)
+        {
+            lmins = loc_mins[i];
+            lmaxs = loc_maxs[i];
+            dist = fabs(lmins_x - pos_x) + fabs(lmaxs_x - pos_x)
+                 + fabs(lmins_y - pos_y) + fabs(lmaxs_y - pos_y)
+                 + fabs(lmins_z - pos_z) + fabs(lmaxs_z - pos_z)
+                 - loc_sums[i];
+            if (dist < 0.01)
+                return loc_names[i]; // inside the box
+            if (dist < best_dist)
+            {
+                best_dist = dist;
+                best_idx = i;
+            }
+            i = i + 1;
+        }
+    }
+    else
+    {
+        // QW: squared Euclidean distance to point
+        i = 0;
+        while (i < loc_count)
+        {
+            d = pos - loc_mins[i];
+            dist = d_x * d_x + d_y * d_y + d_z * d_z;
+            if (dist < best_dist)
+            {
+                best_dist = dist;
+                best_idx = i;
+            }
+            i = i + 1;
+        }
+    }
+
+    if (best_idx >= 0)
+        return loc_names[best_idx];
+    return "";
+};
+
+string(entity bot) frogbot_get_role_desc =
+{
+    if (!frogbot_ctf_mode_active())
+        return "";
+    if (bot.fb_ctf_role == FROGBOT_CTF_ROLE_ATTACK)
+        return "attacking";
+    if (bot.fb_ctf_role == FROGBOT_CTF_ROLE_DEFEND)
+        return "defending";
+    if (bot.fb_ctf_role == FROGBOT_CTF_ROLE_ESCORT)
+        return "escorting";
+    if (bot.fb_ctf_role == FROGBOT_CTF_ROLE_ROAM)
+        return "roaming";
+    return "";
+};
+
+void(entity bot) frogbot_loc_periodic_report =
+{
+    local string loc;
+    local string role;
+    local string msg;
+
+    if (!teamplay)
+        return;
+    if (loc_count <= 0)
+        return;
+    if (cvar("frogbot_loc_reports") <= 0)
+        return;
+    if (bot.fb_next_loc_report_time > time)
+        return;
+
+    loc = frogbot_get_location(bot.origin);
+    if (loc == "")
+        return;
+
+    // Skip if still at the same location
+    if (bot.fb_last_loc_name != "" && loc == bot.fb_last_loc_name)
+    {
+        // Push timer forward so we check again soon
+        bot.fb_next_loc_report_time = time + 5;
+        return;
+    }
+
+    role = frogbot_get_role_desc(bot);
+    if (role != "")
+        msg = sprintf("at %s, %s", loc, role);
+    else
+        msg = sprintf("at %s", loc);
+
+    if (frogbot_team_say(bot, msg))
+    {
+        if (bot.fb_last_loc_name != "")
+            strunzone(bot.fb_last_loc_name);
+        bot.fb_last_loc_name = strzone(loc);
+        bot.fb_next_loc_report_time = time + cvar("frogbot_loc_report_interval");
+    }
 };
 
 float() frogbot_powerup_awareness_enabled =
@@ -533,6 +887,14 @@ void(entity bot, entity enemy, float flags, float visible_now) frogbot_track_ene
         else
             msg = "";
 
+        if (msg != "")
+        {
+            local string pw_loc;
+            pw_loc = frogbot_get_location(enemy.origin);
+            if (pw_loc != "")
+                msg = sprintf("%s at %s", msg, pw_loc);
+        }
+
         if (msg != "" && frogbot_team_say(bot, msg))
             bot.fb_next_powerup_call_time = time + cooldown;
     }
@@ -608,6 +970,32 @@ float(string s) frogbot_is_uint =
     }
 
     return TRUE;
+};
+
+// Returns color number (1-13) if s is a color keyword, or -1 if not.
+// Recognized: "red" (4), "blue" (13), "c1" through "c13".
+float(string s) frogbot_parse_color_arg =
+{
+    local string lower;
+    local string num_part;
+    local float c;
+
+    lower = strtolower(s);
+    if (lower == "red") return COLOR_RED;
+    if (lower == "blue") return COLOR_BLUE;
+
+    if (strlen(lower) >= 2 && substring(lower, 0, 1) == "c")
+    {
+        num_part = substring(lower, 1, -1);
+        if (frogbot_is_uint(num_part))
+        {
+            c = stof(num_part);
+            if (c >= 1 && c <= 13)
+                return c;
+        }
+    }
+
+    return -1;
 };
 
 float(string token) frogbot_valid_map_token =
@@ -3294,7 +3682,14 @@ float(entity bot, entity enemy) frogbot_apply_combat_escape =
         bot.fb_combat_escape_until = max(bot.fb_combat_escape_until, time + hold_time);
         bot.fb_next_combat_escape_time = time + cooldown;
         if (!escape_active)
-            frogbot_team_say(bot, "need help, backing off");
+        {
+            local string help_loc;
+            help_loc = frogbot_get_location(bot.origin);
+            if (help_loc != "")
+                frogbot_team_say(bot, sprintf("need help at %s, backing off", help_loc));
+            else
+                frogbot_team_say(bot, "need help, backing off");
+        }
     }
 
     if (cvar("frogbot_debug") >= 2)
@@ -3316,6 +3711,8 @@ float(entity bot, entity enemy) frogbot_apply_combat_escape =
 
 void(entity bot) frogbot_stop_movement =
 {
+    if (bot.fb_hook_climb_state > 0)
+        frogbot_hook_climb_abort(bot);
     bot.movement = '0 0 0';
     bot.button0 = 0;
     bot.button1 = 0;
@@ -3349,6 +3746,11 @@ void(entity bot) frogbot_clear_runtime_targets =
     bot.fb_rj_fire_time = 0;
     bot.fb_rj_pitch = 0;
     bot.fb_rj_yaw = 0;
+    bot.fb_hook_climb_state = 0;
+    bot.fb_hook_climb_start_time = 0;
+    bot.fb_hook_climb_target_z = 0;
+    bot.fb_hook_climb_prev_weapon = 0;
+    bot.fb_hook_climb_aim = '0 0 0';
     bot.fb_combat_escape_until = 0;
     bot.fb_next_combat_escape_time = 0;
     bot.fb_dodge_missile = world;
@@ -3536,6 +3938,15 @@ float(entity bot) frogbot_can_rj_now =
     return (hp_armor >= min_hp_armor);
 };
 
+float(entity bot) frogbot_can_use_rj_paths =
+{
+    if (frogbot_can_rj_now(bot))
+        return TRUE;
+    if (frogbot_can_hook_climb(bot))
+        return TRUE;
+    return FALSE;
+};
+
 float(string classname) frogbot_is_item_goal_class =
 {
     if (classname == "")
@@ -3604,7 +4015,7 @@ float(entity bot, entity from_marker, entity to_marker) frogbot_skill_goal_eta =
     if (from_marker == to_marker)
         return 0;
 
-    allow_rj = (cvar("frogbot_enable_rj") > 0 && frogbot_can_rj_now(bot));
+    allow_rj = frogbot_can_use_rj_paths(bot);
     travel_eta = frogbot_zone_arrival_time(from_marker, to_marker, allow_rj);
     if (travel_eta < FROGBOT_ZONE_INF * 0.5)
         return max(0, travel_eta);
@@ -4184,8 +4595,13 @@ float(entity bot, entity marker, entity next_marker, float path_flags) frogbot_r
     hazard_level = frogbot_marker_hazard_level(next_marker);
     cost = hazard_level * hazard_penalty;
 
-    if ((path_flags & FROGBOT_PATH_ROCKET_JUMP) && !frogbot_can_rj_now(bot))
-        cost = cost + 4;
+    if (path_flags & FROGBOT_PATH_ROCKET_JUMP)
+    {
+        if (!frogbot_can_use_rj_paths(bot))
+            cost = cost + 4;
+        else if (!frogbot_can_rj_now(bot))
+            cost = cost + 0.8;
+    }
 
     return cost;
 };
@@ -4214,7 +4630,7 @@ float(entity bot, entity marker, entity next_marker, float path_flags) frogbot_p
 
     if (path_flags & FROGBOT_PATH_ROCKET_JUMP)
     {
-        if (!frogbot_can_rj_now(bot))
+        if (!frogbot_can_use_rj_paths(bot))
             return FALSE;
     }
 
@@ -4301,7 +4717,7 @@ float(entity bot, entity marker, entity next_marker, float path_flags, entity zo
         next_slot = frogbot_marker_slot(next_marker);
         if (marker_slot >= 0 && next_slot >= 0)
         {
-            use_rj_eta = (cvar("frogbot_enable_rj") > 0 && frogbot_can_rj_now(bot));
+            use_rj_eta = frogbot_can_use_rj_paths(bot);
             if (use_rj_eta)
             {
                 zone_current_eta = frogbot_zone_goal_eta_rj[marker_slot];
@@ -4354,7 +4770,7 @@ float(entity bot, entity marker, entity next_marker, float path_flags, entity zo
         && frogbot_is_marker_entity(zone_virtual_anchor)
         && zone_virtual_anchor_score > 0)
     {
-        use_rj_eta = (cvar("frogbot_enable_rj") > 0 && frogbot_can_rj_now(bot));
+        use_rj_eta = frogbot_can_use_rj_paths(bot);
         zone_virtual_next = frogbot_zone_next_marker(marker, zone_virtual_anchor, use_rj_eta);
         if (zone_virtual_next == next_marker)
         {
@@ -4405,7 +4821,7 @@ void(entity bot, entity marker, entity next_marker, entity zone_virtual_anchor, 
     if (marker_slot < 0 || next_slot < 0)
         return;
 
-    use_rj_eta = (cvar("frogbot_enable_rj") > 0 && frogbot_can_rj_now(bot));
+    use_rj_eta = frogbot_can_use_rj_paths(bot);
     zone_current_eta = FROGBOT_ZONE_INF;
     zone_next_eta = FROGBOT_ZONE_INF;
     zone_delta = FROGBOT_ZONE_INF;
@@ -5010,7 +5426,7 @@ float(entity bot, entity marker, entity next_marker) frogbot_camp_route_bonus =
     if (marker == camp_marker)
         return -0.65;
 
-    use_rj_eta = (cvar("frogbot_enable_rj") > 0 && frogbot_can_rj_now(bot));
+    use_rj_eta = frogbot_can_use_rj_paths(bot);
     current_eta = frogbot_zone_arrival_time(marker, camp_marker, use_rj_eta);
     next_eta = frogbot_zone_arrival_time(next_marker, camp_marker, use_rj_eta);
     if (current_eta < FROGBOT_ZONE_INF * 0.5 && next_eta < FROGBOT_ZONE_INF * 0.5)
@@ -5840,7 +6256,14 @@ entity(entity bot) frogbot_find_enemy_target =
                     }
                     bot.fb_last_enemy_seen_time = time;
                     if (!had_contact)
-                        frogbot_team_say(bot, "enemy spotted");
+                    {
+                        local string spot_loc1;
+                        spot_loc1 = frogbot_get_location(keep_target.origin);
+                        if (spot_loc1 != "")
+                            frogbot_team_say(bot, sprintf("enemy spotted at %s", spot_loc1));
+                        else
+                            frogbot_team_say(bot, "enemy spotted");
+                    }
                     bot.fb_team_has_contact = 1;
                     return keep_target;
                 }
@@ -5992,7 +6415,14 @@ entity(entity bot) frogbot_find_enemy_target =
             }
             bot.fb_last_enemy_seen_time = time;
             if (!had_contact)
-                frogbot_team_say(bot, "enemy spotted");
+            {
+                local string spot_loc2;
+                spot_loc2 = frogbot_get_location(best.origin);
+                if (spot_loc2 != "")
+                    frogbot_team_say(bot, sprintf("enemy spotted at %s", spot_loc2));
+                else
+                    frogbot_team_say(bot, "enemy spotted");
+            }
         }
         else if (power_awareness)
         {
@@ -6013,7 +6443,14 @@ entity(entity bot) frogbot_find_enemy_target =
             if (bot.fb_last_enemy_seen_time <= 0
                 || bot.fb_last_enemy_seen_time + lost_delay <= time)
             {
-                frogbot_team_say(bot, "lost enemy");
+                {
+                    local string lost_loc;
+                    lost_loc = frogbot_get_location(bot.origin);
+                    if (lost_loc != "")
+                        frogbot_team_say(bot, sprintf("lost enemy at %s", lost_loc));
+                    else
+                        frogbot_team_say(bot, "lost enemy");
+                }
                 bot.fb_team_has_contact = 0;
             }
             else
@@ -6980,6 +7417,7 @@ void() frogbot_client_frame =
     }
 
     frogbot_ctf_update_runtime(self);
+    frogbot_loc_periodic_report(self);
     frogbot_refresh_item_desire(self);
 
     if (self.origin_z < frogbot_map_death_height)
@@ -7344,6 +7782,14 @@ void() frogbot_client_frame =
             self.fb_next_combat_log_time = time + 2;
             frogbot_debug_log("");
         }
+    }
+
+    if (frogbot_ctf_apply_hook_climb(self, combat_target, hook_combat_has_los,
+                                      hook_combat_dist, delta, dist,
+                                      self.fb_target_path_flags))
+    {
+        self.button2 = 0;
+        return;
     }
 
     frogbot_ctf_apply_hook_transit(self, combat_target, hook_combat_has_los, hook_combat_dist, delta, dist);
@@ -8219,17 +8665,27 @@ float() frogbot_should_join_blue =
 
 void() frogbot_assign_match_team_color =
 {
+    local float col;
+
     if (!teamplay)
     {
-        if (self.team <= 1)
-        {
-            self.team = 13;
-            clientcommand(self, "color 13 13");
-        }
+        col = self.fb_requested_color;
+        if (col <= 0)
+            col = 13;
+        self.team = col;
+        clientcommand(self, sprintf("color %g %g", col, col));
         return;
     }
 
-    if (frogbot_should_join_blue())
+    // Teamplay: honor requested color if red or blue
+    if (self.fb_requested_color == COLOR_RED)
+    {
+        self.team = RED;
+        self.style = (self.style | CLANRING_RED_TEAM);
+        self.style = self.style - (self.style & CLANRING_BLUE_TEAM);
+        clientcommand(self, "color 4 4");
+    }
+    else if (self.fb_requested_color == COLOR_BLUE)
     {
         self.team = BLUE;
         self.style = (self.style | CLANRING_BLUE_TEAM);
@@ -8238,10 +8694,21 @@ void() frogbot_assign_match_team_color =
     }
     else
     {
-        self.team = RED;
-        self.style = (self.style | CLANRING_RED_TEAM);
-        self.style = self.style - (self.style & CLANRING_BLUE_TEAM);
-        clientcommand(self, "color 4 4");
+        // Auto-balance (default or invalid color for teamplay)
+        if (frogbot_should_join_blue())
+        {
+            self.team = BLUE;
+            self.style = (self.style | CLANRING_BLUE_TEAM);
+            self.style = self.style - (self.style & CLANRING_RED_TEAM);
+            clientcommand(self, "color 13 13");
+        }
+        else
+        {
+            self.team = RED;
+            self.style = (self.style | CLANRING_RED_TEAM);
+            self.style = self.style - (self.style & CLANRING_BLUE_TEAM);
+            clientcommand(self, "color 4 4");
+        }
     }
 
     self.height = self.team - 1;
@@ -8327,7 +8794,13 @@ void() frogbot_post_spawn_think =
     else if (teamplay)
     {
         if (!(self.style & CLANRING_RED_TEAM) && !(self.style & CLANRING_BLUE_TEAM))
+        {
+            if (self.fb_requested_color == COLOR_RED)
+                self.team = RED;
+            else if (self.fb_requested_color == COLOR_BLUE)
+                self.team = BLUE;
             teamplay_ready_player();
+        }
     }
 
     frogbot_debug_log("");
@@ -8373,7 +8846,7 @@ string(string base_name) frogbot_make_unique_name =
     return candidate;
 };
 
-entity(string bot_name, float skill_level) frogbot_spawn_one =
+entity(string bot_name, float skill_level, float requested_color) frogbot_spawn_one =
 {
     local entity bot;
     local entity evt;
@@ -8387,6 +8860,7 @@ entity(string bot_name, float skill_level) frogbot_spawn_one =
     bot_entnum = num_for_edict(bot);
     bot.fb_is_bot_client = TRUE;
     bot.fb_bot_bootstrap = FALSE;
+    bot.fb_requested_color = requested_color;
     bot.colormap = bot_entnum;
     frogbot_reset_runtime_state(bot);
     frogbot_apply_skill_level(bot, skill_level);
@@ -8463,7 +8937,7 @@ float() frogbot_mode_allows_botadd =
     return TRUE;
 };
 
-void(string arg1, string arg2) frogbot_command_add =
+void(string arg1, string arg2, float requested_color) frogbot_command_add =
 {
     local float count;
     local float i;
@@ -8472,14 +8946,27 @@ void(string arg1, string arg2) frogbot_command_add =
     local float using_custom_skill;
     local string base_name;
     local string bot_name;
+    local string color_desc;
+    local float had_name_arg;
 
     if (!frogbot_mode_allows_botadd())
         return;
+
+    // Validate color for teamplay modes
+    if (requested_color > 0 && teamplay)
+    {
+        if (requested_color != COLOR_RED && requested_color != COLOR_BLUE)
+        {
+            sprint(self, "Frogbot: only red/blue valid in team modes.\n");
+            requested_color = 0;
+        }
+    }
 
     count = 1;
     base_name = "";
     skill_level = cvar("frogbot_skill");
     using_custom_skill = FALSE;
+    had_name_arg = FALSE;
 
     if (arg1 != "")
     {
@@ -8496,12 +8983,14 @@ void(string arg1, string arg2) frogbot_command_add =
                 else
                 {
                     base_name = arg2;
+                    had_name_arg = TRUE;
                 }
             }
         }
         else
         {
             base_name = arg1;
+            had_name_arg = TRUE;
             if (arg2 != "" && frogbot_is_uint(arg2))
             {
                 skill_level = stof(arg2);
@@ -8530,12 +9019,12 @@ void(string arg1, string arg2) frogbot_command_add =
     added = 0;
     while (i <= count)
     {
-        if (count == 1 && !frogbot_is_uint(arg1))
+        if (count == 1 && had_name_arg)
             bot_name = base_name;
         else
             bot_name = sprintf("%s%g", base_name, i);
 
-        if (frogbot_spawn_one(bot_name, skill_level) == world)
+        if (frogbot_spawn_one(bot_name, skill_level, requested_color) == world)
             break;
 
         added = added + 1;
@@ -8543,10 +9032,22 @@ void(string arg1, string arg2) frogbot_command_add =
     }
 
     frogbot_debug_log("");
+
+    color_desc = "";
+    if (requested_color > 0)
+    {
+        if (requested_color == COLOR_RED)
+            color_desc = " (red)";
+        else if (requested_color == COLOR_BLUE)
+            color_desc = " (blue)";
+        else
+            color_desc = sprintf(" (color %g)", requested_color);
+    }
+
     if (using_custom_skill)
-        sprint(self, sprintf("Frogbot: added %g bot(s) at skill %g.\n", added, skill_level));
+        sprint(self, sprintf("Frogbot: added %g bot(s) at skill %g%s.\n", added, skill_level, color_desc));
     else
-        sprint(self, sprintf("Frogbot: added %g bot(s).\n", added));
+        sprint(self, sprintf("Frogbot: added %g bot(s)%s.\n", added, color_desc));
 };
 
 float() frogbot_remove_all_bots =
@@ -8653,7 +9154,7 @@ void() frogbot_vote_add_pass =
             arg2 = sprintf("%g", frogbot_vote_add_skill);
     }
 
-    frogbot_command_add(arg1, arg2);
+    frogbot_command_add(arg1, arg2, frogbot_vote_add_color);
     self = saved_self;
 };
 
@@ -8680,38 +9181,69 @@ void(string arg1, string arg2) frogbot_request_add =
     local float count;
     local float skill_level;
     local float has_custom_skill;
+    local float requested_color;
+    local float c;
     local string details;
+    local string color_desc;
+    local string effective_arg1;
+    local string effective_arg2;
 
     if (!frogbot_mode_allows_botadd())
         return;
 
+    // Extract color keyword from either arg before further parsing
+    requested_color = 0;
+    effective_arg1 = arg1;
+    effective_arg2 = arg2;
+
+    if (arg1 != "")
+    {
+        c = frogbot_parse_color_arg(arg1);
+        if (c > 0)
+        {
+            requested_color = c;
+            effective_arg1 = arg2;
+            effective_arg2 = "";
+        }
+    }
+    if (requested_color == 0 && arg2 != "")
+    {
+        c = frogbot_parse_color_arg(arg2);
+        if (c > 0)
+        {
+            requested_color = c;
+            effective_arg2 = "";
+        }
+    }
+
     if (self.style & CLANRING_ADMINISTRATOR)
     {
-        frogbot_command_add(arg1, arg2);
+        frogbot_command_add(effective_arg1, effective_arg2, requested_color);
         return;
     }
 
+    // Non-admin vote path: only allow numeric count/skill (plus color keywords)
     count = 1;
     skill_level = cvar("frogbot_skill");
     has_custom_skill = FALSE;
 
-    if (arg1 != "")
+    if (effective_arg1 != "")
     {
-        if (!frogbot_is_uint(arg1))
+        if (!frogbot_is_uint(effective_arg1))
         {
-            sprint(self, "Frogbot: non-admin botadd supports numeric count/skill only.\n");
+            sprint(self, "Frogbot: non-admin botadd supports count/skill/color only.\n");
             return;
         }
 
-        count = stof(arg1);
-        if (arg2 != "")
+        count = stof(effective_arg1);
+        if (effective_arg2 != "")
         {
-            if (!frogbot_is_uint(arg2))
+            if (!frogbot_is_uint(effective_arg2))
             {
-                sprint(self, "Frogbot: non-admin botadd supports numeric count/skill only.\n");
+                sprint(self, "Frogbot: non-admin botadd supports count/skill/color only.\n");
                 return;
             }
-            skill_level = stof(arg2);
+            skill_level = stof(effective_arg2);
             has_custom_skill = TRUE;
         }
     }
@@ -8721,11 +9253,23 @@ void(string arg1, string arg2) frogbot_request_add =
     frogbot_vote_add_count = count;
     frogbot_vote_add_skill = skill_level;
     frogbot_vote_add_has_custom_skill = has_custom_skill;
+    frogbot_vote_add_color = requested_color;
+
+    color_desc = "";
+    if (requested_color > 0)
+    {
+        if (requested_color == COLOR_RED)
+            color_desc = " red";
+        else if (requested_color == COLOR_BLUE)
+            color_desc = " blue";
+        else
+            color_desc = sprintf(" color %g", requested_color);
+    }
 
     if (has_custom_skill)
-        details = sprintf("%g bot(s) at skill %g", count, skill_level);
+        details = sprintf("%g bot(s) at skill %g%s", count, skill_level, color_desc);
     else
-        details = sprintf("%g bot(s)", count);
+        details = sprintf("%g bot(s)%s", count, color_desc);
 
     if (vote_init("add ", details, frogbot_vote_add_pass, "frogbot_add"))
         vote_yes();
@@ -8839,7 +9383,7 @@ void(string arg1) frogbot_command_routes =
 void() frogbot_print_help =
 {
     sprint(self, "Frogbot commands:\n");
-    sprint(self, " botadd [count] [nameprefix|skill] - add bot(s), vote for non-admin\n");
+    sprint(self, " botadd [count] [name|skill] [red|blue|cN] - add bot(s)\n");
     sprint(self, " botkick [name|index|all]    - remove bot(s), vote for non-admin\n");
     sprint(self, " botroutes [status|reload|where|map] - route file status/load\n");
     sprint(self, " botver                       - print frogbot build tag\n");
@@ -9081,6 +9625,9 @@ void() frogbot_init_world =
     registercvar("frogbot_marker_force_rebind_hits", "2");
     registercvar("frogbot_skill", "10");
     registercvar("frogbot_aim_error", "1");
+    registercvar("frogbot_loc_reports", "1");
+    registercvar("frogbot_loc_report_interval", "20");
+    frogbot_load_locations();
     frogbot_ctf_init_world();
 
     if (purge_latched > 0)
