@@ -264,6 +264,7 @@ void () HookFire2;
 void () ban_kick_client;
 void (entity client) clanring_kick_player;
 void () modes_commands;
+void () hh_startup;
 void () gameplay_commands;
 void () watch_commands;
 void () stat_commands;
@@ -531,6 +532,11 @@ void () server_set_infokey_modes =
         else if (clanring_playmode & CLANRING_RA_MODE) 		zmode = "rocketarena";
         else if (clanring_playmode & CLANRING_AIRSHOT_MODE) zmode = "airshot";
     //else if (clanring_playmode & CLANRING_FREEZETAG_MODE) zmode = "freezetag";
+    }
+    else if (clanring_playmode & CLANRING_HH_MODE)
+    {
+        pmode = "ffa";
+        zmode = "headhunters";
     }
     forceinfokey(world, "gametype", zmode);	//for json output; gamemode = gametype + playmode ("CTF PickUp", "CA Match", "TDM Practice")
     forceinfokey(world, "mode", zmode);
@@ -803,6 +809,8 @@ void () clanring_init_world =
     // schedule the config files for a bit later so that they don't
     // get loaded twice on startup
     utils_make_scheduled_event(clanring_exec_configs, 1);
+    if (clanring_playmode & CLANRING_HH_MODE)
+        utils_make_scheduled_event(hh_startup, 0.2);
     // spawn runes if enabled, wait for the cfg to be read.
     utils_make_scheduled_event(StartRuneSpawnStart, 2);
     // fix the start teleport bug
@@ -1197,6 +1205,8 @@ void () clanring_show_mode =
             sprint(self.owner, "airshot mode\n");
         else if (clanring_playmode & CLANRING_RA_MODE)
             sprint(self.owner, "rocket arena mode\n");
+        else if (clanring_playmode & CLANRING_HH_MODE)
+            sprint(self.owner, "head hunters mode\n");
         else if (clanring_playmode & CLANRING_PRACTICE_MODE)
             sprint(self.owner, "practice mode\n");
         else if (clanring_playmode & CLANRING_NORMAL_MODE)
@@ -1856,6 +1866,7 @@ void () modes_commands =
         sprint(self, " \bctf\b\n");
         sprint(self, " \bdm\b\n");
         sprint(self, " \bdmm4\b\n");
+        sprint(self, " \bhh\b\n");
         sprint(self, " \bmatch\b\n");
         sprint(self, " \bnormal\b\n");
         sprint(self, " \bpractice\b\n");

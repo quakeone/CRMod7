@@ -83,6 +83,7 @@ void() votables_send_aliases =
 	stuffcmd(self, "alias dmm4 cmd dmm4\n");
 	stuffcmd(self, "alias ctfdmm4 cmd ctfdmm4\n");
 	stuffcmd(self, "alias airshot cmd airshot\n");
+	stuffcmd(self, "alias hh cmd hh\n");
 	stuffcmd(self, "alias powerupdrop cmd powerupdrop;\n");
 	stuffcmd(self, "alias leavemealone \"cmd leavemealone\"\n");
 	stuffcmd(self, "alias prediction \"cmd prediction\"\n");
@@ -356,6 +357,7 @@ void() votables_clear_arena_playmode_flags =
 	clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_DMM4_MODE);
 	clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_AIRSHOT_MODE);
 	clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_WIPEOUT_MODE);
+	clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_HH_MODE);
 }
 
 void() votables_clear_playmode_flags =
@@ -478,6 +480,16 @@ void() votables_set_gametype_mode_map =
 			bprint("gametype set to ctf dmm4\n");
 
 			newmapname = "ctf8dmm4";
+		}
+		else if (request_gametype == 8)
+		{
+			votables_clear_playmode_flags();
+			clanring_playmode = (clanring_playmode | CLANRING_HH_MODE);
+			cvar_set("timelimit", "10");
+			cvar_set("fraglimit", "0");
+			cvar_set("teamplay", "0");
+			cvar_set("deathmatch", "3");
+			bprint("gametype set to Head Hunters\n");
 		}
 
 		utils_set_cvar ("samelevel", clanring_playmode);
@@ -606,6 +618,7 @@ void() votables_set_gametype_mode_map =
 //		5	-	airshot
 //		6	-	wipeout
 //		7	-	ctfdmm4
+//		8	-	head hunters
 //
 // newmode		(dm/ctf)
 //	   -1	-	no change
@@ -652,6 +665,7 @@ void(float newtype, float newmode, float newmap) votables_request_set_gametype_m
 		if (newtype == 0 && !(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) 
 			&& !(clanring_playmode & CLANRING_DMM4_MODE) && !(clanring_playmode & CLANRING_CA_MODE) 
 			&& !(clanring_playmode & CLANRING_RA_MODE) && !(clanring_playmode & CLANRING_AIRSHOT_MODE) 
+			&& !(clanring_playmode & CLANRING_HH_MODE)
 			&& newmode < 0 && !newmap)
 		{
 			sprint(self, "Already in DeathMatch mode\n");
@@ -686,6 +700,11 @@ void(float newtype, float newmode, float newmap) votables_request_set_gametype_m
 		else if (newtype == 6 && clanring_playmode & CLANRING_WIPEOUT_MODE && newmode < 0 && !newmap)
 		{
 			sprint(self, "Already in wipeout mode\n");
+			return;
+		}
+		else if (newtype == 8 && clanring_playmode & CLANRING_HH_MODE && newmode < 0 && !newmap)
+		{
+			sprint(self, "Already in Head Hunters mode\n");
 			return;
 		}
 	}
@@ -781,6 +800,10 @@ void(float newtype, float newmode, float newmap) votables_request_set_gametype_m
 		else if (request_gametype == 7)
 		{
 			gametype_string = "CTF Duel";
+		}
+		else if (request_gametype == 8)
+		{
+			gametype_string = "Head Hunters";
 		}
 
 		if (request_mapname != "")

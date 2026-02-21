@@ -2048,7 +2048,7 @@ PLAYER BACKPACKS
 void() BackpackTouch =
 {
 	local string s;
-	local float best, new, acount, bswitch;
+	local float best, new, acount, bswitch, headroom, headtake;
 	local entity stemp;
 
 	if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
@@ -2155,6 +2155,27 @@ void() BackpackTouch =
 	other.ammo_nails = (other.ammo_nails + self.ammo_nails);
 	other.ammo_rockets = (other.ammo_rockets + self.ammo_rockets);
 	other.ammo_cells = (other.ammo_cells + self.ammo_cells);
+	if ((clanring_playmode & CLANRING_HH_MODE) && (self.ammo_heads > 0))
+	{
+		headroom = hh_maxheads - other.ammo_heads;
+		if (headroom > 0)
+		{
+			headtake = self.ammo_heads;
+			if (headtake > headroom)
+				headtake = headroom;
+
+			other.ammo_heads = other.ammo_heads + headtake;
+			self.ammo_heads = self.ammo_heads - headtake;
+
+			if (acount)
+				sprint(other, ", ");
+
+			acount = 1;
+			sprint(other, ftos(headtake), " head");
+			if (headtake != 1)
+				sprint(other, "s");
+		}
+	}
 	new = self.items;
 	if (!new)
 		new = other.weapon;
@@ -2258,7 +2279,8 @@ void() DropBackpack =
 	local entity item;
 	local string msg;
 
-	if (!(self.ammo_shells + self.ammo_nails + self.ammo_rockets + self.ammo_cells))
+	if (!(self.ammo_shells + self.ammo_nails + self.ammo_rockets + self.ammo_cells
+		+ ((clanring_playmode & CLANRING_HH_MODE) ? self.ammo_heads : 0)))
 		return;	// nothing in it
 
 	item = spawn();
@@ -2326,6 +2348,11 @@ void() DropBackpack =
 	item.ammo_nails 	= self.ammo_nails;
 	item.ammo_rockets 	= self.ammo_rockets;
 	item.ammo_cells 	= self.ammo_cells;
+	if (clanring_playmode & CLANRING_HH_MODE)
+	{
+		item.ammo_heads = self.ammo_heads;
+		self.ammo_heads = 0;
+	}
 
 	item.velocity_z = 300;
 	item.velocity_x = -100 + (random () * 200);

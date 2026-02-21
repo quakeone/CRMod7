@@ -679,8 +679,15 @@ void(float dm) ThrowHead =
 
 void() GibPlayer =
 {
+	local vector hh_head_origin;
+
+	hh_head_origin = self.origin;
+
 	//ThrowHead ("progs/h_player.mdl", self.health);
 	ThrowHead (self.health);
+
+	if (clanring_playmode & CLANRING_HH_MODE)
+		hh_spawn_head_at(self, hh_head_origin);
 
 	if (!(clanring_playmode & CLANRING_NO_GIBS))
 	{
@@ -765,7 +772,9 @@ void() PlayerDie =
 	self.movetype = MOVETYPE_TOSS;
 	self.finaldest_y = MOVETYPE_TOSS;
 
-	if (((self.health < -40) && !(clanring_playmode & CLANRING_NO_GIBS)) || (clanring_playmode & CLANRING_AIRSHOT_MODE))
+	if (((self.health < -40) && !(clanring_playmode & CLANRING_NO_GIBS))
+		|| (clanring_playmode & CLANRING_AIRSHOT_MODE)
+		|| (clanring_playmode & CLANRING_HH_MODE))
 	{
 		GibPlayer ();
 		PlayerDead ();

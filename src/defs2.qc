@@ -92,6 +92,7 @@ float CLANRING_DMM4_MODE			= 1048576;
 float CLANRING_CONSOLE_STATS   		= 2097152;
 float CLANRING_CA_MODE				= 4194304;
 float CLANRING_RA_MODE				= 8388608;
+float CLANRING_HH_MODE             = 16777216;
 
 /*
 	G A M E C O N F I G
@@ -159,6 +160,7 @@ float ADMIN_RA_MODE    		= 5;
 float ADMIN_AIRSHOT_MODE    = 6;
 float ADMIN_DMM4_MODE    	= 7;
 float ADMIN_WIPEOUT_MODE	= 8;
+float ADMIN_HH_MODE         = 9;
 
 // entity constants
 float CLANRING_MANUAL_SPAWN = 1;
@@ -181,6 +183,8 @@ float   clanring_levelcount;        // used to scan through list in levels.cfg
 float   clanring_lastcount;         // used to detect end-of-file in levels.cfg
 float   clanring_force_ring;        // 1 = force ring on, -1 = force ring off, 0 = no force (auto)
 float   clanring_force_timelimit;   // 1 = force timelimit from cfg, 0 = auto
+float   hh_maxheads = 5;            // max collectible heads a player can carry
+float   hh_altar_scoring;           // allows client_frag only during HH altar scoring
 
 float   dm_num_spawns;              // number of deathmatch spawn points (as opposed to ctf spawn points)
 float   clanring_num_starts;        // number of match extra start points
@@ -488,6 +492,7 @@ float	clanring_afk_check;
 float	clanring_afk_timeout;
 .float 	afk_time;
 .float 	vote;    //client flag that holds their vote
+.float  ammo_heads;
 
 .float stats_item_ssg;				//
 .float stats_item_ng;				//

@@ -1014,6 +1014,7 @@ void() PutClientInServer =
     self.killstreak				= 0;
     self.combo_frags 			= 0;
     self.combo_time 			= 0;
+    self.ammo_heads             = 0;
     self.enemy					= world;	//who shot/killed us
     self.enemy_target			= world;	//who we last shot/killed
 
@@ -2411,6 +2412,9 @@ void(entity client, float fragval) client_frag =
 {
     local float old_frags, window, old_togo, togo; // Declare locals once to avoid duplicates
 
+    if ((clanring_playmode & CLANRING_HH_MODE) && !hh_altar_scoring)
+        return;
+
     if ((clanring_playmode & CLANRING_CA_MODE) || (clanring_playmode & CLANRING_RA_MODE))
         return;
 
@@ -3785,6 +3789,18 @@ void(string cmd) SV_ParseClientCommand =
                 return;
             }
             votables_request_set_gametype_mode_map(7, -1, 0);
+            return;
+        case "hh":
+            if (arg1 != "")
+            {
+                mapnumber = found_in_warp_list(arg1);
+                if (mapnumber)
+                    votables_request_set_gametype_mode_map(8, -1, mapnumber);
+                else
+                    sprint2(self, arg1, " is not a recognized map.\n");
+                return;
+            }
+            votables_request_set_gametype_mode_map(8, -1, 0);
             return;
         case "ca":
             if (arg1 != "")

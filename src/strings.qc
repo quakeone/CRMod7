@@ -609,6 +609,7 @@ string (float mode) strings_get_mode =
 		case 6: return "Airshot";
 		case 7: return "DMM4";
 		case 8: return "Wipeout";		
+		case 9: return "Head Hunters";
 	}
 	return "";
 };
@@ -627,6 +628,7 @@ string (float mode) strings_get_mode_gold =
 		case 6: return "\bAirshot";
 		case 7: return "\bDMM4";
 		case 8: return "\bWipeout";
+		case 9: return "\bHead Hunters";
 	}
 	return "";
 };

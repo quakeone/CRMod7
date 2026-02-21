@@ -563,6 +563,8 @@ void () options_display =
 //
 float () options_get_mode =
 {
+    if (clanring_playmode & CLANRING_HH_MODE)
+        return ADMIN_HH_MODE;
     if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
         return ADMIN_CTF_MODE;
     if (clanring_playmode & CLANRING_WIPEOUT_MODE)
