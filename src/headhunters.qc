@@ -45,7 +45,7 @@ void() hh_head_touch =
 
 	if (take == 1)
 	{
-		if (self.owner == other)
+		if (self.enemy == other)
 			sprint(other, "You got your own head\n");
 		else if (self.netname != "")
 			sprint(other, "You got ", self.netname, "'s head\n");
@@ -205,7 +205,8 @@ void(entity dead, vector spawn_origin) hh_spawn_head_at =
 
 	head = spawn();
 	head.classname = "item_hh_head";
-	head.owner = dead;
+	head.owner = world;
+	head.enemy = dead;
 	head.netname = dead.netname;
 	head.colormap = dead.colormap;
 	head.ammo_heads = 1;
