@@ -46,6 +46,7 @@ void() misc_model_use = {
 		self.model = "";
 
 		self.state = STATE_INVISIBLE;
+		self.estate = STATE_INVISIBLE;
 		setorigin(self, self.origin);
 	}
 	else {
@@ -53,6 +54,7 @@ void() misc_model_use = {
 		self.model = self.mdl;
 
 		self.state = STATE_ACTIVE;
+		self.estate = STATE_ACTIVE;
 		setorigin(self, self.origin);
 	}
 };
