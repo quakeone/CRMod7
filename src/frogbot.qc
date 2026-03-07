@@ -7331,6 +7331,8 @@ void(entity bot, entity target, vector route_delta, float move_speed) frogbot_ap
     if (cvar("frogbot_debug") >= 2 && bot.fb_next_combat_log_time <= time)
     {
         bot.fb_next_combat_log_time = time + 0.75;
+        bprint(sprintf("[%s] combat: fire=%g reason=%s dot=%.2f dist=%.0f wpn=%g los=%g ok2s=%g\n",
+            bot.netname, fire_now, fire_reason, fire_dot, enemy_dist, bot.weapon, has_los, (bot.style & CLANRING_OK_TO_SHOOT)));
         combat_state = '0 0 0';
         combat_state_x = fire_dot;
         combat_state_y = enemy_power_flags;
@@ -7714,11 +7716,24 @@ void() frogbot_client_frame =
             hook_combat_dist = vlen(combat_target.origin - self.origin);
             hook_combat_has_los = frogbot_target_visible(self, combat_target);
         }
+        if (cvar("frogbot_debug") >= 2 && self.fb_next_combat_log_time <= time)
+        {
+            self.fb_next_combat_log_time = time + 1;
+            if (combat_target != world)
+                bprint(sprintf("[%s] target=%s dist=%.0f los=%g ok2s=%g\n", self.netname, combat_target.netname, hook_combat_dist, hook_combat_has_los, (self.style & CLANRING_OK_TO_SHOOT)));
+            else
+                bprint(sprintf("[%s] no target found\n", self.netname));
+        }
     }
     else
     {
         self.fb_enemy_target = world;
         self.fb_team_has_contact = 0;
+        if (cvar("frogbot_debug") >= 2 && self.fb_next_combat_log_time <= time)
+        {
+            self.fb_next_combat_log_time = time + 2;
+            bprint(sprintf("[%s] combat disabled (frogbot_combat=%g)\n", self.netname, cvar("frogbot_combat")));
+        }
     }
 
     frogbot_update_camp_state(self, combat_target);
@@ -7751,7 +7766,17 @@ void() frogbot_client_frame =
         self.fb_target_marker = frogbot_pick_next_target(self, self.fb_current_marker);
         self.fb_last_progress_time = time;
         if (frogbot_is_marker_entity(self.fb_target_marker))
+        {
             self.fb_last_target_distance = vlen(self.fb_target_marker.origin - self.origin);
+            if (frogbot_debug_enabled())
+                bprint(sprintf("[%s] route #%g -> #%g (goal=%g dist=%.0f flags=%g)\n",
+                    self.netname,
+                    frogbot_is_marker_entity(self.fb_current_marker) ? self.fb_current_marker.fb_marker_index : 0,
+                    self.fb_target_marker.fb_marker_index,
+                    self.fb_target_marker.fb_goal,
+                    self.fb_last_target_distance,
+                    self.fb_target_path_flags));
+        }
         else
             self.fb_last_target_distance = 999999;
 
@@ -7847,6 +7872,12 @@ void() frogbot_client_frame =
 
     if (dist <= FROGBOT_REACH_RADIUS)
     {
+        if (frogbot_debug_enabled())
+            bprint(sprintf("[%s] reached marker #%g (goal=%g zone=%g) pos=(%g %g %g)\n",
+                self.netname, self.fb_target_marker.fb_marker_index,
+                self.fb_target_marker.fb_goal, self.fb_target_marker.fb_zone,
+                self.fb_target_marker.origin_x, self.fb_target_marker.origin_y, self.fb_target_marker.origin_z));
+
         self.fb_prev_marker = self.fb_current_marker;
         self.fb_current_marker = self.fb_target_marker;
         frogbot_mark_marker_visited(self.fb_current_marker);
@@ -9093,6 +9124,13 @@ void() frogbot_post_spawn_think =
 
     frogbot_debug_log("");
 
+    if (frogbot_debug_enabled())
+        bprint(sprintf("[%s] spawned — routes=%s markers=%g links=%g src=%s\n",
+            bot.netname,
+            frogbot_routes_loaded ? "yes" : "no",
+            frogbot_marker_count, frogbot_path_link_count,
+            frogbot_route_source != "" ? frogbot_route_source : "none"));
+
     self = evt;
     frogbot_free_spawn_event(evt);
 };
@@ -9787,37 +9825,50 @@ void() frogbot_delayed_route_load =
     remove(self);
 };
 
-void() frogbot_rebootstrap_surviving_bots =
+void() frogbot_drop_stale_bots_think =
 {
     local entity p;
-    local entity evt;
-    local float reboot_count;
+    local entity nextp;
+    local float dropped;
 
-    reboot_count = 0;
+    dropped = 0;
     p = nextent(world);
     while (p != world)
     {
-        if (frogbot_is_bot_client(p) && p.fb_bot_bootstrap)
+        nextp = nextent(p);
+        if (clienttype(p) == CLIENTTYPE_BOT || frogbot_is_bot_client(p))
         {
+            if (p.fb_bot_name != "")
+            {
+                strunzone(p.fb_bot_name);
+                p.fb_bot_name = "";
+            }
+            p.fb_is_bot_client = FALSE;
             p.fb_bot_bootstrap = FALSE;
-            p.style = p.style - (p.style & CLANRING_CONNECTED);
-            frogbot_apply_skill_level(p, cvar("frogbot_skill"));
-
-            evt = spawn();
-            evt.classname = "frogbot_spawn_event";
-            evt.owner = p;
-            evt.think = frogbot_post_spawn_think;
-            evt.nextthink = time + 0.2;
-            evt.count = 0;
-            evt.noise1 = "";
-
-            reboot_count = reboot_count + 1;
+            if (clienttype(p) != CLIENTTYPE_DISCONNECTED)
+                dropclient(p);
+            dropped = dropped + 1;
         }
-        p = nextent(p);
+        p = nextp;
     }
 
-    if (reboot_count > 0)
-        bprint(sprintf("Frogbot: re-bootstrapping %g surviving bot(s) for new map.\n", reboot_count));
+    if (dropped > 0 && frogbot_debug_enabled())
+        bprint(sprintf("Frogbot: dropped %g stale bot slot(s).\n", dropped));
+
+    remove(self);
+};
+
+void() frogbot_rebootstrap_surviving_bots =
+{
+    local entity evt;
+
+    // Defer cleanup so the engine finishes processing client slots
+    // first — calling dropclient during worldspawn corrupts the
+    // active-player count.
+    evt = spawn();
+    evt.classname = "frogbot_cleanup_event";
+    evt.nextthink = time + 0.5;
+    evt.think = frogbot_drop_stale_bots_think;
 };
 
 void() frogbot_init_world =
@@ -9841,6 +9892,8 @@ void() frogbot_init_world =
     registercvar("frogbot_last_mode", "-1");
     registercvar("frogbot_last_mode_set", "0");
     registercvar("frogbot_combat", "1");
+    if (cvar("frogbot_combat") <= 0)
+        cvar_set("frogbot_combat", "1");
     registercvar("frogbot_combat_range", "1100");
     registercvar("frogbot_combat_scan_interval", "0.2");
     registercvar("frogbot_visibility_scan_360", "1");
