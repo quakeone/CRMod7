@@ -50,7 +50,7 @@
     ----------------------------------------------------------------------------
 */
 
-float FROGBOT_MAX_MARKERS = 300;
+float FROGBOT_MAX_MARKERS = 235;
 float FROGBOT_MAX_PATHS = 8;
 float FROGBOT_DEFAULT_MAP_DEATH_HEIGHT = -9999999;
 string FROGBOT_BUILD_TAG = "frogbot-mswitch-debug-20260211b";
@@ -82,8 +82,8 @@ float FROGBOT_RJ_DEFAULT_PITCH = 78.25;
 float FROGBOT_RJ_MIN_START_DIST = 10;
 float FROGBOT_RJ_MAX_START_DIST = 120;
 float FROGBOT_ROUTE_COST_INF = 999999;
-float FROGBOT_ZONE_COUNT = 24;
-float FROGBOT_SUBZONE_COUNT = 32;
+float FROGBOT_ZONE_COUNT = 18;
+float FROGBOT_SUBZONE_COUNT = 18;
 float FROGBOT_ZONE_INF = 1000000;
 float FROGBOT_HEALTYPE_MEGA = 2;
 float FROGBOT_ITEM_WEAPON_SHOTGUN = 1;
@@ -124,23 +124,23 @@ float frogbot_zone_used_count;
 float frogbot_zone_validation_checks;
 float frogbot_zone_validation_failures;
 float frogbot_zone_validation_ratio;
-entity frogbot_zone_heads[24];
-entity frogbot_zone_tails[24];
-float frogbot_zone_marker_counts[24];
-float frogbot_zone_subzone_counts[24];
-float frogbot_zone_time_cache[7200];
-float frogbot_zone_rj_time_cache[7200];
-entity frogbot_zone_next_cache[7200];
-entity frogbot_zone_next_rj_cache[7200];
-float frogbot_subzone_time_cache[9600];
-float frogbot_subzone_rj_time_cache[9600];
-entity frogbot_subzone_next_cache[9600];
-entity frogbot_subzone_next_rj_cache[9600];
-float frogbot_zone_goal_eta[300];
-float frogbot_zone_goal_eta_rj[300];
-entity frogbot_zone_goal_marker[300];
-entity frogbot_zone_goal_marker_rj[300];
-entity frogbot_markers[300];
+entity frogbot_zone_heads[18];
+entity frogbot_zone_tails[18];
+float frogbot_zone_marker_counts[18];
+float frogbot_zone_subzone_counts[18];
+float fb_z_t[4230];
+float fb_z_rjt[4230];
+entity fb_z_n[4230];
+entity fb_z_rjn[4230];
+float fb_sz_t[4230];
+float fb_sz_rjt[4230];
+entity fb_sz_n[4230];
+entity fb_sz_rjn[4230];
+float frogbot_zone_goal_eta[235];
+float frogbot_zone_goal_eta_rj[235];
+entity frogbot_zone_goal_marker[235];
+entity frogbot_zone_goal_marker_rj[235];
+entity frogbot_markers[235];
 
 // Location system
 float LOC_MAX = 64;
@@ -2545,22 +2545,22 @@ void() frogbot_reset_zone_cache_tables =
     }
 
     i = 0;
-    while (i < 7200)
+    while (i < 4230)
     {
-        frogbot_zone_time_cache[i] = FROGBOT_ZONE_INF;
-        frogbot_zone_rj_time_cache[i] = FROGBOT_ZONE_INF;
-        frogbot_zone_next_cache[i] = world;
-        frogbot_zone_next_rj_cache[i] = world;
+        fb_z_t[i] = FROGBOT_ZONE_INF;
+        fb_z_rjt[i] = FROGBOT_ZONE_INF;
+        fb_z_n[i] = world;
+        fb_z_rjn[i] = world;
         i = i + 1;
     }
 
     i = 0;
-    while (i < 9600)
+    while (i < 4230)
     {
-        frogbot_subzone_time_cache[i] = FROGBOT_ZONE_INF;
-        frogbot_subzone_rj_time_cache[i] = FROGBOT_ZONE_INF;
-        frogbot_subzone_next_cache[i] = world;
-        frogbot_subzone_next_rj_cache[i] = world;
+        fb_sz_t[i] = FROGBOT_ZONE_INF;
+        fb_sz_rjt[i] = FROGBOT_ZONE_INF;
+        fb_sz_n[i] = world;
+        fb_sz_rjn[i] = world;
         i = i + 1;
     }
 
@@ -2682,20 +2682,20 @@ void() frogbot_seed_zone_cache_identity =
             if (zone_slot >= 0 && zone_slot < FROGBOT_ZONE_COUNT)
             {
                 table_slot = frogbot_zone_cache_index(marker_slot, zone_slot);
-                frogbot_zone_time_cache[table_slot] = 0;
-                frogbot_zone_rj_time_cache[table_slot] = 0;
-                frogbot_zone_next_cache[table_slot] = marker;
-                frogbot_zone_next_rj_cache[table_slot] = marker;
+                fb_z_t[table_slot] = 0;
+                fb_z_rjt[table_slot] = 0;
+                fb_z_n[table_slot] = marker;
+                fb_z_rjn[table_slot] = marker;
             }
 
             subzone_slot = marker.fb_subzone;
             if (subzone_slot >= 0 && subzone_slot < FROGBOT_SUBZONE_COUNT)
             {
                 table_slot = frogbot_subzone_cache_index(marker_slot, subzone_slot);
-                frogbot_subzone_time_cache[table_slot] = 0;
-                frogbot_subzone_rj_time_cache[table_slot] = 0;
-                frogbot_subzone_next_cache[table_slot] = marker;
-                frogbot_subzone_next_rj_cache[table_slot] = marker;
+                fb_sz_t[table_slot] = 0;
+                fb_sz_rjt[table_slot] = 0;
+                fb_sz_n[table_slot] = marker;
+                fb_sz_rjn[table_slot] = marker;
             }
         }
         i = i + 1;
@@ -2811,32 +2811,32 @@ float() frogbot_relax_subzone_cache_pass =
                 from_table = frogbot_subzone_cache_index(marker_slot, s);
                 next_table = frogbot_subzone_cache_index(next_slot, s);
 
-                if (edge_walk < FROGBOT_ZONE_INF * 0.5 && frogbot_subzone_time_cache[next_table] < FROGBOT_ZONE_INF * 0.5)
+                if (edge_walk < FROGBOT_ZONE_INF * 0.5 && fb_sz_t[next_table] < FROGBOT_ZONE_INF * 0.5)
                 {
-                    candidate = edge_walk + frogbot_subzone_time_cache[next_table];
-                    if (candidate + 0.001 < frogbot_subzone_time_cache[from_table])
+                    candidate = edge_walk + fb_sz_t[next_table];
+                    if (candidate + 0.001 < fb_sz_t[from_table])
                     {
-                        frogbot_subzone_time_cache[from_table] = candidate;
-                        frogbot_subzone_next_cache[from_table] = next_marker;
+                        fb_sz_t[from_table] = candidate;
+                        fb_sz_n[from_table] = next_marker;
                         changed = changed + 1;
                     }
                 }
 
-                if (edge_rj < FROGBOT_ZONE_INF * 0.5 && frogbot_subzone_rj_time_cache[next_table] < FROGBOT_ZONE_INF * 0.5)
+                if (edge_rj < FROGBOT_ZONE_INF * 0.5 && fb_sz_rjt[next_table] < FROGBOT_ZONE_INF * 0.5)
                 {
-                    candidate = edge_rj + frogbot_subzone_rj_time_cache[next_table];
-                    if (candidate + 0.001 < frogbot_subzone_rj_time_cache[from_table])
+                    candidate = edge_rj + fb_sz_rjt[next_table];
+                    if (candidate + 0.001 < fb_sz_rjt[from_table])
                     {
-                        frogbot_subzone_rj_time_cache[from_table] = candidate;
-                        frogbot_subzone_next_rj_cache[from_table] = next_marker;
+                        fb_sz_rjt[from_table] = candidate;
+                        fb_sz_rjn[from_table] = next_marker;
                         changed = changed + 1;
                     }
                 }
 
-                if (frogbot_subzone_time_cache[from_table] + 0.001 < frogbot_subzone_rj_time_cache[from_table])
+                if (fb_sz_t[from_table] + 0.001 < fb_sz_rjt[from_table])
                 {
-                    frogbot_subzone_rj_time_cache[from_table] = frogbot_subzone_time_cache[from_table];
-                    frogbot_subzone_next_rj_cache[from_table] = frogbot_subzone_next_cache[from_table];
+                    fb_sz_rjt[from_table] = fb_sz_t[from_table];
+                    fb_sz_rjn[from_table] = fb_sz_n[from_table];
                 }
 
                 s = s + 1;
@@ -2906,32 +2906,32 @@ float() frogbot_relax_zone_cache_pass =
                 from_table = frogbot_zone_cache_index(marker_slot, z);
                 next_table = frogbot_zone_cache_index(next_slot, z);
 
-                if (edge_walk < FROGBOT_ZONE_INF * 0.5 && frogbot_zone_time_cache[next_table] < FROGBOT_ZONE_INF * 0.5)
+                if (edge_walk < FROGBOT_ZONE_INF * 0.5 && fb_z_t[next_table] < FROGBOT_ZONE_INF * 0.5)
                 {
-                    candidate = edge_walk + frogbot_zone_time_cache[next_table];
-                    if (candidate + 0.001 < frogbot_zone_time_cache[from_table])
+                    candidate = edge_walk + fb_z_t[next_table];
+                    if (candidate + 0.001 < fb_z_t[from_table])
                     {
-                        frogbot_zone_time_cache[from_table] = candidate;
-                        frogbot_zone_next_cache[from_table] = next_marker;
+                        fb_z_t[from_table] = candidate;
+                        fb_z_n[from_table] = next_marker;
                         changed = changed + 1;
                     }
                 }
 
-                if (edge_rj < FROGBOT_ZONE_INF * 0.5 && frogbot_zone_rj_time_cache[next_table] < FROGBOT_ZONE_INF * 0.5)
+                if (edge_rj < FROGBOT_ZONE_INF * 0.5 && fb_z_rjt[next_table] < FROGBOT_ZONE_INF * 0.5)
                 {
-                    candidate = edge_rj + frogbot_zone_rj_time_cache[next_table];
-                    if (candidate + 0.001 < frogbot_zone_rj_time_cache[from_table])
+                    candidate = edge_rj + fb_z_rjt[next_table];
+                    if (candidate + 0.001 < fb_z_rjt[from_table])
                     {
-                        frogbot_zone_rj_time_cache[from_table] = candidate;
-                        frogbot_zone_next_rj_cache[from_table] = next_marker;
+                        fb_z_rjt[from_table] = candidate;
+                        fb_z_rjn[from_table] = next_marker;
                         changed = changed + 1;
                     }
                 }
 
-                if (frogbot_zone_time_cache[from_table] + 0.001 < frogbot_zone_rj_time_cache[from_table])
+                if (fb_z_t[from_table] + 0.001 < fb_z_rjt[from_table])
                 {
-                    frogbot_zone_rj_time_cache[from_table] = frogbot_zone_time_cache[from_table];
-                    frogbot_zone_next_rj_cache[from_table] = frogbot_zone_next_cache[from_table];
+                    fb_z_rjt[from_table] = fb_z_t[from_table];
+                    fb_z_rjn[from_table] = fb_z_n[from_table];
                 }
 
                 z = z + 1;
@@ -2969,8 +2969,8 @@ float(entity from_marker, entity to_marker, float allow_rj) frogbot_subzone_arri
 
     table_slot = frogbot_subzone_cache_index(from_slot, subzone_slot);
     if (allow_rj)
-        return frogbot_subzone_rj_time_cache[table_slot];
-    return frogbot_subzone_time_cache[table_slot];
+        return fb_sz_rjt[table_slot];
+    return fb_sz_t[table_slot];
 };
 
 entity(entity from_marker, entity to_marker, float allow_rj) frogbot_subzone_next_marker =
@@ -2999,9 +2999,9 @@ entity(entity from_marker, entity to_marker, float allow_rj) frogbot_subzone_nex
 
     table_slot = frogbot_subzone_cache_index(from_slot, subzone_slot);
     if (allow_rj)
-        next_marker = frogbot_subzone_next_rj_cache[table_slot];
+        next_marker = fb_sz_rjn[table_slot];
     else
-        next_marker = frogbot_subzone_next_cache[table_slot];
+        next_marker = fb_sz_n[table_slot];
 
     if (!frogbot_is_marker_entity(next_marker))
         return world;
@@ -3036,8 +3036,8 @@ float(entity from_marker, entity to_marker, float allow_rj) frogbot_zone_arrival
 
     table_slot = frogbot_zone_cache_index(from_slot, zone_slot);
     if (allow_rj)
-        return frogbot_zone_rj_time_cache[table_slot];
-    return frogbot_zone_time_cache[table_slot];
+        return fb_z_rjt[table_slot];
+    return fb_z_t[table_slot];
 };
 
 entity(entity from_marker, entity to_marker, float allow_rj) frogbot_zone_next_marker =
@@ -3068,9 +3068,9 @@ entity(entity from_marker, entity to_marker, float allow_rj) frogbot_zone_next_m
 
     table_slot = frogbot_zone_cache_index(from_slot, zone_slot);
     if (allow_rj)
-        next_marker = frogbot_zone_next_rj_cache[table_slot];
+        next_marker = fb_z_rjn[table_slot];
     else
-        next_marker = frogbot_zone_next_cache[table_slot];
+        next_marker = fb_z_n[table_slot];
 
     if (!frogbot_is_marker_entity(next_marker))
         return world;
