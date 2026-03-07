@@ -40,24 +40,24 @@ string (float mode) options_szmode =
     if (self.t_length == 0)
     {
         if (mode == ADMIN_NORMAL_MODE)
-            return "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\nΝοδε      ÿ Ξοςναμ  \n";
+            return "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n\xCD\xEF\xE4\xE5      \xFF \xCE\xEF\xF2\xED\xE1\xEC  \n";
         else if (mode == ADMIN_PRACTICE_MODE)
-            return "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\nΝοδε      ÿ Πςαγτιγε\n";
+            return "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n\xCD\xEF\xE4\xE5      \xFF \xD0\xF2\xE1\xE3\xF4\xE9\xE3\xE5\n";
         else if (mode == ADMIN_MATCH_MODE)
-            return "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\nΝοδε      ÿ Νατγθ   \n";
+            return "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n\xCD\xEF\xE4\xE5      \xFF \xCD\xE1\xF4\xE3\xE8   \n";
         else
-            return "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\n  Νοδε      ÿ Ιξδιφιδυαμ\n";
+            return "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n  \xCD\xEF\xE4\xE5      \xFF \xC9\xEE\xE4\xE9\xF6\xE9\xE4\xF5\xE1\xEC\n";
     }
     else
     {
         if (mode == ADMIN_NORMAL_MODE)
-            return "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\nΝοδε        Ξοςναμ  \n";
+            return "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n\xCD\xEF\xE4\xE5        \xCE\xEF\xF2\xED\xE1\xEC  \n";
         else if (mode == ADMIN_PRACTICE_MODE)
-            return "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\nΝοδε        Πςαγτιγε\n";
+            return "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n\xCD\xEF\xE4\xE5        \xD0\xF2\xE1\xE3\xF4\xE9\xE3\xE5\n";
         else if (mode == ADMIN_MATCH_MODE)
-            return "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\nΝοδε        Νατγθ   \n";
+            return "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n\xCD\xEF\xE4\xE5        \xCD\xE1\xF4\xE3\xE8   \n";
         else
-            return "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\n  Νοδε        Ιξδιφιδυαμ\n";
+            return "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n  \xCD\xEF\xE4\xE5        \xC9\xEE\xE4\xE9\xF6\xE9\xE4\xF5\xE1\xEC\n";
     }
 };
 
@@ -71,48 +71,48 @@ string (float value) options_sztimelimit =
     if (self.t_length == 1)
     {
         if (value == 0)
-            return "Τινεμινιτ ÿ °       \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB0       \n";
         else if (value <= 5)
-            return "Τινεμινιτ ÿ µ       \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB5       \n";
         else if (value <= 10)
-            return "Τινεμινιτ ÿ ±°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB1\xB0      \n";
         else if (value <= 15)
-            return "Τινεμινιτ ÿ ±µ      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB1\xB5      \n";
         else if (value <= 20)
-            return "Τινεμινιτ ÿ ²°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB2\xB0      \n";
         else if (value <= 25)
-            return "Τινεμινιτ ÿ ²µ      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB2\xB5      \n";
         else if (value <= 30)
-            return "Τινεμινιτ ÿ ³°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB3\xB0      \n";
         else if (value <= 40)
-            return "Τινεμινιτ ÿ ΄°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB4\xB0      \n";
         else if (value <= 50)
-            return "Τινεμινιτ ÿ µ°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB5\xB0      \n";
         else
-            return "Τινεμινιτ ÿ ¶°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4 \xFF \xB6\xB0      \n";
     }
     else
     {
         if (value == 0)
-            return "Τινεμινιτ   °       \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB0       \n";
         else if (value <= 5)
-            return "Τινεμινιτ   µ       \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB5       \n";
         else if (value <= 10)
-            return "Τινεμινιτ   ±°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB1\xB0      \n";
         else if (value <= 15)
-            return "Τινεμινιτ   ±µ      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB1\xB5      \n";
         else if (value <= 20)
-            return "Τινεμινιτ   ²°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB2\xB0      \n";
         else if (value <= 25)
-            return "Τινεμινιτ   ²µ      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB2\xB5      \n";
         else if (value <= 30)
-            return "Τινεμινιτ   ³°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB3\xB0      \n";
         else if (value <= 40)
-            return "Τινεμινιτ   ΄°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB4\xB0      \n";
         else if (value <= 50)
-            return "Τινεμινιτ   µ°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB5\xB0      \n";
         else
-            return "Τινεμινιτ   ¶°      \n";
+            return "\xD4\xE9\xED\xE5\xEC\xE9\xED\xE9\xF4   \xB6\xB0      \n";
     }
 };
 
@@ -126,32 +126,32 @@ string (float value) options_szfraglimit =
     if (self.t_length == 2)
     {
         if (value == 0)
-            return "Ζςαημινιτ ÿ °       \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4 \xFF \xB0       \n";
         else if (value <= 10)
-            return "Ζςαημινιτ ÿ ±°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4 \xFF \xB1\xB0      \n";
         else if (value <= 20)
-            return "Ζςαημινιτ ÿ ²°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4 \xFF \xB2\xB0      \n";
         else if (value <= 30)
-            return "Ζςαημινιτ ÿ ³°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4 \xFF \xB3\xB0      \n";
         else if (value <= 40)
-            return "Ζςαημινιτ ÿ ΄°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4 \xFF \xB4\xB0      \n";
         else
-            return "Ζςαημινιτ ÿ µ°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4 \xFF \xB5\xB0      \n";
     }
     else
     {
         if (value == 0)
-            return "Ζςαημινιτ   °       \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4   \xB0       \n";
         else if (value <= 10)
-            return "Ζςαημινιτ   ±°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4   \xB1\xB0      \n";
         else if (value <= 20)
-            return "Ζςαημινιτ   ²°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4   \xB2\xB0      \n";
         else if (value <= 30)
-            return "Ζςαημινιτ   ³°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4   \xB3\xB0      \n";
         else if (value <= 40)
-            return "Ζςαημινιτ   ΄°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4   \xB4\xB0      \n";
         else
-            return "Ζςαημινιτ   µ°      \n";
+            return "\xC6\xF2\xE1\xE7\xEC\xE9\xED\xE9\xF4   \xB5\xB0      \n";
     }
 };
 
@@ -165,40 +165,40 @@ string (float value) options_szovertime =
     if (self.t_length == 2)
     {
         if (value == -1)
-            return "    Οφεςτινε  ÿ Συδδεξ Δεατθ\n";
+            return "    \xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5  \xFF \xD3\xF5\xE4\xE4\xE5\xEE \xC4\xE5\xE1\xF4\xE8\n";
         else if (value == 0)
-            return "Οφεςτινε  ÿ Δισαβμεδ\n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5  \xFF \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
         else if (value == 1)
-            return "Οφεςτινε  ÿ ±       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5  \xFF \xB1       \n";
         else if (value == 2)
-            return "Οφεςτινε  ÿ ²       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5  \xFF \xB2       \n";
         else if (value == 3)
-            return "Οφεςτινε  ÿ ³       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5  \xFF \xB3       \n";
         else if (value == 4)
-            return "Οφεςτινε  ÿ ΄       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5  \xFF \xB4       \n";
         else if (value == 5)
-            return "Οφεςτινε  ÿ µ       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5  \xFF \xB5       \n";
         else if (value == 10)
-            return "Οφεςτινε  ÿ ±°      \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5  \xFF \xB1\xB0      \n";
     }
     else
     {
         if (value == -1)
-            return "    Οφεςτινε    Συδδεξ Δεατθ\n";
+            return "    \xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5    \xD3\xF5\xE4\xE4\xE5\xEE \xC4\xE5\xE1\xF4\xE8\n";
         else if (value == 0)
-            return "Οφεςτινε    Δισαβμεδ\n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5    \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
         else if (value == 1)
-            return "Οφεςτινε    ±       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5    \xB1       \n";
         else if (value == 2)
-            return "Οφεςτινε    ²       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5    \xB2       \n";
         else if (value == 3)
-            return "Οφεςτινε    ³       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5    \xB3       \n";
         else if (value == 4)
-            return "Οφεςτινε    ΄       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5    \xB4       \n";
         else if (value == 5)
-            return "Οφεςτινε    µ       \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5    \xB5       \n";
         else if (value == 10)
-            return "Οφεςτινε    ±°      \n";
+            return "\xCF\xF6\xE5\xF2\xF4\xE9\xED\xE5    \xB1\xB0      \n";
     }
     return "";
 };
@@ -213,20 +213,20 @@ string (float gibs) options_szgibs =
     if (self.t_length == 3)
     {
         if (gibs == OPTIONS_NO_GIBS)
-            return "Ηιβσ      ÿ Δισαβμεδ\n";
+            return "\xC7\xE9\xE2\xF3      \xFF \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
         else if (gibs == OPTIONS_LOW_GIBS)
-            return "Ηιβσ      ÿ Μοχ     \n";
+            return "\xC7\xE9\xE2\xF3      \xFF \xCC\xEF\xF7     \n";
         else
-            return "Ηιβσ      ÿ Θιηθ    \n";
+            return "\xC7\xE9\xE2\xF3      \xFF \xC8\xE9\xE7\xE8    \n";
     }
     else
     {
         if (gibs == OPTIONS_NO_GIBS)
-            return "Ηιβσ        Δισαβμεδ\n";
+            return "\xC7\xE9\xE2\xF3        \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
         else if (gibs == OPTIONS_LOW_GIBS)
-            return "Ηιβσ        Μοχ     \n";
+            return "\xC7\xE9\xE2\xF3        \xCC\xEF\xF7     \n";
         else
-            return "Ηιβσ        Θιηθ    \n";
+            return "\xC7\xE9\xE2\xF3        \xC8\xE9\xE7\xE8    \n";
     }
     return "";
 };
@@ -241,20 +241,20 @@ string (float value) options_szteamplay =
     if (self.t_length == 4)
     {
         if (value == 0)
-            return "Τεανπμαω  ÿ °       \n";
+            return "\xD4\xE5\xE1\xED\xF0\xEC\xE1\xF9  \xFF \xB0       \n";
         else if (value == 1)
-            return "Τεανπμαω  ÿ ±       \n";
+            return "\xD4\xE5\xE1\xED\xF0\xEC\xE1\xF9  \xFF \xB1       \n";
         else
-            return "Τεανπμαω  ÿ ²       \n";
+            return "\xD4\xE5\xE1\xED\xF0\xEC\xE1\xF9  \xFF \xB2       \n";
     }
     else
     {
         if (value == 0)
-            return "Τεανπμαω    °       \n";
+            return "\xD4\xE5\xE1\xED\xF0\xEC\xE1\xF9    \xB0       \n";
         else if (value == 1)
-            return "Τεανπμαω    ±       \n";
+            return "\xD4\xE5\xE1\xED\xF0\xEC\xE1\xF9    \xB1       \n";
         else
-            return "Τεανπμαω    ²       \n";
+            return "\xD4\xE5\xE1\xED\xF0\xEC\xE1\xF9    \xB2       \n";
     }
     return "";
 };
@@ -269,20 +269,20 @@ string (float value) options_sznoexit =
     if (self.t_length == 5)
     {
         if (value == 0)
-            return "Ξοεψιτ    ÿ °       \n";
+            return "\xCE\xEF\xE5\xF8\xE9\xF4    \xFF \xB0       \n";
         else if (value == 1)
-            return "Ξοεψιτ    ÿ ±       \n";
+            return "\xCE\xEF\xE5\xF8\xE9\xF4    \xFF \xB1       \n";
         else
-            return "Ξοεψιτ    ÿ ²       \n";
+            return "\xCE\xEF\xE5\xF8\xE9\xF4    \xFF \xB2       \n";
     }
     else
     {
         if (value == 0)
-            return "Ξοεψιτ      °       \n";
+            return "\xCE\xEF\xE5\xF8\xE9\xF4      \xB0       \n";
         else if (value == 1)
-            return "Ξοεψιτ      ±       \n";
+            return "\xCE\xEF\xE5\xF8\xE9\xF4      \xB1       \n";
         else
-            return "Ξοεψιτ      ²       \n";
+            return "\xCE\xEF\xE5\xF8\xE9\xF4      \xB2       \n";
     }
     return "";
 };
@@ -299,30 +299,30 @@ string (float value) options_szpausable =
     if (self.t_length == 6)
     {
         if (value)
-            return "Παυσαβμε  ÿ Ωεσ     \nΝοςε®®              \n        Δοξε";
+            return "\xD0\xE1\xF5\xF3\xE1\xE2\xEC\xE5  \xFF \xD9\xE5\xF3     \n\xCD\xEF\xF2\xE5\xAE\xAE              \n        \xC4\xEF\xEE\xE5";
         else
-            return "Παυσαβμε  ÿ Ξο      \nΝοςε®®              \n        Δοξε";
+            return "\xD0\xE1\xF5\xF3\xE1\xE2\xEC\xE5  \xFF \xCE\xEF      \n\xCD\xEF\xF2\xE5\xAE\xAE              \n        \xC4\xEF\xEE\xE5";
     }
     else if (self.t_length == 7)
     {
         if (value)
-            return "Παυσαβμε    Ωεσ     \nΝοςε®®    ÿ         \n        Δοξε";
+            return "\xD0\xE1\xF5\xF3\xE1\xE2\xEC\xE5    \xD9\xE5\xF3     \n\xCD\xEF\xF2\xE5\xAE\xAE    \xFF         \n        \xC4\xEF\xEE\xE5";
         else
-            return "Παυσαβμε    Ξο      \nΝοςε®®    ÿ         \n        Δοξε";
+            return "\xD0\xE1\xF5\xF3\xE1\xE2\xEC\xE5    \xCE\xEF      \n\xCD\xEF\xF2\xE5\xAE\xAE    \xFF         \n        \xC4\xEF\xEE\xE5";
     }
     else if (self.t_length == 8)
     {
         if (value)
-            return "Παυσαβμε    Ωεσ     \nΝοςε®®              \n      ÿ Δοξε";
+            return "\xD0\xE1\xF5\xF3\xE1\xE2\xEC\xE5    \xD9\xE5\xF3     \n\xCD\xEF\xF2\xE5\xAE\xAE              \n      \xFF \xC4\xEF\xEE\xE5";
         else
-            return "Παυσαβμε    Ξο      \nΝοςε®®              \n      ÿ Δοξε";
+            return "\xD0\xE1\xF5\xF3\xE1\xE2\xEC\xE5    \xCE\xEF      \n\xCD\xEF\xF2\xE5\xAE\xAE              \n      \xFF \xC4\xEF\xEE\xE5";
     }
     else
     {
         if (value)
-            return "Παυσαβμε    Ωεσ     \nΝοςε®®              \n        Δοξε";
+            return "\xD0\xE1\xF5\xF3\xE1\xE2\xEC\xE5    \xD9\xE5\xF3     \n\xCD\xEF\xF2\xE5\xAE\xAE              \n        \xC4\xEF\xEE\xE5";
         else
-            return "Παυσαβμε    Ξο      \nΝοςε®®              \n        Δοξε";
+            return "\xD0\xE1\xF5\xF3\xE1\xE2\xEC\xE5    \xCE\xEF      \n\xCD\xEF\xF2\xE5\xAE\xAE              \n        \xC4\xEF\xEE\xE5";
     }
     return "";
 };
@@ -337,20 +337,20 @@ string (float value) options_szdeathmatch =
     if (self.t_length == 18)
     {
         if (value == 1)
-            return "Δεατθνατγθ ÿ ±       \n";
+            return "\xC4\xE5\xE1\xF4\xE8\xED\xE1\xF4\xE3\xE8 \xFF \xB1       \n";
         else if (value == 2)
-            return "Δεατθνατγθ ÿ ²       \n";
+            return "\xC4\xE5\xE1\xF4\xE8\xED\xE1\xF4\xE3\xE8 \xFF \xB2       \n";
         else if (value == 3)
-            return "Δεατθνατγθ ÿ ³       \n";
+            return "\xC4\xE5\xE1\xF4\xE8\xED\xE1\xF4\xE3\xE8 \xFF \xB3       \n";
     }
     else
     {
         if (value == 1)
-            return "Δεατθνατγθ   ±       \n";
+            return "\xC4\xE5\xE1\xF4\xE8\xED\xE1\xF4\xE3\xE8   \xB1       \n";
         else if (value == 2)
-            return "Δεατθνατγθ   ²       \n";
+            return "\xC4\xE5\xE1\xF4\xE8\xED\xE1\xF4\xE3\xE8   \xB2       \n";
         else if (value == 3)
-            return "Δεατθνατγθ   ³       \n";
+            return "\xC4\xE5\xE1\xF4\xE8\xED\xE1\xF4\xE3\xE8   \xB3       \n";
     }
     return "";
 };
@@ -365,32 +365,32 @@ string (float value) options_szticrate =
     if (self.t_length == 19)
     {
         if (value <= 0.05)
-            return "Τιγςατε    ÿ °®°µ    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5    \xFF \xB0\xAE\xB0\xB5    \n";
         else if (value <= 0.06)
-            return "Τιγςατε    ÿ °®°¶    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5    \xFF \xB0\xAE\xB0\xB6    \n";
         else if (value <= 0.07)
-            return "Τιγςατε    ÿ °®°·    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5    \xFF \xB0\xAE\xB0\xB7    \n";
         else if (value <= 0.08)
-            return "Τιγςατε    ÿ °®°Έ    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5    \xFF \xB0\xAE\xB0\xB8    \n";
         else if (value <= 0.09)
-            return "Τιγςατε    ÿ °®°Ή    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5    \xFF \xB0\xAE\xB0\xB9    \n";
         else
-            return "Τιγςατε    ÿ °®±     \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5    \xFF \xB0\xAE\xB1     \n";
     }
     else
     {
         if (value <= 0.05)
-            return "Τιγςατε      °®°µ    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5      \xB0\xAE\xB0\xB5    \n";
         else if (value <= 0.06)
-            return "Τιγςατε      °®°¶    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5      \xB0\xAE\xB0\xB6    \n";
         else if (value <= 0.07)
-            return "Τιγςατε      °®°·    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5      \xB0\xAE\xB0\xB7    \n";
         else if (value <= 0.08)
-            return "Τιγςατε      °®°Έ    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5      \xB0\xAE\xB0\xB8    \n";
         else if (value <= 0.09)
-            return "Τιγςατε      °®°Ή    \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5      \xB0\xAE\xB0\xB9    \n";
         else
-            return "Τιγςατε      °®±     \n";
+            return "\xD4\xE9\xE3\xF2\xE1\xF4\xE5      \xB0\xAE\xB1     \n";
     }
     return "";    
 };
@@ -405,16 +405,16 @@ string (float value) options_szquad =
     if (self.t_length == 20)
     {
         if (!value)
-            return "Ρυαδ       ÿ Εξαβμεδ \n";
+            return "\xD1\xF5\xE1\xE4       \xFF \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n";
         else
-            return "Ρυαδ       ÿ Δισαβμεδ\n";
+            return "\xD1\xF5\xE1\xE4       \xFF \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
     }
     else
     {
         if (!value)
-            return "Ρυαδ         Εξαβμεδ \n";
+            return "\xD1\xF5\xE1\xE4         \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n";
         else
-            return "Ρυαδ         Δισαβμεδ\n";
+            return "\xD1\xF5\xE1\xE4         \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
     }
     return "";    
 };
@@ -429,16 +429,16 @@ string (float value) options_szpent =
     if (self.t_length == 21)
     {
         if (!value)
-            return "Πεξταηςαν  ÿ Εξαβμεδ \n";
+            return "\xD0\xE5\xEE\xF4\xE1\xE7\xF2\xE1\xED  \xFF \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n";
         else
-            return "Πεξταηςαν  ÿ Δισαβμεδ\n";
+            return "\xD0\xE5\xEE\xF4\xE1\xE7\xF2\xE1\xED  \xFF \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
     }
     else
     {
         if (!value)
-            return "Πεξταηςαν    Εξαβμεδ \n";
+            return "\xD0\xE5\xEE\xF4\xE1\xE7\xF2\xE1\xED    \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n";
         else
-            return "Πεξταηςαν    Δισαβμεδ\n";
+            return "\xD0\xE5\xEE\xF4\xE1\xE7\xF2\xE1\xED    \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
     }
     return "";    
 };
@@ -453,16 +453,16 @@ string (float value) options_szring =
     if (self.t_length == 22)
     {
         if (!value)
-            return "ÿιξη       ÿ Εξαβμεδ \n";
+            return "\xFF\xE9\xEE\xE7       \xFF \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n";
         else
-            return "ÿιξη       ÿ Δισαβμεδ\n";
+            return "\xFF\xE9\xEE\xE7       \xFF \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
     }
     else
     {
         if (!value)
-            return "ÿιξη         Εξαβμεδ \n";
+            return "\xFF\xE9\xEE\xE7         \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n";
         else
-            return "ÿιξη         Δισαβμεδ\n";
+            return "\xFF\xE9\xEE\xE7         \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n";
     }
     return "";    
 };
@@ -479,23 +479,23 @@ string (float value) options_szmode_vote =
     if (self.t_length == 23)
     {
         if (value)
-            return "Νοδε Φοτε  ÿ Εξαβμεδ \n         Βαγλ\n";
+            return "\xCD\xEF\xE4\xE5 \xD6\xEF\xF4\xE5  \xFF \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n         \xC2\xE1\xE3\xEB\n";
         else
-            return "Νοδε Φοτε  ÿ Δισαβμεδ\n         Βαγλ\n";
+            return "\xCD\xEF\xE4\xE5 \xD6\xEF\xF4\xE5  \xFF \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n         \xC2\xE1\xE3\xEB\n";
     }
     else if (self.t_length == 24)
     {
         if (value)
-            return "Νοδε Φοτε    Εξαβμεδ \n       ÿ Βαγλ\n";
+            return "\xCD\xEF\xE4\xE5 \xD6\xEF\xF4\xE5    \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n       \xFF \xC2\xE1\xE3\xEB\n";
         else
-            return "Νοδε Φοτε    Δισαβμεδ\n       ÿ Βαγλ\n";
+            return "\xCD\xEF\xE4\xE5 \xD6\xEF\xF4\xE5    \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n       \xFF \xC2\xE1\xE3\xEB\n";
     }
     else
     {
         if (value)
-            return "Νοδε Φοτε    Εξαβμεδ \n         Βαγλ\n";
+            return "\xCD\xEF\xE4\xE5 \xD6\xEF\xF4\xE5    \xC5\xEE\xE1\xE2\xEC\xE5\xE4 \n         \xC2\xE1\xE3\xEB\n";
         else
-            return "Νοδε Φοτε    Δισαβμεδ\n         Βαγλ\n";
+            return "\xCD\xEF\xE4\xE5 \xD6\xEF\xF4\xE5    \xC4\xE9\xF3\xE1\xE2\xEC\xE5\xE4\n         \xC2\xE1\xE3\xEB\n";
     }
     return "";    
 };
@@ -548,7 +548,7 @@ void () options_display =
         szpent = options_szpent(self.aflag & CLANRING_NO_PENT);
         szring = options_szring(self.aflag & CLANRING_NO_RING);
         szmodevote = options_szmode_vote(self.aflag & CLANRING_MODE_VOTE);
-        centerprint7(self, "Πςεσσ κυνπ το σεμεγτ¬\nατταγλ το γθαξηε®\n\n",
+        centerprint7(self, "\xD0\xF2\xE5\xF3\xF3 \xEA\xF5\xED\xF0 \xF4\xEF \xF3\xE5\xEC\xE5\xE3\xF4\xAC\n\xE1\xF4\xF4\xE1\xE3\xEB \xF4\xEF \xE3\xE8\xE1\xEE\xE7\xE5\xAE\n\n",
                      szdeathmatch, szticrate, szquad, szpent, szring, szmodevote);
     }
 

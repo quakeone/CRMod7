@@ -65,7 +65,7 @@ void(entity who, float b) ident_update_display =
 	res	= TeamSetStatRes2(self);//r00K: Position the idenifier based on the player's .statstate setting (impulse 71 - 81)
 
 /*
-	woods — in prewar it should identify everyone with only name
+	woods in prewar it should identify everyone with only name
 */
 	if (clanring_playmode & CLANRING_MATCH_MODE && (!(clanring_state & CLANRING_MATCH_STARTED)))
 	{

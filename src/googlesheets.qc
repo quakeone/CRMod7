@@ -7,14 +7,23 @@
 
 // Request IDs for async HTTP callbacks
 float GSHEETS_REQ_READ_TRIAL  = 200;
-float GSHEETS_REQ_READ_MATCH  = 201;
+float GSHEETS_REQ_READ_LOOKUP = 201;
 float GSHEETS_REQ_WRITE_TRIAL = 202;
 float GSHEETS_REQ_WRITE_MATCH = 203;
 float GSHEETS_REQ_VALIDATE    = 204;
+float GSHEETS_REQ_READ_MATCH  = 205;
+float GSHEETS_REQ_LOOKUP_MATCH = 206;
 
 // Pending request tracking
 float gsheets_pending_read;    // TRUE while waiting for read response
 string gsheets_pending_map;    // Map name for pending request
+float gsheets_last_read_used_google; // TRUE when current map records came from gsheets response
+float gsheets_current_map_trial_loaded; // TRUE when current map trial records loaded from Sheets
+float gsheets_current_map_match_loaded; // TRUE when current map match records loaded from Sheets
+float gsheets_lookup_pending;  // TRUE while waiting for lookup-map response
+entity gsheets_lookup_client;  // requester for lookup-map response
+string gsheets_lookup_map;     // requested lookup map
+string gsheets_lookup_trial_lines; // formatted trial output waiting for match request
 
 //
 // Sanitize a string for JSON (preserve Quake colors, strip control/JSON breakers)
@@ -148,6 +157,110 @@ float() gsheets_configured =
 };
 
 //
+// TRUE once a read has been issued for the current map (pending or completed)
+//
+float() gsheets_read_started_current_map =
+{
+	if (!gsheets_configured())
+		return FALSE;
+	if (gsheets_pending_map == "" || gsheets_pending_map == string_null)
+		return FALSE;
+	if (gsheets_pending_map != mapname)
+		return FALSE;
+	return TRUE;
+};
+
+//
+// TRUE while a read is currently in flight for the current map
+//
+float() gsheets_read_inflight_current_map =
+{
+	if (!gsheets_read_started_current_map())
+		return FALSE;
+	if (!gsheets_pending_read)
+		return FALSE;
+	return TRUE;
+};
+
+//
+// TRUE when current-map trial records are loaded and ready from Google Sheets.
+// Returns TRUE when Sheets is not configured (local records are authoritative then).
+//
+float() gsheets_trial_records_ready_current_map =
+{
+	if (!gsheets_configured())
+		return TRUE;
+	if (!gsheets_read_started_current_map())
+		return FALSE;
+	if (gsheets_read_inflight_current_map())
+		return FALSE;
+	if (!gsheets_current_map_trial_loaded)
+		return FALSE;
+	return TRUE;
+};
+
+//
+// TRUE when current-map match records are loaded and ready from Google Sheets.
+// Returns TRUE when Sheets is not configured (local records are authoritative then).
+//
+float() gsheets_match_records_ready_current_map =
+{
+	if (!gsheets_configured())
+		return TRUE;
+	if (!gsheets_read_started_current_map())
+		return FALSE;
+	if (gsheets_read_inflight_current_map())
+		return FALSE;
+	if (!gsheets_current_map_match_loaded)
+		return FALSE;
+	return TRUE;
+};
+
+//
+// Source label for current in-memory CTF captime records
+//
+string() gsheets_captimes_source_title =
+{
+	if (gsheets_configured()
+		&& gsheets_pending_map != "" && gsheets_pending_map != string_null
+		&& gsheets_pending_map == mapname
+		&& !gsheets_pending_read
+		&& gsheets_last_read_used_google)
+		return "CTF Capture Records (Google Sheet)";
+	return "CTF Capture Records (Local Records)";
+};
+
+//
+// Read captime records for an arbitrary map (for cmd captimes <map>)
+// Returns TRUE if async request was dispatched.
+//
+float(string lookup_map, entity requester) gsheets_read_capture_stats_lookup =
+{
+	if (!gsheets_configured())
+		return FALSE;
+	if (!requester || requester == world)
+		return FALSE;
+	if (lookup_map == "" || lookup_map == string_null)
+		return FALSE;
+	if (gsheets_lookup_pending)
+		return FALSE;
+
+	if (gsheets_lookup_map != "" && gsheets_lookup_map != string_null)
+		strunzone(gsheets_lookup_map);
+	gsheets_lookup_map = strzone(lookup_map);
+	gsheets_lookup_client = requester;
+	gsheets_lookup_pending = TRUE;
+
+	string url = sprintf("%s?action=read&map=%s&type=trial&key=%s",
+		clanring_googlesheetsurl,
+		lookup_map,
+		clanring_googlesheetsapikey);
+
+	uri_get(url, GSHEETS_REQ_READ_LOOKUP);
+	return TRUE;
+};
+
+//
 // Build the full URL with action and API key
 //
 string(string action) gsheets_build_url =
@@ -189,16 +302,19 @@ void() gsheets_read_capture_stats =
 		strunzone(gsheets_pending_map);
 	gsheets_pending_map = strzone(mapname);
 	gsheets_pending_read = TRUE;
+	gsheets_last_read_used_google = FALSE;
+	gsheets_current_map_trial_loaded = FALSE;
+	gsheets_current_map_match_loaded = FALSE;
 	
 	// Reset records before loading
 	reset_records(0);
 	reset_records(2);
 	
-	string url = sprintf("%s?action=read&map=%s&key=%s",
+	string url = sprintf("%s?action=read&map=%s&type=trial&key=%s",
 		clanring_googlesheetsurl,
 		mapname,
 		clanring_googlesheetsapikey);
-	
+
 	uri_get(url, GSHEETS_REQ_READ_TRIAL);
 };
 
@@ -280,40 +396,244 @@ void(float is_match, float rank, string player, float teamcolor,
 };
 
 //
+// Find the matching close bracket ']' for an already-opened '[',
+// skipping nested brackets and quoted strings.
+// 'start' should point to the first char inside the '['.
+// Returns the index of the matching ']', or -1 if not found.
+//
+float(string body, float start) gsheets_find_array_end =
+{
+	float depth = 1;
+	float i = start;
+	float len = strlen(body);
+	float cc;
+
+	while (i < len && depth > 0)
+	{
+		cc = str2chr(body, i);
+		if (cc == 34) // '"'
+		{
+			// Skip quoted string
+			i = i + 1;
+			while (i < len)
+			{
+				cc = str2chr(body, i);
+				if (cc == 92) { i = i + 2; continue; } // backslash
+				if (cc == 34) break; // '"'
+				i = i + 1;
+			}
+		}
+		else if (cc == 91) // '['
+			depth = depth + 1;
+		else if (cc == 93) // ']'
+			depth = depth - 1;
+		if (depth > 0)
+			i = i + 1;
+	}
+
+	if (depth == 0)
+		return i;
+	return -1;
+};
+
+//
+// Find the matching close brace '}' for an already-opened '{',
+// skipping nested braces and quoted strings.
+// 'start' should point to the first char inside the '{'.
+// Returns the index of the matching '}', or -1 if not found.
+//
+float(string body, float start) gsheets_find_object_end =
+{
+	float depth = 1;
+	float i = start;
+	float len = strlen(body);
+	float cc;
+
+	while (i < len && depth > 0)
+	{
+		cc = str2chr(body, i);
+		if (cc == 34) // '"'
+		{
+			// Skip quoted string
+			i = i + 1;
+			while (i < len)
+			{
+				cc = str2chr(body, i);
+				if (cc == 92) { i = i + 2; continue; } // backslash
+				if (cc == 34) break; // '"'
+				i = i + 1;
+			}
+		}
+		else if (cc == 123) // '{'
+			depth = depth + 1;
+		else if (cc == 125) // '}'
+			depth = depth - 1;
+		if (depth > 0)
+			i = i + 1;
+	}
+
+	if (depth == 0)
+		return i;
+	return -1;
+};
+
+//
+// Whitespace helper for lightweight JSON parsing
+//
+float(float cc) gsheets_is_json_ws =
+{
+	if (cc == 32 || cc == 10 || cc == 13 || cc == 9) // space, \n, \r, \t
+		return TRUE;
+	return FALSE;
+};
+
+//
+// Quick error detector for Apps Script JSON responses
+//
+float(string body) gsheets_body_has_error =
+{
+	if (body == "" || body == string_null)
+		return TRUE;
+	if (strstrofs(body, "\"error\"", 0) >= 0)
+		return TRUE;
+	return FALSE;
+};
+
+//
 // Parse JSON response for records
 // Expects: {"map":"xxx","trial":[{...}],"match":[{...}]}
 //
 void(string body) gsheets_parse_records =
 {
-	// Simple JSON parsing - find trial and match arrays
 	float pos, end;
 	string chunk;
-	
+
 	// Parse trial records
-	pos = strstrofs(body, "\"trial\":[", 0);
+	pos = strstrofs(body, "\"trial\"", 0);
 	if (pos >= 0)
 	{
-		pos += 9; // Skip past "trial":[
-		end = strstrofs(body, "]", pos);
-		if (end > pos)
+		pos = strstrofs(body, "[", pos);
+		if (pos >= 0)
 		{
-			chunk = substring(body, pos, end - pos);
-			gsheets_parse_record_array(chunk, 0); // recordset 0 = trial
+			pos += 1; // first char inside '['
+			end = gsheets_find_array_end(body, pos);
+			if (end > pos)
+			{
+				chunk = substring(body, pos, end - pos);
+				gsheets_parse_record_array(chunk, 0); // recordset 0 = trial
+			}
 		}
 	}
-	
+
 	// Parse match records
-	pos = strstrofs(body, "\"match\":[", 0);
+	pos = strstrofs(body, "\"match\"", 0);
 	if (pos >= 0)
 	{
-		pos += 9; // Skip past "match":[
-		end = strstrofs(body, "]", pos);
-		if (end > pos)
+		pos = strstrofs(body, "[", pos);
+		if (pos >= 0)
 		{
-			chunk = substring(body, pos, end - pos);
-			gsheets_parse_record_array(chunk, 2); // recordset 2 = match
+			pos += 1; // first char inside '['
+			end = gsheets_find_array_end(body, pos);
+			if (end > pos)
+			{
+				chunk = substring(body, pos, end - pos);
+				gsheets_parse_record_array(chunk, 2); // recordset 2 = match
+			}
 		}
 	}
+};
+
+//
+// Format top-3 lines from a JSON record array chunk (objects only)
+//
+string(string arr, float include_mt, string empty_msg) gsheets_format_top3_from_array =
+{
+	arr = strzone(arr); // protect from tempstring recycling
+
+	float pos = 0;
+	float obj_start, obj_end;
+	float count = 0;
+	string out = "";
+	string obj, player_qhex, player_json, player, decoded;
+	string rec_date, mt_str, meta, prefix, line;
+	float teamcolor, captime, ping;
+
+	while (count < 3)
+	{
+		obj_start = strstrofs(arr, "{", pos);
+		if (obj_start < 0)
+			break;
+
+		obj_end = gsheets_find_object_end(arr, obj_start + 1);
+		if (obj_end < 0)
+			break;
+
+		obj = strzone(substring(arr, obj_start, obj_end - obj_start + 1));
+
+		player_qhex = gsheets_json_get_string(obj, "player_qhex");
+		player_json = gsheets_json_get_string(obj, "player");
+		player = "";
+		if (player_qhex != "")
+		{
+			decoded = gsheets_hex_decode(player_qhex);
+			if (decoded != "" && strlen(decoded) >= 2)
+				player = decoded;
+		}
+		if (player == "")
+			player = player_json;
+		teamcolor = gsheets_json_get_number(obj, "teamcolor");
+		captime = gsheets_json_get_number(obj, "time");
+		rec_date = gsheets_json_get_string(obj, "date");
+		mt_str = gsheets_json_get_string(obj, "mt_str");
+		ping = gsheets_json_get_number(obj, "ping");
+
+		strunzone(obj);
+
+		if (player != "" && captime > 0)
+		{
+			if (count == 0) prefix = "\1";
+			else if (count == 1) prefix = "\2";
+			else prefix = "\3";
+
+			line = sprintf("%s  %s %s %s", prefix, utils_get_time(captime), get_team_letter(teamcolor), player);
+			meta = format_rec_meta(rec_date, mt_str, ping > 0 ? ping : -1, include_mt);
+			if (meta != "")
+				line = strcat(line, meta);
+			out = strcat(out, line, "\n");
+			count = count + 1;
+		}
+
+		pos = obj_end + 1;
+	}
+
+	strunzone(arr);
+
+	if (out == "")
+		return strcat(empty_msg, "\n");
+	return out;
+};
+
+//
+// Locate trial/match array in response body and format top-3 lines
+//
+string(string body, string key, float include_mt, string empty_msg) gsheets_format_top3_from_body =
+{
+	float pos, end;
+	string chunk;
+
+	pos = strstrofs(body, sprintf("\"%s\"", key), 0);
+	if (pos < 0)
+		return strcat(empty_msg, "\n");
+	pos = strstrofs(body, "[", pos);
+	if (pos < 0)
+		return strcat(empty_msg, "\n");
+	pos = pos + 1;
+	end = gsheets_find_array_end(body, pos);
+	if (end <= pos)
+		return strcat(empty_msg, "\n");
+
+	chunk = substring(body, pos, end - pos);
+	return gsheets_format_top3_from_array(chunk, include_mt, empty_msg);
 };
 
 //
@@ -322,59 +642,72 @@ void(string body) gsheets_parse_records =
 //
 void(string arr, float recordset) gsheets_parse_record_array =
 {
+	arr = strzone(arr); // protect from tempstring recycling
+
 	// Parse each object in the array
 	float pos = 0;
 	float obj_start, obj_end;
 	float rank = 0;
-	
+
 	while (TRUE)
 	{
 		obj_start = strstrofs(arr, "{", pos);
 		if (obj_start < 0)
 			break;
-		
-		obj_end = strstrofs(arr, "}", obj_start);
+
+		obj_end = gsheets_find_object_end(arr, obj_start + 1);
 		if (obj_end < 0)
 			break;
-		
-		string obj = substring(arr, obj_start, obj_end - obj_start + 1);
-		
+
+		string obj = strzone(substring(arr, obj_start, obj_end - obj_start + 1));
+
 		// Extract fields from object
 		string player_qhex = gsheets_json_get_string(obj, "player_qhex");
+		string player_json = gsheets_json_get_string(obj, "player");
 		string player = "";
 		if (player_qhex != "")
-			player = gsheets_hex_decode(player_qhex);
+		{
+			string decoded = gsheets_hex_decode(player_qhex);
+			// Guard against legacy sheets where ping could be read from the qhex column.
+			if (decoded != "" && strlen(decoded) >= 2)
+				player = decoded;
+		}
 		if (player == "")
-			player = gsheets_json_get_string(obj, "player");
+			player = player_json;
 		float teamcolor = gsheets_json_get_number(obj, "teamcolor");
 		float captime = gsheets_json_get_number(obj, "time");
 		string rec_date = gsheets_json_get_string(obj, "date");
 		string mt_str = gsheets_json_get_string(obj, "mt_str");
 		float ping = gsheets_json_get_number(obj, "ping");
-		
+
+		strunzone(obj);
+
 		if (player != "" && captime > 0)
 		{
 			// Set metadata globals for check_player_*_record functions
 			if (crx_meta_date != "") strunzone(crx_meta_date);
 			crx_meta_date = strzone(rec_date);
+			crx_meta_mt_remain = -1; // not stored in gsheets; use mt_str instead
 			if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
 			crx_meta_mt_str = strzone(mt_str);
 			if (ping > 0)
 				crx_meta_ping = ping;
 			else
 				crx_meta_ping = -1;
-			
+
 			if (recordset == 2)
 				check_player_low_record2(captime, teamcolor, player);
 			else
 				check_player_low_record(captime, teamcolor, player);
 		}
-		
+
 		pos = obj_end + 1;
 		rank++;
 		if (rank >= PLAYER_RECORDS_MAX_COUNT)
 			break;
 	}
+
+	strunzone(arr);
 };
 
 //
@@ -382,16 +715,31 @@ void(string arr, float recordset) gsheets_parse_record_array =
 //
 string(string json, string key) gsheets_json_get_string =
 {
-	string pattern = sprintf("\"%s\":\"", key);
+	string pattern = sprintf("\"%s\"", key);
 	float pos = strstrofs(json, pattern, 0);
 	if (pos < 0)
 		return "";
-	
+
 	pos += strlen(pattern);
+
+	// Skip whitespace before colon
+	while (pos < strlen(json) && gsheets_is_json_ws(str2chr(json, pos)))
+		pos++;
+	if (str2chr(json, pos) != 58) // ':'
+		return "";
+	pos++;
+
+	// Skip whitespace after colon
+	while (pos < strlen(json) && gsheets_is_json_ws(str2chr(json, pos)))
+		pos++;
+	if (str2chr(json, pos) != 34) // '"'
+		return "";
+	pos++;
+
 	float end = strstrofs(json, "\"", pos);
 	if (end < 0)
 		return "";
-	
+
 	return substring(json, pos, end - pos);
 };
 
@@ -400,28 +748,66 @@ string(string json, string key) gsheets_json_get_string =
 //
 float(string json, string key) gsheets_json_get_number =
 {
-	string pattern = sprintf("\"%s\":", key);
+	string pattern = sprintf("\"%s\"", key);
 	float pos = strstrofs(json, pattern, 0);
 	if (pos < 0)
 		return 0;
-	
+
 	pos += strlen(pattern);
-	// Skip whitespace
-	while (substring(json, pos, 1) == " ")
+
+	// Skip whitespace before colon
+	while (pos < strlen(json) && gsheets_is_json_ws(str2chr(json, pos)))
 		pos++;
-	
+	if (str2chr(json, pos) != 58) // ':'
+		return 0;
+	pos++;
+
+	// Skip whitespace after colon
+	while (pos < strlen(json) && gsheets_is_json_ws(str2chr(json, pos)))
+		pos++;
+
+	// Accept quoted numbers too, e.g. "time":"2.56"
+	if (str2chr(json, pos) == 34) // '"'
+	{
+		pos++;
+		float endq = strstrofs(json, "\"", pos);
+		if (endq < 0)
+			return 0;
+		return stof(substring(json, pos, endq - pos));
+	}
+
 	// Find end of number (next comma, brace, or bracket)
 	float end = pos;
-	string c;
+	float cc;
 	while (end < strlen(json))
 	{
-		c = substring(json, end, 1);
-		if (c == "," || c == "}" || c == "]")
+		cc = str2chr(json, end);
+		if (cc == 44 || cc == 125 || cc == 93) // ',', '}', ']'
 			break;
 		end++;
 	}
-	
+
 	return stof(substring(json, pos, end - pos));
+};
+
+//
+// Best-effort stale-response check: if body has a map field and it does not
+// match the requested map, ignore this callback.
+//
+float(string body, string wanted_map) gsheets_response_matches_map =
+{
+	string body_map;
+
+	if (wanted_map == "" || wanted_map == string_null)
+		return TRUE;
+
+	body_map = gsheets_json_get_string(body, "map");
+	if (body_map == "" || body_map == string_null)
+		return TRUE; // Cannot verify; accept.
+
+	if (strtolower(body_map) == strtolower(wanted_map))
+		return TRUE;
+	return FALSE;
 };
 
 //
@@ -430,6 +816,8 @@ float(string json, string key) gsheets_json_get_number =
 //
 void(float reqid, float status, string body) gsheets_callback =
 {
+	body = strzone(body); // protect from tempstring recycling during parsing
+
 	switch (reqid)
 	{
 		case GSHEETS_REQ_VALIDATE:
@@ -442,34 +830,153 @@ void(float reqid, float status, string body) gsheets_callback =
 			else
 			{
 				clanring_googlesheets_valid = FALSE;
-				dprint(sprintf("Google Sheets validation failed (status %g) - falling back to local files\n", status));
+				dprint(sprintf("Google Sheets validation failed (status %g)\n", status));
 				if (body != "")
 					dprint(sprintf("Response: %s\n", body));
 			}
 			break;
 		}
 		
-		case GSHEETS_REQ_READ_TRIAL:
-		{
-			gsheets_pending_read = FALSE;
+			case GSHEETS_REQ_READ_TRIAL:
+			{
+				if (!gsheets_response_matches_map(body, gsheets_pending_map))
+				{
+					dprint(sprintf("Google Sheets trial read ignored for stale map response (wanted %s)\n", gsheets_pending_map));
+					break;
+				}
+
+				if (status == 200 && !gsheets_body_has_error(body))
+				{
+					gsheets_current_map_trial_loaded = TRUE;
+					dprint(sprintf("Google Sheets trial read successful for %s\n", gsheets_pending_map));
+					gsheets_parse_records(body);
+				}
+				else
+				{
+					gsheets_current_map_trial_loaded = FALSE;
+					dprint(sprintf("Google Sheets trial read failed (status %g)\n", status));
+					if (body != "")
+						dprint(sprintf("Response: %s\n", body));
+				}
+				gsheets_last_read_used_google = (gsheets_current_map_trial_loaded || gsheets_current_map_match_loaded);
+
+				// Fire match request separately to stay under QC string length limit
+				string match_url = sprintf("%s?action=read&map=%s&type=match&key=%s",
+					clanring_googlesheetsurl,
+					gsheets_pending_map,
+					clanring_googlesheetsapikey);
+				uri_get(match_url, GSHEETS_REQ_READ_MATCH);
+				break;
+			}
+
+			case GSHEETS_REQ_READ_MATCH:
+			{
+				if (!gsheets_response_matches_map(body, gsheets_pending_map))
+				{
+					dprint(sprintf("Google Sheets match read ignored for stale map response (wanted %s)\n", gsheets_pending_map));
+					break;
+				}
+
+				gsheets_pending_read = FALSE;
+
+				if (status == 200 && !gsheets_body_has_error(body))
+				{
+					gsheets_current_map_match_loaded = TRUE;
+					dprint(sprintf("Google Sheets match read successful for %s\n", gsheets_pending_map));
+					gsheets_parse_records(body);
+				}
+				else
+				{
+					gsheets_current_map_match_loaded = FALSE;
+					dprint(sprintf("Google Sheets match read failed (status %g)\n", status));
+					if (body != "")
+						dprint(sprintf("Response: %s\n", body));
+				}
+				gsheets_last_read_used_google = (gsheets_current_map_trial_loaded || gsheets_current_map_match_loaded);
+				break;
+			}
+
+			case GSHEETS_REQ_READ_LOOKUP:
+			{
+				string trial_lines;
+
+				if (!gsheets_lookup_client || gsheets_lookup_client == world)
+				{
+					if (gsheets_lookup_map != "" && gsheets_lookup_map != string_null)
+						strunzone(gsheets_lookup_map);
+					gsheets_lookup_map = "";
+					gsheets_lookup_pending = FALSE;
+					break;
+				}
+
+				if (status == 200 && !gsheets_body_has_error(body))
+				{
+					trial_lines = gsheets_format_top3_from_body(body, "trial", FALSE, "No capture times set");
+				}
+				else
+				{
+					dprint(sprintf("Google Sheets lookup failed for %s (status %g)\n", gsheets_lookup_map, status));
+					if (body != "")
+						dprint(sprintf("Google Sheets lookup failed body: %s\n", body));
+					trial_lines = "No capture times set\n";
+				}
+
+				// Store trial output and fire match request
+				if (gsheets_lookup_trial_lines != "" && gsheets_lookup_trial_lines != string_null)
+					strunzone(gsheets_lookup_trial_lines);
+				gsheets_lookup_trial_lines = strzone(trial_lines);
+
+				string lookup_match_url = sprintf("%s?action=read&map=%s&type=match&key=%s",
+					clanring_googlesheetsurl,
+					gsheets_lookup_map,
+					clanring_googlesheetsapikey);
+				uri_get(lookup_match_url, GSHEETS_REQ_LOOKUP_MATCH);
+				break;
+			}
+
+			case GSHEETS_REQ_LOOKUP_MATCH:
+			{
+				string match_lines, title;
+
+				gsheets_lookup_pending = FALSE;
+
+				if (!gsheets_lookup_client || gsheets_lookup_client == world)
+				{
+					if (gsheets_lookup_map != "" && gsheets_lookup_map != string_null)
+						strunzone(gsheets_lookup_map);
+					gsheets_lookup_map = "";
+					if (gsheets_lookup_trial_lines != "" && gsheets_lookup_trial_lines != string_null)
+						strunzone(gsheets_lookup_trial_lines);
+					gsheets_lookup_trial_lines = "";
+					break;
+				}
+
+				if (status == 200 && !gsheets_body_has_error(body))
+				{
+					match_lines = gsheets_format_top3_from_body(body, "match", TRUE, "No match capture times set");
+				}
+				else
+				{
+					dprint(sprintf("Google Sheets lookup match failed for %s (status %g)\n", gsheets_lookup_map, status));
+					match_lines = "No match capture times set\n";
+				}
+
+				title = strcat("CTF Capture Records (Google Sheet)\n\n", sprintf("\bTime Trial Leaders\b for %s:\n", gsheets_lookup_map));
+				sprint(gsheets_lookup_client, title, gsheets_lookup_trial_lines, "\n\bMatch Times\b:\n", match_lines, "\n");
+
+				if (gsheets_lookup_trial_lines != "" && gsheets_lookup_trial_lines != string_null)
+					strunzone(gsheets_lookup_trial_lines);
+				gsheets_lookup_trial_lines = "";
+
+				if (gsheets_lookup_map != "" && gsheets_lookup_map != string_null)
+					strunzone(gsheets_lookup_map);
+				gsheets_lookup_map = "";
+				gsheets_lookup_client = world;
+				break;
+			}
 			
-			if (status == 200)
-			{
-				dprint(sprintf("Google Sheets read successful for %s\n", gsheets_pending_map));
-				gsheets_parse_records(body);
-			}
-			else
-			{
-				dprint(sprintf("Google Sheets read failed (status %g) - falling back to local files\n", status));
-				// Fallback to local files
-				read_player_stats(sprintf("%s_captimes.crx", gsheets_pending_map), RECORD_LOW, 0);
-				read_player_stats(sprintf("%s_captimes_match.crx", gsheets_pending_map), RECORD_LOW, 2);
-			}
-			break;
-		}
-		
-		case GSHEETS_REQ_WRITE_TRIAL:
-		case GSHEETS_REQ_WRITE_MATCH:
+			case GSHEETS_REQ_WRITE_TRIAL:
+			case GSHEETS_REQ_WRITE_MATCH:
 		{
 			if (status == 200)
 			{
@@ -482,4 +989,6 @@ void(float reqid, float status, string body) gsheets_callback =
 			break;
 		}
 	}
+
+	strunzone(body);
 };

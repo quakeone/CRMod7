@@ -4,7 +4,7 @@
 // This is the main file for CRMod++.  CRMod++ was derived from the
 // Elohim server, which is why everything is still called "elohim".
 //
-// Developed by J.P. Grossman (a.k.a. ˘Mephistopheles) and Paul Baker
+// Developed by J.P. Grossman (a.k.a. Mephistopheles) and Paul Baker
 //
 // All code by J.P. Grossman unless otherwise commented.
 //
@@ -217,6 +217,8 @@ float(string s) utils_semver_to_code;
 void() utils_dedupe_disconnect_log;
 void() utils_namewatch_think;
 void() utils_refresh_overlay_if_renamed;
+void() match_refresh_spawn_markers;
+void(void () dofunc) utils_do_match_spawns;
 float(string player_name) utils_is_in_last_disconnects;
 float(string player_name) utils_name_has_player;
 void () score_init_world;
@@ -282,6 +284,9 @@ void () CaptureHighScores_sprint;
 void () AirshotHighScores_sprint;
 void () LongRangeGibs_sprint;
 void () check_client_status;
+void () status_refresh_f_status_pref;
+void () lockdown_restore_from_cvars;
+void () lockdown_release_if_server_empty;
 //void () Teamplay_Select_Team;
 
 // ------------------------------------------------------------------
@@ -305,7 +310,7 @@ float() CountActivePlayersDM =
 
 float() InDMNormalMode =
 {
-    // "Normal" (FFA) only ó exclude arena/CTF/etc.
+    // "Normal" (FFA) only - exclude arena/CTF/etc.
     if (!(clanring_playmode & CLANRING_NORMAL_MODE))
         return FALSE;
     if (clanring_playmode & (CLANRING_CAPTURE_THE_FLAG
@@ -467,7 +472,7 @@ void () restore_afk_status =
     remove(self); // Clean up the scheduled event entity
 }
 
-//woods ó
+//woods
 /*
 mode: dm, ctf, ra, ca, wipeout, airshot, dmm4
 playmode: match, ffa, practice
@@ -550,6 +555,9 @@ void () clanring_init_world =
     local string szmode;
     local float temp;
 
+    // Reset map-scoped team info generation on each level load.
+    team_info_global_gen = 0;
+
     //CRMOD - string to be used throughout code to show version number.
     //version.year.month.day
     string vstring = strftime(TRUE, "%y.%m");
@@ -588,6 +596,9 @@ void () clanring_init_world =
     
     // Load disconnect log from persistent storage
     utils_load_disconnect_log();
+
+    // Restore private-lock state across map changes.
+    lockdown_restore_from_cvars();
     
     // Set the server time offset to maintain continuity across map changes
     // The offset should already be loaded from the file, no need to modify it here
@@ -879,6 +890,19 @@ void (float value) clanring_set_fraglimit =
         utils_set_cvar("fraglimit", value);
 
     fraglimit = cvar("fraglimit");
+
+    // Rocket Arena uses ra_wins as its actual match target.
+    // Keep it synchronized with fraglimit so frag votes apply to RA.
+    if (clanring_playmode & CLANRING_RA_MODE)
+    {
+        if (fraglimit <= 0)
+        {
+            fraglimit = 10;
+            utils_set_cvar("fraglimit", fraglimit);
+        }
+        ra_wins = fraglimit;
+    }
+
     temp = ftos(fraglimit);
 
     if (clanring_playmode & CLANRING_MATCH_MODE)
@@ -1059,7 +1083,7 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias dropammo impulse 20\n");
     stuffcmd(self, "alias rune-use impulse 20\n");
     stuffcmd(self, "alias dropweapon impulse 21\n");
-    stuffcmd(self, "alias flagstatus impulse 23\n");
+    stuffcmd(self, "alias flagstatus cmd flagstatus\n");
     stuffcmd(self, "alias droprune impulse 19\n");
     stuffcmd(self, "alias nextmap impulse 199\n");
     stuffcmd(self, "alias faststart impulse 209\n");
@@ -1370,39 +1394,61 @@ void () find_pqc_teamscore_teams =
 string() server_find_myClient =
 {    
     local string text = "";
-    string myClient;
+    local string myClient;
+    local string myClientLower;
 
     myClient = string_null;
+    myClientLower = "";
+    self.client = "Quake";
 
     myClient = infokey(self,"*ver");						//FTE and QSS
     self.client_ver_code = 0; // default
 
     if (myClient != "")
     {
-        if (substring(myClient, 0, 5) == "QSS-M")
+        myClientLower = strtolower(myClient);
+        if (substring(myClientLower, 0, 5) == "qss-m")
         {
             self.client = "QSS-M";
             self.client_ver_code = utils_semver_to_code(myClient);
         }
-
-        if (substring(myClient, 0, 3) == "FTE")
+        else if (substring(myClientLower, 0, 3) == "fte")
             self.client = "FTE";
+        else if (strstrofs(myClientLower, "ezquake", 0) >= 0)
+            self.client = "ezQuake";
+
         text = (sprintf(" with %s.\n", myClient));
     }
     else
     {
-        myClient = infokey(self,"*client");					//ezQuake
+        myClient = infokey(self,"*client");					//ezQuake/FTE/others
         if (myClient != "")
         {
-            self.client = "ezQuake";
+            myClientLower = strtolower(myClient);
+
+            if (substring(myClientLower, 0, 3) == "fte")
+                self.client = "FTE";
+            else if (substring(myClientLower, 0, 5) == "qss-m")
+                self.client = "QSS-M";
+            else if (strstrofs(myClientLower, "ezquake", 0) >= 0)
+                self.client = "ezQuake";
+
             text = (sprintf(" with %s.\n", myClient));
         }
         else
         {
             text = ".\n";									//anything else
-            self.client = "Quake";
         }
     }
+
+    // Optional connect-time client detection tracing.
+    registercvar("cr_debug_client_detect", "0");
+    if (cvar("cr_debug_client_detect") > 0)
+    {
+        bprint(sprintf("DEBUG client detect: %s *ver='%s' *client='%s' => '%s'\n",
+            self.netname, infokey(self,"*ver"), infokey(self,"*client"), self.client));
+    }
+
     return text;
  }
 
@@ -1416,6 +1462,7 @@ string() server_find_myClient =
 void () clanring_client_connect =
 {
     local string text = "";
+    local string client_name;
         
     if (parm10 & CLANRING_NEW_CLIENT)
     {
@@ -1444,22 +1491,54 @@ void () clanring_client_connect =
         self.afk_time = time + 20;
 
         text = server_find_myClient();  //This also sets self.client
+
+        // Only QSS-M chat status is trusted; clear everyone else on connect.
+        client_name = strtolower(self.client);
+        if (client_name != "qss-m")
+            forceinfokey(self, "chat", "");
+
         bprint (self.netname," has connected", text);
     }
     else 
     {
         self.afk_time = time;
-        
-        // Level change - check client's chat status to restore AFK if needed
-        local string chat_status = infokey(self, "chat");
-        if (chat_status == "2" && !(self.style & CLANRING_AFK_CLIENT)) // Client is AFK but not flagged yet
+
+        // Re-detect on level change in case *ver/*client arrived late on initial connect.
+        if (!(self.client) || self.client == "Quake")
+            server_find_myClient();
+
+        // Only QSS-M chat status is trusted for AFK restore.
+        client_name = strtolower(self.client);
+        if (client_name == "qss-m")
         {
-            utils_make_scheduled_event(restore_afk_status, 1.0);
+            // Level change: restore AFK only for reliable chat states.
+            local string chat_status = infokey(self, "chat");
+            if ((chat_status == "2" || chat_status == "3") && !(self.style & CLANRING_AFK_CLIENT))
+                utils_make_scheduled_event(restore_afk_status, 1.0);
+        }
+        else
+        {
+            forceinfokey(self, "chat", "");
         }
     }
 
+    // Cache f_status preference once on connect/level-change.
+    status_refresh_f_status_pref();
+    self.hud_last_sig_ctf = -1;
+
+    // Reset per-receiver delta-send state on connect and level transitions.
+    team_info_reset_receiver_state();
+
     // send aliases if necessary
     utils_make_scheduled_event(clanring_send_ignore_this, 1);
+
+    if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+        && (clanring_playmode & CLANRING_MATCH_MODE)
+        && !(clanring_state & CLANRING_MATCH_STARTED))
+    {
+        // Push prematch CTF spawn marker appearance for newly connected clients.
+        match_refresh_spawn_markers();
+    }
 
     //utils_make_scheduled_event(clanring_send_detect, 0.8);
 
@@ -1571,6 +1650,8 @@ void () clanring_client_disconnect =
     // Let the admin module know in case there's a kick in progress
     admin_disconnect_notify(self);
 
+    lockdown_release_if_server_empty();
+
     // Check to see if we were debugging this client
     if (clanring_debug_client == self)
         clanring_debug_client = world;
@@ -1634,7 +1715,9 @@ void () clanring_put_client_in_server =
 
     utils_make_scheduled_event(send_pause_match_timer, 0.5);
 
-    if (!(self.client))         // woods -- map change
+    if (!(self.client)
+        || (self.client == "Quake"
+            && ((infokey(self,"*ver") != "") || (infokey(self,"*client") != "")))) // woods -- map change / late client keys
         server_find_myClient();
 
     if (mode_is_arena())
@@ -1701,9 +1784,7 @@ void () clanring_put_client_in_server =
             if (!((clanring_playmode & CLANRING_PRACTICE_MODE) || ((clanring_playmode & CLANRING_NORMAL_MODE) && !teamplay)))
             {
                 string temp = ftos(self.height);
-                stuffcmd(self, "color ");
-                stuffcmd(self, temp);
-                stuffcmd(self, "\n");
+                stuffcmd(self, strcat("color ", temp, "\n"));
                 temp = "";
             }
         }
@@ -1754,8 +1835,8 @@ void () clanring_help_change =
     sprint(self, "\n");
     sprint(self, " type \bwarp\b to change maps\n");
     sprint(self, "\n");
-    //sprint(self, "‘Ô „Ë·ÓÁÂ ÏÂˆÂÏÛ¨ ÂÓÙÂÚ ÙËÂ Ó·ÌÂ ÔÊ\n");
-    //sprint(self, "ÙËÂ ÏÂˆÂÏ ÈÓ ÙËÂ „ÔÓÛÔÏÂÆ\n");
+    //sprint(self, "\xD4\xEF \xE3\xE8\xE1\xEE\xE7\xE5 \xEC\xE5\xF6\xE5\xEC\xF3\xAC \xE5\xEE\xF4\xE5\xF2 \xF4\xE8\xE5 \xEE\xE1\xED\xE5 \xEF\xE6\n");
+    //sprint(self, "\xF4\xE8\xE5 \xEC\xE5\xF6\xE5\xEC \xE9\xEE \xF4\xE8\xE5 \xE3\xEF\xEE\xF3\xEF\xEC\xE5\xAE\n");
 };
 
 //
@@ -1838,7 +1919,8 @@ void () clanring_commands =
         sprint(self, " \bfaststart\b    \bnextspawn\b\n");
         sprint(self, " \bghostlist\b    \bnextcam\b\n");
         sprint(self, " \bhelp-admin\b   \boptions\b\n");
-        sprint(self, " \bips\b          \bsafepractice\b\n");
+        sprint(self, " \bips\b          \blockdown\b\n");
+        sprint(self, " \bsafepractice\b\n");
         sprint(self, "\n");
     }
     //clanring_help_change ();
@@ -1912,9 +1994,11 @@ void () misc_commands =
         sprint(self, " \bdropammo\b\n");
         sprint(self, " \bdropweapon\b\n");
         sprint(self, " \bhighscores\b\n");
+        sprint(self, " \bcmd ignore\b\n");
         sprint(self, " \blast\b\n");
         sprint(self, " \bmotd\b\n");
         sprint(self, " \brules\b\n");
+        sprint(self, " \bcmd unignore\b\n");
         sprint(self, "\n");
 };
 
@@ -2015,124 +2099,124 @@ void () clanring_show_rules =
     local float temp;
 
     if (clanring_playmode & CLANRING_DMM4_MODE)
-        sprint(self, "é 1v1 duel  mode é\n");
+        sprint(self, "\x8E 1v1 duel  mode \x8E\n");
     else if (clanring_playmode & CLANRING_AIRSHOT_MODE)
-        sprint(self, "é  airshot mode  é\n");
+        sprint(self, "\x8E  airshot mode  \x8E\n");
     else if (clanring_playmode & CLANRING_WIPEOUT_MODE)
-        sprint(self, "é wipeout modeé\n");
+        sprint(self, "\x8E wipeout mode\x8E\n");
     else if (clanring_playmode & CLANRING_CA_MODE)
-        sprint(self, "éclan arena  modeé\n");
+        sprint(self, "\x8Eclan arena  mode\x8E\n");
     else if (clanring_playmode & CLANRING_RA_MODE)
-        sprint(self, "érocket arena modeé\n");
+        sprint(self, "\x8Erocket arena mode\x8E\n");
     else if (clanring_playmode & CLANRING_MATCH_MODE)
     {
         if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            sprint(self, "éCRCTF match modeé\n");
+            sprint(self, "\x8ECRCTF match mode\x8E\n");
         else
-            sprint(self, "éCRMod match modeé\n");
+            sprint(self, "\x8ECRMod match mode\x8E\n");
     }
     else if (clanring_playmode & CLANRING_PRACTICE_MODE)
     {
         if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            sprint(self, "éctf practice modeé\n");
+            sprint(self, "\x8Ectf practice mode\x8E\n");
         else
-            sprint(self, "épractice modeé\n");
+            sprint(self, "\x8Epractice mode\x8E\n");
     }
     else
     {
         if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            sprint(self, "éPublic CTF modeé\n");
+            sprint(self, "\x8EPublic CTF mode\x8E\n");
         else
         {
             if (teamplay)
-                sprint(self, "éPublic Team DeathMatch modeé\n");
+                sprint(self, "\x8EPublic Team DeathMatch mode\x8E\n");
             else
-                sprint(self, "éFFA DeathMatch modeé\n");
+                sprint(self, "\x8EFFA DeathMatch mode\x8E\n");
         }
     }
     temp = cvar("deathmatch");
-    sprint(self, "deathmatchÆÆÆ");
+    sprint(self, "deathmatch\xAE\xAE\xAE");
     utils_print_float(temp);
     temp = cvar("teamplay");
-    sprint(self, "teamplayÆÆÆÆÆ");
+    sprint(self, "teamplay\xAE\xAE\xAE\xAE\xAE");
     utils_print_float(temp);
     if (!(clanring_playmode & CLANRING_MATCH_MODE))
         temp = cvar("timelimit");
     else
         temp = clanring_timelimit;
 
-    sprint(self, "timelimitÆÆÆÆ");
+    sprint(self, "timelimit\xAE\xAE\xAE\xAE");
     utils_print_float(temp);
     temp = cvar("fraglimit");
-    sprint(self, "fraglimitÆÆÆÆ");
+    sprint(self, "fraglimit\xAE\xAE\xAE\xAE");
     utils_print_float(temp);
     if (clanring_playmode & CLANRING_MATCH_MODE)
     {
         if (clanring_overtime > 0)
         {
-            sprint(self, "overtimeÆÆÆÆÆ");
+            sprint(self, "overtime\xAE\xAE\xAE\xAE\xAE");
             utils_print_float(clanring_overtime);
         }
         else
         {
             if (clanring_overtime == 0)
-                sprint(self, "overtimeÆÆÆÆÆdisabled\n");
+                sprint(self, "overtime\xAE\xAE\xAE\xAE\xAEdisabled\n");
             else
-                sprint(self, "overtimeÆÆÆÆÆsudden death\n");
+                sprint(self, "overtime\xAE\xAE\xAE\xAE\xAEsudden death\n");
         }
     }
     else
     {
         temp = cvar("noexit");
-        sprint(self, "noexitÆÆÆÆÆÆÆ");
+        sprint(self, "noexit\xAE\xAE\xAE\xAE\xAE\xAE\xAE");
         utils_print_float(temp);
     }
 
-    sprint(self, "quadÆÆÆÆÆÆÆÆÆ");
+    sprint(self, "quad\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE");
 
     if (clanring_playmode & CLANRING_NO_QUAD)
         sprint(self, "\bOFF\n");
     else
         sprint(self, "on\n");
 
-    sprint(self, "pentÆÆÆÆÆÆÆÆÆ");
+    sprint(self, "pent\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE");
     if (clanring_playmode & CLANRING_NO_PENT)
         sprint(self, "\bOFF\n");
     else
         sprint(self, "on\n");
 
-    sprint(self, "ringÆÆÆÆÆÆÆÆÆ");
+    sprint(self, "ring\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE");
     if (clanring_playmode & CLANRING_NO_RING)
         sprint(self, "\bOFF\n");
     else
         sprint(self, "on\n");
 
     if (clanring_gameconfig & CLANRING_POWERUP_DROP)
-        sprint(self, "powerupDropsÆ", "on\n");
+        sprint(self, "powerupDrops\xAE", "on\n");
 
     if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
     {
-        sprint(self, "runesÆÆÆÆÆÆÆÆ");
+        sprint(self, "runes\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE");
         if (clanring_playmode & CLANRING_RUNES)
             sprint(self, "on\n");
         else
             sprint(self, "\bOFF\n");
     }
     //R00k: we *can* have the hook enabled in non-CTF modes too! :)
-    sprint(self, "hookÆÆÆÆÆÆÆÆÆ");
+    sprint(self, "hook\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE\xAE");
     if (clanring_playmode & CLANRING_NO_HOOK)
         sprint(self, "\bOFF\n");
     else
         sprint(self, "on\n");
 
     if (clanring_playmode & CLANRING_NO_SPOOGE)
-        sprint(self, "no spoogeÆÆÆÆon\n");
+        sprint(self, "no spooge\xAE\xAE\xAE\xAEon\n");
 
     if (self.style & CLANRING_SMART_WEAPON)
-        sprint(self, "autoweaponÆÆÆon\n");
+        sprint(self, "autoweapon\xAE\xAE\xAEon\n");
 
     if (!(clanring_playmode & CLANRING_MATCH_MODE))
-        sprint(self, "nextÆmapÆÆÆÆÆ",nextmap,"\n");
+        sprint(self, "next\xAEmap\xAE\xAE\xAE\xAE\xAE",nextmap,"\n");
 
     sprint(self, "\n");
 };
@@ -2172,19 +2256,19 @@ void () clanring_show_rules_prematch =
     if (timervar > 3)
     {
         if (clanring_playmode & CLANRING_DMM4_MODE)
-            s1 = "é  d u e l mode  é\n\n";
+            s1 = "\x8E  d u e l mode  \x8E\n\n";
         else if (clanring_playmode & CLANRING_AIRSHOT_MODE)
-            s1 = "é  airshot mode  é\n\n";
+            s1 = "\x8E  airshot mode  \x8E\n\n";
         else if (clanring_playmode & CLANRING_WIPEOUT_MODE)
-            s1 = "éclan arena wipeouté\n\n";
+            s1 = "\x8Eclan arena wipeout\x8E\n\n";
         else if (clanring_playmode & CLANRING_CA_MODE)
-            s1 = "éclan arena  modeé\n\n";
+            s1 = "\x8Eclan arena  mode\x8E\n\n";
         else if (clanring_playmode & CLANRING_RA_MODE)
-            s1 = "érocket arena modeé\n\n";
+            s1 = "\x8Erocket arena mode\x8E\n\n";
         else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            s1 = "écrctf match modeé\n\n";
+            s1 = "\x8Ecrctf match mode\x8E\n\n";
         else
-            s1 = "écrmod match modeé\n\n";
+            s1 = "\x8Ecrmod match mode\x8E\n\n";
 
         if (!(clanring_playmode & CLANRING_CA_MODE) && !(clanring_playmode & CLANRING_RA_MODE))
         {
@@ -2317,15 +2401,15 @@ void () clanring_admins =
         sprint(self, "There are no administrators\n");
         return;
     }
-    sprint(self, "\n†√Ô‰Â†¸††††††Œ·ÌÂ\n");
-    sprint(self, "≠≠≠≠≠≠´≠≠≠≠≠≠≠≠≠≠≠≠≠≠≠≠≠\n");
+    sprint(self, "\n\xA0\xC3\xEF\xE4\xE5\xA0\xFC\xA0\xA0\xA0\xA0\xA0\xA0\xCE\xE1\xED\xE5\n");
+    sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
     e = find(world, classname, "player");
     while (e)
     {
         if ((e.style & CLANRING_CONNECTED) && (e.style & CLANRING_ADMINISTRATOR))
         {
             s = ftos(e.clanring_hack_count);
-            sprint5(self, "   ", s, "  ¸ ", e.netname, "\n");
+            sprint5(self, "   ", s, "  \xFC ", e.netname, "\n");
         }
         e = find(e, classname, "player");
     }
@@ -2697,7 +2781,85 @@ void (entity player) observer_update_player_observer_key;
 //  For team games, only sends info about players on the same team.
 //
 
-.float team_info_time;
+void(entity target) team_info_mark_target_dirty =
+{
+    if (!target)
+        return;
+    target.team_info_cache_init = FALSE;
+    target.team_info_check_frame = -1;
+};
+
+void () team_info_reset_receiver_state =
+{
+    self.team_info_seen_gen = -1;
+    self.team_info_time = 0;
+    self.team_info_fullsync_time = time + 2 + (num_for_edict(self) * 0.1);
+};
+
+void(entity target) team_info_quantize_and_mark_changed =
+{
+    local float qx, qy, qz;
+    local float qh, qa;
+    local float qitems, qspeed;
+    local float qteam, qheight, qteam2;
+    local float speed;
+
+    // Avoid recomputing target quantization once per receiving client.
+    if (target.team_info_check_frame == framecount)
+        return;
+    target.team_info_check_frame = framecount;
+
+    qx = floor(target.origin_x / TEAM_INFO_POS_GRID) * TEAM_INFO_POS_GRID;
+    qy = floor(target.origin_y / TEAM_INFO_POS_GRID) * TEAM_INFO_POS_GRID;
+    qz = floor(target.origin_z / TEAM_INFO_POS_GRID) * TEAM_INFO_POS_GRID;
+
+    qh = floor(bound(0, target.health, 999));
+    qa = floor(bound(0, target.armorvalue, 999));
+
+    qitems = target.items;
+    if (target.items2 & IT2_SIGIL1) qitems = qitems | (1 << 23);
+    if (target.items2 & IT2_SIGIL2) qitems = qitems | (1 << 24);
+    if (target.items2 & IT2_SIGIL3) qitems = qitems | (1 << 25);
+    if (target.items2 & IT2_SIGIL4) qitems = qitems | (1 << 26);
+
+    speed = vlen(target.velocity);
+    if (speed < TEAM_INFO_SPEED_DEADZONE)
+        qspeed = 0;
+    else
+        qspeed = floor(speed / TEAM_INFO_SPEED_BAND) * TEAM_INFO_SPEED_BAND;
+
+    qteam = target.team;
+    qheight = target.height;
+    qteam2 = target.team2;
+
+    if (!target.team_info_cache_init
+     || qx != target.team_info_qx
+     || qy != target.team_info_qy
+     || qz != target.team_info_qz
+     || qh != target.team_info_qh
+     || qa != target.team_info_qa
+     || qitems != target.team_info_qitems
+     || qspeed != target.team_info_qspeed
+     || qteam != target.team_info_qteam
+     || qheight != target.team_info_qheight
+     || qteam2 != target.team_info_qteam2)
+    {
+        target.team_info_qx = qx;
+        target.team_info_qy = qy;
+        target.team_info_qz = qz;
+        target.team_info_qh = qh;
+        target.team_info_qa = qa;
+        target.team_info_qitems = qitems;
+        target.team_info_qspeed = qspeed;
+        target.team_info_qteam = qteam;
+        target.team_info_qheight = qheight;
+        target.team_info_qteam2 = qteam2;
+        target.team_info_cache_init = TRUE;
+
+        team_info_global_gen = team_info_global_gen + 1;
+        target.team_info_gen = team_info_global_gen;
+    }
+};
 
 void () Send_TeamInfo =
 {
@@ -2708,37 +2870,34 @@ void () Send_TeamInfo =
     if ((self.client != "QSS-M") && (self.client != "FTE"))
         return;
 
-
+    team_info_send_force_fullsync = FALSE;
+    if (self.team_info_fullsync_time <= time)
+    {
+        team_info_send_force_fullsync = TRUE;
+        self.team_info_fullsync_time = time + TEAM_INFO_FULLSYNC_INTERVAL;
+    }
 
     void(entity target) SendPlayerInfo =
     {
-        if (!(target.style & CLANRING_CONNECTED))
+        if (!(target.style & CLANRING_CONNECTED) || (target.classname != "player"))
             return;
-            
-        local float speed = vlen(target.velocity);
-        local float newItems = target.items;
 
-        // Add sigil/rune bits using bits 23-26
-        local float i;
-        for (i = 0; i < 4; i = i + 1)
-        {
-            local float bitmask = 32 << i;  // produces 32, 64, 128, 256
-            local float sigilBit = 1 << (23 + i);
-            if (target.items2 & bitmask)
-                newItems = newItems | sigilBit;
-        }
-        
-        string part1 = sprintf("//tinfo %d %d %d %d ", 
+        team_info_quantize_and_mark_changed(target);
+
+        if (!team_info_send_force_fullsync && !(target.team_info_gen > self.team_info_seen_gen))
+            return;
+
+        string part1 = sprintf("//tinfo %d %d %d %d ",
             num_for_edict(target) - 1,
-            target.origin_x,
-            target.origin_y,
-            target.origin_z);
+            target.team_info_qx,
+            target.team_info_qy,
+            target.team_info_qz);
 
         string part2 = sprintf("%d %d %d %d\n",
-            floor(bound(0, target.health, 999)),
-            floor(bound(0, target.armorvalue, 999)),
-            newItems,
-            floor(speed));
+            target.team_info_qh,
+            target.team_info_qa,
+            target.team_info_qitems,
+            target.team_info_qspeed);
 
         stuffcmd(self, strcat(part1, part2));
     };
@@ -2776,6 +2935,7 @@ void () Send_TeamInfo =
                 player = player.next_player;
             }
         }
+        self.team_info_seen_gen = team_info_global_gen;
         return;
     }
 
@@ -2819,6 +2979,8 @@ void () Send_TeamInfo =
             list_player = list_player.next_player;
         }
     }
+
+    self.team_info_seen_gen = team_info_global_gen;
 };
 
 //
@@ -2878,6 +3040,9 @@ void () clanring_periodic_checks =
 {
     if (!(self.style & CLANRING_CONNECTED))
         return;
+
+    // Refresh userinfo-backed status preference at 1Hz.
+    status_refresh_f_status_pref();
 
     local float inactive, c;
 
@@ -3030,11 +3195,9 @@ void () clanring_periodic_checks =
             {
                 if ((inactive - (c * 60)) < 1)//One minute has passed...sorta
                 {
-                    stuffcmd(self, "play ");
                     //todo choose random?
-                    //stuffcmd(self, "zombie/idle_w2.wav");
-                    stuffcmd(self, "demon/idle1");
-                    stuffcmd(self, "\n");
+                    //stuffcmd(self, "play zombie/idle_w2.wav\n");
+                    stuffcmd(self, "play demon/idle1\n");
                     sprint(self, "AFK ALERT: \bYou will be kicked in ",s," minute",pl,".\n");
                     sprint(self, "Press jump or fire to stay connected.\n");
                 }

@@ -607,6 +607,10 @@ void () observer_start =
 	}
 
 	self.style = self.style | CLANRING_OBSERVER;
+	team_info_reset_receiver_state();
+	self.hud_last_sig_ctf = -1;
+	self.hud_last_sig_observer = -1;
+	self.hud_obs_skip_count = 0;
 
 	setcolour(self, 0, 0);
 	stuffcmd(self, "color 0\n");
@@ -668,9 +672,7 @@ void () observer_start =
 		{
 			setcolour(self,self.team2,0);
 			tmp = ftos(self.team2);
-			stuffcmd(self,";color ");
-			stuffcmd(self,tmp);
-			stuffcmd(self,",0;\n");
+			stuffcmd(self, strcat(";color ", tmp, ",0;\n"));
 		}
 		else
 		{
@@ -773,6 +775,9 @@ void () observer_start =
 	if (self.style & CLANRING_HEADS_UP)
 		stuffcmd(self, "viewsize 120\n");
 
+	// Observer transitions rewrite sent stats/items/position semantics.
+	team_info_mark_target_dirty(self);
+
 	// Check to see if anyone was observing this client
 	observer_disconnect_notify(self);	
 };
@@ -788,6 +793,11 @@ void() observer_end =
 
 	if (!(self.style & CLANRING_OBSERVER))
 		return;
+
+	team_info_reset_receiver_state();
+	self.hud_last_sig_ctf = -1;
+	self.hud_last_sig_observer = -1;
+	self.hud_obs_skip_count = 0;
 
 	if (mode_is_arena())
 	{
@@ -1847,6 +1857,14 @@ void () observer_check_size =
 //  Q, O, R are the quad, ring and suit flags.  The suit flag is not really
 //  an R; it's some weird quake symbol.
 //
+float (float sig, float value) observer_hud_sig_mix =
+{
+	sig = floor(sig * 131 + value + 19);
+	if (sig >= 16000000)
+		sig = sig - floor(sig / 16000000) * 16000000;
+	return sig;
+};
+
 void () observer_update_display =
 {
 	local entity player;	// CRMOD cameras
@@ -1864,11 +1882,35 @@ void () observer_update_display =
 
 	if (self.style & CLANRING_HEADS_UP)
     {		
+		local float sig = 29;
 		player = self.movetarget;
 		// CRMOD account for cameras
 		if ((player != world) && (player.classname == "clanring_camera"))
 			player = player.movetarget;
-    
+
+		if (!player || player == world)
+		{
+			self.hud_last_sig_observer = -1;
+			self.hud_obs_skip_count = 0;
+			return;
+		}
+
+		sig = observer_hud_sig_mix(sig, num_for_edict(player));
+		sig = observer_hud_sig_mix(sig, self.statstate);
+		sig = observer_hud_sig_mix(sig, player.weapon);
+		sig = observer_hud_sig_mix(sig, player.items);
+		sig = observer_hud_sig_mix(sig, floor(bound(0, player.armorvalue, 999)));
+		sig = observer_hud_sig_mix(sig, floor(bound(0, player.health, 999)));
+		sig = observer_hud_sig_mix(sig, floor(bound(0, player.currentammo, 999)));
+
+		if (sig == self.hud_last_sig_observer && self.hud_obs_skip_count < 5)
+		{
+			self.hud_obs_skip_count = self.hud_obs_skip_count + 1;
+			return;
+		}
+		self.hud_obs_skip_count = 0;
+		self.hud_last_sig_observer = sig;
+	    
 		local string w="", armour="", aval="", healthammo="", ammo="", pad_top="";
         w = strings_get_weapon(player);
         armour = strings_get_armour_type(player);
@@ -2222,6 +2264,8 @@ void () observer_pre_think =
 //
 //  Called from PlayerPostThink in Client.qc
 //
+.float observer_status_time;
+
 void () observer_post_think =
 {
 	if (!gameover)
@@ -2268,9 +2312,18 @@ void () observer_post_think =
 		//         compared to movetarget's in tourney and auto modes
 		//         to see if movetarget was damaged
         
-		// Update the status bar every frame
-		if (!(self.style & CLANRING_HEADS_UP))
-			observer_update_status_bar();
+			// Keep demo POV sync at full rate (weaponframe/weaponmodel),
+			// but throttle other observer modes to reduce per-frame overhead.
+			if (!(self.style & CLANRING_HEADS_UP))
+			{
+				if (self.oflags & OBSERVER_DEMO)
+					observer_update_status_bar();
+				else if (time >= self.observer_status_time)
+				{
+					self.observer_status_time = time + 0.1;
+					observer_update_status_bar();
+				}
+			}
 
 		// Update the heads up display every 0.5 seconds
 		if (time > self.delay)

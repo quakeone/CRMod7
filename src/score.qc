@@ -41,7 +41,7 @@ void () score_check_sudden_death =
 	if (clanring_winning_teamname != CLANRING_STRING_TIED)
 		match_end();
 	else
-		bprint("ù–Ï·˘†œÓ°ü\n");
+		bprint("\x9D\xD0\xEC\xE1\xF9\xA0\xCF\xEE\xA1\x9F\n");
 };
 
 //

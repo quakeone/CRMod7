@@ -195,7 +195,7 @@ float () vote_majority =
 //
 void() vote_repeat =
 {
-	bprint5((clanring_request.owner.netname)," ςερυεστσ το \b", clanring_request.wad, clanring_request.map, "\n");
+	bprint5((clanring_request.owner.netname)," \xF2\xE5\xF1\xF5\xE5\xF3\xF4\xF3\xA0\xF4\xEF \b", clanring_request.wad, clanring_request.map, "\n");
 	bprint("Type \byes\b or \bno\b in console to vote\n");
 	sound (world, CHAN_AUTO, "misc/talk.wav", 1, ATTN_NONE);
 	clanring_request.nextthink = time + 7;
@@ -224,7 +224,7 @@ void() vote_accept =
 
 void() vote_reject =
 {
-	bprint("Φοτε γαξγεμμεδ\n");
+	bprint("\xD6\xEF\xF4\xE5\xA0\xE3\xE1\xEE\xE3\xE5\xEC\xEC\xE5\xE4\n");
 	sound (world, CHAN_AUTO, "misc/talk.wav", 1, ATTN_NONE);
 	clanring_request.th_die ();
 	remove(clanring_request);

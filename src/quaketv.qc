@@ -18,9 +18,7 @@ void (string soundname) quaketv_sound =
 	{
 		if ((o.style & CLANRING_CONNECTED) && (o.style & CLANRING_OBSERVER) && (o.oflags & OBSERVER_COMMENTARY))
 		{
-			stuffcmd(o, "play ");
-			stuffcmd(o, soundname);
-			stuffcmd(o, "\n");
+			stuffcmd(o, strcat("play ", soundname, "\n"));
 		}
 		o = find(o, classname, "player");
 	}

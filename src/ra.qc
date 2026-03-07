@@ -1,3 +1,5 @@
+void (float value) clanring_set_fraglimit;
+
 void () rocket_arena_init_world =
 {
 	boss 				= spawn ();
@@ -30,7 +32,7 @@ void () rocket_arena_init_world =
 	boss.aborted 		= FALSE;
 
 	ra_initial_rules_shown = FALSE;
-	ra_wins = 10;
+	clanring_set_fraglimit(cvar("fraglimit"));
 };
 
 string() ra_get_next_map =
@@ -346,9 +348,7 @@ void() ra_join_queue =
 
 	setcolour(self,self.team2,0);
 
-	stuffcmd(self,";color ");
-	stuffcmd(self,tmp);
-	stuffcmd(self," 0;\n");
+	stuffcmd(self, strcat(";color ", tmp, " 0;\n"));
 
 	ready_name();
 
@@ -589,9 +589,7 @@ void () ra_spawn_players =
 					}
 					setcolour(self,self.team2,self.team2);
 					tmpc = ftos(self.team2);
-					stuffcmd(self,";color ");
-					stuffcmd(self,tmpc);
-					stuffcmd(self,";\n");
+					stuffcmd(self, strcat(";color ", tmpc, ";\n"));
 					self = tmp;
 				}
 				player.dmg_given_round = 0;

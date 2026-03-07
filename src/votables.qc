@@ -62,7 +62,6 @@ void() votables_send_aliases =
 	// timelimit aliases
 	stuffcmd(self, "alias timeset cmd timeset\n");
 	stuffcmd(self, "alias otset impulse 216\n");
-	stuffcmd(self, "alias fragset impulse 219\n");
 	// Quad, Pent, Ring aliases
 	stuffcmd(self, "alias setquad impulse 221\n");
 	stuffcmd(self, "alias setpent impulse 222\n");
@@ -377,7 +376,16 @@ void() votables_set_gametype_mode_map =
 	if (clanring_state & CLANRING_MATCH_STARTED)
 		return;
 
+	local float old_type_flags = 0, new_type_flags = 0;
 	local string newmapname = "", request_mapname = "";
+
+	old_type_flags = clanring_playmode
+		& (CLANRING_CAPTURE_THE_FLAG
+			| CLANRING_CA_MODE
+			| CLANRING_RA_MODE
+			| CLANRING_DMM4_MODE
+			| CLANRING_AIRSHOT_MODE
+			| CLANRING_WIPEOUT_MODE);
 
 	if (request_gametype >= 0)
 	{
@@ -478,6 +486,28 @@ void() votables_set_gametype_mode_map =
 			bprint("gametype set to ctf dmm4\n");
 
 			newmapname = "ctf8dmm4";
+		}
+
+		new_type_flags = clanring_playmode
+			& (CLANRING_CAPTURE_THE_FLAG
+				| CLANRING_CA_MODE
+				| CLANRING_RA_MODE
+				| CLANRING_DMM4_MODE
+				| CLANRING_AIRSHOT_MODE
+				| CLANRING_WIPEOUT_MODE);
+
+		// Keep alt ents scoped to the current mode family; reset on gametype switch.
+		if (old_type_flags != new_type_flags && (clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS))
+		{
+			clanring_gameconfig = clanring_gameconfig - (clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS);
+
+			if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+				cvar_set("external_ents_dir", "ctf");
+			else
+				cvar_set("external_ents_dir", "");
+
+			bprint("Alternative entity set reset to standard for mode switch\n");
+			utils_set_cvar("gamecfg", clanring_gameconfig);
 		}
 
 		utils_set_cvar ("samelevel", clanring_playmode);
@@ -1158,7 +1188,13 @@ void() votables_get_fraglimit =
 };
 void() votables_select_fraglimit =
 {
-	if ((clanring_playmode & CLANRING_AIRSHOT_MODE) || (clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_RA_MODE))
+	// Rocket Arena: allow fraglimit vote menu at any time.
+	if (clanring_playmode & CLANRING_RA_MODE)
+	{
+	}
+	// Allow Rocket Arena fraglimit votes while rounds are active.
+	// Keep the in-progress lock for modes that rely on fixed live-round limits.
+	else if ((clanring_playmode & CLANRING_AIRSHOT_MODE) || (clanring_playmode & CLANRING_DMM4_MODE))
 	{
 		if ((boss != world) && (boss.state == CA_MATCH_PLAYING))
 		{
@@ -1907,6 +1943,13 @@ void() DropRune;
 
 void() votables_set_runes =
 {
+	local float is_pub_ctf;
+
+	is_pub_ctf = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+		&& (clanring_playmode & CLANRING_NORMAL_MODE)
+		&& !(clanring_playmode & CLANRING_MATCH_MODE)
+		&& !(clanring_playmode & CLANRING_PRACTICE_MODE);
+
 	if (clanring_playmode & CLANRING_RUNES)
 	{		
 		utils_do_players(DropRune);
@@ -1914,6 +1957,8 @@ void() votables_set_runes =
 		bprint("Runes Disabled\n");		
 		clanring_playmode = (clanring_playmode - (clanring_playmode & CLANRING_RUNES));
 		utils_set_cvar("samelevel", clanring_playmode);
+		if (is_pub_ctf)
+			cvar_set("cr_pubctf_runes_override", "0");
 	}
 	else
 	{	
@@ -1921,6 +1966,8 @@ void() votables_set_runes =
 		bprint("Runes Enabled\n");
 		clanring_playmode = (clanring_playmode | CLANRING_RUNES);
 		utils_set_cvar("samelevel", clanring_playmode);
+		if (is_pub_ctf)
+			cvar_set("cr_pubctf_runes_override", "1");
 	}
 };
 

@@ -14,6 +14,10 @@ string(float want_match_record) stats_format_captime_record;
 float(float team) ctf_trial_get_top_record;
 float(float team) ctf_match_get_top_record;
 
+// Prevent duplicate Discord stats sends when stats_autodump is triggered
+// multiple times around intermission/match-over paths.
+float stats_webhook_next_allowed_time;
+
 //
 //  Format capture-time record line, with disk fallback if needed.
 //
@@ -194,6 +198,7 @@ void() stats_reset_player =
 	self.stats_avenge_teammate = 0;
 	self.stats_teamkill_quad = 0;
 	self.stats_powerup_denial_quad = 0;
+	self.stats_quad_secure = 0;
 	self.strategic_returns = 0;
 	self.fcarries_time = 0;
 	self.flag_carry_start = 0;
@@ -222,8 +227,8 @@ void() stats_show_badstats =
 	sprint(self, "\bbad stuff\n");
 	sprint(self, "\n");
 
-	sprint(self, " paks ü self ü team ü lava ü axe  ü fall ü      name\n");
-	sprint(self, "­­­­­­«­­­­­­«­­­­­­«­­­­­­«­­­­­­«­­­­­­«­­­­­­­­­­­­­­­­\n");
+	sprint(self, " paks \xFC self \xFC team \xFC lava \xFC axe  \xFC fall \xFC      name\n");
+	sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
 	player = clanring_sentinel.next_player;
 	while (player)
 	{
@@ -233,33 +238,33 @@ void() stats_show_badstats =
 		{
 			sprint(self, " \x90");
 			utils_print_int3(player.clanring_badstats_x);
-			sprint(self, "‘ü \x90");
+			sprint(self, "\x91\xFC \x90");
 			stats_print_percent3(player.clanring_badstats_y, tot_done);
-			sprint(self, "‘ü \x90");
+			sprint(self, "\x91\xFC \x90");
 			stats_print_percent3(player.clanring_badstats_z, tot_done);
-			sprint(self, "‘ü \x90");
+			sprint(self, "\x91\xFC \x90");
 			utils_print_int3(player.clanring_badstats2_x);
-			sprint(self, "‘ü \x90");
+			sprint(self, "\x91\xFC \x90");
 			utils_print_int3(player.clanring_badstats2_y);
-			sprint(self, "‘ü \x90");
+			sprint(self, "\x91\xFC \x90");
 			utils_print_int3(player.clanring_badstats2_z);
-			sprint(self, "‘ü ");
+			sprint(self, "\x91\xFC ");
 		}
 		else
 		{
 			sprint(self, "  ");
 			utils_print_int3(player.clanring_badstats_x);
-			sprint(self, " ü  ");
+			sprint(self, " \xFC  ");
 			stats_print_percent3(player.clanring_badstats_y, tot_done);
-			sprint(self, " ü  ");
+			sprint(self, " \xFC  ");
 			stats_print_percent3(player.clanring_badstats_z, tot_done);
-			sprint(self, " ü  ");
+			sprint(self, " \xFC  ");
 			utils_print_int3(player.clanring_badstats2_x);
-			sprint(self, " ü  ");
+			sprint(self, " \xFC  ");
 			utils_print_int3(player.clanring_badstats2_y);
-			sprint(self, " ü  ");
+			sprint(self, " \xFC  ");
 			utils_print_int3(player.clanring_badstats2_z);
-			sprint(self, " ü ");
+			sprint(self, " \xFC ");
 		}
 		sprint2(self, player.netname, "\n");
 		player = player.next_player;
@@ -285,8 +290,8 @@ void() stats_show_quadstats =
 	sprint(self, "\n");
 	sprint(self, "\bquad damage\b\n");
 	sprint(self, "\n");
-	sprint(self,   "quadsütimeüeffüoppüslfütm ü     name\n");
-	sprint(self, "\b-----+----+---+---+---+---+---------------­­­­\n");
+	sprint(self,   "quads\xFCtime\xFCeff\xFCopp\xFCslf\xFCtm \xFC     name\n");
+	sprint(self, "\b-----+----+---+---+---+---+---------------\xAD\xAD\xAD\xAD\n");
 	player = clanring_sentinel.next_player;
 	pteam = player.next_team;
 	while (player)
@@ -295,30 +300,30 @@ void() stats_show_quadstats =
 		{
 			sprint(self, "\x90");
 			utils_print_int3(player.clanring_qdwep_z);
-			sprint(self, "‘ü ");
+			sprint(self, "\x91\xFC ");
 		}
 		else
 		{
 			sprint(self, " ");
 			utils_print_int3(player.clanring_qdwep_z);
-			sprint(self, " ü ");
+			sprint(self, " \xFC ");
 		}
 		utils_print_int3(player.totalquad);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		stats_print_percent3(player.clanring_qdwep_x, player.clanring_qdwep_y);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.clanring_qdkill_x);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.clanring_qdkill_z);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.clanring_qdkill_y);
-		sprint3(self, "ü", player.netname, "\n");
+		sprint3(self, "\xFC", player.netname, "\n");
 		player = player.next_player;
 		if (useteams && (player.next_team != pteam))
 		{
 			sprint(self, " ");
 			utils_print_int3_gold(pteam.dest2_x);
-			sprint3(self, " ü    ü   ü   ü   ü   ü", pteam.mdl, "\n");
+			sprint3(self, " \xFC    \xFC   \xFC   \xFC   \xFC   \xFC", pteam.mdl, "\n");
 			pteam = player.next_team;
 		}
 	}
@@ -342,8 +347,8 @@ void() stats_show_pentstats =
 	sprint(self, "\n");
 	sprint(self, "\bpent protection\b\n");
 	sprint(self, "\n");
-	sprint(self, "pentsüeffüoppütm ü     name\n");
-	sprint(self, "­­­­­«­­­«­­­«­­­«­­­­­­­­­­­­­­­\n");
+	sprint(self, "pents\xFCeff\xFCopp\xFCtm \xFC     name\n");
+	sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
 	player = clanring_sentinel.next_player;
 	pteam = player.next_team;
 	while (player)
@@ -352,26 +357,26 @@ void() stats_show_pentstats =
 		{
 			sprint(self, "\x90");
 			utils_print_int3(player.clanring_ptwep_z);
-			sprint(self, "‘ü");
+			sprint(self, "\x91\xFC");
 		}
 		else
 		{
 			sprint(self, " ");
 			utils_print_int3(player.clanring_ptwep_z);
-			sprint(self, " ü");
+			sprint(self, " \xFC");
 		}
 		stats_print_percent3(player.clanring_ptwep_x, player.clanring_ptwep_y);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.clanring_ptkill_x);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.clanring_ptkill_y);
-		sprint3(self, "ü", player.netname, "\n");
+		sprint3(self, "\xFC", player.netname, "\n");
 		player = player.next_player;
 		if (useteams && (player.next_team != pteam))
 		{
 			sprint(self, " ");
 			utils_print_int3_gold(pteam.dest2_y);
-			sprint3(self, " ü   ü   ü   ü", pteam.mdl, "\n");
+			sprint3(self, " \xFC   \xFC   \xFC   \xFC", pteam.mdl, "\n");
 			pteam = player.next_team;
 		}
 	}
@@ -388,7 +393,7 @@ void() stats_show_killstats =
 	sprint(self, "\n");
 	sprint(self, "\bkills\b\n");
 	sprint(self, "\n");
-	sprint(self, "fragsüoppüavngüslfütm ükldü dcü dtk ü dgv ü ewp ü     name\n");
+	sprint(self, "frags\xFCopp\xFCavng\xFCslf\xFCtm \xFCkld\xFC dc\xFC dtk \xFC dgv \xFC ewp \xFC     name\n");
 	sprint(self, "\b-----+---+----+---+---+---+---+-----+-----+-----+---------------\n");
 	
 	player = clanring_sentinel.next_player;
@@ -401,32 +406,32 @@ void() stats_show_killstats =
 		{
 			sprint(self, "\x90");
 			utils_print_int3(player.frags);
-			sprint(self, "‘ü");
+			sprint(self, "\x91\xFC");
 		}
 		else
 		{
 			sprint(self, " ");
 			utils_print_int3(player.frags);
-			sprint(self, " ü");
+			sprint(self, " \xFC");
 		}
 		utils_print_int3(player.true_kills);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		sprint(self, sprintf("%4g",player.stats_avenge_teammate));
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.mangle_x);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.mangle_y);//FIXME: teamkills doesnt account for discharging (ctf)
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.mangle_z);//FIXME: killed doesnt account for discharging (ctf)
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_int3(player.stats_discharge_kills);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_damage_gold(player.dmg_taken);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_damage_gold(player.dmg_given);
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		utils_print_damage_gold(player.ewep);
-		sprint3(self, "ü", player.netname, "\n");
+		sprint3(self, "\xFC", player.netname, "\n");
 		player = player.next_player;
 		c -= 1;
 	}
@@ -522,8 +527,8 @@ void () stats_show_efficiency =
     local float fpm;
 
     sprint(self, "\n");
-    sprint(self, "bulünlsüroxülg ütotalüfpm ü     name\n");
-    sprint(self, "­­­«­­­«­­­«­­­«­­­­­«­­­­«­­­­­­­­­­­­­­­\n");
+    sprint(self, "bul\xFCnls\xFCrox\xFClg \xFCtotal\xFCfpm \xFC     name\n");
+    sprint(self, "\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
     player = find(world,classname, "player");
     while (player)
     {
@@ -531,13 +536,13 @@ void () stats_show_efficiency =
             (!(mode_is_arena()) && !(player.style & CLANRING_OBSERVER)))
         {
             stats_print_percent3(player.dest2_x, player.dest1_x);
-            sprint(self, "ü");
+            sprint(self, "\xFC");
             stats_print_percent3(player.dest2_y, player.dest1_y);
-            sprint(self, "ü");
+            sprint(self, "\xFC");
             stats_print_percent3(player.dest_y, player.dest_x);
-            sprint(self, "ü");
+            sprint(self, "\xFC");
             stats_print_percent3(player.dest2_z, player.dest1_z);
-            sprint(self, "ü");
+            sprint(self, "\xFC");
             tot_fired = player.dest1_x + player.dest1_y + player.dest1_z + player.dest_x;
             tot_done = player.dest2_x + player.dest2_y + player.dest2_z + player.dest_y;
             
@@ -551,21 +556,21 @@ void () stats_show_efficiency =
 			{
 				sprint(self, " ");
 				stats_print_percent3(tot_done, tot_fired);
-				sprint(self, " ü");
+				sprint(self, " \xFC");
 				if (fpm < 10)
 					sprint(self, " ");
 				sprint(self, sprintf("%.1f", fpm));
-				sprint(self, "ü");
+				sprint(self, "\xFC");
 			}
 			else
 			{
 				sprint(self, " ");
 				stats_print_percent3(tot_done, tot_fired);
-				sprint(self, " ü");
+				sprint(self, " \xFC");
 				if (fpm < 10)
 					sprint(self, " ");
 				sprint(self, sprintf("%.1f", fpm));
-				sprint(self, "ü");
+				sprint(self, "\xFC");
 			}
             sprint2(self, player.netname, "\n");
         }
@@ -711,13 +716,13 @@ void () stats_show_summary =
 	sprint(self, "\n");
 	if (useteams)
 	{
-		sprint(self, "   team  ükill üweapnü     name\n");
-		sprint(self, "­­­­­­­­­«­­­­­«­­­­­«­­­­­­­­­­­­­­­\n");
+		sprint(self, "   team  \xFCkill \xFCweapn\xFC     name\n");
+		sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
 	}
 	else
 	{
-		sprint(self, "kill üweapnü     name\n");
-		sprint(self, "­­­­­«­­­­­«­­­­­­­­­­­­­­­\n");
+		sprint(self, "kill \xFCweapn\xFC     name\n");
+		sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
 	}
 
 	if (mode_is_arena())
@@ -736,7 +741,7 @@ void () stats_show_summary =
 			if (useteams)
 			{
 				teamname = strings_get_teamname3(player.height);
-				sprint2(self, teamname, " ü");
+				sprint2(self, teamname, " \xFC");
 			}
 			kfrac = player.true_kills;
 			ktot = kfrac + player.mangle_z;
@@ -746,17 +751,17 @@ void () stats_show_summary =
 			{
 				sprint(self, "\x90");
 				stats_print_percent3(kfrac, ktot);
-				sprint(self, "‘ü\x90");
+				sprint(self, "\x91\xFC\x90");
 				stats_print_percent3(wfrac, wtot);
-				sprint(self, "‘ü");
+				sprint(self, "\x91\xFC");
 			}
 			else
 			{
 				sprint(self, " ");
 				stats_print_percent3(kfrac, ktot);
-				sprint(self, " ü ");
+				sprint(self, " \xFC ");
 				stats_print_percent3(wfrac, wtot);
-				sprint(self, " ü");
+				sprint(self, " \xFC");
 			}
 			sprint2(self, player.netname, "\n");
 		}
@@ -882,15 +887,15 @@ void (vector v) stats_format_vector =
 {
 	local string s;
 
-	sprint(self, "ü");
+	sprint(self, "\xFC");
 	if (v_x < 10)
 		sprint(self, " ");
 	s = ftos(v_x);
-	sprint(self, s, "Ž");
+	sprint(self, s, "\x8E");
 	if (v_y < 10)
 		sprint(self, " ");
 	s = ftos(v_y);
-	sprint(self, s, "Ž");
+	sprint(self, s, "\x8E");
 	if (v_z < 10)
 		sprint(self, " ");
 	s = ftos(v_z);
@@ -931,57 +936,57 @@ void() stats_show_teamstats =
 	while (pteam)
 	{
 		s = strings_get_teamname3(pteam.height);
-		sprint2(self, "ü", s);
+		sprint2(self, "\xFC", s);
 		pteam = pteam.next_team;
 	}
-	sprint(self, "\n­­­­­­­­­­");
+	sprint(self, "\n\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
 	{
-		sprint(self, "«­­­­­­­­");
+		sprint(self, "\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD");
 		pteam = pteam.next_team;
 	}
-	sprint(self, "\nQŽ˜˜˜Žring");
+	sprint(self, "\nQ\x8E\x98\x98\x98\x8Ering");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
 	{
 		stats_format_vector(pteam.dest2);
 		pteam = pteam.next_team;
 	}
-	sprint(self, "\nRLŽLGŽGL  ");
+	sprint(self, "\nRL\x8ELG\x8EGL  ");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
 	{
 		stats_format_vector(pteam.dest1);
 		pteam = pteam.next_team;
 	}
-	sprint(self, "\nSNGŽNGŽMH ");
+	sprint(self, "\nSNG\x8ENG\x8EMH ");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
 	{
 		stats_format_vector(pteam.pos1);
 		pteam = pteam.next_team;
 	}
-	sprint(self, "\nRAŽYAŽGA  ");
+	sprint(self, "\nRA\x8EYA\x8EGA  ");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
 	{
 		stats_format_vector(pteam.dest);
 		pteam = pteam.next_team;
 	}
-	sprint(self, "\nrlpak +/- ");
+	sprint(self, "\nrlpak\xA0+/- ");
 	pteam = clanring_sentinel.next_team;
 	while (pteam)
 	{
-		sprint(self, "ü");
+		sprint(self, "\xFC");
 		s = ftos(pteam.mangle_y);
 		if (pteam.mangle_y < 10)
 			sprint(self, " ");
-		sprint3(self, "«", s, " ");
+		sprint3(self, "\xAB", s, " ");
 		s = ftos(pteam.mangle_z);
 		if (pteam.mangle_z < 10)
 			sprint(self, " ");
-		sprint3(self, "­", s, " ");
+		sprint3(self, "\xAD", s, " ");
 		pteam = pteam.next_team;
 	}
 
@@ -993,7 +998,7 @@ void() stats_show_teamstats =
 		control = 100 * pteam.mangle_x / clanring_sentinel.cnt;
 		f = floor(control);
 		s = ftos(f);
-		sprint2(self, "ü  %", s);
+		sprint2(self, "\xFC  %", s);
 		f = floor((control - f) * 10);
 		s = ftos(f);
 		sprint3(self, ".", s, " ");
@@ -1241,12 +1246,13 @@ float (entity p) Q1_PER_Calc_Eff =
    
     resources_raw =
         quad_term
+      + 0.75 * p.stats_quad_secure                 // Quad secures (kills while holding quad)
       + 5.0 * p.clanring_ptwep_z                  // Pents taken
       + 1.0 * p.stats_item_ring
       + 0.30 * p.stats_item_redarmor
       + 0.10 * p.stats_item_yellowarmor
       + 0.15 * p.stats_item_mega
-      + 0.20 * p.stats_item_rl        
+      + 0.20 * p.stats_item_rl
       + 0.20 * p.stats_item_lg;
 
 
@@ -1352,7 +1358,7 @@ void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 	else
 		q_eff_pct = 0;
 
-	// insertion helper (inline) — maintain top1/top2/top3 by value
+	// insertion helper (inline) - maintain top1/top2/top3 by value
 	#define TRY_PUSH(_val, _label) \
 		do { \
 			v = (_val) / mins_norm; \
@@ -1379,6 +1385,8 @@ void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 	// ---- Resources atomic terms ----
 	TRY_PUSH( quad_term,
 	          sprintf("quad control conversion (%gs total; %g quad pickups; %g%% eff)", floor(p.totalquad + 0.5), p.clanring_qdwep_z, q_eff_pct) );
+	TRY_PUSH( 0.75 * p.stats_quad_secure,
+	          sprintf("quad secures (%g)", p.stats_quad_secure) );
 	TRY_PUSH( 5.0 * p.clanring_ptwep_z,
 	          sprintf("Pents taken (%g)", p.clanring_ptwep_z) );
 	TRY_PUSH( 1.0 * p.stats_item_ring,
@@ -1430,6 +1438,7 @@ void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 			+ res_term;
 		resources_raw =
 			  quad_term
+			+ 0.75 * p.stats_quad_secure
 			+ 5.0 * p.clanring_ptwep_z
 			+ 1.0 * p.stats_item_ring
 			+ 0.30 * p.stats_item_redarmor
@@ -1449,7 +1458,7 @@ void(entity towhom, entity p, float mins_norm) PER_PrintTop3Reasons =
 				+ 1.0 * p.fcdefenses;
 
 		// push the three category totals (largest first naturally by value)
-		// (not thresholded—these are intentional fallbacks)
+		// (not thresholded - these are intentional fallbacks)
 		top1 = combat_raw / mins_norm; r1 = "combat impact";
 		top2 = resources_raw / mins_norm; r2 = "resource control";
 		top3 = objectives_raw / mins_norm; r3 = "objectives";
@@ -1470,7 +1479,7 @@ void() stats_show_per =
     local float match_secs, mins_norm;
     local entity bestp;
     local float best_per_min, best_mins_norm;
-    local float best_is_valid; // 0/1 — only show reasons if leader wasn't short+empty
+    local float best_is_valid; // 0/1 - only show reasons if leader wasn't short+empty
     local float short_and_empty;
 
     // Header
@@ -1507,9 +1516,9 @@ void() stats_show_per =
             if (final_per < 0.1) final_per = 0.1;
 
             if (p == self)
-                sprint(self, sprintf("\x90%5.1f\x91 ü %s\n", final_per, p.netname));
+                sprint(self, sprintf("\x90%5.1f\x91 \xFC %s\n", final_per, p.netname));
             else
-                sprint(self, sprintf(" %5.1f  ü %s\n", final_per, p.netname));
+                sprint(self, sprintf(" %5.1f  \xFC %s\n", final_per, p.netname));
 
             // Track top PER/min player
             // Only consider as a valid "leader" if not a short+empty stint.
@@ -1646,9 +1655,16 @@ void() stats_autodump =
         if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
             msg = strcat(msg, sprintf("%s set a new match capture record!\n", clanring_new_record_player));
 
-        // Defer the post: PREP = webhook_stats_info, CONTENT = msg
+        // Defer the post: PREP = webhook_stats_info, CONTENT = msg.
+        // Throttle so multiple stats_autodump passes don't duplicate posts.
         if (!(clanring_timelimit > 0 && match_aborted_too_early()))
-            webhook_post_deferred(webhook_stats_info, msg);
+        {
+            if (time >= stats_webhook_next_allowed_time)
+            {
+                stats_webhook_next_allowed_time = time + 90.0;
+                webhook_post_deferred(webhook_stats_info, msg);
+            }
+        }
 
 };
 

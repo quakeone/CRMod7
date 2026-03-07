@@ -11,6 +11,11 @@ void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_re
 void (float t_statvalue, float t_teamcolor, string t_player) check_player_low_record2;
 void() match_bprint_score;
 float(entity e) client_ping;
+void() gsheets_read_capture_stats;
+float() gsheets_configured;
+float() gsheets_read_started_current_map;
+float() gsheets_trial_records_ready_current_map;
+float() gsheets_match_records_ready_current_map;
 
 // Returns 1 if a top time-trial record exists for (current map, team).
 // On success, sets tt_top_time (float seconds) and tt_top_player (string).
@@ -18,190 +23,227 @@ float(float team) ctf_trial_get_top_record;
 float(float team) ctf_match_get_top_record;
 
 // Returns 1 if a top time-trial record exists for (current map, team).
+// If team <= 0, searches all teams (global top record).
 // On success, sets tt_top_time (float seconds) and tt_top_player (string).
 float(float team) ctf_trial_get_top_record =
 {
-    local float i, best_time, have_mem;
-    local string best_player;
+	local float i, best_time, have_mem;
+	local string best_player;
 
-    best_time = 999999;
-    best_player = "";
-    have_mem = FALSE;
+	// If Google Sheets is configured, only use records after Sheets finishes
+	// loading for this map (never compare against local fallback first).
+	if (gsheets_configured())
+	{
+		if (!gsheets_read_started_current_map())
+		{
+			gsheets_read_capture_stats();
+			tt_top_time = 0;
+			tt_top_player = "";
+			return FALSE;
+		}
+		if (!gsheets_trial_records_ready_current_map())
+		{
+			tt_top_time = 0;
+			tt_top_player = "";
+			return FALSE;
+		}
+	}
 
-    // --- Fix: scan ALL loaded records; choose the MIN statvalue for this team
-    for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i = i + 1)
-    {
-        if (playerrecord[i].statvalue > 0 && playerrecord[i].teamcolor == team)
-        {
-            if (playerrecord[i].statvalue < best_time)
-            {
-                best_time = playerrecord[i].statvalue;
-                best_player = playerrecord[i].player; // pointer; already zoned by loader
-                have_mem = TRUE;
-            }
-        }
-    }
+	best_time = 999999;
+	best_player = "";
+	have_mem = FALSE;
 
-    // If nothing in memory, fall back to reading from disk
-    if (!have_mem)
-    {
-        local string filename = sprintf("%s_captimes.crx", mapname);
-        local filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
-        if (f < 0)
-            f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
+	// Scan all loaded records; choose the minimum time.
+	for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i = i + 1)
+	{
+		if (playerrecord[i].statvalue > 0 && (team <= 0 || playerrecord[i].teamcolor == team))
+		{
+			if (playerrecord[i].statvalue < best_time)
+			{
+				best_time = playerrecord[i].statvalue;
+				best_player = playerrecord[i].player;
+				have_mem = TRUE;
+			}
+		}
+	}
 
-        if (f >= 0)
-        {
-            local string line, player_name, meta_line;
-            local float team_color, time_value;
+	// Local disk fallback is only allowed when Google Sheets is not configured.
+	if (!have_mem && !gsheets_configured())
+	{
+		local string filename = sprintf("%s_captimes.crx", mapname);
+		local filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
+		if (f < 0)
+			f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
 
-            while (TRUE)
-            {
-                line = fgets(f);
-                if (!line) break;
+		if (f >= 0)
+		{
+			local string line, player_name, meta_line;
+			local float team_color, time_value;
 
-                // Player line
-                if (line == "" || substring(line,0,2) == "//") // skip blank/comment
-                    continue;
+			while (TRUE)
+			{
+				line = fgets(f);
+				if (!line) break;
 
-                player_name = strtrim(line);
+				// Player line
+				if (line == "" || substring(line,0,2) == "//") // skip blank/comment
+					continue;
 
-                // Team and time lines
-                line = fgets(f); if (!line) break;
-                team_color = stof(line);
+				player_name = strtrim(line);
 
-                line = fgets(f); if (!line) break;
-                time_value = stof(line);
+				// Team and time lines
+				line = fgets(f); if (!line) break;
+				team_color = stof(line);
 
-                // Optional meta line (consume if present)
-                meta_line = fgets(f);
-                if (meta_line)
-                {
-                    local float argc = tokenize(meta_line);
-                    if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
-                    {
-                        // Not a meta line; it's likely the next record's player line.
-                        // We can't unread; the next loop iteration will treat it as the player line.
-                        // (This matches previous behavior.)
-                        // No action needed.
-                    }
-                }
+				line = fgets(f); if (!line) break;
+				time_value = stof(line);
 
-                if (time_value > 0 && time_value < best_time && team_color == team)
-                {
-                    best_time = time_value;
-                    // ensure a zoned copy since file scope ends after close
-                    if (best_player != "") strunzone(best_player);
-                    best_player = strzone(player_name);
-                }
-            }
-            fclose(f);
-            if (best_time < 999999) have_mem = TRUE; // we found one on disk
-        }
-    }
+				// Optional meta line (consume if present)
+				meta_line = fgets(f);
+				if (meta_line)
+				{
+					local float argc = tokenize(meta_line);
+					if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
+					{
+						// Not a meta line; next loop handles it as the next record.
+					}
+				}
 
-    if (have_mem)
-    {
-        tt_top_time = best_time;
-        tt_top_player = best_player;
-        return TRUE;
-    }
+				if (time_value > 0 && time_value < best_time && (team <= 0 || team_color == team))
+				{
+					best_time = time_value;
+					// Ensure a zoned copy since file scope ends after close.
+					if (best_player != "") strunzone(best_player);
+					best_player = strzone(player_name);
+				}
+			}
+			fclose(f);
+			if (best_time < 999999) have_mem = TRUE;
+		}
+	}
 
-    tt_top_time = 0;
-    tt_top_player = "";
-    return FALSE;
+	if (have_mem)
+	{
+		tt_top_time = best_time;
+		tt_top_player = best_player;
+		return TRUE;
+	}
+
+	tt_top_time = 0;
+	tt_top_player = "";
+	return FALSE;
 };
 
 // Returns 1 if a top match capture record exists for (current map, team).
+// If team <= 0, searches all teams (global top record).
 // On success, sets tt_top_time (float seconds) and tt_top_player (string).
 float(float team) ctf_match_get_top_record =
 {
-    local float i, best_time, have_mem;
-    local string best_player;
+	local float i, best_time, have_mem;
+	local string best_player;
 
-    best_time = 999999;
-    best_player = "";
-    have_mem = FALSE;
+	// If Google Sheets is configured, only use records after Sheets finishes
+	// loading match records for this map (never compare against local fallback first).
+	if (gsheets_configured())
+	{
+		if (!gsheets_read_started_current_map())
+		{
+			gsheets_read_capture_stats();
+			tt_top_time = 0;
+			tt_top_player = "";
+			return FALSE;
+		}
+		if (!gsheets_match_records_ready_current_map())
+		{
+			tt_top_time = 0;
+			tt_top_player = "";
+			return FALSE;
+		}
+	}
 
-    // Look at in-memory match records first (playerrecord2)
-    for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i = i + 1)
-    {
-        if (playerrecord2[i].statvalue > 0 && playerrecord2[i].teamcolor == team)
-        {
-            if (playerrecord2[i].statvalue < best_time)
-            {
-                best_time = playerrecord2[i].statvalue;
-                best_player = playerrecord2[i].player; // pointer; already zoned by loader
-                have_mem = TRUE;
-            }
-        }
-    }
+	best_time = 999999;
+	best_player = "";
+	have_mem = FALSE;
 
-    // If nothing in memory, fall back to reading from disk
-    if (!have_mem)
-    {
-        local string filename = sprintf("%s_captimes_match.crx", mapname);
-        local filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
-        if (f < 0)
-            f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
+	// Look at in-memory match records first (playerrecord2).
+	for (i = 0; i < PLAYER_RECORDS_MAX_COUNT; i = i + 1)
+	{
+		if (playerrecord2[i].statvalue > 0 && (team <= 0 || playerrecord2[i].teamcolor == team))
+		{
+			if (playerrecord2[i].statvalue < best_time)
+			{
+				best_time = playerrecord2[i].statvalue;
+				best_player = playerrecord2[i].player;
+				have_mem = TRUE;
+			}
+		}
+	}
 
-        if (f >= 0)
-        {
-            local string line, player_name, meta_line;
-            local float team_color, time_value;
+	// Local disk fallback is only allowed when Google Sheets is not configured.
+	if (!have_mem && !gsheets_configured())
+	{
+		local string filename = sprintf("%s_captimes_match.crx", mapname);
+		local filestream f = fopen(sprintf("stats/%s", filename), FILE_READ);
+		if (f < 0)
+			f = fopen(sprintf("data/stats/%s", filename), FILE_READ);
 
-            while (TRUE)
-            {
-                line = fgets(f);
-                if (!line) break;
+		if (f >= 0)
+		{
+			local string line, player_name, meta_line;
+			local float team_color, time_value;
 
-                // Player line
-                if (line == "" || substring(line,0,2) == "//") // skip blank/comment
-                    continue;
+			while (TRUE)
+			{
+				line = fgets(f);
+				if (!line) break;
 
-                player_name = strtrim(line);
+				// Player line
+				if (line == "" || substring(line,0,2) == "//") // skip blank/comment
+					continue;
 
-                // Team and time lines
-                line = fgets(f); if (!line) break;
-                team_color = stof(line);
+				player_name = strtrim(line);
 
-                line = fgets(f); if (!line) break;
-                time_value = stof(line);
+				// Team and time lines
+				line = fgets(f); if (!line) break;
+				team_color = stof(line);
 
-                // Optional meta line (consume if present)
-                meta_line = fgets(f);
-                if (meta_line)
-                {
-                    local float argc = tokenize(meta_line);
-                    if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
-                    {
-                        // Not a meta line; next loop will treat it as player
-                    }
-                }
+				line = fgets(f); if (!line) break;
+				time_value = stof(line);
 
-                if (time_value > 0 && time_value < best_time && team_color == team)
-                {
-                    best_time = time_value;
-                    // ensure a zoned copy since file scope ends after close
-                    if (best_player != "") strunzone(best_player);
-                    best_player = strzone(player_name);
-                }
-            }
-            fclose(f);
-            if (best_time < 999999) have_mem = TRUE; // we found one on disk
-        }
-    }
+				// Optional meta line (consume if present)
+				meta_line = fgets(f);
+				if (meta_line)
+				{
+					local float argc = tokenize(meta_line);
+					if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
+					{
+						// Not a meta line; next loop handles it as the next record.
+					}
+				}
 
-    if (have_mem)
-    {
-        tt_top_time = best_time;
-        tt_top_player = best_player;
-        return TRUE;
-    }
+				if (time_value > 0 && time_value < best_time && (team <= 0 || team_color == team))
+				{
+					best_time = time_value;
+					// Ensure a zoned copy since file scope ends after close.
+					if (best_player != "") strunzone(best_player);
+					best_player = strzone(player_name);
+				}
+			}
+			fclose(f);
+			if (best_time < 999999) have_mem = TRUE;
+		}
+	}
 
-    tt_top_time = 0;
-    tt_top_player = "";
-    return FALSE;
+	if (have_mem)
+	{
+		tt_top_time = best_time;
+		tt_top_player = best_player;
+		return TRUE;
+	}
+
+	tt_top_time = 0;
+	tt_top_player = "";
+	return FALSE;
 };
 
 void(entity flg) RegenFlag =
@@ -337,11 +379,11 @@ void(entity flg) TeamDropFlag =
 		
 	if (p.team == RED)
 	{
-		announce2(p.netname," ìïóô the ÂÌÕÅ flag!"); // blue
+		announce2(p.netname," \xEC\xEF\xF3\xF4 the \xC2\xCC\xD5\xC5 flag!"); // blue
 	}
 	else
 	{
-		announce2(p.netname," ìïóô the ÒÅÄ flag!"); // red
+		announce2(p.netname," \xEC\xEF\xF3\xF4 the \xD2\xC5\xC4 flag!"); // red
 	}
 
 	p.fctime += (time - p.flag_since);
@@ -419,7 +461,7 @@ void(entity player, float reset) TeamCaptureDropFlagOfPlayer =
 void() TeamCaptureFlagTouch =
 {
 	local entity p;
-	local float compare, i=0, j=0, have_top;
+	local float compare, i=0, j=0, have_top, ping_ms;
 	
 	// CRX v2: Snapshot match timer BEFORE any other logic
 	local float match_seconds_remaining;
@@ -492,35 +534,40 @@ void() TeamCaptureFlagTouch =
 			if (other.flag_carrier==TRUE)
 			{				
 				if (other.team == RED)
-					announce2(other.netname," ãáðôõòåä the ÂÌÕÅ ÆÌÁÇ!");
+					announce2(other.netname," \xE3\xE1\xF0\xF4\xF5\xF2\xE5\xE4 the \xC2\xCC\xD5\xC5 \xC6\xCC\xC1\xC7!");
 				else
-					announce2(other.netname," ãáðôõòåä the ÒÅÄ ÆÌÁÇ!");
+					announce2(other.netname," \xE3\xE1\xF0\xF4\xF5\xF2\xE5\xE4 the \xD2\xC5\xC4 \xC6\xCC\xC1\xC7!");
 
 				compare = (time - other.lefty);//stop the clock
 				if (other.lefty > 0)
 				{
+					local float compare_ms, top_ms, diff_ms;
+					compare_ms = floor(compare * 1000 + 0.5);
+
 					// Unified TT/match capture time banner (mirrors time-trial output)
 					bprint("\bcapture time ");
 					bprint("[");
-					utils_bprint_time_plain(compare);  // White numbers for capture time
+					utils_bprint_time_plain(compare_ms / 1000);  // White numbers for capture time
 					bprint("]");
 					// Include (+/- diff vs record) when we have a top time
 					have_top = 0;
 					if (clanring_playmode & CLANRING_MATCH_MODE)
 					{
 						if (clanring_state & CLANRING_MATCH_STARTED)
-							have_top = ctf_match_get_top_record(other.team);
+							have_top = ctf_match_get_top_record(0);
 						else
-							have_top = ctf_trial_get_top_record(other.team);
+							have_top = ctf_trial_get_top_record(0);
 					}
 					else
-						have_top = ctf_trial_get_top_record(other.team);
+						have_top = ctf_trial_get_top_record(0);
 					if (have_top)
 					{
+						top_ms = floor(tt_top_time * 1000 + 0.5);
+						diff_ms = compare_ms - top_ms;
 						bprint(" ");
-						utils_bprint_signed_time_diff(compare - tt_top_time);  // Gold numbers for diff
+						utils_bprint_signed_time_diff(diff_ms / 1000);  // Gold numbers for diff
 						bprint(" vs record [");
-						utils_bprint_time_plain(tt_top_time);  // White numbers for record
+						utils_bprint_time_plain(top_ms / 1000);  // White numbers for record
 						bprint("] by ");
 						bprint(tt_top_player);
 					}
@@ -533,63 +580,67 @@ void() TeamCaptureFlagTouch =
 						new_player_record = 0;
 						if (!(clanring_state & CLANRING_MATCH_STARTED))
 						{
-							// --- CRX v2 metadata (trial run): date only ---
-							if (crx_meta_date != "") strunzone(crx_meta_date);
-							crx_meta_date = strzone(strftime(TRUE, "%Y-%m-%dT%H:%M:%S%z"));
-							crx_meta_mt_remain = -1;
-							if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
-							crx_meta_mt_str = "";
-							crx_meta_ping = -1;
-							if (other.ping_time > 0)
-								crx_meta_ping = floor(other.ping_time + 0.5);
-							else
+							if (gsheets_trial_records_ready_current_map())
 							{
-								local float ping_ms;
-								ping_ms = client_ping(other);
-								crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
-							}
-														check_player_low_record(compare, other.team, other.netname);
-                            if (new_player_record > 0)
-							{
-								if (new_player_record == 1)
+								// --- CRX v2 metadata (trial run): date only ---
+								if (crx_meta_date != "") strunzone(crx_meta_date);
+								crx_meta_date = strzone(strftime(TRUE, "%Y-%m-%dT%H:%M:%S%z"));
+								crx_meta_mt_remain = -1;
+								if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
+								crx_meta_mt_str = "";
+								crx_meta_ping = -1;
+								if (other.ping_time > 0)
+									crx_meta_ping = floor(other.ping_time + 0.5);
+								else
 								{
-									sound(world,CHAN_AUTO,"crx/congrats.wav",1,ATTN_NONE);
-									if (clanring_new_record_player != "") strunzone(clanring_new_record_player);
-									clanring_new_record_player = strzone(other.netname);
-								}									
-								else if ((new_player_record == 2) || (new_player_record == 3))
-									sound(world,CHAN_AUTO,"crx/goodstat.wav",1,ATTN_NONE);
-								write_capture_stats();
-                                // Webhook: time trial record (top 3)
-                                if (new_player_record == 1)
-                                {
-                                    local string msg_tt, team_s, server_host;
-                                    local float sec_whole, cs;
-                                    local string tsec, tcs, tshort;
-                                    if (other.team == RED) team_s = "RED"; else if (other.team == BLUE) team_s = "BLUE"; else team_s = "?";
-                                    sec_whole = floor(compare);
-                                    cs = floor(((compare - sec_whole) * 100) + 0.001);
-                                    tsec = ftos(sec_whole);
-                                    if (sec_whole < 10) tsec = strcat("0", tsec);
-                                    tcs = ftos(cs);
-                                    if (cs < 10) tcs = strcat("0", tcs);
-                                    tshort = sprintf("%s.%s", tsec, tcs);
-                                    server_host = cvar_string("hostname");
-                                    msg_tt = sprintf("New Time Trial #%g Record | %s, %s, %s, %s, %s",
-                                        new_player_record,
-                                        mapname,
-                                        other.netname,
-                                        tshort,
-                                        team_s,
-                                        server_host);
+									ping_ms = client_ping(other);
+									crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
+								}
+								check_player_low_record(compare, other.team, other.netname);
+								if (new_player_record > 0)
+								{
+									if (new_player_record == 1)
+									{
+										sound(world,CHAN_AUTO,"crx/congrats.wav",1,ATTN_NONE);
+										if (clanring_new_record_player != "") strunzone(clanring_new_record_player);
+										clanring_new_record_player = strzone(other.netname);
+									}
+									else if ((new_player_record == 2) || (new_player_record == 3))
+										sound(world,CHAN_AUTO,"crx/goodstat.wav",1,ATTN_NONE);
+									write_capture_stats();
+									// Webhook: time trial record (top 3)
+									if (new_player_record == 1)
+									{
+							local string msg_tt, team_s, server_host;
+							local float sec_whole, ms, total_ms;
+							local string tsec, tms, tshort;
+							if (other.team == RED) team_s = "RED"; else if (other.team == BLUE) team_s = "BLUE"; else team_s = "?";
+							total_ms = floor(compare * 1000 + 0.5);
+							sec_whole = floor(total_ms / 1000);
+							ms = total_ms - sec_whole * 1000;
+							tsec = ftos(sec_whole);
+							if (sec_whole < 10) tsec = strcat("0", tsec);
+							tms = ftos(ms);
+							if (ms < 10) tms = strcat("00", tms);
+							else if (ms < 100) tms = strcat("0", tms);
+							tshort = sprintf("%s.%s", tsec, tms);
+										server_host = cvar_string("hostname");
+										msg_tt = sprintf("New Time Trial #%g Record | %s, %s, %s, %s, %s",
+											new_player_record,
+											mapname,
+											other.netname,
+											tshort,
+											team_s,
+											server_host);
 										webhook_post_deferred(webhook_captime_info, msg_tt);
-                                }
+									}
+								}
 							}
 							//else sound(world,CHAN_AUTO,"crx/capreg.wav",1,ATTN_NONE);
 						}
 						else
 						{
-							if (clanring_maxsize > 1)
+							if (clanring_maxsize > 1 && gsheets_match_records_ready_current_map())
 							{
 								// --- CRX v2 metadata (match): date + match time remaining ---
 								// Use pre-captured timer values to avoid race conditions
@@ -603,39 +654,14 @@ void() TeamCaptureFlagTouch =
 									crx_meta_ping = floor(other.ping_time + 0.5);
 								else
 								{
-									local float ping_ms;
 									ping_ms = client_ping(other);
 									crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
 								}
-																check_player_low_record2(compare, other.team, other.netname);
-                                if (new_player_record > 0)
+								check_player_low_record2(compare, other.team, other.netname);
+								if (new_player_record > 0)
 								{
 									new_player_record_match = new_player_record;
 									write_capture_stats_match();
-                                    // Webhook: match record (top 3), same compact format as TT
-                                    if (new_player_record == 1)
-                                    {
-                                        local string msg_m, team_s_m, server_host_m;
-                                        local float sec_whole_m, cs_m;
-                                        local string tsec_m, tcs_m, tshort_m;
-                                        if (other.team == RED) team_s_m = "RED"; else if (other.team == BLUE) team_s_m = "BLUE"; else team_s_m = "?";
-                                        sec_whole_m = floor(compare);
-                                        cs_m = floor(((compare - sec_whole_m) * 100) + 0.001);
-                                        tsec_m = ftos(sec_whole_m);
-                                        if (sec_whole_m < 10) tsec_m = strcat("0", tsec_m);
-                                        tcs_m = ftos(cs_m);
-                                        if (cs_m < 10) tcs_m = strcat("0", tcs_m);
-                                        tshort_m = sprintf("%s.%s", tsec_m, tcs_m);
-                                        server_host_m = cvar_string("hostname");
-                                        msg_m = sprintf("New Match #%g Record | %s, %s, %s, %s, %s",
-                                            new_player_record_match,
-                                            mapname,
-                                            other.netname,
-                                            tshort_m,
-                                            team_s_m,
-                                            server_host_m);
-											webhook_post_deferred(webhook_captime_info, msg_m);
-                                    }
 								}
 							}
 						}
@@ -702,14 +728,14 @@ void() TeamCaptureFlagTouch =
 							
 							if ((p.last_returned_flag + TEAM_CAPTURE_RETURN_FLAG_ASSIST_TIMEOUT) > time)
 							{
-								announce2(p.netname," gets an assist for returning the ÆÌÁÇ!");
+								announce2(p.netname," gets an assist for returning the \xC6\xCC\xC1\xC7!");
 								client_frag(p, TEAM_CAPTURE_RETURN_FLAG_ASSIST_BONUS);// awarded for returning a flag that causes a capture to happen almost immediately
 								p.fcassists = (p.fcassists + 1);//fstat
 							}
 							
 							if ((p.last_fragged_carrier + TEAM_CAPTURE_FRAG_CARRIER_ASSIST_TIMEOUT) > time)
 							{								
-								announce2(p.netname," gets an assist for fragging the ÆÌÁÇ carrier!");
+								announce2(p.netname," gets an assist for fragging the \xC6\xCC\xC1\xC7 carrier!");
 								client_frag(p, TEAM_CAPTURE_FRAG_CARRIER_ASSIST_BONUS);// award for fragging a flag carrier if a capture happens almost immediately
 								p.fcassists = (p.fcassists + 1);//fstat
 							}
@@ -742,9 +768,9 @@ void() TeamCaptureFlagTouch =
 
 		//--begin flag laying on the field...
 		if (other.team == RED)
-			announce2(other.netname," òåôõòîåä the ÒÅÄ ÆÌÁÇ!");
+			announce2(other.netname," \xF2\xE5\xF4\xF5\xF2\xEE\xE5\xE4 the \xD2\xC5\xC4 \xC6\xCC\xC1\xC7!");
 		else
-			announce2(other.netname," òåôõòîåä the ÂÌÕÅ ÆÌÁÇ!");
+			announce2(other.netname," \xF2\xE5\xF4\xF5\xF2\xEE\xE5\xE4 the \xC2\xCC\xD5\xC5 \xC6\xCC\xC1\xC7!");
 
 		if (!(clanring_playmode & CLANRING_MATCH_MODE) || (clanring_state & CLANRING_MATCH_STARTED))
 		{
@@ -768,19 +794,19 @@ void() TeamCaptureFlagTouch =
 	//begin take flag thats not ours!
 	if (self.team == RED)
 	{
-		announce2(other.netname," çïô the ÒÅÄ ÆÌÁÇ!");
+		announce2(other.netname," \xE7\xEF\xF4 the \xD2\xC5\xC4 \xC6\xCC\xC1\xC7!");
 	}
 	else
 	{
-		announce2(other.netname," çïô the ÂÌÕÅ ÆÌÁÇ!");
+		announce2(other.netname," \xE7\xEF\xF4 the \xC2\xCC\xD5\xC5 \xC6\xCC\xC1\xC7!");
 	}
 	//newbie message removed:
 	//YOU GOT THE ENEMY FLAG
 	//RETURN TO BASE
-	//centerprint(other, "ÙÏÕ ÇÏÔ ÔÈÅ ÅÎÅÍÙ ÆÌÁÇ\n\nÒÅÔÕÒÎ ÔÏ ÂÁÓÅ\n");
+	//centerprint(other, "\xD9\xCF\xD5 \xC7\xCF\xD4 \xD4\xC8\xC5 \xC5\xCE\xC5\xCD\xD9 \xC6\xCC\xC1\xC7\n\n\xD2\xC5\xD4\xD5\xD2\xCE \xD4\xCF \xC2\xC1\xD3\xC5\n");
 	if ((clanring_playmode & CLANRING_MATCH_MODE) && (!(clanring_state & CLANRING_MATCH_STARTED)))
 	{
-		centerprint(other, "ŽŽmatch has not begunŽŽ\n\x80\x81\bcapture time trials\b\x81\x82");
+		centerprint(other, "\x8E\x8Ematch has not begun\x8E\x8E\n\x80\x81\bcapture time trials\b\x81\x82");
 		// spawn ghost at the base the flag was taken from
 		CTF_SpawnGhostFlag(self);
 	}
@@ -834,13 +860,13 @@ void() TeamCaptureFlagTouch =
 				{
 					if (self.team == RED)
 					{
-						centerprint (p, "ÒÅÄ flag has been taken");
+						centerprint (p, "\xD2\xC5\xC4 flag has been taken");
 					}
 					else
 					{
 						if (self.team == BLUE)
 						{
-							centerprint (p, "ÂÌÕÅ flag has been taken");
+							centerprint (p, "\xC2\xCC\xD5\xC5 flag has been taken");
 						}
 					}
 				}
@@ -848,11 +874,11 @@ void() TeamCaptureFlagTouch =
 				{
 					if (p.team != other.team)
 					{
-						centerprint (p, "Your ÆÌÁÇ has been taken!");
+						centerprint (p, "Your \xC6\xCC\xC1\xC7 has been taken!");
 					}
 					else
 					{
-						centerprint (p, "Your team has the enemy ÆÌÁÇ!");
+						centerprint (p, "Your team has the enemy \xC6\xCC\xC1\xC7!");
 					}
 				}
 			}
@@ -1331,28 +1357,28 @@ void() RuneTouch =
 	if (other.player_flag & ITEM_RUNE1_FLAG)//Rune 1 - Earth Magic(resistance)
 	{
 		other.items2 = (other.items2 | IT2_SIGIL1);
-		sprint(other,"you got the rune of Åáòôè Íáçéã!    \b[resistance]\n");
+		sprint(other,"you got the rune of \xC5\xE1\xF2\xF4\xE8 \xCD\xE1\xE7\xE9\xE3!    \b[resistance]\n");
 	}
 	else
 	{
 		if (other.player_flag & ITEM_RUNE2_FLAG)//Rune 2 - Black Magic(strength)
 		{
 			other.items2 = (other.items2 | IT2_SIGIL2);			
-			sprint(other,"you got the rune of Âìáãë Íáçéã!    \b[strength]\n");			
+			sprint(other,"you got the rune of \xC2\xEC\xE1\xE3\xEB \xCD\xE1\xE7\xE9\xE3!    \b[strength]\n");			
 		}
 		else
 		{
 			if (other.player_flag & ITEM_RUNE3_FLAG)
 			{
 				other.items2 = (other.items2 | IT2_SIGIL3);
-				sprint(other,"you got the rune of Èåìì Íáçéã!    \b[haste]\n");//Rune 3 - Hell Magic(haste)				
+				sprint(other,"you got the rune of \xC8\xE5\xEC\xEC \xCD\xE1\xE7\xE9\xE3!    \b[haste]\n");//Rune 3 - Hell Magic(haste)				
 			}
 			else
 			{
 				if (other.player_flag & ITEM_RUNE4_FLAG)//Rune 4 - Elder Magic(regeneration)
 				{
 					other.items2 = (other.items2 | IT2_SIGIL4);					
-					sprint(other,"you got the rune of Åìäåò Íáçéã!    \b[regeneration]\n");					
+					sprint(other,"you got the rune of \xC5\xEC\xE4\xE5\xF2 \xCD\xE1\xE7\xE9\xE3!    \b[regeneration]\n");					
 					other.max_health = 150;
 				}
 			}
@@ -1665,22 +1691,26 @@ void() CTF_GhostFlagTouch =
 
 		if (other.lefty > 0)
 		{
+			local float compare_ms, top_ms, diff_ms;
 			compare = (time - other.lefty);
+			compare_ms = floor(compare * 1000 + 0.5);
 
 			// Lookup #1 TT record BEFORE we update records
-			have_top = ctf_trial_get_top_record(other.team);
+			have_top = ctf_trial_get_top_record(0);
 
-			// New display: capture time [MM:SS.CS]  (+/-DD:dd.cc vs record MM:SS.CS by NAME)
+			// New display: capture time [MM:SS.MMM] (+/-DD:dd.ddd vs record MM:SS.MMM by NAME)
 			bprint("\bcapture time ");
 			bprint("[");
-			utils_bprint_time_plain(compare);  // White numbers for capture time
+			utils_bprint_time_plain(compare_ms / 1000);  // White numbers for capture time
 			bprint("]");
 			if (have_top)
 			{
+				top_ms = floor(tt_top_time * 1000 + 0.5);
+				diff_ms = compare_ms - top_ms;
 				bprint(" ");
-				utils_bprint_signed_time_diff(compare - tt_top_time);  // Gold numbers for diff
+				utils_bprint_signed_time_diff(diff_ms / 1000);  // Gold numbers for diff
 				bprint(" vs record [");
-				utils_bprint_time_plain(tt_top_time);  // White numbers for record
+				utils_bprint_time_plain(top_ms / 1000);  // White numbers for record
 				bprint("] by ");
 				bprint(tt_top_player);
 			}
@@ -1690,56 +1720,61 @@ void() CTF_GhostFlagTouch =
 
 			// mirror the prewar TT record path
 			new_player_record = 0;
-			// --- CRX v2 metadata (trial run): date only ---
-			if (crx_meta_date != "") strunzone(crx_meta_date);
-			crx_meta_date = strzone(strftime(TRUE, "%Y-%m-%dT%H:%M:%S%z"));
-			crx_meta_mt_remain = -1;
-			if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
-			crx_meta_mt_str = "";
-			crx_meta_ping = -1;
-			if (other.ping_time > 0)
-				crx_meta_ping = floor(other.ping_time + 0.5);
-			else
+			if (gsheets_trial_records_ready_current_map())
 			{
-				local float ping_ms;
-				ping_ms = client_ping(other);
-				crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
-			}
-						check_player_low_record(compare, other.team, other.netname);
-			if (new_player_record > 0)
-			{
-				if (new_player_record == 1)
+				// --- CRX v2 metadata (trial run): date only ---
+				if (crx_meta_date != "") strunzone(crx_meta_date);
+				crx_meta_date = strzone(strftime(TRUE, "%Y-%m-%dT%H:%M:%S%z"));
+				crx_meta_mt_remain = -1;
+				if (crx_meta_mt_str != "") strunzone(crx_meta_mt_str);
+				crx_meta_mt_str = "";
+				crx_meta_ping = -1;
+				if (other.ping_time > 0)
+					crx_meta_ping = floor(other.ping_time + 0.5);
+				else
 				{
-					sound(world,CHAN_AUTO,"crx/congrats.wav",1,ATTN_NONE);
-					if (clanring_new_record_player != "") strunzone(clanring_new_record_player);
-					clanring_new_record_player = strzone(other.netname);
+					local float ping_ms;
+					ping_ms = client_ping(other);
+					crx_meta_ping = (ping_ms > 0) ? floor(ping_ms + 0.5) : -1;
 				}
-				else if ((new_player_record == 2) || (new_player_record == 3))
-					sound(world,CHAN_AUTO,"crx/goodstat.wav",1,ATTN_NONE);
-				write_capture_stats();
-				// Webhook: time trial record (top 3)
-				if (new_player_record == 1)
+				check_player_low_record(compare, other.team, other.netname);
+				if (new_player_record > 0)
 				{
-					local string msg_tt, team_s, server_host;
-					local float sec_whole, cs;
-					local string tsec, tcs, tshort;
-					if (other.team == RED) team_s = "RED"; else if (other.team == BLUE) team_s = "BLUE"; else team_s = "?";
-					sec_whole = floor(compare);
-					cs = floor(((compare - sec_whole) * 100) + 0.001);
-					tsec = ftos(sec_whole);
-					if (sec_whole < 10) tsec = strcat("0", tsec);
-					tcs = ftos(cs);
-					if (cs < 10) tcs = strcat("0", tcs);
-					tshort = sprintf("%s.%s", tsec, tcs);
-					server_host = cvar_string("hostname");
-					msg_tt = sprintf("New Time Trial #%g Record | %s, %s, %s, %s, %s",
-						new_player_record,
-						mapname,
-						other.netname,
-						tshort,
-						team_s,
-						server_host);
+					if (new_player_record == 1)
+					{
+						sound(world,CHAN_AUTO,"crx/congrats.wav",1,ATTN_NONE);
+						if (clanring_new_record_player != "") strunzone(clanring_new_record_player);
+						clanring_new_record_player = strzone(other.netname);
+					}
+					else if ((new_player_record == 2) || (new_player_record == 3))
+						sound(world,CHAN_AUTO,"crx/goodstat.wav",1,ATTN_NONE);
+					write_capture_stats();
+					// Webhook: time trial record (top 3)
+					if (new_player_record == 1)
+					{
+						local string msg_tt, team_s, server_host;
+							local float sec_whole, ms, total_ms;
+							local string tsec, tms, tshort;
+							if (other.team == RED) team_s = "RED"; else if (other.team == BLUE) team_s = "BLUE"; else team_s = "?";
+							total_ms = floor(compare * 1000 + 0.5);
+							sec_whole = floor(total_ms / 1000);
+							ms = total_ms - sec_whole * 1000;
+							tsec = ftos(sec_whole);
+							if (sec_whole < 10) tsec = strcat("0", tsec);
+							tms = ftos(ms);
+							if (ms < 10) tms = strcat("00", tms);
+							else if (ms < 100) tms = strcat("0", tms);
+							tshort = sprintf("%s.%s", tsec, tms);
+						server_host = cvar_string("hostname");
+						msg_tt = sprintf("New Time Trial #%g Record | %s, %s, %s, %s, %s",
+							new_player_record,
+							mapname,
+							other.netname,
+							tshort,
+							team_s,
+							server_host);
 						webhook_post_deferred(webhook_captime_info, msg_tt);
+					}
 				}
 			}
 		}

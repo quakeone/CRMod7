@@ -11,22 +11,22 @@ void() TeamCaptureCheckUpdate =
 	teamscr2 = 0;
 	teamscr1 = 0;
 	
-	p = find(world, classname, "player");
-	
-	while ((p != world) && (p.style & CLANRING_CONNECTED))
+	p = clanring_sentinel.next_player;
+
+	while (p)
 	{
+		if (!(p.style & CLANRING_CONNECTED))
+		{
+			p = p.next_player;
+			continue;
+		}
+
 		if ((p.team == RED) && (!(p.style & CLANRING_OBSERVER)))
-		{
 			teamscr1 = (teamscr1 + p.frags);
-		}
-		else
-		{
-			if ((p.team == BLUE) && (!(p.style & CLANRING_OBSERVER)))
-			{
-				teamscr2 = (teamscr2 + p.frags);
-			}
-		}
-		p = find(p, classname, "player");
+		else if ((p.team == BLUE) && (!(p.style & CLANRING_OBSERVER)))
+			teamscr2 = (teamscr2 + p.frags);
+
+		p = p.next_player;
 	}
 };
 
@@ -34,6 +34,41 @@ void() TeamCaptureResetUpdate =
 {
 	lastteamscrtime = 0;
 	TeamCaptureCheckUpdate ();
+};
+
+void() status_refresh_f_status_pref =
+{
+	local float enabled;
+
+	enabled = TRUE;
+	if (lowrcase(infokey(self, "f_status")) == "off")
+		enabled = FALSE;
+
+	if (self.f_status_enabled != enabled)
+	{
+		// Force an immediate redraw when the preference flips.
+		self.hud_last_sig_ctf = -1;
+		self.laststattime = 0;
+	}
+
+	self.f_status_enabled = enabled;
+};
+
+float (float value, float min_value, float max_value) status_clamp =
+{
+	if (value < min_value)
+		return min_value;
+	if (value > max_value)
+		return max_value;
+	return value;
+};
+
+float (float sig, float value) status_sig_mix =
+{
+	sig = floor(sig * 131 + value + 17);
+	if (sig >= 16000000)
+		sig = sig - floor(sig / 16000000) * 16000000;
+	return sig;
 };
 
 string(entity who) TeamSetStatRes =
@@ -98,33 +133,33 @@ string() TeamCaptureFlagStatusString =
 	e = find(world, classname, "item_flag_team1");
 	if ((e.cnt == FLAG_AT_BASE))
 	{
-		s2 = "ù û";
+		s2 = "\x9D \x9E";
 	}
 	else
 	{
 		if ((e.cnt == FLAG_CARRIED))
 		{
-			s2 = "ùrû";
+			s2 = "\x9Dr\x9E";
 		}
 		else
 		{
-			s2 = "ùÚû";
+			s2 = "\x9D\xF2\x9E";
 		}
 	}
 	e = find(world, classname, "item_flag_team2");
 	if ((e.cnt == FLAG_AT_BASE))
 	{
-		s3 = " ü";
+		s3 = " \x9F";
 	}
 	else
 	{
 		if ((e.cnt == FLAG_CARRIED))
 		{
-			s3 = "bü";
+			s3 = "b\x9F";
 		}
 		else
 		{
-			s3 = "‚ü";
+			s3 = "\xE2\x9F";
 		}
 	}
 
@@ -143,9 +178,9 @@ string() TeamCaptureScoreString =
 	if ((teamscr1 > teamscr2))
 	{
 		if ((teamscr1 - teamscr2) > 99)
-			t = "                   ÚÂ‰ ";
+			t = "                   \xF2\xE5\xE4 ";
 		else
-			t = "                    ÚÂ‰ ";
+			t = "                    \xF2\xE5\xE4 ";
 		n = ftos((teamscr1 - teamscr2));
 	}
 	else
@@ -153,9 +188,9 @@ string() TeamCaptureScoreString =
 		if ((teamscr1 < teamscr2))
 		{
 			if ((teamscr2 - teamscr1) > 99)
-				t = "                  ‚ÏıÂ ";
+				t = "                  \xE2\xEC\xF5\xE5 ";
 			else
-				t = "                   ‚ÏıÂ ";
+				t = "                   \xE2\xEC\xF5\xE5 ";
 			n = ftos((teamscr2 - teamscr1));
 		}
 		else
@@ -170,10 +205,16 @@ string() TeamCaptureScoreString =
 
 void() TeamCapturePlayerUpdate =
 {
+	local entity flag1 = world;
+	local entity flag2 = world;
 	local string s1="";
 	local string s2="";
 	local string s3="";
 	local string res="";
+	local float sig = 23;
+	local float target_sig = 0;
+	local float red_score_sig = 0;
+	local float blue_score_sig = 0;
 
 	if (intermission_running)
 		return;
@@ -187,7 +228,7 @@ void() TeamCapturePlayerUpdate =
 	if ((clanring_playmode & CLANRING_MATCH_MODE)&& (!(clanring_state & CLANRING_MATCH_STARTED)))
 		return;
 
-	if (strconv(1,0,0,(infokey(self, "f_status"))) == "off")
+	if (!self.f_status_enabled)
 		return;
 
 	if (self.statstate < 0)
@@ -214,7 +255,46 @@ void() TeamCapturePlayerUpdate =
 			self.leaderboardtime = 0;
 		}
 		else
-		{	//TODO: update for higher PLAYER_RECORDS_MAX_COUNT?
+		{
+			sig = status_sig_mix(sig, 1); // leaderboard branch marker
+			sig = status_sig_mix(sig, self.statstate);
+			if (self.movetarget)
+				target_sig = num_for_edict(self.movetarget);
+			sig = status_sig_mix(sig, target_sig);
+
+			// Top-3 presence/value hash for captimes display.
+			if (playerrecord[0].statvalue > 0)
+			{
+				sig = status_sig_mix(sig, 1);
+				sig = status_sig_mix(sig, floor(status_clamp(playerrecord[0].statvalue, 0, 99999)));
+				sig = status_sig_mix(sig, playerrecord[0].teamcolor);
+			}
+			else
+				sig = status_sig_mix(sig, 0);
+
+			if (playerrecord[1].statvalue > 0)
+			{
+				sig = status_sig_mix(sig, 1);
+				sig = status_sig_mix(sig, floor(status_clamp(playerrecord[1].statvalue, 0, 99999)));
+				sig = status_sig_mix(sig, playerrecord[1].teamcolor);
+			}
+			else
+				sig = status_sig_mix(sig, 0);
+
+			if (playerrecord[2].statvalue > 0)
+			{
+				sig = status_sig_mix(sig, 1);
+				sig = status_sig_mix(sig, floor(status_clamp(playerrecord[2].statvalue, 0, 99999)));
+				sig = status_sig_mix(sig, playerrecord[2].teamcolor);
+			}
+			else
+				sig = status_sig_mix(sig, 0);
+
+			if (sig == self.hud_last_sig_ctf)
+				return;
+			self.hud_last_sig_ctf = sig;
+
+			//TODO: update for higher PLAYER_RECORDS_MAX_COUNT?
 			if (playerrecord[0].statvalue > 0)
 			{
 				s1 = sprintf("    \1  %s %s %-16s\n\n", utils_get_time(playerrecord[0].statvalue), get_team_letter(playerrecord[0].teamcolor), playerrecord[0].player);
@@ -236,13 +316,49 @@ void() TeamCapturePlayerUpdate =
 		}
 	}
 
-	self.laststattime = (time + PLAYERSTATTIME);
-	res = TeamSetStatRes (self);
-	//Removed runes because they are on the hud.
-	s1 = TeamCaptureFlagStatusString();
+	sig = status_sig_mix(sig, 0); // normal HUD branch marker
+	sig = status_sig_mix(sig, self.statstate);
+
+	flag1 = find(world, classname, "item_flag_team1");
+	flag2 = find(world, classname, "item_flag_team2");
+	if (flag1 != world)
+		sig = status_sig_mix(sig, flag1.cnt);
+	else
+		sig = status_sig_mix(sig, 0);
+	if (flag2 != world)
+		sig = status_sig_mix(sig, flag2.cnt);
+	else
+		sig = status_sig_mix(sig, 0);
+
 	if (clanring_playmode & CLANRING_NORMAL_MODE)	//R00k: no need to print the team up by score since in match mode we have hud scores.
 	{
 		TeamCaptureCheckUpdate ();
+		red_score_sig = floor(status_clamp(teamscr1, -999, 999)) + 1000;
+		blue_score_sig = floor(status_clamp(teamscr2, -999, 999)) + 1000;
+		sig = status_sig_mix(sig, red_score_sig);
+		sig = status_sig_mix(sig, blue_score_sig);
+	}
+	else
+	{
+		sig = status_sig_mix(sig, 0);
+		sig = status_sig_mix(sig, 0);
+	}
+
+	if (self.movetarget)
+		target_sig = num_for_edict(self.movetarget);
+	sig = status_sig_mix(sig, target_sig);
+
+	self.laststattime = (time + PLAYERSTATTIME);
+
+	if (sig == self.hud_last_sig_ctf)
+		return;
+	self.hud_last_sig_ctf = sig;
+
+	res = TeamSetStatRes (self);
+	//Removed runes because they are on the hud.
+	s1 = TeamCaptureFlagStatusString();
+	if (clanring_playmode & CLANRING_NORMAL_MODE)
+	{
 		s2 = TeamCaptureScoreString();
 	}
 	else
@@ -296,7 +412,7 @@ string (entity e) wipeout_get_teamstatus =
 	else
 		talive = strings_ftos_gold(e.teamalive);
 
-	return sprintf("ù%s %s%sü                                \n", tname, talive, get_nextspawn_string(e.nextspawn));
+	return sprintf("\x9D%s %s%s\x9F                                \n", tname, talive, get_nextspawn_string(e.nextspawn));
 };
 
 float (entity e) IS_CA_OBSERVER;

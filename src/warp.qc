@@ -27,7 +27,7 @@ void() warp_menu_top =
 		}
 	}
 	sprint(self,"\b--------------------------------------\b\n");
-	sprint(self," ’ \bEXIT\n");
+	sprint(self," \x92 \bEXIT\n");
 	sprint(self, "\n");
 };
 
@@ -56,7 +56,7 @@ void() warp_show_map_menu =
 		index += 1;
 	}
 	sprint(self,"\b--------------------------------------\b\n");
-	sprint(self," ’ \bEXIT\n");
+	sprint(self," \x92 \bEXIT\n");
 	sprint(self, "\n");
 	sprint(self, "select map\n");
 };

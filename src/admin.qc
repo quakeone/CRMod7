@@ -22,6 +22,10 @@ void() admin_do_ban;
 void() options_start_setting;
 void() SUB_Freeze;
 void() W_SetCurrentAmmo;
+float() lockdown_is_active;
+string(string ip_with_port) lockdown_normalize_ip;
+float(string ip, entity except_client) lockdown_ip_has_other_connected_client;
+void(string ip) lockdown_remove_ip;
 
 // global variables
 entity kick_target;         // Player to kick
@@ -48,6 +52,7 @@ void() admin_send_aliases =
 	stuffcmd(self, "alias kick! impulse 213\n");
 	stuffcmd(self, "alias skick impulse 213\n");
     stuffcmd(self, "alias crkick impulse 213\n");		//I think we need more kick aliases
+	stuffcmd(self, "alias lockdown \"cmd lockdown $*\"\n");
 	stuffcmd(self, "alias safepractice impulse 224\n");
 	stuffcmd(self, "alias modevote impulse 228\n");
 	stuffcmd(self, "alias options impulse 229\n");
@@ -152,14 +157,14 @@ void() admin_start_code =
 void()admin_show_ip_list =
 {
 	local entity e;
-	sprint(self, "\n ip address          ü      name\n");
-	sprint(self, "­­­­­­­­­­­­­­­­­­­­­«­­­­­­­­­­­­­­­­­\n");
+	sprint(self, "\n\xA0ip address  \xA0       \xFC\xA0\xA0\xA0\xA0\xA0\xA0name\n");
+	sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
 	e = find(world, classname, "player");
 	while (e)
 	{
 		if ((e.style & CLANRING_CONNECTED) && (!(e.style & CLANRING_ADMINISTRATOR)))
 		{
-			sprint4(self, infokey(e, INFOKEY_P_IP), " ü ", e.netname, "\n");
+			sprint4(self, infokey(e, INFOKEY_P_IP), " \xFC ", e.netname, "\n");
 		}
 		e = find(e, classname, "player");
 	}
@@ -171,6 +176,7 @@ void()admin_show_ip_list =
 void(entity client) clanring_kick_player =
 {
 	local string temp;
+	local string ip;
 	local entity oself;
 
 	if (client.style & CLANRING_ADMINISTRATOR)
@@ -199,6 +205,15 @@ void(entity client) clanring_kick_player =
 
 	client.takedamage = DAMAGE_NO;
 
+	// If an admin manually kicks/bans during a private lock, revoke that IP from the allowlist.
+	if (lockdown_is_active() && (self.style & CLANRING_ADMINISTRATOR)
+		&& (clanring_kick_mode == KICK_KICK || clanring_kick_mode == KICK_BAN))
+	{
+		ip = lockdown_normalize_ip(infokey(client, INFOKEY_P_IP));
+		if (!lockdown_ip_has_other_connected_client(ip, client))
+			lockdown_remove_ip(ip);
+	}
+
 	if (clanring_kick_mode == KICK_KICK)
 	{
 		announce2(client.netname, " was kicked!");
@@ -209,9 +224,9 @@ void(entity client) clanring_kick_player =
 	{
 		if (clanring_kick_mode == KICK_BAN)
 		{
-			utils_make_scheduled_event(ban_kick_client, sys_ticrate);
-			clanring_kick_mode = 0;//1/11/2016 11:00PM --FIXME--TESTING!!!
-			return;//R00k: forgot this return! FIXED 9/7/2011 10:45PM
+			announce2(client.netname, " was banned!");
+			temp = ftos(client.colormap);
+			localcmd3("kick # ", temp, "\n");
 		}
 		else
 		{
@@ -540,10 +555,21 @@ void(float fDoKick) admin_confirm_ban_response =
 
 void() admin_do_ban =
 {
-	localcmd("addip %s ban 0 \"Banned via Admin\"\n", infokey(self, INFOKEY_P_IP));
-	sprint(self, self.netname, " has been banned.\n");
+	local string ip;
 
-	clanring_kick_mode = KICK_BAN;
+	ip = lockdown_normalize_ip(infokey(kick_target, INFOKEY_P_IP));
+	if (ip == "")
+	{
+		sprint(self, "Unable to read target IP. Ban not applied; kicking instead.\n");
+		clanring_kick_mode = KICK_KICK;
+	}
+	else
+	{
+		localcmd3("addip ", ip, " ban 0 \"Banned via Admin\"\n");
+		sprint2(self, kick_target.netname, " has been banned.\n");
+		clanring_kick_mode = KICK_BAN;
+	}
+
 	clanring_kick_player(kick_target);
 
 	kick_target = find(world, classname, "clanring_kick_timeout");
@@ -579,13 +605,13 @@ void() admin_list_ghosts =
 	}
 	if (teamplay)
 	{
-		sprint(self, "\ncodeü   team   üfragsü     name\n");
+		sprint(self, "\ncode\xFC   team   \xFCfrags\xFC     name\n");
 	}
 	else
 	{
-		sprint(self, "\ncodeü  colour  üfragsü     name\n");
+		sprint(self, "\ncode\xFC  colour  \xFCfrags\xFC     name\n");
 	}
-	sprint(self, "­­­­«­­­­­­­­­­«­­­­­«­­­­­­­­­­­­­­­\n");
+	sprint(self, "\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
 
 	local string num, szTeam, pad;
 	local float frag;
@@ -593,29 +619,29 @@ void() admin_list_ghosts =
 	while (e)
 	{
 		num = ftos(e.count);
-		sprint3(self, " ", num, " ü");
+		sprint3(self, " ", num, " \xFC");
 		szTeam = strings_get_teamname2 (e.height);
 				if (e.owner.owner == e)
 		frag = e.owner.frags;
 		else
 		frag = e.frags;
 		if (frag < -99)
-		pad = "ü";
+		pad = "\xFC";
 		else if (frag < -9)
-		pad = "ü ";
+		pad = "\xFC ";
 		else if (frag < 0)
-		pad = "ü  ";
+		pad = "\xFC  ";
 		else if (frag < 10)
-		pad = "ü   ";
+		pad = "\xFC   ";
 		else if (frag < 100)
-		pad = "ü  ";
+		pad = "\xFC  ";
 		else
-		pad = "ü ";
+		pad = "\xFC ";
 		num = ftos(frag);
 		if (e.owner.owner == e)
-		sprint(self, szTeam, pad, num, " ü", e.owner.netname, "\n");
+		sprint(self, szTeam, pad, num, " \xFC", e.owner.netname, "\n");
 		else
-		sprint(self, szTeam, pad, num, " ü Disconnected\n");
+		sprint(self, szTeam, pad, num, " \xFC Disconnected\n");
 		e = find(e, classname, "clanring_ghost");
 	}
 	sprint(self, "\n");
@@ -820,6 +846,7 @@ void() admin_help =
 	sprint(self, " makespawn    - add spawn point\n");
 	sprint(self, " nextcam      - go to next camera\n");
 	sprint(self, " makecam      - add camera\n");
+	sprint(self, " lockdown     - private lock [1-30|-1..-30|status|off|list|add/remove <ip>]\n");
 	sprint(self, " safepractice - no spam/discharging\n");
 };
 
@@ -1035,12 +1062,12 @@ void() admin_dm3_screenshot_setup =
 				stuffcmd(other, "-showscores;impulse 128\n");
 				if (self != clanring_match_timer)
 				{
-					stuffcmd(other, "echo \"Ãìáîòéîç Óãòååîóèïô âù ");
+					stuffcmd(other, "echo \"\xC3\xEC\xE1\xEE\xF2\xE9\xEE\xE7\xA0\xD3\xE3\xF2\xE5\xE5\xEE\xF3\xE8\xEF\xF4\xA0\xE2\xF9\xA0");
 					stuffcmd(other, self.netname);
 				}
 				else
 				{
-					stuffcmd(other, "echo \"Áõôïíáôéã Ãìáîòéîç Óãòååîóèïô");
+					stuffcmd(other, "echo \"\xC1\xF5\xF4\xEF\xED\xE1\xF4\xE9\xE3\xA0\xC3\xEC\xE1\xEE\xF2\xE9\xEE\xE7\xA0\xD3\xE3\xF2\xE5\xE5\xEE\xF3\xE8\xEF\xF4");
 				}
 				stuffcmd(other, "\"\nname\n");
 			}
@@ -1186,11 +1213,11 @@ void() admin_auto_screenshot =
 		}
 		else
 		{
-			stuffcmd(self, "echo \"Ãìáîòéîç Óãòååîóèïô âù ");
+			stuffcmd(self, "echo \"\xC3\xEC\xE1\xEE\xF2\xE9\xEE\xE7\xA0\xD3\xE3\xF2\xE5\xE5\xEE\xF3\xE8\xEF\xF4\xA0\xE2\xF9\xA0");
 			stuffcmd(self, self.netname);
 			stuffcmd(self, "\"\nwait;screenshot\n");
 			stuffcmd(self.movetarget, "name\n");
-			stuffcmd(self.movetarget, "echo \"Ãìáîòéîç Óãòååîóèïô âù ");
+			stuffcmd(self.movetarget, "echo \"\xC3\xEC\xE1\xEE\xF2\xE9\xEE\xE7\xA0\xD3\xE3\xF2\xE5\xE5\xEE\xF3\xE8\xEF\xF4\xA0\xE2\xF9\xA0");
 			stuffcmd(self.movetarget, self.netname);
 			stuffcmd(self.movetarget, "\"\nwait;coop 0\n");
 		}
@@ -1211,7 +1238,7 @@ void() admin_auto_screenshot =
 					else
 					{
 						stuffcmd(player, "name\n");
-						stuffcmd(player, "echo \"Ãìáîòéîç Óãòååîóèïô âù ");
+						stuffcmd(player, "echo \"\xC3\xEC\xE1\xEE\xF2\xE9\xEE\xE7\xA0\xD3\xE3\xF2\xE5\xE5\xEE\xF3\xE8\xEF\xF4\xA0\xE2\xF9\xA0");
 						stuffcmd(player, self.netname);
 						stuffcmd(player, "\"\nwait;coop 0\n");
 					}
@@ -1227,7 +1254,7 @@ void() admin_auto_screenshot =
 				if (!(player.style & CLANRING_OBSERVER))
 				{
 					stuffcmd(player, "+showscores;\n");
-					stuffcmd(player, "echo \"Ãìáîòéîç Óãòååîóèïô âù ");
+					stuffcmd(player, "echo \"\xC3\xEC\xE1\xEE\xF2\xE9\xEE\xE7\xA0\xD3\xE3\xF2\xE5\xE5\xEE\xF3\xE8\xEF\xF4\xA0\xE2\xF9\xA0");
 					stuffcmd(player, self.netname);
 					stuffcmd(player, "\"\nscr_conspeed 9999;path;name;wait;coop 0;toggleconsole;wait;coop 0;-showscores;toggleconsole\n");
 				}

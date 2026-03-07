@@ -351,7 +351,7 @@ void() tdeath_touch =
         entity victim = other_is_later ? self.owner : other;
         entity killer = other_is_later ? other       : self.owner;
 
-        /* Pentagram check – if the intended victim is invulnerable,
+        /* Pentagram check - if the intended victim is invulnerable,
            swap roles so the invulnerable player survives. */
         if (victim.invincible_finished > time)
         {

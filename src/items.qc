@@ -296,7 +296,7 @@ string(float n) QuadControl_OrdinalSuffix =
 // Announce to QTV and in-game observers.
 void(string msg, entity subject) QuadControl_AnnounceObservers =
 {
-    // QTV (if available) – match style used elsewhere in items.qc
+    // QTV (if available) - match style used elsewhere in items.qc
     quaketv_announce4(subject.netname, " ", msg, "");
 
     // In-game observers only (don't spam active players)
@@ -1911,7 +1911,7 @@ void() powerup_touch =
 		}
 	}
 
-	// 1998-12-24 Improved weapon and powerup touch functions by Maddes/Smï¿½agol  start
+	// 1998-12-24 Improved weapon and powerup touch functions by Maddes/Smagol  start
 	if (self.items == IT_QUAD)
 	{	// R00k: TODO: count number of quads on the map; if only one then use global attenuation.
 		if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
@@ -1936,6 +1936,20 @@ void() powerup_touch =
 		if (other.next_team != world)
 		{
 			other.next_team.dest2_x = other.next_team.dest2_x + 1;
+		}
+		// Quad securing presence: reward nearby teammates (team modes only)
+		if (teamplay)
+		{
+			local entity e;
+			e = findradius(other.origin, 512);
+			while (e)
+			{
+				if (e.classname == "player" && e != other
+					&& e.team == other.team && e.health > 0
+					&& !(e.style & CLANRING_OBSERVER))
+					e.stats_quad_secure = e.stats_quad_secure + 1;
+				e = e.chain;
+			}
 		}
 	}
 	activator = other;

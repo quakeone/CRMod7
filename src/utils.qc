@@ -11,6 +11,7 @@ void() utils_update_server_time;
 void() utils_save_disconnect_log;
 // from strings.qc
 string(float v) strings_ftos_gold;
+string(float code) utils_qf_chr;
 // --- prototypes needed by name overlay watcher ---
 float (string a, string b) utils_str_eq;
 void  (entity ent, string c_name) updatename;
@@ -661,19 +662,24 @@ string (float t) utils_get_time_m_s =
 //	
 // G E T   T I M E   w it h   M I L L I S E C O N D S
 //
-// Returns a string of t in mm:ss.ms format, t is seconds
+// Returns a string of t in mm:ss.mmm format, t is seconds
 //
 string (float t) utils_get_time =
 {
+	local float total;
 	local float minutes;
 	local float seconds;
-	local float csec;
+	local float msec;
 	local string temp;
-	local string tmin="",tsec="",tcsec="";
+	local string tmin="",tsec="",tmsec="";
 
-	minutes = floor((t/60));
-	seconds = floor((((t/60)-minutes)*60));
-	csec    = floor((((((t/60)-minutes)*60)-seconds)*100));
+	if (t < 0) t = 0;
+
+	// Round to milliseconds using integer math so carries are correct.
+	total   = floor(t * 1000 + 0.5);
+	minutes = floor(total / 60000);
+	seconds = floor((total - minutes * 60000) / 1000);
+	msec    = total - minutes * 60000 - seconds * 1000;
 
 	temp = ftos(minutes);
 	if ((minutes < 10))
@@ -687,29 +693,32 @@ string (float t) utils_get_time =
 	else
 		tsec = temp;
 
-	temp = ftos(csec);
-	if ((csec < 10))
-		tcsec = sprintf("0%s", temp);
+	temp = ftos(msec);
+	if (msec < 10)
+		tmsec = sprintf("00%s", temp);
+	else if (msec < 100)
+		tmsec = sprintf("0%s", temp);
 	else
-		tcsec = temp;
+		tmsec = temp;
 
-		return sprintf("%s:%s.%s",tmin,tsec,tcsec);
+	return sprintf("%s:%s.%s", tmin, tsec, tmsec);
 };
 
-// Print time with minimal leading zeros for diffs (e.g., "2.50" or "1:23.45")
+// Print time with minimal leading zeros for diffs (e.g., "2.500" or "1:23.456")
 // Uses strings_ftos_gold() for consistent gold coloring.
 void(float t) utils_bprint_time_splitcolor =
 {
-    local float total, mins, secs, cs;
+    local float total, mins, secs, ms;
     local float tens, ones;
+    local float hundreds;
 
     if (t < 0) t = 0;
 
-    // round to centiseconds
-    total = floor(t * 100 + 0.5);
-    mins  = floor(total / 6000);
-    secs  = floor((total - mins * 6000) / 100);
-    cs    = total - mins * 6000 - secs * 100;
+    // round to milliseconds
+    total = floor(t * 1000 + 0.5);
+    mins  = floor(total / 60000);
+    secs  = floor((total - mins * 60000) / 1000);
+    ms    = total - mins * 60000 - secs * 1000;
 
     // Only show minutes if non-zero
     if (mins > 0)
@@ -738,28 +747,31 @@ void(float t) utils_bprint_time_splitcolor =
     // punctuation stays white
     bprint(".");
 
-    // centiseconds (always two digits) - all gold
-    tens = floor(cs / 10);
-    ones = cs - tens * 10;
+    // milliseconds (always three digits) - all gold
+    hundreds = floor(ms / 100);
+    tens = floor((ms - hundreds * 100) / 10);
+    ones = ms - hundreds * 100 - tens * 10;
 
+    bprint(strings_ftos_gold(hundreds));
     bprint(strings_ftos_gold(tens));
     bprint(strings_ftos_gold(ones));
 };
 
-// Print MM:SS.CS with all digits in white (for capture times and records).
+// Print MM:SS.MMM with all digits in white (for capture times and records).
 // No color codes, plain white text.
 void(float t) utils_bprint_time_plain =
 {
-    local float total, mins, secs, cs;
+    local float total, mins, secs, ms;
     local float tens, ones;
+    local float hundreds;
 
     if (t < 0) t = 0;
 
-    // round to centiseconds
-    total = floor(t * 100 + 0.5);
-    mins  = floor(total / 6000);
-    secs  = floor((total - mins * 6000) / 100);
-    cs    = total - mins * 6000 - secs * 100;
+    // round to milliseconds
+    total = floor(t * 1000 + 0.5);
+    mins  = floor(total / 60000);
+    secs  = floor((total - mins * 60000) / 1000);
+    ms    = total - mins * 60000 - secs * 1000;
 
     // minutes (two digits) - all white
     tens = floor(mins / 10);
@@ -779,14 +791,16 @@ void(float t) utils_bprint_time_plain =
     // punctuation stays white
     bprint(".");
 
-    // centiseconds (two digits) - all white
-    tens = floor(cs / 10);
-    ones = cs - tens * 10;
+    // milliseconds (three digits) - all white
+    hundreds = floor(ms / 100);
+    tens = floor((ms - hundreds * 100) / 10);
+    ones = ms - hundreds * 100 - tens * 10;
+    bprint(ftos(hundreds));
     bprint(ftos(tens));
     bprint(ftos(ones));
 };
 
-// Prints a signed delta with red sign and gold numbers (e.g., " +00:02.11" or " -00:00.45")
+// Prints a signed delta with red sign and gold numbers (e.g., " +00:02.110" or " -00:00.450")
 void (float dt) utils_bprint_signed_time_diff =
 {
     if (dt >= 0)
@@ -951,7 +965,7 @@ void (float f) utils_print_damage_gold =
    	temp = floor(n / 10000);
    	s = " ";
    	if (d) s = strings_ftos_gold(d);
-        else if (f >= 10000)  s="’";
+        else if (f >= 10000)  s=utils_qf_chr(18);
 	n = n - (d * 10000);
   	sprint(self, s);
 
@@ -960,7 +974,7 @@ void (float f) utils_print_damage_gold =
    	temp = floor(n / 1000);
    	s = " ";
    	if (d)  s = strings_ftos_gold(d);
-           else if (f >= 1000) s="’";
+           else if (f >= 1000) s=utils_qf_chr(18);
      	n = n - (d * 1000);
   	sprint(self, s);
   	
@@ -969,7 +983,7 @@ void (float f) utils_print_damage_gold =
    	temp = floor(n / 100);
    	s = " ";
    	if (d)  s = strings_ftos_gold(d);
-           else if (f >= 100)  s="’";
+           else if (f >= 100)  s=utils_qf_chr(18);
    	n = n - (d * 100);
   	sprint(self, s);
   	
@@ -977,7 +991,7 @@ void (float f) utils_print_damage_gold =
    	d = floor(n / 10);
            s = " ";
    	if (temp || d) 	s = strings_ftos_gold(d);
-   	else if (f >= 10) s="’";
+   	else if (f >= 10) s=utils_qf_chr(18);
            n = n - (d * 10);     
    	sprint(self, s);
    	
@@ -1000,7 +1014,7 @@ void (float f) utils_bprint_damage_gold =
    	temp = floor(n / 10000);
    	s = " ";
    	if (d) s = strings_ftos_gold(d);
-        else if (f >= 10000)  s="’";
+        else if (f >= 10000)  s=utils_qf_chr(18);
 	n = n - (d * 10000);
   	bprint(s);
 
@@ -1009,7 +1023,7 @@ void (float f) utils_bprint_damage_gold =
    	temp = floor(n / 1000);
    	s = " ";
    	if (d)  s = strings_ftos_gold(d);
-           else if (f >= 1000) s="’";
+           else if (f >= 1000) s=utils_qf_chr(18);
      	n = n - (d * 1000);
   	bprint(s);
   	
@@ -1018,7 +1032,7 @@ void (float f) utils_bprint_damage_gold =
    	temp = floor(n / 100);
    	s = " ";
    	if (d)  s = strings_ftos_gold(d);
-           else if (f >= 100)  s="’";
+           else if (f >= 100)  s=utils_qf_chr(18);
    	n = n - (d * 100);
   	bprint(s);
   	
@@ -1026,7 +1040,7 @@ void (float f) utils_bprint_damage_gold =
    	d = floor(n / 10);
            s = " ";
    	if (temp || d) 	s = strings_ftos_gold(d);
-   	else if (f >= 10) s="’";
+   	else if (f >= 10) s=utils_qf_chr(18);
            n = n - (d * 10);     
    	bprint(s);
    	
@@ -2402,6 +2416,7 @@ void() utils_load_disconnect_log =
 
 string json_escape(string s);                 // from json.qc
 float (entity p) Q1_PER_Calc_Eff;            // PER helper
+float(entity p) PER_HasNontrivialActivity;   // from stats.qc
 
 // Private, non-serverinfo storage for webhook URL configured via clanring.cfg
 string clanring_captimesdiscordurl;
@@ -2635,7 +2650,74 @@ string(string in) Webhook_SanitizeURL =
     return s;
 };
 
-// Keep content within Discord’s limit (budgeted lower for code blocks)
+// Parse a list of webhook URLs (comma/semicolon/newline separated), sanitize,
+// dedupe, and return up to 3 URLs in order.
+void(entity ev, string raw) Webhook_SetEventURLsMax3 =
+{
+    local string s, part, u1, u2, u3;
+    local float pos, n, nl, done;
+
+    u1 = "";
+    u2 = "";
+    u3 = "";
+
+    s = raw ? raw : "";
+    s = strreplace("\r\n", "\n", s);
+    s = strreplace("\r", "\n", s);
+    s = strreplace(";", "\n", s);
+    s = strreplace(",", "\n", s);
+
+    pos = 0;
+    n = strlen(s);
+    done = 0;
+
+    while (!done && pos <= n)
+    {
+        nl = strstrofs(s, "\n", pos);
+        if (nl < 0)
+        {
+            part = substring(s, pos, n - pos);
+            done = 1;
+        }
+        else
+        {
+            part = substring(s, pos, nl - pos);
+            pos = nl + 1;
+        }
+
+        part = Webhook_SanitizeURL(part);
+        if (part == "") continue;
+
+        if (u1 == "")
+        {
+            u1 = part;
+            continue;
+        }
+        if (part == u1) continue;
+
+        if (u2 == "")
+        {
+            u2 = part;
+            continue;
+        }
+        if (part == u2) continue;
+
+        if (u3 == "")
+        {
+            u3 = part;
+            break; // hard cap: 3
+        }
+    }
+
+    if (ev.hook_url) strunzone(ev.hook_url);
+    if (ev.hook_url2) strunzone(ev.hook_url2);
+    if (ev.hook_url3) strunzone(ev.hook_url3);
+    ev.hook_url = strzone(u1);
+    ev.hook_url2 = strzone(u2);
+    ev.hook_url3 = strzone(u3);
+};
+
+// Keep content within Discord's limit (budgeted lower for code blocks)
 string(string s) Webhook_TruncateForDiscord =
 {
     local float max, n, keep;
@@ -2731,18 +2813,14 @@ float(string s, float limit) Webhook_FindSplitPos =
 // ------------------------------------------------------------
 void(entity ev) webhook_captime_info =
 {
-    local string url, content;
+    local string urls, content;
 
     content = utils_dequake_for_discord(ev.message);
 
-    url = clanring_captimesdiscordurl;
-    if (url == "") url = cvar_string("webhook_url");
-    url = Webhook_SanitizeURL(url);
-    if (url == "") return;
-
-
-    if (ev.hook_url) strunzone(ev.hook_url);
-    ev.hook_url = strzone(url);
+    urls = clanring_captimesdiscordurl;
+    if (urls == "") urls = cvar_string("webhook_url");
+    Webhook_SetEventURLsMax3(ev, urls);
+    if (ev.hook_url == "") return;
 
     if (strstrofs(content, "```", 0) < 0) content = strcat("```text\n", content, "```");
     content = Webhook_TruncateForDiscord(content);
@@ -2757,18 +2835,14 @@ void() webhook_do_post;
 // Prep function for stats continuation parts (ev.message already contains the chunk)
 void(entity ev) webhook_stats_continuation_info =
 {
-    local string url, content;
+    local string urls, content;
 
     content = ev.message;  // already zoned by caller
 
-    url = clanring_statsdiscordurl;
-    if (url == "") url = cvar_string("webhook_stats_url");
-    url = Webhook_SanitizeURL(url);
-    if (url == "") return;
-
-
-    if (ev.hook_url) strunzone(ev.hook_url);
-    ev.hook_url = strzone(url);
+    urls = clanring_statsdiscordurl;
+    if (urls == "") urls = cvar_string("webhook_stats_url");
+    Webhook_SetEventURLsMax3(ev, urls);
+    if (ev.hook_url == "") return;
 
     if (ev.hook_payload) strunzone(ev.hook_payload);
     ev.hook_payload = Webhook_MakeContentPayloadZ(content);
@@ -2777,13 +2851,15 @@ void(entity ev) webhook_stats_continuation_info =
 // Build and store a Discord "stats" message (safe against tempstring aliasing)
 void(entity ev) webhook_stats_info =
 {
-    local string url;
+    local string urls;
     local entity p;
     local float lines, maxlines;
     local float use_find; // choose player iteration strategy (arena uses find())
     local float is_arena;
     local float eligible_players;
     local float total_frags;
+    local float name_col_w;
+    local float name_len;
 
     // efficiency helpers
     local float kfrac, ktot, wfrac, wtot;
@@ -2796,6 +2872,9 @@ void(entity ev) webhook_stats_info =
     local float hourpos;
     local float mins_norm, per_min, v;
     local float b1, b2, b3, b4, b5;
+    local float obs_participant;
+    local float row_frags;
+    local float participant_cutoff;
 
     // shared tempstring-safe buffers
     local string line;          // reusable line buffer
@@ -2807,39 +2886,57 @@ void(entity ev) webhook_stats_info =
 
     float maxlen; maxlen = 8000;  // build full message, then split later
     is_arena = mode_is_arena();
-    use_find = is_arena || !(clanring_playmode & CLANRING_MATCH_MODE);
+    // Always scan all player entities so match participants who moved to
+    // observer right at match end are still eligible for Discord output.
+    use_find = TRUE;
+    v = clanring_timelimit;
+    if (v <= 0) v = cvar("timelimit");
+    if (v <= 0) v = 20;
+    participant_cutoff = clanring_sentinel.matchTime;
+    if (participant_cutoff <= 0) participant_cutoff = time;
+    participant_cutoff = participant_cutoff - (v * 60 + 180);
 
     // Skip Discord stats if there are fewer than two eligible players,
     // or if every player has 0 frags (idle/afk game).
     eligible_players = 0;
     total_frags = 0;
+    name_col_w = 4; // at least width of "Name"
     if (use_find) p = find(world, classname, "player");
     else p = clanring_sentinel.next_player;
     while (p)
     {
+        obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                           (p.style & CLANRING_OBSERVER) &&
+                           p.join_time > 0 &&
+                           p.join_time >= participant_cutoff &&
+                           PER_HasNontrivialActivity(p));
+
         if ((is_arena && p.next_team != world) ||
-            (!is_arena && !(p.style & CLANRING_OBSERVER)))
+            (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
         {
+            row_frags = p.frags;
+            if (obs_participant && row_frags <= -90)
+                row_frags = p.true_kills - p.mangle_z;
+
             eligible_players = eligible_players + 1;
-            total_frags = total_frags + p.frags;
+            total_frags = total_frags + row_frags;
+            name_len = strlen(utils_dequake_for_discord(p.netname));
+            if (name_len > name_col_w) name_col_w = name_len;
         }
         if (use_find) p = find(p, classname, "player");
         else p = p.next_player;
     }
+    name_col_w = bound(4, name_col_w, 15);
     if (eligible_players < 2)
         return;
     if (total_frags <= 0)
         return;
 
     // Resolve + sanitize URL
-    url = clanring_statsdiscordurl;
-    if (url == "") url = cvar_string("webhook_stats_url");
-    url = Webhook_SanitizeURL(url);
-    if (url == "") return;
-
-
-    if (ev.hook_url) strunzone(ev.hook_url);
-    ev.hook_url = strzone(url);
+    urls = clanring_statsdiscordurl;
+    if (urls == "") urls = cvar_string("webhook_stats_url");
+    Webhook_SetEventURLsMax3(ev, urls);
+    if (ev.hook_url == "") return;
 
     // -------------------------
     // Header (piecewise)
@@ -3001,7 +3098,12 @@ void(entity ev) webhook_stats_info =
         else p = clanring_sentinel.next_player;
         while (p)
         {
-            if (!(p.style & CLANRING_OBSERVER))
+            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                               (p.style & CLANRING_OBSERVER) &&
+                               p.join_time > 0 &&
+                               p.join_time >= participant_cutoff &&
+                               PER_HasNontrivialActivity(p));
+            if (!(p.style & CLANRING_OBSERVER) || obs_participant)
             {
                 p.cnt = 0; // reset printed flag
                 num_players = num_players + 1;
@@ -3014,9 +3116,9 @@ void(entity ev) webhook_stats_info =
         APPEND_SAFE("\n**Scoreboard**\n");
         APPEND_SAFE("```\n");
         if (teamplay)
-            APPEND_SAFE(sprintf("%-12s %-6s %5s %4s\n", "Name", "Team", "Frags", "Ping"));
+            APPEND_SAFE(sprintf("%s %-6s %5s %4s\n", strpad(name_col_w, "Name"), "Team", "Frags", "Ping"));
         else
-            APPEND_SAFE(sprintf("%-12s %5s %4s\n", "Name", "Frags", "Ping"));
+            APPEND_SAFE(sprintf("%s %5s %4s\n", strpad(name_col_w, "Name"), "Frags", "Ping"));
         APPEND_SAFE("\n");
         plines = 0;
         
@@ -3029,10 +3131,21 @@ void(entity ev) webhook_stats_info =
             else p = clanring_sentinel.next_player;
             while (p)
             {
-                if (!(p.style & CLANRING_OBSERVER) && (p.cnt == 0) && (p.frags > best_score))
+                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                                   (p.style & CLANRING_OBSERVER) &&
+                                   p.join_time > 0 &&
+                                   p.join_time >= participant_cutoff &&
+                                   PER_HasNontrivialActivity(p));
+                if ((!(p.style & CLANRING_OBSERVER) || obs_participant) && (p.cnt == 0))
                 {
-                    best_score = p.frags;
-                    best_player = p;
+                    row_frags = p.frags;
+                    if (obs_participant && row_frags <= -90)
+                        row_frags = p.true_kills - p.mangle_z;
+                    if (row_frags > best_score)
+                    {
+                        best_score = row_frags;
+                        best_player = p;
+                    }
                 }
                 if (use_find) p = find(p, classname, "player");
                 else p = p.next_player;
@@ -3047,11 +3160,19 @@ void(entity ev) webhook_stats_info =
                     pteamname = "";
                 
                 ping_ms = floor(best_player.ping_time + 0.5);
+                row_frags = best_player.frags;
+                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                                   (best_player.style & CLANRING_OBSERVER) &&
+                                   best_player.join_time > 0 &&
+                                   best_player.join_time >= participant_cutoff &&
+                                   PER_HasNontrivialActivity(best_player));
+                if (obs_participant && row_frags <= -90)
+                    row_frags = best_player.true_kills - best_player.mangle_z;
                 
                 if (pteamname != "")
-                    APPEND_SAFE(sprintf("%-12s %-6s %5.0f %4.0f\n", pname, pteamname, best_player.frags, ping_ms));
+                    APPEND_SAFE(sprintf("%s %-6s %5.0f %4.0f\n", strpad(name_col_w, pname), pteamname, row_frags, ping_ms));
                 else
-                    APPEND_SAFE(sprintf("%-12s %5.0f %4.0f\n", pname, best_player.frags, ping_ms));
+                    APPEND_SAFE(sprintf("%s %5.0f %4.0f\n", strpad(name_col_w, pname), row_frags, ping_ms));
                 
                 strunzone(pname);
                 plines = plines + 1;
@@ -3077,8 +3198,13 @@ void(entity ev) webhook_stats_info =
         else p = clanring_sentinel.next_player;
         while (p && lines < maxlines)
         {
+            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                               (p.style & CLANRING_OBSERVER) &&
+                               p.join_time > 0 &&
+                               p.join_time >= participant_cutoff &&
+                               PER_HasNontrivialActivity(p));
             if ((is_arena && p.next_team != world) ||
-                (!is_arena && !(p.style & CLANRING_OBSERVER)))
+                (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
             {
                 // kill + weapon accuracy
                 kfrac = p.true_kills;
@@ -3111,13 +3237,12 @@ void(entity ev) webhook_stats_info =
                 fpm_str  = strzone(sprintf("%4.1f", fpm_val));
 
                 zname = strzone(utils_dequake_for_discord(p.netname));
-                line = sprintf("%s / %s | %s %s %s %s | %s    ",
+                tmps = strzone(sprintf("%s / %s | %s %s %s %s | %s",
                                killpct, weappct,
                                pct_bul, pct_nail, pct_rox, pct_lg,
-                               fpm_str);
-                APPEND_SAFE(line);
-                APPEND_SAFE(zname);
-                APPEND_SAFE("\n");
+                               fpm_str));
+                APPEND_SAFE(sprintf("%s %s\n", strpad(name_col_w, zname), tmps));
+                strunzone(tmps);
                 strunzone(killpct);
                 strunzone(weappct);
                 strunzone(pct_bul);
@@ -3148,19 +3273,26 @@ void(entity ev) webhook_stats_info =
         {
             k_seen += 1;
 
+            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                               (p.style & CLANRING_OBSERVER) &&
+                               p.join_time > 0 &&
+                               p.join_time >= participant_cutoff &&
+                               PER_HasNontrivialActivity(p));
             if ((is_arena && p.next_team != world) ||
-                (!is_arena && !(p.style & CLANRING_OBSERVER)))
+                (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
             {
-                nm = utils_dequake_for_discord(p.netname);
-                APPEND_SAFE(sprintf("%g/%g | %g %g | %g    %s\n",
-                                    p.true_kills, p.mangle_z,
-                                    p.dmg_given,  p.dmg_taken,
-                                    p.ewep,
-                                    nm));
+                zname = strzone(utils_dequake_for_discord(p.netname));
+                tmps = strzone(sprintf("%g/%g", p.true_kills, p.mangle_z));
+                APPEND_SAFE(sprintf("%s %5s | %5g %5g | %5g\n",
+                                    strpad(name_col_w, zname), tmps,
+                                    p.dmg_given, p.dmg_taken,
+                                    p.ewep));
+                strunzone(tmps);
+                strunzone(zname);
                 k_inc += 1; lines += 1;
                 if (webhook_stats_len > (maxlen - 120)) { k_limit += 1; break; }
             }
-            else if (p.style & CLANRING_OBSERVER) { k_obs += 1; }
+            else if ((p.style & CLANRING_OBSERVER) && !obs_participant) { k_obs += 1; }
             if (use_find) p = find(p, classname, "player"); else p = p.next_player;
         }
     }
@@ -3182,13 +3314,18 @@ void(entity ev) webhook_stats_info =
             while (p && lines < maxlines)
             {
                 q_seen += 1;
+                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                                   (p.style & CLANRING_OBSERVER) &&
+                                   p.join_time > 0 &&
+                                   p.join_time >= participant_cutoff &&
+                                   PER_HasNontrivialActivity(p));
 
-                if (p.style & CLANRING_OBSERVER) { q_obs += 1; }
-                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world))   { q_noteam += 1; }
+                if ((p.style & CLANRING_OBSERVER) && !obs_participant) { q_obs += 1; }
+                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world) && !obs_participant)   { q_noteam += 1; }
                 else
                 {
                     if (!opened_quad) {
-                        APPEND_SAFE("\n**Quad stats (quads time eff% opp self tm)**\n\n");
+                        APPEND_SAFE("\n**Quad stats (quads time eff% opp self tm)**\n");
                         APPEND_SAFE("```\n");
                         opened_quad = 1;
                     }
@@ -3203,14 +3340,14 @@ void(entity ev) webhook_stats_info =
 
                     // one-shot formatted line
                     line = sprintf(
-                        "%g %gs %g%% %g %g %g    %s\n",
+                        "%s  %2g %3gs %3g%% %2g %2g %2g\n",
+                        strpad(name_col_w, zname),
                         p.clanring_qdwep_z,          // quads taken
                         floor(p.totalquad + 0.5),    // hold time (seconds)
                         q_eff_pct,                   // efficiency %
                         p.clanring_qdkill_x,         // enemy kills while quad
                         p.clanring_qdkill_z,         // self deaths while quad
-                        p.clanring_qdkill_y,         // team kills while quad
-                        zname
+                        p.clanring_qdkill_y          // team kills while quad
                     );
 
                     APPEND_SAFE(line);
@@ -3240,9 +3377,14 @@ void(entity ev) webhook_stats_info =
             while (p && lines < maxlines)
             {
                 b_seen += 1;
+                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                                   (p.style & CLANRING_OBSERVER) &&
+                                   p.join_time > 0 &&
+                                   p.join_time >= participant_cutoff &&
+                                   PER_HasNontrivialActivity(p));
 
-                if (p.style & CLANRING_OBSERVER) { b_obs += 1; }
-                else if (p.next_team == world)   { b_noteam += 1; }
+                if ((p.style & CLANRING_OBSERVER) && !obs_participant) { b_obs += 1; }
+                else if ((p.next_team == world) && !obs_participant)   { b_noteam += 1; }
                 else
                 {
                     if (!opened) {
@@ -3266,16 +3408,16 @@ void(entity ev) webhook_stats_info =
                     nm    = utils_dequake_for_discord(p.netname);
                     zname = strzone(nm);
 
-                    // one-shot formatted line; name only at the end
+                    // one-shot formatted line
                     line = sprintf(
-                        "%g %g%% %g%% %g %g %g    %s\n",
+                        "%s  %2g | %3g%% %3g%% | %2g %2g %2g\n",
+                        strpad(name_col_w, zname),
                         p.clanring_badstats_x,       // paks
                         self_pct,                    // self %
                         team_pct,                    // team %
                         p.clanring_badstats2_x,      // lava
                         p.clanring_badstats2_y,      // axe
-                        p.clanring_badstats2_z,      // fall
-                        zname
+                        p.clanring_badstats2_z       // fall
                     );
 
                     APPEND_SAFE(line);
@@ -3304,27 +3446,32 @@ void(entity ev) webhook_stats_info =
             while (p && lines < maxlines)
             {
                 it_seen += 1;
+                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                                   (p.style & CLANRING_OBSERVER) &&
+                                   p.join_time > 0 &&
+                                   p.join_time >= participant_cutoff &&
+                                   PER_HasNontrivialActivity(p));
 
-                if (p.style & CLANRING_OBSERVER) { it_obs += 1; }
-                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world))   { it_noteam += 1; }
+                if ((p.style & CLANRING_OBSERVER) && !obs_participant) { it_obs += 1; }
+                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world) && !obs_participant)   { it_noteam += 1; }
                 else
                 {
                     if (!opened2) {
-                        APPEND_SAFE("\n**Items (Q RA YA MG RL LG)**\n\n");
+                        APPEND_SAFE("\n**Items (Q RA YA MG RL LG)**\n");
                         APPEND_SAFE("```\n");
                         opened2 = 1;
                     }
                     nm = utils_dequake_for_discord(p.netname);
 
                     // Q = number of Quads taken (clanring_qdwep_z)
-                    APPEND_SAFE(sprintf("%g %g %g %g %g %g    %s\n",
+                    APPEND_SAFE(sprintf("%s  %2g %2g %2g %2g %2g %2g\n",
+                                        strpad(name_col_w, nm),
                                         p.clanring_qdwep_z,          // Q
                                         p.stats_item_redarmor,       // RA
                                         p.stats_item_yellowarmor,    // YA
                                         p.stats_item_mega,           // MG
                                         p.stats_item_rl,             // RL
-                                        p.stats_item_lg,             // LG
-                                        nm));                        // name
+                                        p.stats_item_lg));           // LG
 
                     it_inc += 1; lines += 1;
                     if (webhook_stats_len > (maxlen - 120)) { it_limit += 1; break; }
@@ -3346,7 +3493,12 @@ void(entity ev) webhook_stats_info =
             else p = clanring_sentinel.next_player;
             while (p)
             {
-                if (!(p.style & CLANRING_OBSERVER) && p.next_team != world && p.join_time > 0)
+                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                                   (p.style & CLANRING_OBSERVER) &&
+                                   p.join_time > 0 &&
+                                   p.join_time >= participant_cutoff &&
+                                   PER_HasNontrivialActivity(p));
+                if (((!(p.style & CLANRING_OBSERVER) && p.next_team != world) || obs_participant) && p.join_time > 0)
                 {
                     mins_norm = max(1, (time - p.join_time) / 60);
                     per_min   = Q1_PER_Calc_Eff(p) / mins_norm;
@@ -3362,11 +3514,11 @@ void(entity ev) webhook_stats_info =
                 if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
 
-            if (e1 && e1 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("1) %5.1f    %s\n", b1, utils_dequake_for_discord(e1.netname))); }
-            if (e2 && e2 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("2) %5.1f    %s\n", b2, utils_dequake_for_discord(e2.netname))); }
-            if (e3 && e3 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("3) %5.1f    %s\n", b3, utils_dequake_for_discord(e3.netname))); }
-            if (e4 && e4 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("4) %5.1f    %s\n", b4, utils_dequake_for_discord(e4.netname))); }
-            if (e5 && e5 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("5) %5.1f    %s\n", b5, utils_dequake_for_discord(e5.netname))); }
+            if (e1 && e1 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  1) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e1.netname)), b1)); }
+            if (e2 && e2 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  2) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e2.netname)), b2)); }
+            if (e3 && e3 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  3) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e3.netname)), b3)); }
+            if (e4 && e4 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  4) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e4.netname)), b4)); }
+            if (e5 && e5 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  5) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e5.netname)), b5)); }
 
             // Inline reasons for #1 (same code fence)
             if (e1 && e1 != world)
@@ -3412,18 +3564,19 @@ void(entity ev) webhook_stats_info =
                 T[9]  = (0.15 * ep.stats_item_mega) / per_mins;                              // Megas
                 T[10] = (0.20 * ep.stats_item_rl) / per_mins;                                // RL
                 T[11] = (0.20 * ep.stats_item_lg) / per_mins;                                // LG
-                base = 12;
+                T[12] = (0.75 * ep.stats_quad_secure) / per_mins;                            // quad securing
+                base = 13;
 
                 if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
                 {
-                    T[12] = (2.5 * ep.fcaptures + 0.55 * pow(ep.fcaptures, 1.125)) / per_mins; // captures
-                    T[13] = (5.0 * pow(ep.fcarries_time / 60, 0.9)) / per_mins;                // long holds
-                    T[14] = (1.5 * ep.fcfrags) / per_mins;                                     // carrier kills
-                    T[15] = (0.25 * ep.freturns) / per_mins;                                   // returns
-                    T[16] = (2.25 * ep.strategic_returns) / per_mins;                          // strategic returns
-                    T[17] = (1.0 * ep.fdefenses + 0.23 * pow(ep.fdefenses, 1.10)) / per_mins;  // base defenses
-                    T[18] = (1.0 * ep.fcdefenses) / per_mins;                                  // carrier defenses
-                    base = 19;
+                    T[13] = (2.5 * ep.fcaptures + 0.55 * pow(ep.fcaptures, 1.125)) / per_mins; // captures
+                    T[14] = (5.0 * pow(ep.fcarries_time / 60, 0.9)) / per_mins;                // long holds
+                    T[15] = (1.5 * ep.fcfrags) / per_mins;                                     // carrier kills
+                    T[16] = (0.25 * ep.freturns) / per_mins;                                   // returns
+                    T[17] = (2.25 * ep.strategic_returns) / per_mins;                          // strategic returns
+                    T[18] = (1.0 * ep.fdefenses + 0.23 * pow(ep.fdefenses, 1.10)) / per_mins;  // base defenses
+                    T[19] = (1.0 * ep.fcdefenses) / per_mins;                                  // carrier defenses
+                    base = 20;
                 }
 
                 // pick top-3 above a small threshold to avoid noise
@@ -3466,13 +3619,14 @@ void(entity ev) webhook_stats_info =
                     else if (i1 == 9)  APPEND_SAFE(sprintf("  1) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r1v));
                     else if (i1 == 10) APPEND_SAFE(sprintf("  1) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r1v));
                     else if (i1 == 11) APPEND_SAFE(sprintf("  1) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 12) APPEND_SAFE(sprintf("  1) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 13) { local float cm=floor(ep.fcarries_time/60); local float cs=ep.fcarries_time-cm*60; APPEND_SAFE(sprintf("  1) long flag holds (%g:%02g) (+%3.1f/min)\n", cm, cs, r1v)); }
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 14) APPEND_SAFE(sprintf("  1) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 15) APPEND_SAFE(sprintf("  1) returns (%g) (+%3.1f/min)\n", ep.freturns, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 16) APPEND_SAFE(sprintf("  1) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 17) APPEND_SAFE(sprintf("  1) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 18) APPEND_SAFE(sprintf("  1) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r1v));
+                    else if (i1 == 12) APPEND_SAFE(sprintf("  1) quad securing (%g) (+%3.1f/min)\n", ep.stats_quad_secure, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 13) APPEND_SAFE(sprintf("  1) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 14) { local float cm=floor(ep.fcarries_time/60); local float cs=ep.fcarries_time-cm*60; APPEND_SAFE(sprintf("  1) long flag holds (%g:%02g) (+%3.1f/min)\n", cm, cs, r1v)); }
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 15) APPEND_SAFE(sprintf("  1) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 16) APPEND_SAFE(sprintf("  1) returns (%g) (+%3.1f/min)\n", ep.freturns, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 17) APPEND_SAFE(sprintf("  1) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 18) APPEND_SAFE(sprintf("  1) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r1v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 19) APPEND_SAFE(sprintf("  1) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r1v));
                 }
                 if (i2 >= 0)
                 {
@@ -3488,13 +3642,14 @@ void(entity ev) webhook_stats_info =
                     else if (i2 == 9)  APPEND_SAFE(sprintf("  2) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r2v));
                     else if (i2 == 10) APPEND_SAFE(sprintf("  2) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r2v));
                     else if (i2 == 11) APPEND_SAFE(sprintf("  2) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 12) APPEND_SAFE(sprintf("  2) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 13) { local float cm2=floor(ep.fcarries_time/60); local float cs2=ep.fcarries_time-cm2*60; APPEND_SAFE(sprintf("  2) long flag holds (%g:%02g) (+%3.1f/min)\n", cm2, cs2, r2v)); }
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 14) APPEND_SAFE(sprintf("  2) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 15) APPEND_SAFE(sprintf("  2) returns (%g) (+%3.1f/min)\n", ep.freturns, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 16) APPEND_SAFE(sprintf("  2) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 17) APPEND_SAFE(sprintf("  2) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 18) APPEND_SAFE(sprintf("  2) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r2v));
+                    else if (i2 == 12) APPEND_SAFE(sprintf("  2) quad securing (%g) (+%3.1f/min)\n", ep.stats_quad_secure, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 13) APPEND_SAFE(sprintf("  2) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 14) { local float cm2=floor(ep.fcarries_time/60); local float cs2=ep.fcarries_time-cm2*60; APPEND_SAFE(sprintf("  2) long flag holds (%g:%02g) (+%3.1f/min)\n", cm2, cs2, r2v)); }
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 15) APPEND_SAFE(sprintf("  2) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 16) APPEND_SAFE(sprintf("  2) returns (%g) (+%3.1f/min)\n", ep.freturns, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 17) APPEND_SAFE(sprintf("  2) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 18) APPEND_SAFE(sprintf("  2) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r2v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 19) APPEND_SAFE(sprintf("  2) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r2v));
                 }
                 if (i3 >= 0)
                 {
@@ -3510,13 +3665,14 @@ void(entity ev) webhook_stats_info =
                     else if (i3 == 9)  APPEND_SAFE(sprintf("  3) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r3v));
                     else if (i3 == 10) APPEND_SAFE(sprintf("  3) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r3v));
                     else if (i3 == 11) APPEND_SAFE(sprintf("  3) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 12) APPEND_SAFE(sprintf("  3) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 13) { local float cm3=floor(ep.fcarries_time/60); local float cs3=ep.fcarries_time-cm3*60; APPEND_SAFE(sprintf("  3) long flag holds (%g:%02g) (+%3.1f/min)\n", cm3, cs3, r3v)); }
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 14) APPEND_SAFE(sprintf("  3) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 15) APPEND_SAFE(sprintf("  3) returns (%g) (+%3.1f/min)\n", ep.freturns, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 16) APPEND_SAFE(sprintf("  3) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 17) APPEND_SAFE(sprintf("  3) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 18) APPEND_SAFE(sprintf("  3) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r3v));
+                    else if (i3 == 12) APPEND_SAFE(sprintf("  3) quad securing (%g) (+%3.1f/min)\n", ep.stats_quad_secure, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 13) APPEND_SAFE(sprintf("  3) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 14) { local float cm3=floor(ep.fcarries_time/60); local float cs3=ep.fcarries_time-cm3*60; APPEND_SAFE(sprintf("  3) long flag holds (%g:%02g) (+%3.1f/min)\n", cm3, cs3, r3v)); }
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 15) APPEND_SAFE(sprintf("  3) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 16) APPEND_SAFE(sprintf("  3) returns (%g) (+%3.1f/min)\n", ep.freturns, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 17) APPEND_SAFE(sprintf("  3) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 18) APPEND_SAFE(sprintf("  3) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r3v));
+                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 19) APPEND_SAFE(sprintf("  3) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r3v));
                 }
             }
         }
@@ -3534,7 +3690,12 @@ void(entity ev) webhook_stats_info =
 
             while (p && lines < maxlines)
             {
-                if (!(p.style & CLANRING_OBSERVER) && p.next_team != world)
+                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                                   (p.style & CLANRING_OBSERVER) &&
+                                   p.join_time > 0 &&
+                                   p.join_time >= participant_cutoff &&
+                                   PER_HasNontrivialActivity(p));
+                if ((!(p.style & CLANRING_OBSERVER) && p.next_team != world) || obs_participant)
                 {
                     if (!opened4) {
                         APPEND_SAFE("\n**CTF (cap rtn def cdef cfrg hold)**\n");
@@ -3556,9 +3717,10 @@ void(entity ev) webhook_stats_info =
 
                     // One-shot format using only zoned/safe args
                     line = sprintf(
-                        "%g %g %g %g %g %s    %s\n",
+                        "%s  %3g %3g %3g %4g %4g %5s\n",
+                        strpad(name_col_w, zname),
                         p.fcaptures, p.freturns, p.fdefenses, p.fcdefenses, p.fcfrags,
-                        z_mmss, zname
+                        z_mmss
                     );
 
                     APPEND_SAFE(line);
@@ -3690,6 +3852,17 @@ void(entity ev) webhook_stats_info =
                     remainder = strzone(tmps); \
                     end_in_code = 0; \
                 } \
+                else \
+                { \
+                    tmps = remainder; \
+                    while (strlen(tmps) > 0 && substring(tmps, 0, 1) == "\n") \
+                        tmps = substring(tmps, 1, strlen(tmps) - 1); \
+                    if (strlen(tmps) >= 2) \
+                    { \
+                        if (substring(tmps, 0, 2) == "**" || substring(tmps, 0, 2) == "##") \
+                            end_in_code = 0; \
+                    } \
+                } \
             } \
             if (prepared) strunzone(prepared); \
             prepared = remainder; \
@@ -3751,12 +3924,14 @@ void(entity ev) webhook_stats_info =
 #define WEBHOOK_DEBUG   0
 #define WEBHOOK_DEDUPE  1
 
-float  webhook_dedupe_until;
-string webhook_last_fingerprint;
+#define WEBHOOK_DEDUPE_SLOTS 16
+string webhook_recent_fingerprint[WEBHOOK_DEDUPE_SLOTS];
+float  webhook_recent_until[WEBHOOK_DEDUPE_SLOTS];
+float  webhook_recent_rr;
 
 float(string url, string payload) Webhook_AllowSend =
 {
-    local float n1, n2;
+    local float n1, n2, i, slot;
     local string url_head, payload_head, fp;
 
     n1 = strlen(url);     if (n1 > 64)  n1 = 64;
@@ -3766,12 +3941,35 @@ float(string url, string payload) Webhook_AllowSend =
     payload_head = substring(payload, 0, n2);
     fp = strcat(url_head, "\n", payload_head);
 
-    if (webhook_last_fingerprint != "" && fp == webhook_last_fingerprint && time < webhook_dedupe_until)
-        return FALSE;
+    // Reject if we've seen this exact url+payload fingerprint recently.
+    for (i = 0; i < WEBHOOK_DEDUPE_SLOTS; i = i + 1)
+    {
+        if (webhook_recent_fingerprint[i] != "" &&
+            fp == webhook_recent_fingerprint[i] &&
+            time < webhook_recent_until[i])
+            return FALSE;
+    }
 
-    if (webhook_last_fingerprint) strunzone(webhook_last_fingerprint);
-    webhook_last_fingerprint = strzone(fp);
-    webhook_dedupe_until = time + 2.0;
+    // Pick first free/expired slot, otherwise round-robin overwrite.
+    slot = -1;
+    for (i = 0; i < WEBHOOK_DEDUPE_SLOTS; i = i + 1)
+    {
+        if (webhook_recent_fingerprint[i] == "" || time >= webhook_recent_until[i])
+        {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0)
+    {
+        slot = floor(webhook_recent_rr);
+        webhook_recent_rr = webhook_recent_rr + 1;
+        if (webhook_recent_rr >= WEBHOOK_DEDUPE_SLOTS) webhook_recent_rr = 0;
+    }
+
+    if (webhook_recent_fingerprint[slot]) strunzone(webhook_recent_fingerprint[slot]);
+    webhook_recent_fingerprint[slot] = strzone(fp);
+    webhook_recent_until[slot] = time + 2.0;
     return TRUE;
 };
 
@@ -3798,6 +3996,8 @@ void() webhook_cleanup =
     local entity ev = self;
     if (ev.hook_payload) strunzone(ev.hook_payload);
     if (ev.hook_url)     strunzone(ev.hook_url);
+    if (ev.hook_url2)    strunzone(ev.hook_url2);
+    if (ev.hook_url3)    strunzone(ev.hook_url3);
     if (ev.message)      strunzone(ev.message);
     remove(ev);
 };
@@ -3812,17 +4012,26 @@ void() webhook_do_post =
         // 1) PREP fills ev.hook_url + ev.hook_payload (both zoned)
         ev.webhook_prepfn(ev);
 
-        // 2) POST once if both fields present
-        if (ev.hook_url != "" && ev.hook_payload != "")
+        // 2) POST to configured URLs (stats supports up to 3)
+        if (ev.hook_payload != "" && (ev.hook_url != "" || ev.hook_url2 != "" || ev.hook_url3 != ""))
         {
 #if WEBHOOK_DEDUPE
-            if (Webhook_AllowSend(ev.hook_url, ev.hook_payload)) {
+            if (ev.hook_url != "" && Webhook_AllowSend(ev.hook_url, ev.hook_payload)) {
                 webhook_post(ev.hook_url, ev.hook_payload);
                 posted = TRUE;
             }
+            if (ev.hook_url2 != "" && Webhook_AllowSend(ev.hook_url2, ev.hook_payload)) {
+                webhook_post(ev.hook_url2, ev.hook_payload);
+                posted = TRUE;
+            }
+            if (ev.hook_url3 != "" && Webhook_AllowSend(ev.hook_url3, ev.hook_payload)) {
+                webhook_post(ev.hook_url3, ev.hook_payload);
+                posted = TRUE;
+            }
 #else
-            webhook_post(ev.hook_url, ev.hook_payload);
-            posted = TRUE;
+            if (ev.hook_url != "")  { webhook_post(ev.hook_url,  ev.hook_payload); posted = TRUE; }
+            if (ev.hook_url2 != "") { webhook_post(ev.hook_url2, ev.hook_payload); posted = TRUE; }
+            if (ev.hook_url3 != "") { webhook_post(ev.hook_url3, ev.hook_payload); posted = TRUE; }
 #endif
         }
     }
@@ -3878,7 +4087,7 @@ void(void(entity) prepfn, string content) webhook_post_deferred =
 
 
 // ===========================
-// Match POST (JSON) — single knob
+// Match POST (JSON) single knob
 // ===========================
 
 // Empty => OFF. Non-empty => ON.
@@ -4053,7 +4262,7 @@ void(float reqid, float responsecode, string resourcebody, __int resourcebytes) 
         return;
     }
 
-    // --- Webhook posts (9100–9199) -----------------------------------------
+    // --- Webhook posts (9100-9199) -----------------------------------------
     if (reqid >= 9100 && reqid < 9200)
     {
         if (responsecode >= 200 && responsecode < 300) {
@@ -4081,7 +4290,7 @@ void(float reqid, float responsecode, string resourcebody, __int resourcebytes) 
         return;
     }
 
-    // --- MATCH posts (9300–9399) ------------------------------------------
+    // --- MATCH posts (9300-9399) ------------------------------------------
     if (reqid >= 9300 && reqid < 9400) {
         bprint(sprintf("MATCHPOST %f status=%g bytes=%g\n", reqid, responsecode, bytes));
         L = bytes; if (L > 200) L = 200;
@@ -4100,8 +4309,8 @@ void(float reqid, float responsecode, string resourcebody, __int resourcebytes) 
         return;
     }
 
-    // --- Google Sheets requests (200-204) -----------------------------------
-    if (reqid >= 200 && reqid <= 204)
+    // --- Google Sheets requests (200-206) -----------------------------------
+    if (reqid >= 200 && reqid <= 206)
     {
         gsheets_callback(reqid, responsecode, resourcebody);
         return;
@@ -4196,7 +4405,7 @@ void(string payload) match_post_json =
             if (chk < 0) { dprint(sprintf("[matchpost] QC fopen failed: '%s'\n", p)); }
             else
             {
-                // Show a tiny head so we know we’re pointing at the JSON file we just wrote
+                // Show a tiny head so we know we're pointing at the JSON file we just wrote
                 local string head = mp_readfile_head(p, 160);
                 if (strlen(head) > 0)
                 {
@@ -4359,7 +4568,7 @@ string(float code) utils_qf_chr =
 // Quake "dot" separator (0x9C = 156). Safer than relying on "\x9C".
 string() utils_qf_dot =
 {
-    return utils_qf_chr(156); // ·
+    return utils_qf_chr(156); // \xB7
 };
 
 // Quake-font brackets (code 16 = left, 17 = right)
@@ -4372,10 +4581,10 @@ string() utils_qf_rbrack =
     return utils_qf_chr(17);
 };
 
-// Result (no spaces touching brackets): [when_ago · MODE · map_name]
+// Result (no spaces touching brackets): [when_ago \xB7 MODE \xB7 map_name]
 string(string when_ago, string map_name, string raw_mode) format_match_header =
 {
-    string sep = strcat(" ", utils_qf_dot(), " "); // " · "
+    string sep = strcat(" ", utils_qf_dot(), " "); // " \xB7 "
     string mid = strcat(when_ago, sep, normalize_mode(raw_mode), sep, map_name);
     return strcat(utils_qf_lbrack(), mid, utils_qf_rbrack());
 };
