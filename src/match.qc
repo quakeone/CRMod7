@@ -53,6 +53,10 @@ void() weapon_prewar_cleanup;
 void() weapon_prewar_animate_think;
 void() weapon_prewar_setup;
 float() match_aborted_too_early;
+void() match_check_initial_movement;
+void() match_initialize_initial_movement_tracking;
+void() match_cancel_initial_movement_check;
+void() match_clear_initial_movement_state;
 void() match_refresh_spawn_markers;
 void(void(entity) prepfn, string content) webhook_post_deferred;
 void(entity ev) webhook_captime_info;
@@ -66,10 +70,27 @@ void(entity player, float targetColor) match_add_player_silent;
 
 void() match_clear_leavemealone =
 {
+    if (!self.leavemealone)
+        return;
     self.leavemealone = FALSE;
     if (self.solid == SOLID_TRIGGER)
+    {
         self.solid = SOLID_SLIDEBOX;
-    setorigin(self, self.origin);
+        setorigin(self, self.origin); // relink
+        // Check if now stuck inside something
+        tracebox(self.origin, self.mins, self.maxs, self.origin, MOVE_NORMAL, self);
+        if (trace_startsolid || trace_allsolid)
+        {
+            // Nudge upward to try to free them
+            setorigin(self, self.origin + '0 0 32');
+            tracebox(self.origin, self.mins, self.maxs, self.origin, MOVE_NORMAL, self);
+            if (trace_startsolid || trace_allsolid)
+            {
+                // Still stuck, respawn them
+                PutClientInServer();
+            }
+        }
+    }
 };
 
 // Only allow leave-me-alone during DM/CTF match prewar (non-arena)
@@ -90,6 +111,195 @@ float() leavemealone_mode_allows =
 
     // Base DM match prewar
     return TRUE;
+};
+
+void() match_clear_initial_movement_state =
+{
+    self.match_start_monitor_active = FALSE;
+    self.match_start_origin_valid = FALSE;
+    self.match_start_moved = FALSE;
+    self.match_start_warned = FALSE;
+    self.match_start_origin = '0 0 0';
+};
+
+void() match_cancel_initial_movement_check =
+{
+    local entity saved_self;
+
+    if (clanring_match_inactivity_check != world)
+    {
+        saved_self = self;
+        self = clanring_match_inactivity_check;
+        remove(self);
+        self = saved_self;
+        clanring_match_inactivity_check = world;
+    }
+    else
+        clanring_match_inactivity_check = world;
+
+    clanring_match_start_time = 0;
+
+    saved_self = self;
+    utils_do_players(match_clear_initial_movement_state);
+    self = saved_self;
+};
+
+void() match_initialize_initial_movement_tracking =
+{
+    local entity player;
+    local entity saved_self;
+
+    if (!(clanring_playmode & CLANRING_MATCH_MODE))
+        return;
+    if (mode_is_arena())
+        return;
+
+    match_cancel_initial_movement_check();
+
+    clanring_match_start_time = time + CLANRING_MATCH_PLAYER_RESPAWN_DELAY;
+    clanring_match_inactivity_check = utils_make_scheduled_event(match_check_initial_movement, CLANRING_MATCH_PLAYER_RESPAWN_DELAY + 5);
+
+    saved_self = self;
+    player = find(world, classname, "player");
+    while (player)
+    {
+        if ((player.style & CLANRING_CONNECTED) && !(player.style & CLANRING_OBSERVER) && (player.style & CLANRING_READY))
+        {
+            player.match_start_monitor_active = TRUE;
+            player.match_start_origin_valid = FALSE;
+            player.match_start_moved = FALSE;
+            player.match_start_warned = FALSE;
+        }
+        else
+        {
+            player.match_start_monitor_active = FALSE;
+            player.match_start_origin_valid = FALSE;
+            player.match_start_moved = FALSE;
+            player.match_start_warned = FALSE;
+        }
+        player.match_start_origin = player.origin;
+        player = find(player, classname, "player");
+    }
+    self = saved_self;
+};
+
+void() match_check_initial_movement =
+{
+    local entity event;
+    local entity player;
+    local entity offender;
+    local entity saved_self;
+    local float found_inactive;
+    local float warned_any;
+
+    event = self;
+
+    if (mode_is_arena())
+    {
+        clanring_match_inactivity_check = world;
+        clanring_match_start_time = 0;
+        saved_self = self;
+        utils_do_players(match_clear_initial_movement_state);
+        self = saved_self;
+        remove(event);
+        return;
+    }
+
+    if (!(clanring_state & CLANRING_MATCH_STARTED))
+    {
+        clanring_match_inactivity_check = world;
+        clanring_match_start_time = 0;
+        saved_self = self;
+        utils_do_players(match_clear_initial_movement_state);
+        self = saved_self;
+        remove(event);
+        return;
+    }
+
+    if (clanring_state & CLANRING_MATCH_PAUSED)
+    {
+        event.nextthink = time + 1;
+        return;
+    }
+
+    // Phase 1 (5 seconds): warn about inactive players
+    if (!event.count)
+    {
+        player = find(world, classname, "player");
+        while (player)
+        {
+            if (player.match_start_monitor_active)
+            {
+                if ((player.style & CLANRING_CONNECTED) && !(player.style & CLANRING_OBSERVER) && !player.match_start_moved)
+                {
+                    announce2(player.netname, " has not moved");
+                    player.match_start_warned = TRUE;
+                    warned_any = TRUE;
+                }
+            }
+            player = find(player, classname, "player");
+        }
+
+        if (warned_any)
+        {
+            // Schedule phase 2 (15 more seconds = 20 total)
+            event.count = 1;
+            event.nextthink = time + 15;
+            return;
+        }
+
+        // Everyone moved, clean up
+        clanring_match_inactivity_check = world;
+        clanring_match_start_time = 0;
+        saved_self = self;
+        utils_do_players(match_clear_initial_movement_state);
+        self = saved_self;
+        remove(event);
+        return;
+    }
+
+    // Phase 2 (20 seconds): abort if still inactive
+    player = find(world, classname, "player");
+    while (player)
+    {
+        if (player.match_start_monitor_active && player.match_start_warned)
+        {
+            if ((player.style & CLANRING_CONNECTED) && !(player.style & CLANRING_OBSERVER) && !player.match_start_moved)
+            {
+                if (!found_inactive)
+                    announce("\[\bAuto Match Abort Activated\b\]");
+                announce2(player.netname, " did not move after match start");
+                if (!offender)
+                    offender = player;
+                found_inactive = TRUE;
+            }
+        }
+        player = find(player, classname, "player");
+    }
+
+    clanring_match_inactivity_check = world;
+    clanring_match_start_time = 0;
+
+    saved_self = self;
+    utils_do_players(match_clear_initial_movement_state);
+    self = saved_self;
+
+    if (found_inactive)
+    {
+        if (!offender)
+            offender = world;
+        if (offender != world)
+            announce(strcat("Match aborted: ", offender.netname, " was inactive at start"));
+        else
+            announce("Match aborted due to inactive player");
+        saved_self = self;
+        self = offender;
+        match_end();
+        self = saved_self;
+    }
+
+    self = event;
+    remove(self);
 };
 
 //TODO: Make this dynamic
@@ -146,6 +356,8 @@ void() match_init_world =
 {
     clanring_numteams = 0;
     clanring_match_aborted = FALSE;
+    clanring_match_inactivity_check = world;
+    clanring_match_start_time = 0;
     clanring_sentinel.next_team = world;
     clanring_sentinel.movetarget = world;
     clanring_sentinel.frags = CLANRING_NEGINF;
@@ -279,6 +491,8 @@ void() match_reset =
     clanring_state = clanring_state - (clanring_state & CLANRING_NULL_FLAG);
     clanring_match_aborted = FALSE;
 
+    match_cancel_initial_movement_check();
+
     // prevent items from respawning
     utils_do_items(match_item_reset);
 
@@ -336,7 +550,7 @@ void() match_gib_player =
             self.deadflag = DEAD_DYING;
 
             self.think = respawn;
-            self.nextthink = time + 1;
+            self.nextthink = time + CLANRING_MATCH_PLAYER_RESPAWN_DELAY;
 
             if (clanring_state & CLANRING_MATCH_STARTED)
             {
@@ -978,6 +1192,7 @@ void() match_end =
         match_unpause();
         clanring_numteams = 0;
     }
+    match_cancel_initial_movement_check();
     clanring_state = clanring_state - (clanring_state & CLANRING_MATCH_STARTED);
     clanring_state = clanring_state - (clanring_state & CLANRING_TIMER_STARTED);
     clanring_state = ((clanring_state | CLANRING_MATCH_OVER) | CLANRING_MATCH_WAIT);
@@ -985,14 +1200,17 @@ void() match_end =
     match_show_timelimit();
     match_bprint_score();
 
-    if (clanring_first_place.frags == clanring_second_place.frags)
-        announce("Tie game!");
-    else
+    if (!clanring_match_aborted)
     {
-        announce3(clanring_szthe, clanring_first_place.netname, " has won");
+        if (clanring_first_place.frags == clanring_second_place.frags)
+            announce("Tie game!");
+        else
+        {
+            announce3(clanring_szthe, clanring_first_place.netname, " has won");
 
-        //play post-match sound sometimes
-        match_postgame_sound((clanring_first_place.frags - clanring_second_place.frags));
+            //play post-match sound sometimes
+            match_postgame_sound((clanring_first_place.frags - clanring_second_place.frags));
+        }
     }
 
     local string record_time, team_letter;
@@ -1491,6 +1709,8 @@ void() match_begin =
 
     announce("The match has begun!");//Moved up here for autodemo
     utils_do_players(match_gib_player);//r00k after additional spawns...
+
+    match_initialize_initial_movement_tracking();
 
     clanring_new_record_player = "";	// .netname of the person who set the current top record.(only used in stats output)
     utils_do_projectiles(SUB_Remove);
@@ -3322,6 +3542,8 @@ void() match_pause =
     announce("Match paused");
     match_bprint_time();
     match_bprint_score();
+    if (clanring_match_inactivity_check != world)
+        clanring_match_inactivity_check.nextthink = clanring_match_inactivity_check.nextthink + 1000000;
     clanring_match_timer.think1 = clanring_match_timer.think;
     clanring_match_timer.cnt = clanring_match_timer.nextthink;
     match_show_pause();
@@ -3508,6 +3730,10 @@ void() match_unpause =
     clanring_state = (clanring_state - (clanring_state & CLANRING_MATCH_PAUSED));
     clanring_state = (clanring_state - (clanring_state & CLANRING_AUTO_PAUSED));
     clanring_match_pause_time = time - clanring_match_pause_time;
+    if (clanring_match_start_time)
+        clanring_match_start_time = clanring_match_start_time + clanring_match_pause_time;
+    if (clanring_match_inactivity_check != world)
+        clanring_match_inactivity_check.nextthink = clanring_match_inactivity_check.nextthink - 1000000 + clanring_match_pause_time;
     utils_do_items(match_unpause_item);
     utils_do_item(match_unpause_item, "item_backpack");
 

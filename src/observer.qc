@@ -2144,6 +2144,8 @@ void () observer_pre_think =
 {
     local float jump;
 
+    votables_map_vote_prompt_display();
+
     // Deal with button2.  jump is set to TRUE if button2 was just pressed,
     // FALSE otherwise.
     if (self.button2)

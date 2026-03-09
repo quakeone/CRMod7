@@ -211,6 +211,10 @@ float   clanring_numteams;			// number of teams
 float   clanring_maxsize;           // maximum allowed team size
 entity  clanring_match_timer;       // used to time match
 float   clanring_match_aborted;     // TRUE when the current match was ended early
+entity  clanring_match_inactivity_check;   // scheduled inactivity watchdog during early match
+float   clanring_match_start_time;  // timestamp of when early-match inactivity monitoring begins
+float   CLANRING_MATCH_PLAYER_RESPAWN_DELAY = 1; // ready players respawn 1 second after match begin/end
+float   CLANRING_MATCH_START_MOVEMENT_THRESHOLD = 16; // minimum distance required to count as movement
 // --- Quad control observer announcements ---
 float QUAD_RESPAWN_TIME = 60;     // seconds between quad respawns (standard QW)
 float g_quad_spawner_count;       // number of Quad spawners on the map (cached)
@@ -303,6 +307,13 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .float  saved_pos_valid;
 .float  saved_pos_last_move_time;
 
+// Early match inactivity detection
+.vector match_start_origin;
+.float  match_start_monitor_active;
+.float  match_start_origin_valid;
+.float  match_start_moved;
+.float  match_start_warned;
+
 float 	CLANRING_ANGLE_SMOOTHING    = 0.6; // CRMOD use this instead of typing the number a billion times (actually 6 times in observer.qc ;) )
 
 
@@ -323,6 +334,8 @@ void(string s1, ...) cprint;
 void(string s1, string s2) cprint2;
 void(string s1, string s2, string s3) cprint3;
 void(string s1, string s2, string s3, string s4) cprint4;
+void() votables_map_vote_prompt_display;
+float(float mapnum) votables_maybe_prompt_map_vote_mode_change;
 .float 	rotthink;//megahealth think
 
 .string name_ready;
@@ -337,6 +350,11 @@ void(string s1, string s2, string s3, string s4) cprint4;
 
 .float 	warp_episode;//chosen episode to warp
 .float 	warp_map;//chosen map to warp
+.float  pending_map_vote_mapnum;
+.float  pending_map_vote_type;
+.float  pending_map_vote_mode;
+.float  pending_map_vote_timeout;
+.float  pending_map_vote_print_time;
 
 //ctf variables from ZOID's 3wave
 float 	TEAM_CAPTURE_CAPTURE_BONUS    			    = 5;

@@ -2375,6 +2375,8 @@ void() Team_weapon_touch =
 
 	if (other.classname != "player") return;
 
+	if (other.leavemealone) return;
+
 	// Don't let the owner pick up his own weapon for a second.
 	if ((other == self.owner) && ( (self.nextthink - time) > 19 ) )
 	{

@@ -68,11 +68,11 @@ float(float ballot) Request_Poll_Votes_Needed =
 	{
 		while (bingo)
 		{
-			if (bingo.style & CLANRING_CONNECTED)
+			if ((bingo.style & CLANRING_CONNECTED) && clienttype(bingo) != CLIENTTYPE_BOT)
 			{
 				if (bingo.style & CLANRING_AFK_CLIENT)
 				{
-					if (bingo.vote)	//count players that are afk and already voted 
+					if (bingo.vote)	//count players that are afk and already voted
 					{
 						pcount += 1;
 
@@ -98,14 +98,14 @@ float(float ballot) Request_Poll_Votes_Needed =
 		{
 			while (bingo)
 			{
-				if (bingo.style & CLANRING_CONNECTED)
+				if ((bingo.style & CLANRING_CONNECTED) && clienttype(bingo) != CLIENTTYPE_BOT)
 				{
 					if (bingo.style & CLANRING_AFK_CLIENT)
 					{
-						if (bingo.vote)	//count players that are afk and already voted 
+						if (bingo.vote)	//count players that are afk and already voted
 						{
 							pcount += 1;
-	
+
 							if (bingo.vote == ballot)
 								vcount += 1;
 						}
@@ -113,7 +113,7 @@ float(float ballot) Request_Poll_Votes_Needed =
 					else
 					{
 						pcount += 1;
-	
+
 						if (bingo.vote == ballot)
 							vcount += 1;
 					}

@@ -1054,6 +1054,12 @@ void() PutClientInServer =
     self.origin = self.oldorigin = spot.origin; //R00k: update oldorigin so we dont respawn where we died.
     setorigin(self, spot.origin);	    //R00k: change our origin and relink our edict.
 
+    if ((clanring_state & CLANRING_MATCH_STARTED) && clanring_match_start_time && (clanring_match_inactivity_check != world) && self.match_start_monitor_active && !(mode_is_arena()))
+    {
+        self.match_start_origin = self.origin;
+        self.match_start_origin_valid = TRUE;
+    }
+
     // If leavemealone isn't permitted in this mode, force it off before finishing spawn.
     registercvar("cr_allow_leavemealone", "1");
     if (self.leavemealone)
@@ -1579,6 +1585,8 @@ void() PlayerPreThink =
         self.wait = time + 1;
     }
 
+    votables_map_vote_prompt_display();
+
     if (self.style & CLANRING_SETTING_OPTIONS)
     {
         self.style = self.style | CLANRING_NO_POST_THINK;
@@ -1613,6 +1621,23 @@ void() PlayerPreThink =
         self.velocity = '0 0 0';
         self.movement = '0 0 0';//FIXME?
         return;
+    }
+
+    if ((clanring_playmode & CLANRING_MATCH_MODE) && !(mode_is_arena()))
+    {
+        if (self.match_start_monitor_active && clanring_match_start_time && (clanring_match_inactivity_check != world))
+        {
+            if (!self.match_start_origin_valid)
+            {
+                self.match_start_origin = self.origin;
+                self.match_start_origin_valid = TRUE;
+            }
+            else if (!self.match_start_moved)
+            {
+                if (vlen(self.origin - self.match_start_origin) > CLANRING_MATCH_START_MOVEMENT_THRESHOLD)
+                    self.match_start_moved = TRUE;
+            }
+        }
     }
 
     self.deathtype = "";	//R00k - wrong obituary messages fix by Zoid
@@ -3236,27 +3261,32 @@ void () check_client_status =
 
 float (string s) FindNumericalInput =
 {
-    float pass;
+    float pass, i;
 
     pass = 0;
 
     if (self.use)
     {
-        float n;
+        float n, c;
 
-        if ((strlen(s)) > 2) // 00 to 99
-        {
-            n = 0;
+        // Only treat explicit 1-2 digit console input as menu input.
+        // Empty or non-numeric commands should fall through normally.
+        if (s == "" || (strlen(s)) > 2) // 00 to 99
             pass = 0;
-        }
         else
         {
+            for (i = 0; i < strlen(s); i += 1)
+            {
+                c = str2chr(s, i);
+                if (c < 48 || c > 57)
+                    return 0;
+            }
+
             n = stof(s);
             pass = 1;
+            self.finaldest_z = n;
+            self.use();
         }
-
-        self.finaldest_z = n;
-        self.use();
     }
 
     return pass;
@@ -4205,6 +4235,8 @@ void(string cmd) SV_ParseClientCommand =
                 mapnumber = found_in_warp_list(arg0);
                 if (mapnumber)
                 {
+                    if (votables_maybe_prompt_map_vote_mode_change(mapnumber))
+                        return;
                     votables_request_set_gametype_mode_map(-1, -1, mapnumber);
                     return;
                 }
