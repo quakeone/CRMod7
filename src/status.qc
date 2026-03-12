@@ -1,3 +1,5 @@
+float(float heads) hh_score_value;
+
 void() TeamCaptureCheckUpdate =
 {
 	local entity p;
@@ -368,6 +370,41 @@ void() TeamCapturePlayerUpdate =
 	s3 = sprintf("\n%s",self.movetarget.netname);
 
 	centerprint (self, res, s1, s2, s3);
+};
+
+void() HeadHuntersPlayerUpdate =
+{
+	local float value;
+	local string res;
+	local string heads;
+
+	if (!(clanring_playmode & CLANRING_HH_MODE))
+		return;
+
+	if (strconv(1,0,0,(infokey(self, "f_status"))) == "off")
+		return;
+
+	if (self.statstate < 0)
+		return;
+
+	if (self.laststattime > time)
+		return;
+
+	if ((self.style & CLANRING_MOTD) && (time >= self.leaderboardtime))
+		return;
+
+	if (clanring_state & CLANRING_MATCH_PAUSED)
+		return;
+
+	self.laststattime = (time + PLAYERSTATTIME);
+	res = TeamSetStatRes2(self);
+	if (teamplay && (self.team > 0))
+		value = self.hh_head_total_value;
+	else
+		value = hh_score_value(self.ammo_heads);
+	heads = sprintf("\bHead Value\b %.0f   \bHeads\b %.0f", value, self.ammo_heads);
+
+	centerprint(self, res, heads);
 };
 
 string (float nexttime) get_nextspawn_string =

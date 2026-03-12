@@ -14,6 +14,7 @@ float request_overtime;		// Used for requesting a new overtime
 float request_gibs;         // Used to set gib level
 float request_mode;         // Used to request a new mode
 float request_gametype;		// Used to request a new game type
+float request_teamplay;      // Used for HH FFA/team variants
 float request_weaponstay;   // Used to request weaponstay
 // q14ever overlay: remember who initiated the enable so we can attach the prop to them.
 entity q14ever_last_requester;
@@ -23,6 +24,19 @@ void() utils_update_server_time;
 void() utils_save_disconnect_log;
 void(float ghost) G1v1_UpdateQuadAlpha;
 void() votables_map_vote_prompt_response;
+void(float newtype, float newmode, float newmap) votables_request_set_gametype_mode_map;
+
+void(float newmap) votables_request_set_hh =
+{
+	request_teamplay = -1;
+	votables_request_set_gametype_mode_map(8, -1, newmap);
+};
+
+void(float newteamplay, float newmap) votables_request_set_hh_variant =
+{
+	request_teamplay = newteamplay;
+	votables_request_set_gametype_mode_map(8, -1, newmap);
+};
 
 //
 //  S E N D  A L I A S E S
@@ -83,6 +97,7 @@ void() votables_send_aliases =
 	stuffcmd(self, "alias dmm4 cmd dmm4\n");
 	stuffcmd(self, "alias ctfdmm4 cmd ctfdmm4\n");
 	stuffcmd(self, "alias airshot cmd airshot\n");
+	stuffcmd(self, "alias hh cmd hh\n");
 	stuffcmd(self, "alias powerupdrop cmd powerupdrop;\n");
 	stuffcmd(self, "alias leavemealone \"cmd leavemealone\"\n");
 	stuffcmd(self, "alias prediction \"cmd prediction\"\n");
@@ -365,6 +380,7 @@ void() votables_clear_arena_playmode_flags =
 	clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_DMM4_MODE);
 	clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_AIRSHOT_MODE);
 	clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_WIPEOUT_MODE);
+	clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_HH_MODE);
 }
 
 void() votables_clear_playmode_flags =
@@ -497,6 +513,25 @@ void() votables_set_gametype_mode_map =
 
 			newmapname = "ctf8dmm4";
 		}
+		else if (request_gametype == 8)
+		{
+			votables_clear_playmode_flags();
+			clanring_playmode = (clanring_playmode | CLANRING_HH_MODE);
+			clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_NO_HOOK);
+			cvar_set("timelimit", "20");
+			cvar_set("fraglimit", "100");
+			if (request_teamplay >= 0)
+				cvar_set("teamplay", ftos(request_teamplay));
+			else
+				cvar_set("teamplay", "0");
+			cvar_set("deathmatch", "1");
+			if (request_teamplay > 0)
+				bprint("gametype set to Team Head Hunters\n");
+			else if (request_teamplay == 0)
+				bprint("gametype set to Head Hunters FFA\n");
+			else
+				bprint("gametype set to Head Hunters\n");
+		}
 
 		new_type_flags = clanring_playmode
 			& (CLANRING_CAPTURE_THE_FLAG
@@ -504,7 +539,8 @@ void() votables_set_gametype_mode_map =
 				| CLANRING_RA_MODE
 				| CLANRING_DMM4_MODE
 				| CLANRING_AIRSHOT_MODE
-				| CLANRING_WIPEOUT_MODE);
+				| CLANRING_WIPEOUT_MODE
+				| CLANRING_HH_MODE);
 
 		// Keep alt ents scoped to the current mode family; reset on gametype switch.
 		if (old_type_flags != new_type_flags && (clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS))
@@ -646,6 +682,7 @@ void() votables_set_gametype_mode_map =
 //		5	-	airshot
 //		6	-	wipeout
 //		7	-	ctfdmm4
+//		8	-	head hunters
 //
 // newmode		(dm/ctf)
 //	   -1	-	no change
@@ -688,10 +725,14 @@ void(float newtype, float newmode, float newmap) votables_request_set_gametype_m
 
 	if (newtype >= 0)
 	{
+		if (newtype != 8)
+			request_teamplay = -1;
+
 		//if request is only to change to the game type we are already in
 		if (newtype == 0 && !(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) 
 			&& !(clanring_playmode & CLANRING_DMM4_MODE) && !(clanring_playmode & CLANRING_CA_MODE) 
 			&& !(clanring_playmode & CLANRING_RA_MODE) && !(clanring_playmode & CLANRING_AIRSHOT_MODE) 
+			&& !(clanring_playmode & CLANRING_HH_MODE)
 			&& newmode < 0 && !newmap)
 		{
 			sprint(self, "Already in DeathMatch mode\n");
@@ -727,6 +768,25 @@ void(float newtype, float newmode, float newmap) votables_request_set_gametype_m
 		{
 			sprint(self, "Already in wipeout mode\n");
 			return;
+		}
+		else if (newtype == 8 && clanring_playmode & CLANRING_HH_MODE && newmode < 0 && !newmap)
+		{
+			if (request_teamplay >= 0)
+			{
+				if (teamplay == request_teamplay)
+				{
+					if (request_teamplay > 0)
+						sprint(self, "Already in Team Head Hunters mode\n");
+					else
+						sprint(self, "Already in Head Hunters FFA mode\n");
+					return;
+				}
+			}
+			else
+			{
+				sprint(self, "Already in Head Hunters mode\n");
+				return;
+			}
 		}
 	}
 
@@ -821,6 +881,15 @@ void(float newtype, float newmode, float newmap) votables_request_set_gametype_m
 		else if (request_gametype == 7)
 		{
 			gametype_string = "CTF Duel";
+		}
+		else if (request_gametype == 8)
+		{
+			if (request_teamplay > 0)
+				gametype_string = "Head Hunters Team";
+			else if (request_teamplay == 0)
+				gametype_string = "Head Hunters FFA";
+			else
+				gametype_string = "Head Hunters";
 		}
 
 		if (request_mapname != "")

@@ -2062,7 +2062,7 @@ PLAYER BACKPACKS
 void() BackpackTouch =
 {
 	local string s;
-	local float best, new, acount, bswitch;
+	local float best, new, acount, bswitch, headtake;
 	local entity stemp;
 
 	if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
@@ -2080,6 +2080,7 @@ void() BackpackTouch =
 	if (other.health <= 0)
 		return;
 
+	
 	if (infokey(other, "b_switch") != "")
 		bswitch = infokeyf(other, "b_switch");
 	else
@@ -2169,6 +2170,34 @@ void() BackpackTouch =
 	other.ammo_nails = (other.ammo_nails + self.ammo_nails);
 	other.ammo_rockets = (other.ammo_rockets + self.ammo_rockets);
 	other.ammo_cells = (other.ammo_cells + self.ammo_cells);
+	if ((clanring_playmode & CLANRING_HH_MODE) && ((self.ammo_heads > 0) || (self.hh_head_list != world)))
+	{
+		hh_collect_heads_from_holder(other, self);
+		headtake = hh_collect_taken;
+
+		if (headtake > 0)
+		{
+			if (acount)
+				sprint(other, ", ");
+
+			acount = 1;
+			sprint(other, ftos(headtake), " head");
+			if (headtake != 1)
+				sprint(other, "s");
+		}
+
+		if (hh_collect_reclaimed > 0)
+		{
+			if (acount)
+				sprint(other, ", ");
+
+			acount = 1;
+			sprint(other, ftos(hh_collect_reclaimed), " head");
+			if (hh_collect_reclaimed != 1)
+				sprint(other, "s");
+			sprint(other, " back");
+		}
+	}
 	new = self.items;
 	if (!new)
 		new = other.weapon;
@@ -2225,8 +2254,22 @@ void() BackpackTouch =
 // backpack touch sound
 	sound (other, CHAN_ITEM, "weapons/lock4.wav", 1, ATTN_NORM);
 	other.stats_item_backpacks += 1;
-// remove the backpack, change self to the player
-	remove(self);
+// remove the backpack unless it still needs to hold leftover HH heads
+	if ((clanring_playmode & CLANRING_HH_MODE) && ((self.ammo_heads > 0) || (self.hh_head_list != world)))
+	{
+		self.items = 0;
+		self.netname = "";
+		self.ammo_shells = 0;
+		self.ammo_nails = 0;
+		self.ammo_rockets = 0;
+		self.ammo_cells = 0;
+		self.owner = world;
+		self.enemy = world;
+	}
+	else
+	{
+		remove(self);
+	}
 	self = other;
 
 	if (( other.weapon == best ) && ( other.weapon != IT_HOOK ))
@@ -2272,7 +2315,11 @@ void() DropBackpack =
 	local entity item;
 	local string msg;
 
-	if (!(self.ammo_shells + self.ammo_nails + self.ammo_rockets + self.ammo_cells))
+	if (clanring_playmode & CLANRING_HH_MODE)
+		hh_ensure_holder_heads(self);
+
+	if (!(self.ammo_shells + self.ammo_nails + self.ammo_rockets + self.ammo_cells
+		+ ((clanring_playmode & CLANRING_HH_MODE) ? self.ammo_heads : 0)))
 		return;	// nothing in it
 
 	item = spawn();
@@ -2340,6 +2387,8 @@ void() DropBackpack =
 	item.ammo_nails 	= self.ammo_nails;
 	item.ammo_rockets 	= self.ammo_rockets;
 	item.ammo_cells 	= self.ammo_cells;
+	if (clanring_playmode & CLANRING_HH_MODE)
+		hh_transfer_all_heads(item, self, FALSE);
 
 	item.velocity_z = 300;
 	item.velocity_x = -100 + (random () * 200);
@@ -2352,7 +2401,7 @@ void() DropBackpack =
 	setsize (item, '-16 -16 0', '16 16 56');
 	item.touch = BackpackTouch;
 	item.nextthink = time + 120;	//remove after 2 minutes
-	item.think = SUB_Remove;
+	item.think = hh_backpack_expire;
 };
 
 void() Team_weapon_touch =
@@ -2481,7 +2530,8 @@ void() TossWeapon =
 	if (clanring_playmode & CLANRING_PRACTICE_MODE)
 		return;
 
-	if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
+	if (!((clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+		|| ((clanring_playmode & CLANRING_HH_MODE) && teamplay)))
 		return;
 
 	if (((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED)))
@@ -2765,7 +2815,8 @@ void() TossAmmo =
 		return;
 	}
 
-	if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
+	if (!((clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+		|| ((clanring_playmode & CLANRING_HH_MODE) && teamplay)))
 		return;
 
 	if (((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED)))

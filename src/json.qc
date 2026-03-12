@@ -1041,6 +1041,7 @@ void(string entry) json_append_lastscores =
         else if (clanring_playmode & CLANRING_DMM4_MODE)         mode = "DMM4";
         else if (clanring_playmode & CLANRING_WIPEOUT_MODE)      mode = "WIPEOUT";
         else if (clanring_playmode & CLANRING_AIRSHOT_MODE)      mode = "AIRSHOT";
+        else if (clanring_playmode & CLANRING_HH_MODE)           mode = "HH";
         else                                                     mode = "DM";
     }
 

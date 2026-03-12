@@ -3025,6 +3025,7 @@ void(entity ev) webhook_stats_info =
         else if (clanring_playmode & CLANRING_WIPEOUT_MODE)     modes = "Wipeout";
         else if (clanring_playmode & CLANRING_DMM4_MODE)        modes = "DMM4";
         else if (clanring_playmode & CLANRING_AIRSHOT_MODE)     modes = "Airshot";
+        else if (clanring_playmode & CLANRING_HH_MODE)          modes = "Head Hunters";
         else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
         {
             if      (clanring_playmode & CLANRING_MATCH_MODE)    modes = "CTF Match";

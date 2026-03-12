@@ -96,6 +96,7 @@ float CLANRING_DMM4_MODE			= 1048576;
 float CLANRING_CONSOLE_STATS   		= 2097152;
 float CLANRING_CA_MODE				= 4194304;
 float CLANRING_RA_MODE				= 8388608;
+float CLANRING_HH_MODE             = 16777216;
 
 /*
 	G A M E C O N F I G
@@ -171,6 +172,7 @@ float ADMIN_RA_MODE    		= 5;
 float ADMIN_AIRSHOT_MODE    = 6;
 float ADMIN_DMM4_MODE    	= 7;
 float ADMIN_WIPEOUT_MODE	= 8;
+float ADMIN_HH_MODE         = 9;
 
 // entity constants
 float CLANRING_MANUAL_SPAWN = 1;
@@ -193,6 +195,11 @@ float   clanring_levelcount;        // used to scan through list in levels.cfg
 float   clanring_lastcount;         // used to detect end-of-file in levels.cfg
 float   clanring_force_ring;        // 1 = force ring on, -1 = force ring off, 0 = no force (auto)
 float   clanring_force_timelimit;   // 1 = force timelimit from cfg, 0 = auto
+float   hh_maxheads = 0;            // 0 = no carry cap; positive values enforce a cap
+float   hh_altar_scoring;           // allows client_frag only during HH altar scoring
+float   hh_collect_taken;           // temp pickup count for HH helper transfers
+float   hh_collect_reclaimed;       // temp reclaim count for HH helper transfers
+float   hh_hud_enabled;             // legacy CSQC export toggle; HH now uses server-driven status
 
 float   dm_num_spawns;              // number of deathmatch spawn points (as opposed to ctf spawn points)
 float   clanring_num_starts;        // number of match extra start points
@@ -522,6 +529,19 @@ float	clanring_afk_check;
 float	clanring_afk_timeout;
 .float 	afk_time;
 .float 	vote;    //client flag that holds their vote
+.float  ammo_heads;
+.entity hh_head_list;
+.entity hh_head_next;
+.entity hh_head_owner;
+.entity hh_head_last_owner;
+.entity hh_head_previous_owner_1;
+.entity hh_head_previous_owner_2;
+.entity hh_head_previous_owner_3;
+.entity hh_head_previous_owner_4;
+.entity hh_head_previous_owner_5;
+.float  hh_head_value;
+.float  hh_head_original_team;
+.float  hh_head_total_value;
 
 .float stats_item_ssg;				//
 .float stats_item_ng;				//

@@ -65,6 +65,9 @@ float 	PQC_TEAM_FRAGS	=	4;
 float	PQC_MATCH_TIME	=	5;
 float 	PQC_MATCH_RESET	=	6;
 float 	PQC_PING_TIMES	=	7;
+float   STAT_HH_ENABLED = 32;
+float   STAT_HH_HEADS = 33;
+float   STAT_HH_MAXHEADS = 34;
 
 float matchtime_minutes;
 float matchtime_seconds;
@@ -668,6 +671,33 @@ void() Hud_DrawTeamScores =
 	}
 };
 
+void() Hud_DrawHeadHunters =
+{
+	local float enabled, heads, maxheads;
+	local vector pos;
+
+	enabled = getstatf(STAT_HH_ENABLED);
+	if (enabled <= 0)
+		return;
+
+	maxheads = getstatf(STAT_HH_MAXHEADS);
+	if (maxheads <= 0)
+		return;
+
+	heads = getstatf(STAT_HH_HEADS);
+	if (heads < 0)
+		heads = 0;
+	if (heads > maxheads)
+		heads = maxheads;
+
+	pos_x = autocvar(hud_hh_x, 10);
+	pos_y = autocvar(hud_hh_y, 70);
+
+	drawfill(pos, '88 10 0', '0 0 0', 0.5, 0);
+	drawstring(pos + '4 1 0', "HEADS", '8 8 0', '1 0.85 0.2', 1, 0);
+	drawstring(pos + '46 1 0', sprintf("%.0f/%.0f", heads, maxheads), '8 8 0', '1 1 1', 1, 0);
+};
+
 float numclientseats;
 static void Hud_Draw(vector virtsize, float scoreboard)
 {
@@ -716,6 +746,7 @@ static void Hud_Draw(vector virtsize, float scoreboard)
 		Hud_DrawMatchTime();//todo add virtsize here too
 
 	Hud_DrawTeamScores(); //todo add virtsize here too
+	Hud_DrawHeadHunters();
 };
 
 void () CSQC_Parse_Event =
@@ -794,4 +825,3 @@ void(float apilevel, string enginename, float engineversion) CSQC_Init =
 {
 	Hud_Init();
 };
-
