@@ -1,0 +1,610 @@
+// woods added correct start pos
+
+{
+"classname" "worldspawn"
+"message" "Cap it! -by skeLman (www.skelman.com)"
+}
+{
+"classname" "light"
+"light" "525"
+"origin" "-212 1108 -216"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "90"
+"origin" "144 1020 -440"
+}
+{
+"classname" "item_armor2"
+"origin" "648 1208 -216"
+}
+{
+"classname" "item_armor2"
+"origin" "-336 1216 -208"
+}
+{
+"classname" "weapon_rocketlauncher"
+"origin" "144 1124 -444"
+}
+{
+"classname" "item_flag_team2"
+"angle" "90"
+"origin" "140 1136 -336"
+}
+{
+"classname" "func_door"
+"speed" "800"
+"dmg" "0"
+"health" "0"
+"sounds" "3"
+"lip" "0"
+"model" "*1"
+}
+{
+"classname" "item_armor1"
+"origin" "140 884 -340"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "668 828 -100"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "-392 828 -108"
+}
+{
+"classname" "light"
+"light" "525"
+"origin" "476 1108 -200"
+}
+{
+"classname" "light"
+"light" "250"
+"origin" "136 984 -252"
+}
+{
+"classname" "func_door"
+"angle" "180"
+"speed" "600"
+"dmg" "0"
+"health" "0"
+"sounds" "4"
+"lip" "0"
+"model" "*2"
+}
+{
+"classname" "func_door"
+"speed" "600"
+"dmg" "0"
+"health" "0"
+"sounds" "4"
+"lip" "0"
+"model" "*3"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "668 536 -104"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "-396 540 -100"
+}
+{
+"classname" "item_armorInv"
+"origin" "136 232 -320"
+}
+{
+"classname" "weapon_supershotgun"
+"origin" "-152 1264 -432"
+}
+{
+"classname" "weapon_supernailgun"
+"origin" "464 1264 -436"
+}
+{
+"classname" "item_health"
+"origin" "692 1260 -228"
+}
+{
+"classname" "item_health"
+"origin" "-448 1264 -228"
+}
+{
+"classname" "item_health"
+"origin" "-420 972 -428"
+}
+{
+"classname" "item_health"
+"origin" "-420 1028 -320"
+}
+{
+"classname" "item_rockets"
+"origin" "700 972 -320"
+}
+{
+"classname" "item_cells"
+"spawnflags" "1"
+"origin" "136 1268 -412"
+}
+{
+"classname" "item_health"
+"origin" "68 1256 -108"
+}
+{
+"classname" "item_health"
+"origin" "188 1256 -108"
+}
+{
+"classname" "item_spikes"
+"origin" "106 1256 -104"
+}
+{
+"classname" "item_shells"
+"origin" "148 1256 -104"
+}
+{
+"classname" "item_rockets"
+"origin" "80 1272 -412"
+}
+{
+"classname" "item_rockets"
+"origin" "188 1272 -412"
+}
+{
+"classname" "light"
+"light" "250"
+"origin" "140 640 -420"
+}
+{
+"classname" "light"
+"light" "525"
+"origin" "492 -644 -216"
+}
+{
+"classname" "info_player_team1"
+"angle" "90"
+"origin" "400 -740 -424"
+}
+{
+"classname" "item_armor2"
+"origin" "-368 -744 -216"
+}
+{
+"classname" "item_armor2"
+"origin" "616 -752 -208"
+}
+{
+"classname" "weapon_rocketlauncher"
+"origin" "136 -660 -444"
+}
+{
+"classname" "item_flag_team1"
+"angle" "90"
+"origin" "140 -672 -336"
+}
+{
+"classname" "func_door"
+"speed" "800"
+"dmg" "0"
+"health" "0"
+"sounds" "3"
+"lip" "0"
+"model" "*4"
+}
+{
+"classname" "item_armor1"
+"origin" "140 -428 -340"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "-388 -364 -100"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "672 -364 -108"
+}
+{
+"classname" "light"
+"light" "525"
+"origin" "-196 -644 -200"
+}
+{
+"classname" "light"
+"light" "250"
+"origin" "144 -520 -252"
+}
+{
+"classname" "func_door"
+"speed" "600"
+"dmg" "0"
+"health" "0"
+"sounds" "4"
+"lip" "0"
+"model" "*5"
+}
+{
+"classname" "func_door"
+"angle" "180"
+"speed" "600"
+"dmg" "0"
+"health" "0"
+"sounds" "4"
+"lip" "0"
+"model" "*6"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "-388 -72 -104"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "676 -76 -100"
+}
+{
+"classname" "weapon_supershotgun"
+"origin" "432 -800 -432"
+}
+{
+"classname" "weapon_supernailgun"
+"origin" "-184 -800 -436"
+}
+{
+"classname" "item_health"
+"origin" "-432 -820 -228"
+}
+{
+"classname" "item_health"
+"origin" "688 -824 -228"
+}
+{
+"classname" "item_health"
+"origin" "696 -512 -428"
+}
+{
+"classname" "item_health"
+"origin" "696 -564 -320"
+}
+{
+"classname" "item_rockets"
+"origin" "-408 -520 -320"
+}
+{
+"classname" "item_cells"
+"spawnflags" "1"
+"origin" "140 -812 -412"
+}
+{
+"classname" "item_health"
+"origin" "192 -816 -108"
+}
+{
+"classname" "item_health"
+"origin" "72 -816 -108"
+}
+{
+"classname" "item_spikes"
+"origin" "154 -816 -104"
+}
+{
+"classname" "item_shells"
+"origin" "112 -816 -104"
+}
+{
+"classname" "item_rockets"
+"origin" "200 -808 -412"
+}
+{
+"classname" "item_rockets"
+"origin" "92 -808 -412"
+}
+{
+"classname" "light"
+"light" "250"
+"origin" "140 -176 -420"
+}
+{
+"classname" "light"
+"light" "700"
+"origin" "-164 236 -88"
+}
+{
+"classname" "light"
+"light" "700"
+"origin" "424 236 -92"
+}
+{
+"classname" "light"
+"light" "650"
+"origin" "128 232 -220"
+}
+{
+"classname" "light"
+"origin" "44 232 -412"
+}
+{
+"classname" "light"
+"origin" "232 232 -412"
+}
+{
+"classname" "item_health"
+"origin" "96 232 -436"
+}
+{
+"classname" "item_health"
+"origin" "176 232 -436"
+}
+{
+"classname" "weapon_lightning"
+"origin" "136 232 -176"
+}
+{
+"classname" "weapon_grenadelauncher"
+"origin" "140 496 -344"
+}
+{
+"classname" "weapon_grenadelauncher"
+"origin" "136 -28 -344"
+}
+{
+"classname" "weapon_rocketlauncher"
+"origin" "-376 232 -444"
+}
+{
+"classname" "weapon_rocketlauncher"
+"origin" "656 232 -444"
+}
+{
+"classname" "trigger_teleport"
+"target" "tred"
+"model" "*7"
+}
+{
+"classname" "trigger_teleport"
+"target" "tblue"
+"model" "*8"
+}
+{
+"classname" "item_health"
+"origin" "88 856 -172"
+}
+{
+"classname" "item_health"
+"origin" "168 856 -172"
+}
+{
+"classname" "info_teleport_destination"
+"angle" "270"
+"targetname" "tblue"
+"origin" "140 892 -168"
+}
+{
+"classname" "info_teleport_destination"
+"angle" "90"
+"targetname" "tred"
+"origin" "132 -428 -176"
+}
+{
+"classname" "item_health"
+"origin" "164 -400 -180"
+}
+{
+"classname" "item_health"
+"origin" "88 -400 -180"
+}
+{
+"classname" "item_artifact_super_damage"
+"origin" "656 -404 -280"
+}
+{
+"classname" "light"
+"light" "400"
+"origin" "452 -244 -284"
+}
+{
+"classname" "item_health"
+"spawnflags" "2"
+"origin" "-372 868 -280"
+}
+{
+"classname" "light"
+"light" "400"
+"origin" "-176 708 -284"
+}
+{
+"classname" "item_cells"
+"origin" "40 440 -452"
+}
+{
+"classname" "item_cells"
+"origin" "240 28 -448"
+}
+{
+"classname" "light"
+"light" "400"
+"origin" "492 728 -380"
+}
+{
+"classname" "light"
+"light" "400"
+"origin" "-180 -264 -388"
+}
+{
+"classname" "item_armor1"
+"origin" "688 864 -440"
+}
+{
+"classname" "item_armor1"
+"origin" "-400 -400 -432"
+}
+{
+"classname" "trigger_push"
+"angle" "-1"
+"speed" "70"
+"style" "32"
+"delay" "2"
+"model" "*9"
+}
+{
+"classname" "trigger_push"
+"angle" "90"
+"speed" "95"
+"style" "32"
+"delay" "2"
+"model" "*10"
+}
+{
+"classname" "trigger_push"
+"angle" "270"
+"speed" "95"
+"style" "32"
+"delay" "2"
+"model" "*11"
+}
+{
+"classname" "trigger_push"
+"angle" "-1"
+"speed" "70"
+"style" "32"
+"delay" "2"
+"model" "*12"
+}
+{
+"classname" "light"
+"light" "250"
+"origin" "396 836 -68"
+}
+{
+"classname" "light"
+"light" "250"
+"origin" "-104 832 -44"
+}
+{
+"classname" "light"
+"light" "250"
+"origin" "396 -388 -56"
+}
+{
+"classname" "light"
+"light" "250"
+"origin" "-96 -388 -44"
+}
+{
+"classname" "item_rockets"
+"origin" "32 -256 -436"
+}
+{
+"classname" "item_rockets"
+"origin" "248 -256 -436"
+}
+{
+"classname" "item_rockets"
+"origin" "28 712 -444"
+}
+{
+"classname" "item_rockets"
+"origin" "244 712 -444"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-196 232 -444"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "180"
+"origin" "500 236 -444"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "270"
+"origin" "-388 236 -84"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "90"
+"origin" "668 232 -84"
+}
+{
+"classname" "info_player_team1"
+"angle" "90"
+"origin" "-124 -744 -440"
+}
+{
+"classname" "info_player_team1"
+"origin" "-312 -784 -224"
+}
+{
+"classname" "info_player_team1"
+"angle" "180"
+"origin" "552 -800 -220"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "270"
+"origin" "144 -560 -284"
+}
+{
+"classname" "info_player_team2"
+"angle" "270"
+"origin" "-92 1204 -436"
+}
+{
+"classname" "info_player_team2"
+"angle" "270"
+"origin" "384 1200 -432"
+}
+{
+"classname" "info_player_team2"
+"angle" "270"
+"origin" "572 1256 -220"
+}
+{
+"classname" "info_player_team2"
+"angle" "270"
+"origin" "-288 1256 -216"
+}
+
+// woods changed no to clip into roof
+
+{
+"classname" "info_player_start"
+"origin" "136 236 -159"
+}
+{
+"classname" "light"
+"light" "200"
+"origin" "144 804 -100"
+}
+{
+"classname" "light"
+"light" "200"
+"origin" "140 -336 -100"
+}
+{
+"classname" "weapon_supershotgun"
+"origin" "24 876 -452"
+}
+{
+"classname" "weapon_supershotgun"
+"origin" "244 -404 -452"
+}
+{
+"classname" "weapon_supernailgun"
+"origin" "32 -408 -460"
+}
+{
+"classname" "weapon_supernailgun"
+"origin" "248 872 -452"
+}
+{
+"classname" "light"
+"light" "200"
+"origin" "616 -340 -288"
+}

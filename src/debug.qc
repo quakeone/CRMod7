@@ -542,14 +542,14 @@ void() debug_wingl =
 			if (e.style & CLANRING_WINQUAKE)
 			{
 				if (e.style & CLANRING_GLQUAKE)
-					sprint3(self, "   ???         ü ", e.netname, "\n");
+					sprint3(self, "   ???         \xFC ", e.netname, "\n");
 				else
-					sprint3(self, "   WinQuake    ü ", e.netname, "\n");
+					sprint3(self, "   WinQuake    \xFC ", e.netname, "\n");
 			}
 			else if (e.style & CLANRING_GLQUAKE)
-					sprint3(self, "   GlQuake     ü ", e.netname, "\n");
+					sprint3(self, "   GlQuake     \xFC ", e.netname, "\n");
 			else
-					sprint3(self, "   DosQuake    ü ", e.netname, "\n");
+					sprint3(self, "   DosQuake    \xFC ", e.netname, "\n");
 		}
 		e = find(e, classname, "player");
 	}

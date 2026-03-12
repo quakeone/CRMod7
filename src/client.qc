@@ -38,6 +38,11 @@ void () client_typing_off;
 void () CaptureHighScores_sprint;
 void () AirshotHighScores_sprint;
 string format_rec_meta(string rec_date, string rec_mt_str, float rec_ping, float include_mt);
+void () status_refresh_f_status_pref;
+void () TeamFlagStatusReport;
+float() lockdown_check_connect;
+void(string arg1, string arg2, float argc) lockdown_command;
+void () clanring_show_rules;
 
 // Entity field declarations
 .float just_suicided; // set briefly when a death is a self-kill/suicide
@@ -506,11 +511,7 @@ void() execute_changelevel =
         other.effects 		= 0;
 
         if (prnd)
-        {
-            stuffcmd(other, ";play ");
-            stuffcmd(other, matchsound[prnd]);
-            stuffcmd(other, ";\n");
-        }
+            stuffcmd(other, strcat(";play ", matchsound[prnd], ";\n"));
         tmp   = self;
         self  = other;
         teamplay_final_stats();//display score and stats
@@ -930,6 +931,10 @@ void() PutClientInServer =
 
     DecodeLevelParms ();
 
+    // Any spawn/respawn should force a fresh receiver baseline.
+    team_info_reset_receiver_state();
+    self.hud_last_sig_ctf = -1;
+
     if (self.style & CLANRING_CONNECTED)
     {
         if (!(self.style & CLANRING_AFK_CLIENT))
@@ -1050,6 +1055,12 @@ void() PutClientInServer =
     self.origin = self.oldorigin = spot.origin; //R00k: update oldorigin so we dont respawn where we died.
     setorigin(self, spot.origin);	    //R00k: change our origin and relink our edict.
 
+    if ((clanring_state & CLANRING_MATCH_STARTED) && clanring_match_start_time && (clanring_match_inactivity_check != world) && self.match_start_monitor_active && !(mode_is_arena()))
+    {
+        self.match_start_origin = self.origin;
+        self.match_start_origin_valid = TRUE;
+    }
+
     // If leavemealone isn't permitted in this mode, force it off before finishing spawn.
     registercvar("cr_allow_leavemealone", "1");
     if (self.leavemealone)
@@ -1077,6 +1088,9 @@ void() PutClientInServer =
     setsize (self, VEC_HULL_MIN, VEC_HULL_MAX);
 
     self.view_ofs = '0 0 22';
+
+    // Respawn can change stats drastically; force target cache refresh.
+    team_info_mark_target_dirty(self);
 
     if (intermission_running)
     {
@@ -1131,6 +1145,7 @@ void() info_player_deathmatch =
         self.mdl = "progs/player.mdl";
         self.frame = 6;
         self.alpha = 0.4;
+        self.skin = 0;
         spawns_restore_model();
     }
 };
@@ -1571,6 +1586,8 @@ void() PlayerPreThink =
         self.wait = time + 1;
     }
 
+    votables_map_vote_prompt_display();
+
     if (self.style & CLANRING_SETTING_OPTIONS)
     {
         self.style = self.style | CLANRING_NO_POST_THINK;
@@ -1605,6 +1622,23 @@ void() PlayerPreThink =
         self.velocity = '0 0 0';
         self.movement = '0 0 0';//FIXME?
         return;
+    }
+
+    if ((clanring_playmode & CLANRING_MATCH_MODE) && !(mode_is_arena()))
+    {
+        if (self.match_start_monitor_active && clanring_match_start_time && (clanring_match_inactivity_check != world))
+        {
+            if (!self.match_start_origin_valid)
+            {
+                self.match_start_origin = self.origin;
+                self.match_start_origin_valid = TRUE;
+            }
+            else if (!self.match_start_moved)
+            {
+                if (vlen(self.origin - self.match_start_origin) > CLANRING_MATCH_START_MOVEMENT_THRESHOLD)
+                    self.match_start_moved = TRUE;
+            }
+        }
     }
 
     self.deathtype = "";	//R00k - wrong obituary messages fix by Zoid
@@ -2276,6 +2310,13 @@ called when a player connects to a server
 void() ClientConnect =
 {
     self.finaldest_x = time;//lagout timer
+
+    // Private-lock gate: while active, only allow IPs that were connected at activation time.
+    if ((parm10 & CLANRING_NEW_CLIENT) && lockdown_check_connect())
+    {
+        dropclient(self);
+        return;
+    }
 
     clanring_client_connect ();
 
@@ -3184,16 +3225,23 @@ void () client_typing_off =
 
 void () check_client_status =
 {
+    local string client_name;
+
     if (!(self.style & CLANRING_CONNECTED))
         return;
-        
+
+    // Only QSS-M chat status is trusted for AFK/typing detection.
+    client_name = strtolower(self.client);
+    if (client_name != "qss-m")
+        return;
+
     local string chat_status = infokey(self, "chat");
-    
-    if (chat_status == "2") // AFK
+
+    if (chat_status == "2" || chat_status == "3") // AFK (3 = AFK + chatting)
     {
         if (!(self.style & CLANRING_AFK_CLIENT))
             client_afk_on();
-            
+
         if (self.style & CLANRING_TYPING_CLIENT)
             self.style &= ~CLANRING_TYPING_CLIENT;
     }
@@ -3205,11 +3253,11 @@ void () check_client_status =
         if (!(self.style & CLANRING_TYPING_CLIENT))
             client_typing_on();
     }
-    else if (chat_status == "0") // Active
+    else if (chat_status == "0" || chat_status == "") // Active
     {
         if (self.style & CLANRING_AFK_CLIENT)
             client_afk_off();
-            
+
         if (self.style & CLANRING_TYPING_CLIENT)
             client_typing_off();
     }
@@ -3217,27 +3265,32 @@ void () check_client_status =
 
 float (string s) FindNumericalInput =
 {
-    float pass;
+    float pass, i;
 
     pass = 0;
 
     if (self.use)
     {
-        float n;
+        float n, c;
 
-        if ((strlen(s)) > 2) // 00 to 99
-        {
-            n = 0;
+        // Only treat explicit 1-2 digit console input as menu input.
+        // Empty or non-numeric commands should fall through normally.
+        if (s == "" || (strlen(s)) > 2) // 00 to 99
             pass = 0;
-        }
         else
         {
+            for (i = 0; i < strlen(s); i += 1)
+            {
+                c = str2chr(s, i);
+                if (c < 48 || c > 57)
+                    return 0;
+            }
+
             n = stof(s);
             pass = 1;
+            self.finaldest_z = n;
+            self.use();
         }
-
-        self.finaldest_z = n;
-        self.use();
     }
 
     return pass;
@@ -3347,7 +3400,7 @@ string (string stats_filename, float include_mt, string empty_msg) captimes_read
         else if (count == 1) prefix = "\2";
         else prefix = "\3";
 
-        line = sprintf("%s  %s %s %-16s", prefix, utils_get_time(time_value), get_team_letter(team_color), player_name);
+        line = sprintf("%s  %s %s %s", prefix, utils_get_time(time_value), get_team_letter(team_color), player_name);
         meta = format_rec_meta(rec_date, rec_mt_str, rec_ping, include_mt);
         if (meta != "")
             line = strcat(line, meta);
@@ -3366,11 +3419,12 @@ string (string stats_filename, float include_mt, string empty_msg) captimes_read
 
 void (string wanted_map) captimes_show_map_sprint =
 {
-    local string trial_lines, match_lines;
+    local string trial_lines, match_lines, source_title;
 
     trial_lines = captimes_read_top3_from_file(sprintf("%s_captimes.crx", wanted_map), FALSE, "No capture times set");
     match_lines = captimes_read_top3_from_file(sprintf("%s_captimes_match.crx", wanted_map), TRUE, "No match capture times set");
-    sprint(self, sprintf("\bTime Trial Leaders\b for %s:\n", wanted_map), trial_lines, "\bMatch Times\b:\n", match_lines, "\n");
+    source_title = "CTF Capture Records (Local Records)\n\n";
+    sprint(self, source_title, sprintf("\bTime Trial Leaders\b for %s:\n", wanted_map), trial_lines, "\n\bMatch Times\b:\n", match_lines, "\n");
 };
 
 void(string cmd) SV_ParseClientCommand =
@@ -3396,6 +3450,11 @@ void(string cmd) SV_ParseClientCommand =
     {
         // removed: webhooktest
         // removed: urigettest / uriposttest
+
+        case "ignore":
+        case "unignore":
+            clientcommand(self, cmd);
+            return;
 
         case "altents":
             votables_request_set_altents();
@@ -3432,11 +3491,13 @@ void(string cmd) SV_ParseClientCommand =
             }
             return;
 
-        case "fragset":
-            if ((self.style & CLANRING_ADMINISTRATOR) && (argv(1) != ""))
-                clanring_set_fraglimit(stof(arg1));
+        case "fraglimit":
+            // Keep legacy behavior for plain "fraglimit": show rules/status output.
+            // Allow direct vote/set via "cmd fraglimit <value>".
+            if (arg1 != "")
+                votables_request_set_fraglimit(stof(arg1));
             else
-                votables_select_fraglimit();
+                clanring_show_rules();
             return;
 
         case "timeset":
@@ -3467,10 +3528,12 @@ void(string cmd) SV_ParseClientCommand =
                 return;
             }
 
-            // If already admin, do nothing
+            // Toggle off if already admin (matches interactive "admin" behavior)
             if (self.style & CLANRING_ADMINISTRATOR)
             {
-                sprint(self, "You are already an administrator.\n");
+                sprint(self, "You are no longer an administrator.\n");
+                self.style = self.style - CLANRING_ADMINISTRATOR;
+                self.clanring_hack_count = 0;
                 return;
             }
 
@@ -3513,6 +3576,16 @@ void(string cmd) SV_ParseClientCommand =
             }
             return;
 
+        case "lockdown":
+            if (!(self.style & CLANRING_ADMINISTRATOR))
+            {
+                sprint(self, "Admin only command.\n");
+                return;
+            }
+
+            lockdown_command(arg1, arg2, args);
+            return;
+
         case "afkon":
             client_afk_on();
             return;
@@ -3521,27 +3594,81 @@ void(string cmd) SV_ParseClientCommand =
             client_afk_off();
             return;
 
+        case "flagstatus":
+        {
+            local string opt = "";
+            if (args > 1)
+                opt = lowrcase(argv(args - 1)); // tolerate extra leading args
+
+            if (opt == "off" || opt == "0")
+            {
+                forceinfokey(self, "f_status", "off");
+                self.f_status_enabled = FALSE;
+                self.laststattime = 0;
+                self.hud_last_sig_ctf = -1;
+                sprint(self, "Flag status: off\n");
+                return;
+            }
+            if (opt == "on" || opt == "1")
+            {
+                forceinfokey(self, "f_status", "on");
+                self.f_status_enabled = TRUE;
+                self.laststattime = 0;
+                self.hud_last_sig_ctf = -1;
+                sprint(self, "Flag status: on\n");
+                return;
+            }
+            if (opt == "toggle")
+            {
+                if (self.f_status_enabled)
+                {
+                    forceinfokey(self, "f_status", "off");
+                    self.f_status_enabled = FALSE;
+                }
+                else
+                {
+                    forceinfokey(self, "f_status", "on");
+                    self.f_status_enabled = TRUE;
+                }
+                self.laststattime = 0;
+                self.hud_last_sig_ctf = -1;
+                sprint(self, self.f_status_enabled ? "Flag status: on\n" : "Flag status: off\n");
+                return;
+            }
+            if (opt != "")
+            {
+                sprint(self, "Usage: flagstatus [on|off|toggle]\n");
+                return;
+            }
+
+            if (teamplay)
+                TeamFlagStatusReport();
+            return;
+        }
+
         case "captimes":
         case "highscores":
         {
-            // New map lookup form: "cmd captimes <mapname>" (all modes)
+            // Block during active match only
             if ((clanring_playmode & CLANRING_MATCH_MODE) && (clanring_state & CLANRING_MATCH_STARTED) && !(clanring_state & CLANRING_MATCH_OVER))
             {
-                sprint(self, "cmd captimes <mapname> is not available during match.\n");
+                sprint(self, "Not available during match.\n");
                 return;
             }
 
-            if (arg1 == "")
+            // Airshot mode: "highscores" with no args shows airshot records
+            if (arg1 == "" && (clanring_playmode & CLANRING_AIRSHOT_MODE))
             {
-                if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-                    CaptureHighScores_sprint();
-                else if (clanring_playmode & CLANRING_AIRSHOT_MODE)
-                    AirshotHighScores_sprint();
+                AirshotHighScores_sprint();
                 return;
             }
 
+            // Determine map to look up (default: current map)
             local string wanted_map;
-            wanted_map = strzone(strtolower(arg1));
+            if (arg1 == "")
+                wanted_map = strzone(mapname);
+            else
+                wanted_map = strzone(strtolower(arg1));
 
             if (wanted_map == ""
                 || strstrofs(wanted_map, "/", 0) >= 0
@@ -3553,6 +3680,45 @@ void(string cmd) SV_ParseClientCommand =
                 return;
             }
 
+            // Current map: use in-memory records (populated from gsheets)
+            if (wanted_map == mapname)
+            {
+                if (gsheets_configured())
+                {
+                    if (!gsheets_read_started_current_map())
+                    {
+                        gsheets_read_capture_stats();
+                        strunzone(wanted_map);
+                        sprint(self, "Loading capture times from Google Sheets...\n");
+                        return;
+                    }
+                    if (gsheets_read_inflight_current_map())
+                    {
+                        strunzone(wanted_map);
+                        sprint(self, "Capture times are loading from Google Sheets, try again in a moment.\n");
+                        return;
+                    }
+                }
+                strunzone(wanted_map);
+                CaptureHighScores_sprint();
+                return;
+            }
+
+            // Other maps: prefer Google Sheets when configured
+            if (gsheets_configured())
+            {
+                if (gsheets_read_capture_stats_lookup(wanted_map, self))
+                {
+                    strunzone(wanted_map);
+                    sprint(self, "Loading capture times from Google Sheets...\n");
+                    return;
+                }
+                strunzone(wanted_map);
+                sprint(self, "Google Sheets lookup already in progress, try again in a moment.\n");
+                return;
+            }
+
+            // Fallback: read from local files
             captimes_show_map_sprint(wanted_map);
             strunzone(wanted_map);
             return;
@@ -4085,6 +4251,8 @@ void(string cmd) SV_ParseClientCommand =
                 mapnumber = found_in_warp_list(arg0);
                 if (mapnumber)
                 {
+                    if (votables_maybe_prompt_map_vote_mode_change(mapnumber))
+                        return;
                     votables_request_set_gametype_mode_map(-1, -1, mapnumber);
                     return;
                 }

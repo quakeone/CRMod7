@@ -1,4 +1,4 @@
-// json.qc — JSON helpers
+// json.qc - JSON helpers
 // -----------------------------------------------------------------------------
 // Contents
 //   1) Constants & Globals
@@ -356,7 +356,7 @@ string json_obj_get_string(string obj, string key, string defval)
         string c = substring(OBJ, i, 1);
         float  v = str2chr(c, 0);
 
-        // Inside some string literal — skip with escape handling
+        // Inside some string literal - skip with escape handling
         if (in_str)
         {
             if (esc) { esc = 0; }
@@ -481,7 +481,7 @@ string json_obj_get_string(string obj, string key, string defval)
                     }
                     else
                     {
-                        // Not our key — continue scanning; the value will be skipped by the flow above.
+                        // Not our key - continue scanning; the value will be skipped by the flow above.
                         continue;
                     }
                 }
@@ -1435,7 +1435,7 @@ void(string path, float pretty) json_export_match_to_file =
 
     bprint(sprintf("[matchpost] save-json: writing '%s' (stream)\n", path));
 
-    // IMPORTANT: (f, pretty) — put the file handle first, not the pretty flag.
+    // IMPORTANT: (f, pretty) - put the file handle first, not the pretty flag.
     json_begin_pretty_to_file(f, 0);  // stream compact JSON directly into 'f'
     json_emit_match_document();
 
@@ -1467,7 +1467,7 @@ void(float pretty, float deferred) json_post_current_match =
     bprint(sprintf("[matchpost] cvars: fs_gamedir='%s' fs_basedir='%s' game='%s'\n",
                    gdir ? gdir : "", bdir ? bdir : "", mod ? mod : ""));
 
-    // Candidate list (most engines actually write file into <gamedir>/data/…)
+    // Candidate list (most engines actually write file into <gamedir>/data/)
     local string cand[8]; local float n = 0;
     if (gdir && gdir != "")
     {

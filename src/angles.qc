@@ -45,7 +45,7 @@ float (float angle1, float angle2, float percent) angles_pick_angle =
 //  Recommented and Recoded by JP
 //
 //  Dealing with pitch is a bit tricky.  vectoangles returns a pitch in [0, 360] where
-//  0 is looking straight ahead, 45 looks up at 45° and 315 looks down at 45°.
+//  0 is looking straight ahead, 45 looks up at 45 and 315 looks down at 45\xB0.
 //  However, the pitch in v_angle is in the range [-68, 78] where positive is *down*
 //  and negative is up.
 //

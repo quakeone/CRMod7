@@ -1076,9 +1076,7 @@ void(float whichteam) Join_Team =
 
 	setcolour(self,self.team2,self.team2);
 
-	stuffcmd(self,";color ");
-	stuffcmd(self,tmp);
-	stuffcmd(self,";\n");
+	stuffcmd(self, strcat(";color ", tmp, ";\n"));
 
 	ready_name();
 
@@ -1138,9 +1136,7 @@ float (float n) join_team2 =
 
 	setcolour(self,n,0);
 
-	stuffcmd(self,";color ");
-	stuffcmd(self,tmp);
-	stuffcmd(self," 0;\n");
+	stuffcmd(self, strcat(";color ", tmp, " 0;\n"));
 
 	motd_top5 = string_null;
 	motd_top6 = string_null;
@@ -1912,9 +1908,7 @@ void() round_end =
 					current_player.team2 = lteam.team2;
 					setcolour(current_player,lteam.team2,0);
 					temp = ftos(lteam.team2);
-					stuffcmd(current_player,";color ");
-					stuffcmd(current_player,temp);
-					stuffcmd(current_player," 0;\n");
+					stuffcmd(current_player, strcat(";color ", temp, " 0;\n"));
 
 					ra_join_next_queue(lteam);
 					break;

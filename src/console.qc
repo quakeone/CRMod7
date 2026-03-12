@@ -24,9 +24,33 @@ void() StartRuneSpawn;
 void() DropRune;
 void() info_player_team1;
 void() info_player_team2;
+void(string arg1, string arg2, float argc) lockdown_console_command;
+
+void() console_lockdown_command =
+{
+	local string raw_args;
+	local string arg1, arg2;
+	local float argc;
+
+	raw_args = cvar_string("cr_lockdown_console_args");
+	cvar_set("cr_lockdown_console_args", "");
+
+	arg1 = "";
+	arg2 = "";
+	argc = tokenize(raw_args);
+	if (argc > 0)
+		arg1 = argv(0);
+	if (argc > 1)
+		arg2 = argv(1);
+
+	lockdown_console_command(arg1, arg2, argc);
+};
+
 void() console_set_aliases =
 {
     // set  aliases (server console commands)
+
+	registercvar("cr_lockdown_console_args", "");
 
 	// immediate mode commands
 	localcmd("alias sping temp1 1\n");
@@ -50,6 +74,13 @@ void() console_set_aliases =
 	localcmd("alias teamstats temp1 19\n");
 	localcmd("alias admins temp1 90\n");
 	localcmd("alias settings temp1 17\n");
+	localcmd("alias lockdown \"set cr_lockdown_console_args \\\"$*\\\"; temp1 99\"\n");
+	localcmd("alias lockdownon \"set cr_lockdown_console_args \\\"\\\"; temp1 99\"\n");
+	localcmd("alias lockdownstatus \"set cr_lockdown_console_args \\\"status\\\"; temp1 99\"\n");
+	localcmd("alias lockdownlist \"set cr_lockdown_console_args \\\"list\\\"; temp1 99\"\n");
+	localcmd("alias lockdownoff \"set cr_lockdown_console_args \\\"off\\\"; temp1 99\"\n");
+	localcmd("alias lockdownadd \"set cr_lockdown_console_args \\\"add $*\\\"; temp1 99\"\n");
+	localcmd("alias lockdownremove \"set cr_lockdown_console_args \\\"remove $*\\\"; temp1 99\"\n");
 
 	// config file commands 
 	localcmd("alias safepracticeon \"temp1 20\"\n");
@@ -878,7 +909,7 @@ void() console_show_teamstats =
 		control = 100 * pteam.mangle_x / clanring_sentinel.cnt;
 		f = floor(control);
 		s = ftos(f);
-		cprint2("ü  %", s);
+		cprint2("\xFC  %", s);
 		f = floor((control - f) * 10);
 		s = ftos(f);
 		cprint3(".", s, " ");
@@ -959,7 +990,8 @@ void() console_commands =
 	cprint("\"sping  - approximate client pings       setadmin  - set admin password (use 'skill')\"\n");
 	cprint("\"time   - time elapsed on current map    maxteams  - set maxteams (use 'skill')\"\n");
 	cprint("\"score  - match score/time remaining     otset     - set overtime (use 'skill')\"\n");
-	cprint("\"admins - list administrators\"\n");
+	cprint("\"admins - list administrators           lockdown - private lock controls\"\n");
+	cprint("\"lockdown [1-30|-1..-30|status|off|list|add/remove <ip>]\"\n");
 	cprint("\n");
 	cprint("\"stats     killstats     efficiency      quadstats     badstats     teamstats\"\n");
 	cprint("\n");
@@ -1017,9 +1049,7 @@ void() console_stuff_impulse =
 	}
 	temp = cvar ("skill");
 	s = ftos(temp);
-	stuffcmd(clanring_debug_client, "impulse ");
-	stuffcmd(clanring_debug_client, s);
-	stuffcmd(clanring_debug_client, "\n");
+	stuffcmd(clanring_debug_client, strcat("impulse ", s, "\n"));
 	cprint3("stuffing impulse ", s, "\n");
 };
 
@@ -1040,9 +1070,7 @@ void() console_stuff_colour =
 	}
 	temp = cvar ("skill");
 	s = ftos(temp);
-	stuffcmd(clanring_debug_client, "color ");
-	stuffcmd(clanring_debug_client, s);
-	stuffcmd(clanring_debug_client, "\n");
+	stuffcmd(clanring_debug_client, strcat("color ", s, "\n"));
 	cprint3("stuffing color ", s, "\n");
 };
 
@@ -1723,8 +1751,9 @@ void(float command) console_command =
 		case  7: console_show_killstats();	break;
 		case  8: console_show_efficiency();	break;
 		case  9: console_show_stats();		break;
-		case  10: console_commands();		break;
-		case  11: console_version_info();	break;
+			case  10: console_commands();		break;
+			case  11: console_version_info();	break;
+			case  99: console_lockdown_command();	break;
 
 		case 12:
 		case 13:
@@ -2040,138 +2069,59 @@ void(float command) console_command =
 	}
 };
 
-// Helper: format ISO8601 -> "MM-DD-YYYY HH:MMAM -0700"
-// - replaces 'T' with space
-// - removes seconds
-// - converts 24h -> 12h with AM/PM (no space before AM/PM)
-// - adds a space before timezone
+// Helper: format ISO8601 date -> short "M-D-YY" (no time, no timezone)
 string format_rec_date(string d)
 {
-    local float tpos, start, pos, lastsign, firstspace, colon1, colon2, hour;
-    local string date_iso, timeplus, tz, timepart, ampm;
-    local string yyyy, mm, dd;
-
-    if (!d || d == "")
+    if (!d || d == "" || strlen(d) < 10)
         return d;
 
-    // 1) Split date and the rest (time+tz)
-    tpos = strstrofs(d, "T", 0);
-    if (tpos >= 0) {
-        date_iso = substring(d, 0, 10); // YYYY-MM-DD
-        timeplus = substring(d, tpos + 1, strlen(d) - (tpos + 1));
-    } else {
-        // Fallback: split on first space
-        firstspace = strstrofs(d, " ", 0);
-        if (firstspace >= 0) {
-            date_iso = substring(d, 0, 10);
-            timeplus = substring(d, firstspace + 1, strlen(d) - (firstspace + 1));
-        } else {
-            // Not an ISO-like string; return as-is
-            return d;
-        }
-    }
+    // Expect YYYY-MM-DD... (at least 10 chars)
+    local float mm, dd;
+    local string yy;
 
-    // 2) Extract timezone at the end (supports -0700 or -07:00). Prefer last '-' then '+'.
-    lastsign = -1;
-    start = 0;
-    while (1) {
-        pos = strstrofs(timeplus, "-", start);
-        if (pos < 0) break;
-        lastsign = pos;
-        start = pos + 1;
-    }
-    if (lastsign < 0) {
-        start = 0;
-        while (1) {
-            pos = strstrofs(timeplus, "+", start);
-            if (pos < 0) break;
-            lastsign = pos;
-            start = pos + 1;
-        }
-    }
+    mm = stof(substring(d, 5, 2));
+    dd = stof(substring(d, 8, 2));
+    yy = substring(d, 2, 2);
 
-    if (lastsign >= 0) {
-        tz = substring(timeplus, lastsign, strlen(timeplus) - lastsign);
-        timepart = substring(timeplus, 0, lastsign);
-    } else {
-        // No explicit TZ (e.g., ends with 'Z' or nothing). Handle 'Z'.
-        pos = strstrofs(timeplus, "Z", 0);
-        if (pos >= 0 && pos == strlen(timeplus) - 1) {
-            tz = "Z";
-            timepart = substring(timeplus, 0, pos);
-        } else {
-            tz = "";
-            timepart = timeplus;
-        }
-    }
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31)
+        return d; // not a valid date; return as-is
 
-    // Trim seconds from time (drop the second colon and following 2 digits if present)
-    colon1 = strstrofs(timepart, ":", 0);
-    if (colon1 >= 0) {
-        colon2 = strstrofs(timepart, ":", colon1 + 1);
-        if (colon2 >= 0 && colon2 + 3 <= strlen(timepart)) {
-            timepart = strcat(substring(timepart, 0, colon2),
-                              substring(timepart, colon2 + 3, strlen(timepart) - (colon2 + 3)));
-        }
-    }
-
-    // Convert HH:MM -> 12-hour with AM/PM (no space before AM/PM)
-    // Expect timepart like "HH:MM"
-    if (strlen(timepart) >= 5) {
-        hour = stof(substring(timepart, 0, 2));
-        ampm = "AM";
-        if (hour == 0) {
-            hour = 12;
-        } else if (hour == 12) {
-            ampm = "PM";
-        } else if (hour > 12) {
-            hour -= 12;
-            ampm = "PM";
-        }
-        // Keep ":MM"
-        timepart = sprintf("%g%s%s", hour, substring(timepart, 2, strlen(timepart) - 2), ampm);
-    }
-
-    // Rearrange date YYYY-MM-DD -> MM-DD-YYYY
-    if (strlen(date_iso) >= 10) {
-        yyyy = substring(date_iso, 0, 4);
-        mm   = substring(date_iso, 5, 2);
-        dd   = substring(date_iso, 8, 2);
-    } else {
-        // Fallback if date not as expected
-        return strcat(date_iso, " ", timepart, (tz != "" ? strcat(" ", tz) : ""));
-    }
-
-    // Rebuild with a space before timezone (if present)
-    return strcat(mm, "-", dd, "-", yyyy, " ", timepart, (tz != "" ? strcat(" ", tz) : ""));
+    return sprintf("%g-%g-%s", mm, dd, yy);
 }
 
+// Compact metadata: TT "(M-D-YY, Xms)"  Match "(M-D-YY @ M:SS, Xms)"
 string format_rec_meta(string rec_date, string rec_mt_str, float rec_ping, float include_mt)
 {
-    local string out;
+    local string out, date_short;
     local float has;
 
     out = "";
     has = FALSE;
+    date_short = "";
 
-    if (rec_date != "" || (include_mt && rec_mt_str != "") || rec_ping >= 0)
+    if (rec_date != "")
+        date_short = format_rec_date(rec_date);
+
+    if (date_short != "" || (include_mt && rec_mt_str != "") || rec_ping > 0)
     {
         out = " (";
-        if (rec_date != "")
+        if (date_short != "")
         {
-            out = strcat(out, format_rec_date(rec_date));
+            out = strcat(out, date_short);
             has = TRUE;
         }
-        if (include_mt && rec_mt_str != "")
+        if (include_mt && rec_mt_str != "" && rec_mt_str != "0:00" && rec_mt_str != "00:00" && rec_mt_str != "0:00:00")
         {
-            if (has) out = strcat(out, ", ");
-            out = strcat(out, "at ", rec_mt_str, " remaining");
+            if (has)
+                out = strcat(out, " @ ", rec_mt_str);
+            else
+                out = strcat(out, rec_mt_str);
             has = TRUE;
         }
         if (rec_ping > 0)
         {
             if (has) out = strcat(out, ", ");
-            out = strcat(out, "ping ", ftos(floor(rec_ping + 0.5)), "ms");
+            out = strcat(out, ftos(floor(rec_ping + 0.5)), "ms");
             has = TRUE;
         }
         out = strcat(out, ")");
@@ -2185,23 +2135,23 @@ void () CaptureHighScores_sprint =
 
     if (playerrecord[0].statvalue > 0)
     {
-        s1 = sprintf("\1  %s %s %-16s", utils_get_time(playerrecord[0].statvalue), get_team_letter(playerrecord[0].teamcolor), playerrecord[0].player);
+        s1 = sprintf("\1  %s %s %s", utils_get_time(playerrecord[0].statvalue), get_team_letter(playerrecord[0].teamcolor), playerrecord[0].player);
         meta = format_rec_meta(playerrecord[0].rec_date, "", playerrecord[0].rec_ping, FALSE);
         if (meta != "")
             s1 = strcat(s1, meta);
         s1 = strcat(s1, "\n");
-        
+
         if (playerrecord[1].statvalue > 0)
         {
-            s2 = sprintf("\2  %s %s %-16s", utils_get_time(playerrecord[1].statvalue), get_team_letter(playerrecord[1].teamcolor), playerrecord[1].player);
+            s2 = sprintf("\2  %s %s %s", utils_get_time(playerrecord[1].statvalue), get_team_letter(playerrecord[1].teamcolor), playerrecord[1].player);
             meta = format_rec_meta(playerrecord[1].rec_date, "", playerrecord[1].rec_ping, FALSE);
             if (meta != "")
                 s2 = strcat(s2, meta);
             s2 = strcat(s2, "\n");
-            
+
             if (playerrecord[2].statvalue > 0)
             {
-                s3 = sprintf("\3  %s %s %-16s", utils_get_time(playerrecord[2].statvalue), get_team_letter(playerrecord[2].teamcolor), playerrecord[2].player);
+                s3 = sprintf("\3  %s %s %s", utils_get_time(playerrecord[2].statvalue), get_team_letter(playerrecord[2].teamcolor), playerrecord[2].player);
                 meta = format_rec_meta(playerrecord[2].rec_date, "", playerrecord[2].rec_ping, FALSE);
                 if (meta != "")
                     s3 = strcat(s3, meta);
@@ -2216,23 +2166,23 @@ void () CaptureHighScores_sprint =
 
     if (playerrecord2[0].statvalue > 0)
     {
-        ts1 = sprintf("\1  %s %s %-16s", utils_get_time(playerrecord2[0].statvalue), get_team_letter(playerrecord2[0].teamcolor), playerrecord2[0].player);
+        ts1 = sprintf("\1  %s %s %s", utils_get_time(playerrecord2[0].statvalue), get_team_letter(playerrecord2[0].teamcolor), playerrecord2[0].player);
         meta = format_rec_meta(playerrecord2[0].rec_date, playerrecord2[0].rec_mt_str, playerrecord2[0].rec_ping, TRUE);
         if (meta != "")
             ts1 = strcat(ts1, meta);
         ts1 = strcat(ts1, "\n");
-        
+
         if (playerrecord2[1].statvalue > 0)
         {
-            ts2 = sprintf("\2  %s %s %-16s", utils_get_time(playerrecord2[1].statvalue), get_team_letter(playerrecord2[1].teamcolor), playerrecord2[1].player);
+            ts2 = sprintf("\2  %s %s %s", utils_get_time(playerrecord2[1].statvalue), get_team_letter(playerrecord2[1].teamcolor), playerrecord2[1].player);
             meta = format_rec_meta(playerrecord2[1].rec_date, playerrecord2[1].rec_mt_str, playerrecord2[1].rec_ping, TRUE);
             if (meta != "")
                 ts2 = strcat(ts2, meta);
             ts2 = strcat(ts2, "\n");
-            
+
             if (playerrecord2[2].statvalue > 0)
             {
-                ts3 = sprintf("\3  %s %s %-16s", utils_get_time(playerrecord2[2].statvalue), get_team_letter(playerrecord2[2].teamcolor), playerrecord2[2].player);
+                ts3 = sprintf("\3  %s %s %s", utils_get_time(playerrecord2[2].statvalue), get_team_letter(playerrecord2[2].teamcolor), playerrecord2[2].player);
                 meta = format_rec_meta(playerrecord2[2].rec_date, playerrecord2[2].rec_mt_str, playerrecord2[2].rec_ping, TRUE);
                 if (meta != "")
                     ts3 = strcat(ts3, meta);
@@ -2245,7 +2195,7 @@ void () CaptureHighScores_sprint =
     {
         s4 = "No match capture times set\n";
     }
-    sprint(self, sprintf("\bTime Trial Leaders\b for %s:\n", mapname), s1, s2, s3, "\bMatch Times\b:\n", s4, "\n");
+    sprint(self, strcat(gsheets_captimes_source_title(), "\n\n", sprintf("\bTime Trial Leaders\b for %s:\n", mapname)), s1, s2, s3, "\n\bMatch Times\b:\n", s4, "\n");
     return;
 };
 

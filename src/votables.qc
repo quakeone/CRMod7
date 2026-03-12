@@ -22,6 +22,7 @@ void() UnHookPlayer;
 void() utils_update_server_time;
 void() utils_save_disconnect_log;
 void(float ghost) G1v1_UpdateQuadAlpha;
+void() votables_map_vote_prompt_response;
 
 //
 //  S E N D  A L I A S E S
@@ -62,7 +63,6 @@ void() votables_send_aliases =
 	// timelimit aliases
 	stuffcmd(self, "alias timeset cmd timeset\n");
 	stuffcmd(self, "alias otset impulse 216\n");
-	stuffcmd(self, "alias fragset impulse 219\n");
 	// Quad, Pent, Ring aliases
 	stuffcmd(self, "alias setquad impulse 221\n");
 	stuffcmd(self, "alias setpent impulse 222\n");
@@ -267,16 +267,25 @@ void() votables_request_change_level =
 
 	level = (self.warp_episode * WARP_MAPLIST_SIZE) + (self.warp_map);
 	newmap = sprintf("%s (%s)", warpmap[level].name, warpmap[level].title);
-	
-	//clear warp_flags;
-	self.warp_episode=0;
-	self.warp_map=0;
 
 	if (warpmap[level].name == "")
 	{
+		self.warp_episode = 0;
+		self.warp_map = 0;
 		sprint(self, "Invalid level\n");
 		return;
 	}
+
+	if (votables_maybe_prompt_map_vote_mode_change(level))
+	{
+		self.warp_episode = 0;
+		self.warp_map = 0;
+		return;
+	}
+
+	//clear warp_flags;
+	self.warp_episode=0;
+	self.warp_map=0;
 
     // Do it right away if we're an administrator, otherwise vote
 	if (self.style & CLANRING_ADMINISTRATOR)
@@ -379,7 +388,16 @@ void() votables_set_gametype_mode_map =
 	if (clanring_state & CLANRING_MATCH_STARTED)
 		return;
 
+	local float old_type_flags = 0, new_type_flags = 0;
 	local string newmapname = "", request_mapname = "";
+
+	old_type_flags = clanring_playmode
+		& (CLANRING_CAPTURE_THE_FLAG
+			| CLANRING_CA_MODE
+			| CLANRING_RA_MODE
+			| CLANRING_DMM4_MODE
+			| CLANRING_AIRSHOT_MODE
+			| CLANRING_WIPEOUT_MODE);
 
 	if (request_gametype >= 0)
 	{
@@ -490,6 +508,33 @@ void() votables_set_gametype_mode_map =
 			cvar_set("teamplay", "0");
 			cvar_set("deathmatch", "3");
 			bprint("gametype set to Head Hunters\n");
+		}
+
+		utils_set_cvar ("samelevel", clanring_playmode);
+		clanring_level = 1;//Reset the map count if we changed modes
+		utils_set_cvar ("scratch1", clanring_level);
+		if (nextmap != "") strunzone(nextmap);
+
+		new_type_flags = clanring_playmode
+			& (CLANRING_CAPTURE_THE_FLAG
+				| CLANRING_CA_MODE
+				| CLANRING_RA_MODE
+				| CLANRING_DMM4_MODE
+				| CLANRING_AIRSHOT_MODE
+				| CLANRING_WIPEOUT_MODE);
+
+		// Keep alt ents scoped to the current mode family; reset on gametype switch.
+		if (old_type_flags != new_type_flags && (clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS))
+		{
+			clanring_gameconfig = clanring_gameconfig - (clanring_gameconfig & CLANRING_ALTERNATIVE_ENTS);
+
+			if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+				cvar_set("external_ents_dir", "ctf");
+			else
+				cvar_set("external_ents_dir", "");
+
+			bprint("Alternative entity set reset to standard for mode switch\n");
+			utils_set_cvar("gamecfg", clanring_gameconfig);
 		}
 
 		utils_set_cvar ("samelevel", clanring_playmode);
@@ -968,6 +1013,238 @@ float(string target_dir) AltEntForCurrentMapExists =
     return FALSE;
 };
 
+float() votables_map_vote_suggested_mode =
+{
+    if (clanring_playmode & CLANRING_PRACTICE_MODE)
+        return ADMIN_PRACTICE_MODE;
+    if (clanring_playmode & CLANRING_NORMAL_MODE)
+        return ADMIN_NORMAL_MODE;
+    return ADMIN_MATCH_MODE;
+};
+
+string(float mode) votables_mode_command_name =
+{
+    if (mode == ADMIN_NORMAL_MODE)
+        return "normal";
+    if (mode == ADMIN_PRACTICE_MODE)
+        return "practice";
+    return "match";
+};
+
+string(float gametype) votables_gametype_command_name =
+{
+    if (gametype == 1)
+        return "ctf";
+    return "dm";
+};
+
+float(float mapnum) votables_map_is_ctf_category =
+{
+    local float category;
+    local string label;
+
+    if (!mapnum)
+        return FALSE;
+
+    category = floor((mapnum - 1) / WARP_MAPLIST_SIZE) + 1;
+    if (category < 1 || category >= WARP_CATEGORY_SIZE)
+        return FALSE;
+
+    label = lowrcase(warpmenutop[category]);
+    if (!label || label == "")
+        return FALSE;
+
+    if (strstrofs(label, "ctf", 0) >= 0)
+        return TRUE;
+    if (strstrofs(label, "capture", 0) >= 0)
+        return TRUE;
+
+    return FALSE;
+};
+
+float(string maparg) votables_map_has_ctf_spawnpoints =
+{
+    local string c1, c2;
+
+    if (!maparg || maparg == "")
+        return -1;
+    if (!FS_CanProbe())
+        return -1;
+
+    c1 = strcat("maps/ctf/", maparg, ".ent");
+    c2 = strcat("ctf/maps/", maparg, ".ent");
+
+    if (FS_FileExists(c1) || FS_FileExists(c2))
+        return TRUE;
+
+    return FALSE;
+};
+
+void(float clear_screen) votables_map_vote_prompt_clear =
+{
+    if (self.use == votables_map_vote_prompt_response)
+        self.use = SUB_Null;
+
+    self.pending_map_vote_mapnum = 0;
+    self.pending_map_vote_type = 0;
+    self.pending_map_vote_mode = 0;
+    self.pending_map_vote_timeout = 0;
+    self.pending_map_vote_print_time = 0;
+
+    if (clear_screen)
+        centerprint(self, " ");
+};
+
+void() votables_map_vote_prompt_display =
+{
+    local string maparg = "", intro1 = "", intro2 = "", option1 = "", option2 = "", hint = "", menu = "";
+    local string cmd_gametype = "", cmd_mode = "";
+    local float option_width = 0;
+
+    if (!self.pending_map_vote_mapnum)
+        return;
+
+    if (self.use != votables_map_vote_prompt_response)
+    {
+        votables_map_vote_prompt_clear(FALSE);
+        return;
+    }
+
+    if (time >= self.pending_map_vote_timeout)
+    {
+        sprint(self, "Map vote prompt timed out.\n");
+        votables_map_vote_prompt_clear(TRUE);
+        return;
+    }
+
+    if (self.pending_map_vote_print_time > time)
+        return;
+
+    maparg = warpmap[self.pending_map_vote_mapnum].name;
+    if (!maparg || maparg == "")
+    {
+        votables_map_vote_prompt_clear(TRUE);
+        return;
+    }
+
+    if (self.pending_map_vote_type == 1)
+    {
+        intro1 = sprintf("%s has CTF spawnpoints.", maparg);
+        intro2 = "Vote it with CTF as well?";
+        option1 = "\1 also change to CTF";
+    }
+    else
+    {
+        intro1 = sprintf("%s has no CTF spawnpoints.", maparg);
+        intro2 = "Vote it with DM instead?";
+        option1 = "\1 also change to DM";
+    }
+
+    if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+        option2 = "\2 keep current CTF mode";
+    else
+        option2 = "\2 keep current mode";
+
+    option_width = strlen(option1);
+    if (strlen(option2) > option_width)
+        option_width = strlen(option2);
+    option1 = strpad(option_width, option1);
+    option2 = strpad(option_width, option2);
+
+    cmd_gametype = votables_gametype_command_name(self.pending_map_vote_type);
+    cmd_mode = votables_mode_command_name(self.pending_map_vote_mode);
+    hint = sprintf("ex: cmd %s %s %s", cmd_gametype, cmd_mode, maparg);
+
+    menu = sprintf(
+        "%s\n\n%s\n%s\n\n%s\n%s\n\ncmd x y z\n%s",
+        redify("\x8E map vote check \x8E"), intro1, intro2, option1, option2, hint);
+    centerprint(self, menu);
+    self.pending_map_vote_print_time = time + 1;
+};
+
+void() votables_map_vote_prompt_response =
+{
+    local float choice, mapnum, newtype, newmode;
+
+    choice = self.finaldest_z;
+    mapnum = self.pending_map_vote_mapnum;
+    newtype = self.pending_map_vote_type;
+    newmode = self.pending_map_vote_mode;
+
+    if (!mapnum)
+    {
+        votables_map_vote_prompt_clear(FALSE);
+        return;
+    }
+
+    if (choice == 1)
+    {
+        votables_map_vote_prompt_clear(TRUE);
+        stuffcmd(self, "play misc/menu1.wav\n");
+        votables_request_set_gametype_mode_map(newtype, -1, mapnum);
+        return;
+    }
+
+    if (choice == 2)
+    {
+        votables_map_vote_prompt_clear(TRUE);
+        stuffcmd(self, "play misc/menu2.wav\n");
+        votables_request_set_gametype_mode_map(-1, -1, mapnum);
+        return;
+    }
+
+    stuffcmd(self, "play misc/menu2.wav\n");
+    self.pending_map_vote_print_time = 0;
+    votables_map_vote_prompt_display();
+};
+
+float(float mapnum) votables_maybe_prompt_map_vote_mode_change =
+{
+    local string maparg = "";
+    local float map_has_ctf, suggested_type, suggested_mode;
+
+    if (self == world || !mapnum)
+        return FALSE;
+    if (mode_is_arena())
+        return FALSE;
+
+    maparg = warpmap[mapnum].name;
+    if (!maparg || maparg == "")
+        return FALSE;
+
+    map_has_ctf = votables_map_has_ctf_spawnpoints(maparg);
+    if (map_has_ctf < 0)
+        map_has_ctf = FALSE;
+    if (!map_has_ctf && votables_map_is_ctf_category(mapnum))
+        map_has_ctf = TRUE;
+
+    suggested_type = -1;
+    suggested_mode = votables_map_vote_suggested_mode();
+
+    if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && !map_has_ctf)
+        suggested_type = 0;
+    else if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && map_has_ctf)
+        suggested_type = 1;
+
+    if (suggested_type < 0)
+        return FALSE;
+
+    if (self.pending_map_vote_mapnum)
+        votables_map_vote_prompt_clear(TRUE);
+
+    self.pending_map_vote_mapnum = mapnum;
+    self.pending_map_vote_type = suggested_type;
+    self.pending_map_vote_mode = suggested_mode;
+    self.pending_map_vote_timeout = time + 12;
+    self.pending_map_vote_print_time = 0;
+    self.use = votables_map_vote_prompt_response;
+
+    stuffcmd(self, "play misc/menu1.wav\n");
+    sprint(self, "Check screen for potential map vote options\n");
+    votables_map_vote_prompt_display();
+    return TRUE;
+};
+
 //
 //  S E T  A L T E R N A T I V E  E N T I T I E S
 //
@@ -1181,7 +1458,13 @@ void() votables_get_fraglimit =
 };
 void() votables_select_fraglimit =
 {
-	if ((clanring_playmode & CLANRING_AIRSHOT_MODE) || (clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_RA_MODE))
+	// Rocket Arena: allow fraglimit vote menu at any time.
+	if (clanring_playmode & CLANRING_RA_MODE)
+	{
+	}
+	// Allow Rocket Arena fraglimit votes while rounds are active.
+	// Keep the in-progress lock for modes that rely on fixed live-round limits.
+	else if ((clanring_playmode & CLANRING_AIRSHOT_MODE) || (clanring_playmode & CLANRING_DMM4_MODE))
 	{
 		if ((boss != world) && (boss.state == CA_MATCH_PLAYING))
 		{
@@ -1930,6 +2213,13 @@ void() DropRune;
 
 void() votables_set_runes =
 {
+	local float is_pub_ctf;
+
+	is_pub_ctf = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+		&& (clanring_playmode & CLANRING_NORMAL_MODE)
+		&& !(clanring_playmode & CLANRING_MATCH_MODE)
+		&& !(clanring_playmode & CLANRING_PRACTICE_MODE);
+
 	if (clanring_playmode & CLANRING_RUNES)
 	{		
 		utils_do_players(DropRune);
@@ -1937,6 +2227,8 @@ void() votables_set_runes =
 		bprint("Runes Disabled\n");		
 		clanring_playmode = (clanring_playmode - (clanring_playmode & CLANRING_RUNES));
 		utils_set_cvar("samelevel", clanring_playmode);
+		if (is_pub_ctf)
+			cvar_set("cr_pubctf_runes_override", "0");
 	}
 	else
 	{	
@@ -1944,6 +2236,8 @@ void() votables_set_runes =
 		bprint("Runes Enabled\n");
 		clanring_playmode = (clanring_playmode | CLANRING_RUNES);
 		utils_set_cvar("samelevel", clanring_playmode);
+		if (is_pub_ctf)
+			cvar_set("cr_pubctf_runes_override", "1");
 	}
 };
 

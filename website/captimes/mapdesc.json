@@ -1,0 +1,3166 @@
+[
+  {
+    "name": "2box4",
+    "description": "Railgun 101"
+  },
+  {
+    "name": "2pyramid",
+    "description": "Two Pyramids"
+  },
+  {
+    "name": "2towers",
+    "description": "Twin Towers Arena - By Scooby"
+  },
+  {
+    "name": "23ar-a",
+    "description": "PlatArena23-A by AgEnT_XXIII"
+  },
+  {
+    "name": "100m",
+    "description": "100m run"
+  },
+  {
+    "name": "150dm3",
+    "description": "150% abandoned base"
+  },
+  {
+    "name": "400m",
+    "description": "empty-description"
+  },
+  {
+    "name": "a2",
+    "description": "A2:Return to Atlantis . By Pingu"
+  },
+  {
+    "name": "abyss",
+    "description": "Abyssinia . by bps qhlan2024 Map Pack"
+  },
+  {
+    "name": "ac4",
+    "description": "<[ANTI.CLAN.IV]>"
+  },
+  {
+    "name": "ad_tears",
+    "description": "Tears of the False God"
+  },
+  {
+    "name": "aerowalk",
+    "description": "Aerowalk"
+  },
+  {
+    "name": "aerowalk-brut02",
+    "description": "Aerowalk"
+  },
+  {
+    "name": "aerowalkfrost",
+    "description": "Aerofrost . aerowalk winter edition by bps"
+  },
+  {
+    "name": "aerowalk_halloween",
+    "description": "Aerowalk"
+  },
+  {
+    "name": "agenda",
+    "description": ".Hidden Agenda. by headshot"
+  },
+  {
+    "name": "agent",
+    "description": "AGENT ORANGE - Malevola"
+  },
+  {
+    "name": "aggrado",
+    "description": "Aggrado - Visit quakeqe.com for Quake Remastered"
+  },
+  {
+    "name": "aggressr",
+    "description": "Aggressor - by Tyrann"
+  },
+  {
+    "name": "aghast",
+    "description": "Aghast by Vondur"
+  },
+  {
+    "name": "akator",
+    "description": "Temple of Akator, adoption of Enigma Crucible by"
+  },
+  {
+    "name": "akator_b2",
+    "description": "Temple of Akator, adoption of Enigma Crucible by"
+  },
+  {
+    "name": "aksdm3",
+    "description": "empty-description"
+  },
+  {
+    "name": "alcyone",
+    "description": "Alcyone by hylke beck aka gibbie bech@geo.vu.nl a"
+  },
+  {
+    "name": "amphi",
+    "description": "The AmphitheatrE"
+  },
+  {
+    "name": "anarena",
+    "description": "Arena by anni (Jul 2019)"
+  },
+  {
+    "name": "anarena2",
+    "description": "Anarena 2 by anni (Jan 2024)"
+  },
+  {
+    "name": "anarena3",
+    "description": "Anarena 3 by anni (Jan 2024)"
+  },
+  {
+    "name": "anarena4",
+    "description": "anarena4 by anni (jan 2024)"
+  },
+  {
+    "name": "anarena5",
+    "description": "Anarena5 by anni (Jan 2024)"
+  },
+  {
+    "name": "anarena6",
+    "description": "Anarena 6 by anni (Sep 2024)"
+  },
+  {
+    "name": "anarena7",
+    "description": "Anarena7 by anni (sep 2024)"
+  },
+  {
+    "name": "anarena8",
+    "description": "burn in hell by anni (sep 2024)"
+  },
+  {
+    "name": "anarena10",
+    "description": "anarena 10 by anni (sep 2024)"
+  },
+  {
+    "name": "anfactory-b1",
+    "description": "Factory (beta 1) by anni (May 2023)"
+  },
+  {
+    "name": "ann",
+    "description": "A.N.N."
+  },
+  {
+    "name": "anruin",
+    "description": "Ruin by anni (Jun 2019)"
+  },
+  {
+    "name": "antemple",
+    "description": "Temple by anni (Jul 2019)"
+  },
+  {
+    "name": "anwalked_test",
+    "description": "Walk in the Park by anni (Feb 2021)"
+  },
+  {
+    "name": "arena311",
+    "description": "Arena 311"
+  },
+  {
+    "name": "arenaex",
+    "description": "claustrophorena - by expel"
+  },
+  {
+    "name": "arenarg2",
+    "description": "Rocket Jump This"
+  },
+  {
+    "name": "arenarg4",
+    "description": "SpongeBath"
+  },
+  {
+    "name": "arenarg5",
+    "description": "The Wicked Empty Base"
+  },
+  {
+    "name": "arenarg6",
+    "description": "thE PiT"
+  },
+  {
+    "name": "arenaw1",
+    "description": "Waiting Room of the Damned"
+  },
+  {
+    "name": "arenax",
+    "description": "ArenaX - http://www.planetquake.com/servers/arena"
+  },
+  {
+    "name": "arenazap",
+    "description": "Zaphods Arena"
+  },
+  {
+    "name": "arendm1a",
+    "description": "Place To Die"
+  },
+  {
+    "name": "arenrg3a",
+    "description": "Edge Of Insanity"
+  },
+  {
+    "name": "argonaut",
+    "description": "Argonaut"
+  },
+  {
+    "name": "arma4",
+    "description": "Armageddon 4"
+  },
+  {
+    "name": "asylum-ctf",
+    "description": "Mad's Asylum CTF (an ode to id maps) - by Forrest"
+  },
+  {
+    "name": "auhdm1",
+    "description": "The Forgotten [by AuhsaN]"
+  },
+  {
+    "name": "auhdm2",
+    "description": "Painful Memories - [Auhsan]"
+  },
+  {
+    "name": "ava",
+    "description": "AVA - by Alice"
+  },
+  {
+    "name": "aztek",
+    "description": "The Aztec Ruins . by alice & infiniti ."
+  },
+  {
+    "name": "aztekdmm4",
+    "description": "The Aztec Ruins . by alice & infiniti . DMM4"
+  },
+  {
+    "name": "baldm1",
+    "description": "Horror at Red Hook - by Bal"
+  },
+  {
+    "name": "baldm3",
+    "description": "Baldm3 .Tainted Meat. By .BaL. http://www.barrysw"
+  },
+  {
+    "name": "baldm6",
+    "description": "Baldm6 By .BaL. .Scrap.Metal. www.planetquake.com"
+  },
+  {
+    "name": "baldm7",
+    "description": "Baldm7 By .BaL. .Black.Feathered.Wings. www.plane"
+  },
+  {
+    "name": "baldm8",
+    "description": "Baldm8 By .BaL. .Dying.Embers. www.planetquake.co"
+  },
+  {
+    "name": "barena1",
+    "description": "Bowl Arena by Nacho|rage"
+  },
+  {
+    "name": "barrel",
+    "description": "Da Barrello ..."
+  },
+  {
+    "name": "basarena",
+    "description": "Base arena by Cokeman"
+  },
+  {
+    "name": "base32",
+    "description": "Base32"
+  },
+  {
+    "name": "base32b",
+    "description": "Base32b"
+  },
+  {
+    "name": "base32b_qe",
+    "description": "Base 32"
+  },
+  {
+    "name": "basic1",
+    "description": "basic1 - back to basics: blood soup - by rocketma"
+  },
+  {
+    "name": "basic2",
+    "description": "basic2 - back to basics: The Crooked Mile - rocke"
+  },
+  {
+    "name": "bastard",
+    "description": "Bastard Base --- by Forrest"
+  },
+  {
+    "name": "bastard no vis",
+    "description": "Bastard Base --- by Forrest"
+  },
+  {
+    "name": "battery",
+    "description": "empty-description"
+  },
+  {
+    "name": "bbarena2",
+    "description": "Blood Bath"
+  },
+  {
+    "name": "bigtower",
+    "description": "Entering JONLEVEL"
+  },
+  {
+    "name": "biome-pritchard",
+    "description": "Biome (Mr. Self Destruct) - Pritchard"
+  },
+  {
+    "name": "bless",
+    "description": "ZBless To KillZ by headshot"
+  },
+  {
+    "name": "blitzkrieg2",
+    "description": "Blitzkrieg.v2 by [mf] e v i l"
+  },
+  {
+    "name": "blizz",
+    "description": ".The blizzard."
+  },
+  {
+    "name": "blizz2",
+    "description": ".Blizzard 2000."
+  },
+  {
+    "name": "blocky_devroom_vanilla_v4",
+    "description": "empty-description"
+  },
+  {
+    "name": "blood",
+    "description": ".Mayan Blood Pits .By C4rboN83"
+  },
+  {
+    "name": "bloodthirst",
+    "description": "Blood Thirst - By Tiddles - Thanks DD For All The"
+  },
+  {
+    "name": "bloodwalk",
+    "description": "bloodwalk (modification by alice)"
+  },
+  {
+    "name": "bloody",
+    "description": "Bloody Mine --- by Forrest"
+  },
+  {
+    "name": "bluera",
+    "description": "Blue Rocket Arena"
+  },
+  {
+    "name": "BoHCatdl",
+    "description": "+BoHCatdl+(Baron_of_Hell's_Cathedral)"
+  },
+  {
+    "name": "BoHSuite",
+    "description": "BoHSuite(Baron_of_Hell's_Suite)"
+  },
+  {
+    "name": "BoHWarZn",
+    "description": "BoHWarZn(Baron_of_Hell's_War_Zone)"
+  },
+  {
+    "name": "boldplace",
+    "description": "The Bold Place"
+  },
+  {
+    "name": "bomberman",
+    "description": "Bizarro Bomberman"
+  },
+  {
+    "name": "bombsite_b1",
+    "description": "Bombsite by xstephx"
+  },
+  {
+    "name": "boom",
+    "description": "Ba-Boom --- by Forrest"
+  },
+  {
+    "name": "boss",
+    "description": "Boss by xstephx"
+  },
+  {
+    "name": "bovine",
+    "description": "bovinE interventioN"
+  },
+  {
+    "name": "bravado",
+    "description": "Bravado - by foogs [remake]"
+  },
+  {
+    "name": "bravadodmm4",
+    "description": "Bravado - dmm4"
+  },
+  {
+    "name": "bravado_halloween",
+    "description": "bravado_halloween by xstephx (original by foogs)"
+  },
+  {
+    "name": "brick_b1",
+    "description": "Brick by xstephx"
+  },
+  {
+    "name": "brovado",
+    "description": "Brovado by xstephx"
+  },
+  {
+    "name": "brutefist",
+    "description": "empty-description"
+  },
+  {
+    "name": "br_edge",
+    "description": "Brutal Edge"
+  },
+  {
+    "name": "bsdm2",
+    "description": "TORMENTOR"
+  },
+  {
+    "name": "bsdm4",
+    "description": "HERESY"
+  },
+  {
+    "name": "bsdm7",
+    "description": "Black Mountain Castle"
+  },
+  {
+    "name": "bsdm8",
+    "description": "TACTICAL NEUTRAL IMPACT"
+  },
+  {
+    "name": "bsp",
+    "description": "BLOOD,SWEAT & PISS > by )Az"
+  },
+  {
+    "name": "buckctf1",
+    "description": "empty-description"
+  },
+  {
+    "name": "buckdm1",
+    "description": "buckdm1"
+  },
+  {
+    "name": "buckdm2",
+    "description": "empty-description"
+  },
+  {
+    "name": "buckdm3",
+    "description": "empty-description"
+  },
+  {
+    "name": "buckdm3b",
+    "description": "empty-description"
+  },
+  {
+    "name": "buckdm3_b",
+    "description": "empty-description"
+  },
+  {
+    "name": "buckdm4",
+    "description": "empty-description"
+  },
+  {
+    "name": "bundes",
+    "description": "Bunny in the Desert"
+  },
+  {
+    "name": "bunmoo3",
+    "description": "First Bunny on the Moon"
+  },
+  {
+    "name": "bunsac",
+    "description": "Bunny Sacrifice"
+  },
+  {
+    "name": "bunski",
+    "description": "Ski Bunny"
+  },
+  {
+    "name": "burialb10",
+    "description": "Burial (beta 10) - by foogs"
+  },
+  {
+    "name": "b_rock1-alt",
+    "description": "empty-description"
+  },
+  {
+    "name": "capit",
+    "description": "Cap it! -by skeLman (www.skelman.com)"
+  },
+  {
+    "name": "carddm1",
+    "description": "Attack Vector - by CardO"
+  },
+  {
+    "name": "carddm2",
+    "description": "Stinger - by CardO"
+  },
+  {
+    "name": "castlev2",
+    "description": "Castle - Version 2 - By Tiddles"
+  },
+  {
+    "name": "castlev2_halloween",
+    "description": "castlev2_halloween by xstephx (original by Tiddle"
+  },
+  {
+    "name": "catalyst",
+    "description": "The Catalyst by thct // q1 adaptation by fourier"
+  },
+  {
+    "name": "cavetest2",
+    "description": "empty-description"
+  },
+  {
+    "name": "cbase-ctf",
+    "description": "CBase CTF --- by Forrest"
+  },
+  {
+    "name": "cdff",
+    "description": "CrAzYnEsS dOpEfIsH!"
+  },
+  {
+    "name": "chamber1",
+    "description": "The Chamber of Pain Shadow[iC/JL/N] ICQ-UIN 32585"
+  },
+  {
+    "name": "cheatc",
+    "description": "The CHEAT Complex"
+  },
+  {
+    "name": "chembase",
+    "description": "The Chemical Factory"
+  },
+  {
+    "name": "chesdm1",
+    "description": "Primal Etchings... - by cheshire"
+  },
+  {
+    "name": "chillout_b1",
+    "description": "Chill Out by xstephx"
+  },
+  {
+    "name": "chokerb1",
+    "description": "Choker by xstephx"
+  },
+  {
+    "name": "chokerb2",
+    "description": "Choker by xstephx"
+  },
+  {
+    "name": "chute",
+    "description": "Chute by foogs"
+  },
+  {
+    "name": "chute_b2",
+    "description": "Chute Beta 1 by foogs"
+  },
+  {
+    "name": "cleaver",
+    "description": "Cleaver Love"
+  },
+  {
+    "name": "cmt1",
+    "description": "Silverdome (beta 3) by Zaka"
+  },
+  {
+    "name": "cmt1b",
+    "description": "Silverdome by Zaka"
+  },
+  {
+    "name": "cmt3",
+    "description": ".DeutschMaschine."
+  },
+  {
+    "name": "cmt4",
+    "description": "Andromeda Nine (cmt version) by Slayer"
+  },
+  {
+    "name": "cmt5b",
+    "description": ".the.dreamweaver.by.qurnel."
+  },
+  {
+    "name": "cockra",
+    "description": "Cock Tower -by NoFaDz"
+  },
+  {
+    "name": "cot2v2",
+    "description": "Chambers of Torment revisit by kwon"
+  },
+  {
+    "name": "cpm1qw",
+    "description": "Wicked.by.SamoN (original by FxR|Jude)"
+  },
+  {
+    "name": "cpm3",
+    "description": "CPM3 --- remixed by Forrest"
+  },
+  {
+    "name": "crandome",
+    "description": "empty-description"
+  },
+  {
+    "name": "croctear",
+    "description": "Crocodile Tears"
+  },
+  {
+    "name": "crowdm1",
+    "description": "Hooray for Opensource!"
+  },
+  {
+    "name": "crusher",
+    "description": "The Crusher by: - b B q - And The Demoman Guild"
+  },
+  {
+    "name": "ctf0",
+    "description": "Twin Towers - BraFish"
+  },
+  {
+    "name": "ctf1",
+    "description": "McKinley Base"
+  },
+  {
+    "name": "ctf1dmm4",
+    "description": "McKinley Base"
+  },
+  {
+    "name": "ctf1raff",
+    "description": "McKinley Arena"
+  },
+  {
+    "name": "ctf1war",
+    "description": "McKinley Arena"
+  },
+  {
+    "name": "ctf2",
+    "description": "The Kiln"
+  },
+  {
+    "name": "ctf2m1",
+    "description": "McKinley Station"
+  },
+  {
+    "name": "ctf2m1dmm4",
+    "description": "McKinley Station"
+  },
+  {
+    "name": "ctf2m2",
+    "description": "The Warzone"
+  },
+  {
+    "name": "ctf2m2x",
+    "description": "The Warzone"
+  },
+  {
+    "name": "ctf2m3",
+    "description": "Spill the Blood"
+  },
+  {
+    "name": "ctf2m3dmm4",
+    "description": "Stop the flow"
+  },
+  {
+    "name": "ctf2m4",
+    "description": "The Ruins of NeoMinonk"
+  },
+  {
+    "name": "ctf2m5",
+    "description": "Disciple War Grounds"
+  },
+  {
+    "name": "ctf2m6",
+    "description": "The Two Towers"
+  },
+  {
+    "name": "ctf2m7",
+    "description": "Gloom Castles"
+  },
+  {
+    "name": "ctf2m8",
+    "description": "Capturephobopolis"
+  },
+  {
+    "name": "ctf3",
+    "description": "DySpHoRiA"
+  },
+  {
+    "name": "ctf3m1",
+    "description": "Remix"
+  },
+  {
+    "name": "ctf3m2",
+    "description": "Red Alert - By EG"
+  },
+  {
+    "name": "ctf3m3",
+    "description": "Stop the flow"
+  },
+  {
+    "name": "ctf3m3dmm4",
+    "description": "Stop the flow"
+  },
+  {
+    "name": "ctf3m4",
+    "description": "The Nameless Mines (the sequel)"
+  },
+  {
+    "name": "ctf3m5",
+    "description": "Egyptian Pig Factory -- By Ziggurat"
+  },
+  {
+    "name": "ctf3m5dmm4",
+    "description": "Egyptian Pig Factory -- By Ziggurat"
+  },
+  {
+    "name": "ctf3m6",
+    "description": "UKCTFL1"
+  },
+  {
+    "name": "ctf3m7",
+    "description": "The Dark Age - By EG"
+  },
+  {
+    "name": "ctf3m7dmm4",
+    "description": "The Dark Age - By EG"
+  },
+  {
+    "name": "ctf3m8",
+    "description": "The Place of Two Bases"
+  },
+  {
+    "name": "ctf3m9",
+    "description": "Cheat2!Barkfalls"
+  },
+  {
+    "name": "ctf3m9dmm4",
+    "description": "Cheat2!Barkfalls"
+  },
+  {
+    "name": "ctf3m9x",
+    "description": "Cheat2!Barkfalls"
+  },
+  {
+    "name": "ctf4",
+    "description": "The Forgotten Mines"
+  },
+  {
+    "name": "ctf5",
+    "description": "Da Ancient War Grounds"
+  },
+  {
+    "name": "ctf5dmm4",
+    "description": "Da Ancient War Grounds"
+  },
+  {
+    "name": "ctf6",
+    "description": "Vertigo - By Midiguy"
+  },
+  {
+    "name": "ctf6dmm4",
+    "description": "Vertigo - By Midiguy"
+  },
+  {
+    "name": "ctf7",
+    "description": "Tale of Two Cities"
+  },
+  {
+    "name": "ctf8",
+    "description": "The Strongbox"
+  },
+  {
+    "name": "ctf8dmm4",
+    "description": "The Strongbox"
+  },
+  {
+    "name": "ctf8_qe",
+    "description": "Chthon's Capture House"
+  },
+  {
+    "name": "ctf9",
+    "description": "empty-description"
+  },
+  {
+    "name": "ctf10",
+    "description": "Da Ancient War Grounds"
+  },
+  {
+    "name": "ctf10k",
+    "description": "empty-description"
+  },
+  {
+    "name": "ctf10_2026",
+    "description": "empty-description"
+  },
+  {
+    "name": "CTFBBLUD",
+    "description": "Bad Blood CTF"
+  },
+  {
+    "name": "ctfgold1",
+    "description": "The Mess Hall -Norm & Prax -http://gold.flc.net"
+  },
+  {
+    "name": "ctfgold2",
+    "description": "Badical Bunkers -Gold"
+  },
+  {
+    "name": "ctfgold3",
+    "description": "Arax -Prax & Anox -http://gold.flc.net"
+  },
+  {
+    "name": "ctfgold4",
+    "description": "installaflagus"
+  },
+  {
+    "name": "ctfgold5",
+    "description": "Elder Ctf Shrines -Prax -http://gold.flc.net"
+  },
+  {
+    "name": "ctfgold6",
+    "description": "The CaptureZone"
+  },
+  {
+    "name": "ctfgold7",
+    "description": "Flags 'n' Frags - by Bain -"
+  },
+  {
+    "name": "ctfgold8",
+    "description": "Abandoned Dungeon"
+  },
+  {
+    "name": "ctfnec",
+    "description": "-Necropolis Remix- By:Panic"
+  },
+  {
+    "name": "ctfstart",
+    "description": "Introduction"
+  },
+  {
+    "name": "ctf_desert",
+    "description": "Strongholds in the Hale"
+  },
+  {
+    "name": "ctf_facing",
+    "description": "Facing Worlds (quakeQE.com)"
+  },
+  {
+    "name": "ctf_relic2",
+    "description": "kilomile & unh0ly - relic"
+  },
+  {
+    "name": "ctf_shrine_a0",
+    "description": "rctf2: The Mystic Shrine | r00k / infiniti"
+  },
+  {
+    "name": "ctf_space",
+    "description": "empty-description"
+  },
+  {
+    "name": "ctl4beta2",
+    "description": "ctl4 - QnBase"
+  },
+  {
+    "name": "ctl8",
+    "description": "Ctl8 - Grim Dungeons Revisited"
+  },
+  {
+    "name": "cy2",
+    "description": "The Courtyard"
+  },
+  {
+    "name": "dajno",
+    "description": "dino robot . by alice"
+  },
+  {
+    "name": "dakyne",
+    "description": "Dakyne by G1ZM0"
+  },
+  {
+    "name": "damaul2",
+    "description": ".Reign In Blood. By DaMaul"
+  },
+  {
+    "name": "damaul7",
+    "description": ".The Temple of Tanktarta. By DaMaul"
+  },
+  {
+    "name": "dark",
+    "description": "The Dark Arena"
+  },
+  {
+    "name": "dark-planet",
+    "description": "Dark Planet - By Tiddles"
+  },
+  {
+    "name": "dark-storm-ffa",
+    "description": "Dark Storm - By Tiddles"
+  },
+  {
+    "name": "dazdm12",
+    "description": "@ In the thick of it special edition - By DaZ @"
+  },
+  {
+    "name": "dazdm13",
+    "description": "@Black Deception@ - By DaZ"
+  },
+  {
+    "name": "dbbase",
+    "description": "Dodgeball Base"
+  },
+  {
+    "name": "dbcourt",
+    "description": "Dodgeball Court"
+  },
+  {
+    "name": "dead",
+    "description": "Dead of Night by Hellscrag"
+  },
+  {
+    "name": "death1",
+    "description": "Sudden Death Shadow[iC/JL/N] ICQ-UIN 3258545"
+  },
+  {
+    "name": "death32",
+    "description": "empty-description"
+  },
+  {
+    "name": "death32a",
+    "description": "Death32a"
+  },
+  {
+    "name": "death32b",
+    "description": "Death32b"
+  },
+  {
+    "name": "death32c",
+    "description": "Death32c"
+  },
+  {
+    "name": "death32c_qe",
+    "description": "Death 32"
+  },
+  {
+    "name": "debello",
+    "description": "De Bello Quakero"
+  },
+  {
+    "name": "defer",
+    "description": "Coup de Fer"
+  },
+  {
+    "name": "delven_example",
+    "description": "empty-description"
+  },
+  {
+    "name": "dividex_b3",
+    "description": "Divided Crossings"
+  },
+  {
+    "name": "dm-chthon",
+    "description": "[DM] House of Chthon Expanded -Skies912"
+  },
+  {
+    "name": "dm1",
+    "description": "Place of Two Deaths"
+  },
+  {
+    "name": "dm1_nq",
+    "description": "Place of Two Deaths"
+  },
+  {
+    "name": "dm2",
+    "description": "Claustrophobopolis"
+  },
+  {
+    "name": "dm2arena",
+    "description": "Claustarena"
+  },
+  {
+    "name": "dm2b",
+    "description": "Claustrophobopolis"
+  },
+  {
+    "name": "dm2dmm4",
+    "description": "DM2 - DMM4 Edition"
+  },
+  {
+    "name": "dm2frost",
+    "description": "Frozenphobopolis . dm2 winter edition by bps"
+  },
+  {
+    "name": "dm2kilo8",
+    "description": "DM2: Rats in the Walls"
+  },
+  {
+    "name": "dm2kilo8 ",
+    "description": "DM2: Rats in the Walls"
+  },
+  {
+    "name": "dm2kilo9",
+    "description": "DM2: Rats in the Walls"
+  },
+  {
+    "name": "dm2kilo94",
+    "description": "DM2: Rats in the Walls"
+  },
+  {
+    "name": "dm2w",
+    "description": "Claustrophobopolis"
+  },
+  {
+    "name": "dm2_nq",
+    "description": "Claustrophobopolis"
+  },
+  {
+    "name": "dm3",
+    "description": "The Abandoned Base"
+  },
+  {
+    "name": "dm3again",
+    "description": "the alternate base"
+  },
+  {
+    "name": "DM3AirshotArena",
+    "description": "The Abandoned Arena by R00k"
+  },
+  {
+    "name": "dm3hill",
+    "description": "DM3 Hill . by bABy rOo!"
+  },
+  {
+    "name": "dm3o",
+    "description": "The Abandoned Base"
+  },
+  {
+    "name": "dm3_fp",
+    "description": "The Abandoned Base - Mr. Fancypants"
+  },
+  {
+    "name": "dm4",
+    "description": "The Bad Place"
+  },
+  {
+    "name": "dm4dmm4",
+    "description": "the bad place"
+  },
+  {
+    "name": "dm4frost",
+    "description": "The Frozen Place . dm4 winter edition by bps"
+  },
+  {
+    "name": "dm4f_b1",
+    "description": "The Bad Place - Remix by Fortiss"
+  },
+  {
+    "name": "dm5",
+    "description": "The Cistern"
+  },
+  {
+    "name": "dm6",
+    "description": "The Dark Zone"
+  },
+  {
+    "name": "dm6dmm4",
+    "description": "The Dark Zone for DMM4. Idea: glad, mapping: skar"
+  },
+  {
+    "name": "dm6frost",
+    "description": "The Frozen Zone . dm6 winter edition by bps"
+  },
+  {
+    "name": "dm6rmx",
+    "description": "The Dark Portal"
+  },
+  {
+    "name": "dm6_fp",
+    "description": "The Dark Zone - Mr. Fancypants"
+  },
+  {
+    "name": "dm7",
+    "description": "Acrophobia"
+  },
+  {
+    "name": "dm8",
+    "description": "Acrophobia"
+  },
+  {
+    "name": "dm30",
+    "description": "The Abandoned Base"
+  },
+  {
+    "name": "dm69",
+    "description": "The House of Blues"
+  },
+  {
+    "name": "dmak4_02",
+    "description": "The Bad Place"
+  },
+  {
+    "name": "dmak4_03",
+    "description": "The Bad Place remake by Makkon"
+  },
+  {
+    "name": "dmak6_02",
+    "description": "empty-description"
+  },
+  {
+    "name": "dmak6_03",
+    "description": "The Dark Zone remake by Makkon"
+  },
+  {
+    "name": "dmcepheus",
+    "description": "Cepheus - by Adib Murad (www.adibmurad.com) - 201"
+  },
+  {
+    "name": "dmd1",
+    "description": "It Begins With Two Deaths"
+  },
+  {
+    "name": "dmd2",
+    "description": "Hemophobopolis"
+  },
+  {
+    "name": "dmd3",
+    "description": "The Occupied Base"
+  },
+  {
+    "name": "dmd4",
+    "description": "The Bad Palace"
+  },
+  {
+    "name": "dmd5",
+    "description": "Round The U-Bend"
+  },
+  {
+    "name": "dmd6",
+    "description": "The Dark Portal"
+  },
+  {
+    "name": "dmfdm1",
+    "description": "Crimson Sunset by Daniel Flanagan"
+  },
+  {
+    "name": "dmfdm2",
+    "description": "ORANGE CRUSH BY DANIEL FLANAGAN"
+  },
+  {
+    "name": "dmm4_1",
+    "description": "dmm4_1 by aard"
+  },
+  {
+    "name": "dmm4_2",
+    "description": "dmm4_2 by aard"
+  },
+  {
+    "name": "dmm4_3",
+    "description": "dmm4_3 by aard"
+  },
+  {
+    "name": "dmm4_4",
+    "description": "dmm4_4 by aard"
+  },
+  {
+    "name": "dmm4_5",
+    "description": "dmm4_5 by aard"
+  },
+  {
+    "name": "dmm4_6",
+    "description": "dmm4_6 by aard"
+  },
+  {
+    "name": "dmm4_7",
+    "description": "dmm4_7 by aard"
+  },
+  {
+    "name": "dmm4_8",
+    "description": "dmm4_8 by aard"
+  },
+  {
+    "name": "dmm4_9",
+    "description": "dmm4_8 by aard"
+  },
+  {
+    "name": "dmtomb",
+    "description": "empty-description"
+  },
+  {
+    "name": "DM_Diesel1",
+    "description": "Diesel Cathedral"
+  },
+  {
+    "name": "dm_digsite",
+    "description": "Archaeologia Daemonum"
+  },
+  {
+    "name": "dm_herepeak_b1",
+    "description": "Peak Monastery"
+  },
+  {
+    "name": "dm_t2vulcan",
+    "description": "Turok 2 - Vulcan's Forge"
+  },
+  {
+    "name": "dokkur",
+    "description": "Cold halls"
+  },
+  {
+    "name": "dom2_1ra",
+    "description": "Doom2map01RA by hawkmoon"
+  },
+  {
+    "name": "DOOM",
+    "description": "DooM II Map01"
+  },
+  {
+    "name": "doom37",
+    "description": "QuakeDM Version 1.10"
+  },
+  {
+    "name": "doomed",
+    "description": "Doomed by Zaka"
+  },
+  {
+    "name": "doomf",
+    "description": "Doom2map01RA by hawkmoon"
+  },
+  {
+    "name": "doomfsky",
+    "description": "Doom2map01RA by hawkmoon"
+  },
+  {
+    "name": "dranzdm6",
+    "description": "Black Coffee - by Drannerz"
+  },
+  {
+    "name": "dranzdm7",
+    "description": "Purple Haze - by Drannerz"
+  },
+  {
+    "name": "dranzdm8",
+    "description": "Teardrop - by Drannerz"
+  },
+  {
+    "name": "dropout",
+    "description": "Dropout - by foogs"
+  },
+  {
+    "name": "dsn",
+    "description": "['Dead Simple' Nostalgie] by Stargazer"
+  },
+  {
+    "name": "dungeon",
+    "description": "empty-description"
+  },
+  {
+    "name": "dust2qw",
+    "description": "dust2 for qw by qurnel, link, xstephx"
+  },
+  {
+    "name": "dust2_beta",
+    "description": "dust2 for qw by qurnel, link, xstephx"
+  },
+  {
+    "name": "e1m1",
+    "description": "the Slipgate Complex"
+  },
+  {
+    "name": "e1m2",
+    "description": "Castle of the Damned"
+  },
+  {
+    "name": "e1m3",
+    "description": "the Necropolis"
+  },
+  {
+    "name": "e1m4",
+    "description": "the Grisly Grotto"
+  },
+  {
+    "name": "e1m5",
+    "description": "Gloom Keep"
+  },
+  {
+    "name": "e1m5duel",
+    "description": "e1m5 duel"
+  },
+  {
+    "name": "e1m6",
+    "description": "The Door To Chthon"
+  },
+  {
+    "name": "e1m7",
+    "description": "The House of Chthon"
+  },
+  {
+    "name": "e1m7dmm4",
+    "description": "The House of Chthon dmm4 version by kwon"
+  },
+  {
+    "name": "e1m8",
+    "description": "Ziggurat Vertigo"
+  },
+  {
+    "name": "e2m1",
+    "description": "the Installation"
+  },
+  {
+    "name": "e2m2",
+    "description": "the Ogre Citadel"
+  },
+  {
+    "name": "e2m3",
+    "description": "the Crypt of Decay"
+  },
+  {
+    "name": "e2m4",
+    "description": "the Ebon Fortress"
+  },
+  {
+    "name": "e2m5",
+    "description": "the Wizard's Manse"
+  },
+  {
+    "name": "e2m6",
+    "description": "the Dismal Oubliette"
+  },
+  {
+    "name": "e2m7",
+    "description": "the Underearth"
+  },
+  {
+    "name": "e3m1",
+    "description": "Termination Central"
+  },
+  {
+    "name": "e3m2",
+    "description": "The Vaults of Zin"
+  },
+  {
+    "name": "e3m3",
+    "description": "the Tomb of Terror"
+  },
+  {
+    "name": "e3m4",
+    "description": "Satan's Dark Delight"
+  },
+  {
+    "name": "e3m5",
+    "description": "the Wind Tunnels"
+  },
+  {
+    "name": "e3m6",
+    "description": "Chambers of Torment"
+  },
+  {
+    "name": "e3m7",
+    "description": "the Haunted Halls"
+  },
+  {
+    "name": "e3m7tdm",
+    "description": "the Haunted Halls TDM edition by Qurnel"
+  },
+  {
+    "name": "e4m1",
+    "description": "the Sewage System"
+  },
+  {
+    "name": "e4m2",
+    "description": "The Tower of Despair"
+  },
+  {
+    "name": "e4m3",
+    "description": "The Elder God Shrine"
+  },
+  {
+    "name": "e4m4",
+    "description": "the Palace of Hate"
+  },
+  {
+    "name": "e4m5",
+    "description": "Hell's Atrium"
+  },
+  {
+    "name": "e4m6",
+    "description": "The Pain Maze"
+  },
+  {
+    "name": "e4m7",
+    "description": "Azure Agony"
+  },
+  {
+    "name": "e4m8",
+    "description": "the Nameless City"
+  },
+  {
+    "name": "eastern_b1",
+    "description": "Eastern by xstephx"
+  },
+  {
+    "name": "eastern_b2",
+    "description": "Eastern by xstephx"
+  },
+  {
+    "name": "edc",
+    "description": ".Eternal. Dismemberment .Complex. By Tyrann"
+  },
+  {
+    "name": "edge",
+    "description": "The Edge"
+  },
+  {
+    "name": "edge9",
+    "description": "Brutal Edge"
+  },
+  {
+    "name": "efdm5",
+    "description": "efdm5 -V0rteX- by .]Mr.FribbleS[."
+  },
+  {
+    "name": "efdm6",
+    "description": "efdm6 .GunmetaL. by .]Mr.FribbleS[."
+  },
+  {
+    "name": "efdm8",
+    "description": "efdm8 .cryptosporidium. by .]Mr.FribbleS[. http:/"
+  },
+  {
+    "name": "efdm9",
+    "description": "efdm9 .tangerine dream. by .]Mr.FribbleS[. http:/"
+  },
+  {
+    "name": "efdm10",
+    "description": "efdm10 .WhiteChocolateSpaceEgg. by .]Mr.FribbleS["
+  },
+  {
+    "name": "efdm12",
+    "description": "efdm12 .death by the dozen. by .]Mr.FribbleS[. ht"
+  },
+  {
+    "name": "effigy",
+    "description": ":effigy of the forgotten: by moloch"
+  },
+  {
+    "name": "efra",
+    "description": "Mr F and Tig's RA01"
+  },
+  {
+    "name": "egyptra",
+    "description": "egyptra"
+  },
+  {
+    "name": "elder",
+    "description": "The Mystic Shrine"
+  },
+  {
+    "name": "end",
+    "description": "Shub-Niggurath's Pit"
+  },
+  {
+    "name": "end2",
+    "description": "Shub-Niggurath's Pit . End 2"
+  },
+  {
+    "name": "endif",
+    "description": "#endif - by yataze"
+  },
+  {
+    "name": "entitytest",
+    "description": "empty-description"
+  },
+  {
+    "name": "evdm1",
+    "description": "black rain"
+  },
+  {
+    "name": "evilplay",
+    "description": "The evil playground - by Fearicon@hotmail.com"
+  },
+  {
+    "name": "exdm5",
+    "description": ".ESPRIT DE CORPSE. by excessus"
+  },
+  {
+    "name": "experimental",
+    "description": "empty-description"
+  },
+  {
+    "name": "experimental_rc",
+    "description": "experimental - quakeqe.com"
+  },
+  {
+    "name": "fabrik",
+    "description": "Mammoth Fabrik - by Alice"
+  },
+  {
+    "name": "facil10",
+    "description": "storage facility"
+  },
+  {
+    "name": "facingtf",
+    "description": "Facing Worlds porting: XavioR polishing: ss"
+  },
+  {
+    "name": "facing_QRC",
+    "description": "Facing Worlds (quakeQE.com)"
+  },
+  {
+    "name": "factory3",
+    "description": ".Bakunin's Place."
+  },
+  {
+    "name": "ferrum",
+    "description": ".Ferrum. by Vondur"
+  },
+  {
+    "name": "fgoutpost",
+    "description": "The Forgotten Outpost"
+  },
+  {
+    "name": "fgsdm1_a7",
+    "description": "empty-description"
+  },
+  {
+    "name": "fij1",
+    "description": "Frag in Japan 1"
+  },
+  {
+    "name": "fij2",
+    "description": "Japanese frags"
+  },
+  {
+    "name": "flagrun",
+    "description": "flagrun -by skeLman (www.skelman.com)"
+  },
+  {
+    "name": "foodmm4",
+    "description": "xX420Xx DDKS aim MAP xX420Xx - by foogs"
+  },
+  {
+    "name": "football",
+    "description": "Rocket Football arena by Aegis"
+  },
+  {
+    "name": "fort01",
+    "description": "empty-description"
+  },
+  {
+    "name": "fortra",
+    "description": "Abandoned Fort -by NoFaDz"
+  },
+  {
+    "name": "foundry_beta2",
+    "description": "iron foundry - infiniti"
+  },
+  {
+    "name": "foundry_beta3",
+    "description": "iron.f0undry > by . inf1niti (beta3 - July '23)"
+  },
+  {
+    "name": "fpdm01",
+    "description": "Frag Warehouse - By Mr. Fancypants"
+  },
+  {
+    "name": "fragfes1",
+    "description": "Rocketman's Fragfest"
+  },
+  {
+    "name": "fragtwn2",
+    "description": "Fragtown 2 - Motor City"
+  },
+  {
+    "name": "fragtwn5",
+    "description": "FragTown 5 - Dallas"
+  },
+  {
+    "name": "fragtwn6",
+    "description": "Fragtown 6 -Pirates Cove"
+  },
+  {
+    "name": "fragtwn7",
+    "description": "Fragtown 7 - Chicago"
+  },
+  {
+    "name": "frenzy",
+    "description": "frenzy -by skeLman (www.skelman.com)"
+  },
+  {
+    "name": "gear",
+    "description": "Global warming"
+  },
+  {
+    "name": "gear6",
+    "description": "The bad square."
+  },
+  {
+    "name": "gear8",
+    "description": "CENSORED"
+  },
+  {
+    "name": "gear9",
+    "description": "Galapagos-miagos"
+  },
+  {
+    "name": "gearpr0n",
+    "description": "Pornogeddon"
+  },
+  {
+    "name": "gendm1",
+    "description": "GeNDM1: Trash by GeN"
+  },
+  {
+    "name": "gendm2",
+    "description": "HYPERALGESIE BY GeN"
+  },
+  {
+    "name": "gibexpo1",
+    "description": "i dont understand"
+  },
+  {
+    "name": "gloryholeb1",
+    "description": "Gloryhole by xstephx"
+  },
+  {
+    "name": "gmdm1",
+    "description": ".Exercise.One."
+  },
+  {
+    "name": "gnurena",
+    "description": "#.Seek.and.Hide.#"
+  },
+  {
+    "name": "gomdm4",
+    "description": "GomDM4 - Pretty Hate Machine"
+  },
+  {
+    "name": "gordon_b1",
+    "description": "Gordon by xstephx"
+  },
+  {
+    "name": "gordon_b2",
+    "description": "Gordon by xstephx"
+  },
+  {
+    "name": "gworld",
+    "description": "Gloomworld by Eugenius"
+  },
+  {
+    "name": "gym",
+    "description": "The Gymnasium --- by Forrest"
+  },
+  {
+    "name": "hammerv3",
+    "description": "Thor's Hammer v3 by ane"
+  },
+  {
+    "name": "hate",
+    "description": ".hatebreeder.by.qurnel."
+  },
+  {
+    "name": "head",
+    "description": "Gimme Some Head to Head --- by Forrest"
+  },
+  {
+    "name": "head-shot",
+    "description": "Head Shot - By Tiddles (thanks for the help - buf"
+  },
+  {
+    "name": "hellspit",
+    "description": "hellspit by kwon"
+  },
+  {
+    "name": "hex",
+    "description": "HEX - by Alice Soderlund"
+  },
+  {
+    "name": "hexarena_b3",
+    "description": "Hexarena, interpretation of Enigma Crucible by na"
+  },
+  {
+    "name": "hh3",
+    "description": "Spoon City"
+  },
+  {
+    "name": "hh5",
+    "description": "DcDm3"
+  },
+  {
+    "name": "hill20",
+    "description": "empty-description"
+  },
+  {
+    "name": "hip2m3",
+    "description": "The Catacombs"
+  },
+  {
+    "name": "hipark",
+    "description": "High Park"
+  },
+  {
+    "name": "hohoho2",
+    "description": "HO HO HO"
+  },
+  {
+    "name": "horde1",
+    "description": "Tower of the Apprentice"
+  },
+  {
+    "name": "horde2",
+    "description": "Frozen Court"
+  },
+  {
+    "name": "horde3",
+    "description": "The Foundry"
+  },
+  {
+    "name": "horde4",
+    "description": "The Hunt"
+  },
+  {
+    "name": "horde5",
+    "description": "Relic"
+  },
+  {
+    "name": "horde6",
+    "description": "The Trial"
+  },
+  {
+    "name": "horde7",
+    "description": "The Tech Spire"
+  },
+  {
+    "name": "hottub-32",
+    "description": "HotTub by anni (oct 2021)"
+  },
+  {
+    "name": "housedm",
+    "description": "Legoman's House"
+  },
+  {
+    "name": "housedmv2",
+    "description": "Legoman's House version 2 by xstephx"
+  },
+  {
+    "name": "hwjam3_makkon",
+    "description": "the vileduct"
+  },
+  {
+    "name": "iarena2",
+    "description": "2 Castles by iNiT"
+  },
+  {
+    "name": "id3",
+    "description": "DM6 Arena"
+  },
+  {
+    "name": "idctf1",
+    "description": "idctf1 Gloom Castles"
+  },
+  {
+    "name": "ikarena1",
+    "description": "empty-description"
+  },
+  {
+    "name": "imp1dm6",
+    "description": "Daedalus Revisited"
+  },
+  {
+    "name": "impdm3",
+    "description": "Strafeterium II by Biff Debris"
+  },
+  {
+    "name": "inferno",
+    "description": "Inferno of Pain"
+  },
+  {
+    "name": "intro",
+    "description": "Introduction"
+  },
+  {
+    "name": "italy_beta1",
+    "description": "QW ITALY 2022 (TDM)"
+  },
+  {
+    "name": "j",
+    "description": "empty-description"
+  },
+  {
+    "name": "jackra",
+    "description": "The Jack - By NoFaDz"
+  },
+  {
+    "name": "jam5_arrrcee",
+    "description": "Power Cell Prison"
+  },
+  {
+    "name": "jam5_fifth",
+    "description": "The Haram Place"
+  },
+  {
+    "name": "jam5_hypnos",
+    "description": "Steelbreaker"
+  },
+  {
+    "name": "jam5_ijed",
+    "description": "3Janus"
+  },
+  {
+    "name": "jam5_mfx",
+    "description": "Nash Equilibrium"
+  },
+  {
+    "name": "jam5_scampie",
+    "description": "The Ruin of Lemuria"
+  },
+  {
+    "name": "jam5_skacky",
+    "description": "Seeing Faces Where There Shouldn't Be Faces"
+  },
+  {
+    "name": "jam5_start",
+    "description": "Qonquer!"
+  },
+  {
+    "name": "jam5_warren",
+    "description": "empty-description"
+  },
+  {
+    "name": "jexra1",
+    "description": ".Loophole. > by JexJackL"
+  },
+  {
+    "name": "jmsdmm4",
+    "description": "WET DMM4 by Milton"
+  },
+  {
+    "name": "jndm6",
+    "description": "The Temple of Sun"
+  },
+  {
+    "name": "jndm6_fp",
+    "description": "The Temple of Sun by Mr.Fancypants (Original by J"
+  },
+  {
+    "name": "jndm6_fp_rc1",
+    "description": "Sun Temple"
+  },
+  {
+    "name": "jokeydm3",
+    "description": "Jokey's Abandoned Base - Modifications to the ori"
+  },
+  {
+    "name": "jrdm1",
+    "description": "jrdm1: Ignorus Hyperborean, by Junior"
+  },
+  {
+    "name": "judas24",
+    "description": "Judas24 v2.0"
+  },
+  {
+    "name": "kaboom",
+    "description": "K4B00M = Boom+"
+  },
+  {
+    "name": "kashmirdm2",
+    "description": "Kashmir dm2 re-texture by The_One_Without"
+  },
+  {
+    "name": "katla",
+    "description": "Katla . by alice qhlan2024 Map Pack"
+  },
+  {
+    "name": "katt",
+    "description": "katt"
+  },
+  {
+    "name": "kdmv",
+    "description": "Void Runner"
+  },
+  {
+    "name": "kebbysfarm",
+    "description": "Kebby's Farm by xstephx"
+  },
+  {
+    "name": "kikdm3",
+    "description": "The Underworld. KIKDM3 by kickin. kickin@two-dogs"
+  },
+  {
+    "name": "kikdm6",
+    "description": "- Count Zero Interrupt - by kickin. kickin@planet"
+  },
+  {
+    "name": "king",
+    "description": "King. 8J"
+  },
+  {
+    "name": "king1",
+    "description": "empty-description"
+  },
+  {
+    "name": "kjdm7",
+    "description": "kjdm7: MeatPacker - by killjoy"
+  },
+  {
+    "name": "kjdm13",
+    "description": "KJDM13: Burning With Ecstasy"
+  },
+  {
+    "name": "klzinsanity",
+    "description": "A jump into the insanity pit by Killazontherun"
+  },
+  {
+    "name": "klzvob",
+    "description": "Vitriolically Obliterate - By Killazontherun"
+  },
+  {
+    "name": "koc1",
+    "description": "Chthon's Capture House"
+  },
+  {
+    "name": "lacrima",
+    "description": ".Lacrima.Christi. ...by Gilt..."
+  },
+  {
+    "name": "ledges",
+    "description": "Spoon's Ledges"
+  },
+  {
+    "name": "lilith",
+    "description": "Lilith"
+  },
+  {
+    "name": "lim_makkon",
+    "description": "Restless Sentimentality"
+  },
+  {
+    "name": "loco",
+    "description": "Loco - by alice"
+  },
+  {
+    "name": "longest_yard",
+    "description": "Longest Yard"
+  },
+  {
+    "name": "lostcave",
+    "description": "The Lost Cave"
+  },
+  {
+    "name": "lostruinstest",
+    "description": "Lost Ruins by xstephx"
+  },
+  {
+    "name": "lowgrav",
+    "description": "Reduced Gravity"
+  },
+  {
+    "name": "lqdm4_b1",
+    "description": "Psychofuge"
+  },
+  {
+    "name": "lun5_3",
+    "description": "Lun3DM5 - You'll Shoot Your Eye Out"
+  },
+  {
+    "name": "lundm1",
+    "description": "Orange Whip By Lunaran"
+  },
+  {
+    "name": "macarena",
+    "description": "The MacArena"
+  },
+  {
+    "name": "madtower",
+    "description": "Tower of Madmen -by skeLman (www.skelman.com)"
+  },
+  {
+    "name": "mammoth",
+    "description": "Mammoth Depot - by alice"
+  },
+  {
+    "name": "mammoth_b4",
+    "description": "Mammoth Depot - by alice"
+  },
+  {
+    "name": "maphub_v2",
+    "description": "maphub . January 2025 . by bps forum thread: http"
+  },
+  {
+    "name": "marena2",
+    "description": "Arena by Mungo"
+  },
+  {
+    "name": "marena3",
+    "description": "Arena3 by Mungo"
+  },
+  {
+    "name": "marena4",
+    "description": "Arena4 by Mungo"
+  },
+  {
+    "name": "mayan1",
+    "description": "Mayan Showdown by NiOXiN"
+  },
+  {
+    "name": "mbasesr",
+    "description": "Millenium.Bases (revised edition) by [EQ].Wils ww"
+  },
+  {
+    "name": "mcc1_ish",
+    "description": "nematic outcome"
+  },
+  {
+    "name": "mctf1",
+    "description": "Twin Keepers - by Muff1n"
+  },
+  {
+    "name": "metron",
+    "description": "Megatron . by alice"
+  },
+  {
+    "name": "mgdm1",
+    "description": "Art of the Condemned"
+  },
+  {
+    "name": "mgdm1_qe",
+    "description": "Art of the Condemned"
+  },
+  {
+    "name": "mgdm2",
+    "description": "The Bad Space"
+  },
+  {
+    "name": "mgdm2_nq",
+    "description": ".Armatron. by Morgoth http://qw.gracz.net/morgoth"
+  },
+  {
+    "name": "mgdm3",
+    "description": "The Mustard Factory"
+  },
+  {
+    "name": "mgdm4",
+    "description": "The Boiler"
+  },
+  {
+    "name": "midair",
+    "description": "empty-description"
+  },
+  {
+    "name": "miniaztec1",
+    "description": "mini aztec1 by haze, 2018 discord.megateamfortres"
+  },
+  {
+    "name": "mininmtrees",
+    "description": "mini nmtrees by haze, 2018 discord.megateamfortre"
+  },
+  {
+    "name": "minisewer1",
+    "description": "mini sewer1 by haze, 2018 discord.megateamfortres"
+  },
+  {
+    "name": "mirage",
+    "description": "mirage q1 remake by qurnel"
+  },
+  {
+    "name": "misexpo1",
+    "description": "Xenomorph by MisYu"
+  },
+  {
+    "name": "misexpo2",
+    "description": "Ressurection by MisYu"
+  },
+  {
+    "name": "misexpo3",
+    "description": "Lifted! by MisYu"
+  },
+  {
+    "name": "misexpo4",
+    "description": "Quakernakulum by MisYu"
+  },
+  {
+    "name": "mncrdrug",
+    "description": "Mancer's Little Drug"
+  },
+  {
+    "name": "monsoon",
+    "description": "Monsoon by Lukin (xtn's remix) // Q1 Conversion b"
+  },
+  {
+    "name": "namecap",
+    "description": "The Captured City"
+  },
+  {
+    "name": "newcrat",
+    "description": ".New Crater. by bps, andeh, lw, ganon and rst . q"
+  },
+  {
+    "name": "nightwatch",
+    "description": "nightwatch by scythe"
+  },
+  {
+    "name": "nih",
+    "description": "the knights of nih"
+  },
+  {
+    "name": "nilsrar3",
+    "description": "Nils Arena 3, sandog@hem.passagen.se"
+  },
+  {
+    "name": "nindm2",
+    "description": "ASYLUM by Ninja"
+  },
+  {
+    "name": "nindm3",
+    "description": "Retaliation By Ninja"
+  },
+  {
+    "name": "noentry",
+    "description": "No Entry by Bugsy"
+  },
+  {
+    "name": "nova",
+    "description": "Nova - by alice"
+  },
+  {
+    "name": "nuke",
+    "description": "nuke conversion by link"
+  },
+  {
+    "name": "nuke_beta2",
+    "description": "nuke conversion by link - beta"
+  },
+  {
+    "name": "obsidian",
+    "description": "Obsidian by queen* Layout and Geometry by queen*"
+  },
+  {
+    "name": "oldcrat",
+    "description": ".Old Crater."
+  },
+  {
+    "name": "outpost",
+    "description": "The Outpost by Bugsy"
+  },
+  {
+    "name": "p3a",
+    "description": "[p3:a]domination . by Pingu"
+  },
+  {
+    "name": "paingiver",
+    "description": "Pain Giver - By Tiddles"
+  },
+  {
+    "name": "pbrdm2",
+    "description": "Dies Irae by NotoriousRay"
+  },
+  {
+    "name": "pelesgateb1",
+    "description": "Pele's Gate by xstephx"
+  },
+  {
+    "name": "pen2",
+    "description": "empty-description"
+  },
+  {
+    "name": "ph8dm2",
+    "description": "PH8DM2 Storage Facility 1031 By Phait - Feb 2005"
+  },
+  {
+    "name": "phantom",
+    "description": "Phantom Base"
+  },
+  {
+    "name": "phantombase",
+    "description": "Phantom Base TDM Pro"
+  },
+  {
+    "name": "pigremix",
+    "description": "Egyptian Pig Factory -- By Ziggurat"
+  },
+  {
+    "name": "pinion1",
+    "description": ".i. dissonance."
+  },
+  {
+    "name": "pit-original",
+    "description": ".The Pit."
+  },
+  {
+    "name": "pitarena",
+    "description": "The Pit Arena - by Scooby"
+  },
+  {
+    "name": "pkeg1",
+    "description": ".powder keg. by .]Mr.FribbleS[. http://www.planet"
+  },
+  {
+    "name": "plat_ra",
+    "description": "Platform Arena by Korb"
+  },
+  {
+    "name": "pli",
+    "description": "peace & love INC. stecki@terrafusion.com"
+  },
+  {
+    "name": "plpak1",
+    "description": ".bite.the.pain.by.qurnel."
+  },
+  {
+    "name": "plpak2",
+    "description": ".haunted.by.qurnel. - beta!"
+  },
+  {
+    "name": "plpak3",
+    "description": ".hacked.to.pieces.by.qurnel."
+  },
+  {
+    "name": "plpak4",
+    "description": ".Industrial Rage. by Morgoth"
+  },
+  {
+    "name": "plpak5",
+    "description": ".salvage.station.by.qurnel. - beta!"
+  },
+  {
+    "name": "pocket",
+    "description": "pocket infinity (q1.remix) . by fourier/infiniti"
+  },
+  {
+    "name": "pocket2025_t3",
+    "description": "pocket infinity (q1.remix) . by fourier/infiniti"
+  },
+  {
+    "name": "pocket_bf",
+    "description": "p0cket inf1nity . q1.remix by fourier/infiniti ."
+  },
+  {
+    "name": "pocket_rc4",
+    "description": "pocket infinity (q1.remix) . by fourier/infiniti"
+  },
+  {
+    "name": "pound",
+    "description": "Mad Dog Pound --- by Forrest"
+  },
+  {
+    "name": "pov1",
+    "description": "POV1, 'Hall' - By Alice"
+  },
+  {
+    "name": "pov2",
+    "description": "POV2 (No LG), 'Pit' - By Alice"
+  },
+  {
+    "name": "pov3",
+    "description": "POV3 (No RL), 'Penta' - By Alice"
+  },
+  {
+    "name": "pov4",
+    "description": "POV4, 'Pool' - By Alice"
+  },
+  {
+    "name": "pov5",
+    "description": "POV5, 'Culvert' - By Alice"
+  },
+  {
+    "name": "pov6",
+    "description": "POV6, 'Turbine' - By Alice"
+  },
+  {
+    "name": "pov7",
+    "description": "POV7, 'Ball' - By Alice"
+  },
+  {
+    "name": "pov2022",
+    "description": "POVDMM4 Rebirthed by POVOHAT 2021"
+  },
+  {
+    "name": "povdmm4",
+    "description": "DMM4 Arena By Povo-Hat (http://povo-hat.besmella-"
+  },
+  {
+    "name": "prisma",
+    "description": ".Prisma X. ARENA. By .]D1sT0Rt3D[. EMAIL: DiST0RT"
+  },
+  {
+    "name": "proxmap1",
+    "description": "Last Rites [Multi-Arena] by NotoriousRay"
+  },
+  {
+    "name": "proxmap2",
+    "description": "BlackPope Blows Blood Bubbles -=Pro-X Multi-Arena"
+  },
+  {
+    "name": "proxmap3",
+    "description": "Guncotton [Multi-Arena] by [Kona]"
+  },
+  {
+    "name": "proxmap4",
+    "description": "empty-description"
+  },
+  {
+    "name": "proxmap5",
+    "description": "Snowland by MisYu & qurneL"
+  },
+  {
+    "name": "ptucket",
+    "description": "Pawtucket Palladium"
+  },
+  {
+    "name": "pushdmm4",
+    "description": "DMM4 Skeet Shoot Povo-Hat"
+  },
+  {
+    "name": "q1dm17",
+    "description": "The Longest Yard"
+  },
+  {
+    "name": "q1edge",
+    "description": "The Edge Conversion"
+  },
+  {
+    "name": "q1q3almostlost",
+    "description": "Almost Lost - by ID Software .......Project Q1Q3."
+  },
+  {
+    "name": "q1q3asylum_beta2",
+    "description": "Asylum - by ID Software .......Project Q1Q3......"
+  },
+  {
+    "name": "q1q3dm14",
+    "description": "Grim Dungeons by ID Software - Q1 Version by Mick"
+  },
+  {
+    "name": "q1q3evolution_beta2",
+    "description": "Evolution by Till Merker .......Project Q1Q3....."
+  },
+  {
+    "name": "q1q3fheights_beta4",
+    "description": "Furious Heights"
+  },
+  {
+    "name": "q1q3hektik",
+    "description": "Hektik by swelt // Q1 Conversion by Mick"
+  },
+  {
+    "name": "q1q3lostworld",
+    "description": "The Lost World - Converted to Q1 by Jeff McWhorte"
+  },
+  {
+    "name": "q1q3monsoon",
+    "description": "Monsoon by Lukin (xtn's remix) // Q1 Conversion b"
+  },
+  {
+    "name": "q1q3ospdm5",
+    "description": "Deep Inside by Teddy // Q1 Version by Mick"
+  },
+  {
+    "name": "q1q3overkill_beta6",
+    "description": "All The Aces - by Wiebo // Q1 Version by Mick"
+  },
+  {
+    "name": "q1q3phrantic",
+    "description": "Phrantic by swelt // Q1 Conversion by Mick"
+  },
+  {
+    "name": "q1q3solid",
+    "description": "Solid by swelt // Q1 Conversion by Mick"
+  },
+  {
+    "name": "q1q3thunderstruck",
+    "description": "ThunderStruck by Till Merker // Q1 Conversion by"
+  },
+  {
+    "name": "q1q3toxicity",
+    "description": "Toxicity by thefury QW conversion by Mick & Thuri"
+  },
+  {
+    "name": "q1_q3dm13",
+    "description": "The Lost World - Converted to Q1 by Jeff McWhorte"
+  },
+  {
+    "name": "q1_q3tourney2",
+    "description": "The Proving Grounds - Conversion By Plutonium"
+  },
+  {
+    "name": "q2ctf12",
+    "description": "McKinley Revival (woods)"
+  },
+  {
+    "name": "q3dm6nq",
+    "description": "The.Campgrounds.by.SamoN"
+  },
+  {
+    "name": "q3dm6nq_halloween",
+    "description": "The.Campgrounds.by.SamoN (hw ver by xstephx)"
+  },
+  {
+    "name": "q3dm6qw",
+    "description": "The.Campgrounds.by.SamoN"
+  },
+  {
+    "name": "qbj2_mr_m",
+    "description": "empty-description"
+  },
+  {
+    "name": "qbj_chrisholden2",
+    "description": "Aerowalk Rebound"
+  },
+  {
+    "name": "qbj_start",
+    "description": "Ruinous Stone"
+  },
+  {
+    "name": "qdeck16",
+    "description": "Deck 16"
+  },
+  {
+    "name": "qu4d",
+    "description": "a garbage quad map by haze discord.megateamfortre"
+  },
+  {
+    "name": "quess1",
+    "description": "The Dark Church"
+  },
+  {
+    "name": "quess2",
+    "description": "Blood Sky Castle"
+  },
+  {
+    "name": "quess3",
+    "description": "The Hall of Kings"
+  },
+  {
+    "name": "qurexpo1",
+    "description": ".ancient.arena.by.qurnel."
+  },
+  {
+    "name": "qwk2",
+    "description": "The Sulphur Aeon by kwon"
+  },
+  {
+    "name": "qwq3dm7",
+    "description": "Temple of Retribution by ID // Q1 Conversion by M"
+  },
+  {
+    "name": "race8",
+    "description": "Canyon Run by anni (April 2011)"
+  },
+  {
+    "name": "race19",
+    "description": "Long Time Ago by anni (dez 2023)"
+  },
+  {
+    "name": "ragermx",
+    "description": "Rage Arena by Nacho|rage"
+  },
+  {
+    "name": "rampage",
+    "description": "Rampage -by skeLman (www.skelman.com)"
+  },
+  {
+    "name": "rampage2",
+    "description": "Rampage 2 -by skeLman (www.skelman.com)"
+  },
+  {
+    "name": "rapture1",
+    "description": ".imminent boom."
+  },
+  {
+    "name": "rarena3",
+    "description": "Rage Arena by Nacho|rage"
+  },
+  {
+    "name": "ratwall_b1",
+    "description": "DM2: Rats in the Walls"
+  },
+  {
+    "name": "rayexpo1",
+    "description": "Take It To The Bridge"
+  },
+  {
+    "name": "rayexpo2",
+    "description": "One-Track Mind"
+  },
+  {
+    "name": "rayexpo3",
+    "description": "Lexicon Devil"
+  },
+  {
+    "name": "rayexpo4",
+    "description": "Necessary Evil"
+  },
+  {
+    "name": "ra_funkf",
+    "description": "Funkadooda's Revenge"
+  },
+  {
+    "name": "rcra1",
+    "description": "The Loading Dock"
+  },
+  {
+    "name": "rcra2",
+    "description": "Brodmann's Area 2+2/3"
+  },
+  {
+    "name": "rctf1_b2",
+    "description": "rctf1: McKinley Revival - woods"
+  },
+  {
+    "name": "rctf2_b2",
+    "description": "rctf2: K4B00M - infiniti (boom remix)"
+  },
+  {
+    "name": "rctf3dmm4",
+    "description": "rctf3dmm4 | infiniti"
+  },
+  {
+    "name": "rctf3_b2",
+    "description": "rctf3.under the gun (remake) > by infiniti <og ma"
+  },
+  {
+    "name": "rctf4_b2",
+    "description": "rctf4: hellspawn - by r00k and infiniti"
+  },
+  {
+    "name": "rctf5_b2",
+    "description": "rctf5: kingdoms & castles - infiniti"
+  },
+  {
+    "name": "rctf6",
+    "description": "rctf6: The Mystic Shrine | r00k/infiniti"
+  },
+  {
+    "name": "rctf7_a3",
+    "description": "empty-description"
+  },
+  {
+    "name": "rectify_b2",
+    "description": "Rectify Beta 2 - by foogs"
+  },
+  {
+    "name": "redrum",
+    "description": "Redrum by 'Deviant' !"
+  },
+  {
+    "name": "reinc3",
+    "description": "Reinc3: Dysaesthesie by GeN"
+  },
+  {
+    "name": "reinc4",
+    "description": "Reinc4: Phrenesie by GeN"
+  },
+  {
+    "name": "reinc5",
+    "description": "Reinc5: SomewhereintheVast By BaL www.planetquake"
+  },
+  {
+    "name": "rf2",
+    "description": ".rusted.factory.2.by.QurneL."
+  },
+  {
+    "name": "rfury-st5",
+    "description": "Rock Fury (Style Test 5) by foogs"
+  },
+  {
+    "name": "rfury-st5b",
+    "description": "Rock Fury (Style Test 5) by foogs"
+  },
+  {
+    "name": "rgarden",
+    "description": "Rock Garden"
+  },
+  {
+    "name": "rm",
+    "description": "Ruby Midnight - Gilt"
+  },
+  {
+    "name": "rmx_chrisholden",
+    "description": "Celestial Gateway"
+  },
+  {
+    "name": "rmx_strideh",
+    "description": "I shot the Albatross"
+  },
+  {
+    "name": "rm_dm09a",
+    "description": "rm_dm09 - The Tubes rocketman"
+  },
+  {
+    "name": "rock",
+    "description": "ROCK - by Alice Soderlund"
+  },
+  {
+    "name": "rocket",
+    "description": "QuakeDM Version 1.10"
+  },
+  {
+    "name": "rotate",
+    "description": "empty-description"
+  },
+  {
+    "name": "rz2dmm4",
+    "description": "Secluded Pyramid (rz2dmm4) - by rzarecta"
+  },
+  {
+    "name": "rz4dmm4",
+    "description": "The Old Wharehouse (rz4dmm4) - by rzarecta"
+  },
+  {
+    "name": "r_yellow",
+    "description": "Yellow Fever"
+  },
+  {
+    "name": "s3_start",
+    "description": "Welcome to Snack Pack 3!"
+  },
+  {
+    "name": "sabbath",
+    "description": "sabbath bloody sabbath"
+  },
+  {
+    "name": "safe1",
+    "description": "Instant Impact - ziffon"
+  },
+  {
+    "name": "safe2",
+    "description": "Walk The Walk by ziffon"
+  },
+  {
+    "name": "safe3b3",
+    "description": "empty-description"
+  },
+  {
+    "name": "sanctuary",
+    "description": "Sanctuary of the Silent Scribes . by infiniti qhl"
+  },
+  {
+    "name": "sanctum",
+    "description": "Sanctuary of the Silent Scribes . by infiniti qhl"
+  },
+  {
+    "name": "sanity",
+    "description": "When Sanity Ends By Borsato http://borsato.terraf"
+  },
+  {
+    "name": "scarlet",
+    "description": "SCARLET - by Alice Soderlund"
+  },
+  {
+    "name": "schloss",
+    "description": "Schloss Adler by Zaka"
+  },
+  {
+    "name": "schlossdmm4",
+    "description": "Schloss Adler (dmm4)"
+  },
+  {
+    "name": "sew",
+    "description": "THE SEWERS - by Alice Soderlund"
+  },
+  {
+    "name": "shadows",
+    "description": "return of the shadows by hylke beck aka gibbie be"
+  },
+  {
+    "name": "shifter",
+    "description": "shifter by foogs"
+  },
+  {
+    "name": "shifter_nq",
+    "description": "shifter by foogs (NQ edition)"
+  },
+  {
+    "name": "shifter_old",
+    "description": "shifter by foogs"
+  },
+  {
+    "name": "shine",
+    "description": ".the.shine.by.zxc."
+  },
+  {
+    "name": "sim1",
+    "description": "empty-description"
+  },
+  {
+    "name": "sj2_chrisholden",
+    "description": "Sewage Sprint"
+  },
+  {
+    "name": "skull",
+    "description": "Skull Hunt by Zaka"
+  },
+  {
+    "name": "skull_fp",
+    "description": "Skull Hunt by Zaka - Retexture by Mr. Fancypants"
+  },
+  {
+    "name": "skyfort",
+    "description": "Kelluva Linna by Bal/Greenwood - Deathmatch versi"
+  },
+  {
+    "name": "skyhigh",
+    "description": "empty-description"
+  },
+  {
+    "name": "slimerun",
+    "description": "Slimerun by xstephx"
+  },
+  {
+    "name": "sm204_chrisholden",
+    "description": "Death and Retribution"
+  },
+  {
+    "name": "smash-aerowalk",
+    "description": "Aerowalk"
+  },
+  {
+    "name": "smash-catalyst",
+    "description": "The Catalyst by thct // q1 adaptation by fourier"
+  },
+  {
+    "name": "smash-catalystb",
+    "description": "The Catalyst by thct // q1 adaptation by fourier"
+  },
+  {
+    "name": "smash-dm1",
+    "description": "Place of Two Deaths"
+  },
+  {
+    "name": "smash-dm2",
+    "description": "Claustrophobopolis"
+  },
+  {
+    "name": "smash-dm3",
+    "description": "The Abandoned Base"
+  },
+  {
+    "name": "smash-dm4",
+    "description": "The Bad Place"
+  },
+  {
+    "name": "smash-dm5",
+    "description": "The Cistern"
+  },
+  {
+    "name": "smash-dm6",
+    "description": "The Dark Zone"
+  },
+  {
+    "name": "smash-dm6b",
+    "description": "The Dark Zone"
+  },
+  {
+    "name": "smash-dm6c",
+    "description": "The Dark Zone"
+  },
+  {
+    "name": "smash-ring",
+    "description": "empty-description"
+  },
+  {
+    "name": "smash-ultrav",
+    "description": "UltraViolence"
+  },
+  {
+    "name": "smashdeath6test1",
+    "description": "Chthons gone."
+  },
+  {
+    "name": "smashgli1a",
+    "description": ".powder keg. by .]Mr.FribbleS[."
+  },
+  {
+    "name": "smashpkeg2d",
+    "description": ".powder keg. by .]Mr.FribbleS[."
+  },
+  {
+    "name": "smashpush",
+    "description": "DMM4 Skeet Shoot Povo-Hat"
+  },
+  {
+    "name": "snowing",
+    "description": "empty-description"
+  },
+  {
+    "name": "sofdm3",
+    "description": "sof dm3"
+  },
+  {
+    "name": "softbox",
+    "description": "The Softbox --- by Forrest"
+  },
+  {
+    "name": "soyarena",
+    "description": "Flesh Arena by Soylent"
+  },
+  {
+    "name": "SpellsGate",
+    "description": "Spell's Gate"
+  },
+  {
+    "name": "spinev2",
+    "description": ".spine v2. qonference '98 tournament map rev. 2.0"
+  },
+  {
+    "name": "spz1dm1",
+    "description": "En So Begin Dit... Deur oGk.spAz"
+  },
+  {
+    "name": "spz1dm1_rr",
+    "description": "En So Begin Dit... Deur oGk.spAz - ReRelease Vers"
+  },
+  {
+    "name": "st/maps/e1m1",
+    "description": "empty-description"
+  },
+  {
+    "name": "st/maps/e1m2",
+    "description": "empty-description"
+  },
+  {
+    "name": "st/maps/e1m3",
+    "description": "empty-description"
+  },
+  {
+    "name": "st/maps/e1m4",
+    "description": "empty-description"
+  },
+  {
+    "name": "st/maps/e1m5",
+    "description": "empty-description"
+  },
+  {
+    "name": "st/maps/e1m6",
+    "description": "empty-description"
+  },
+  {
+    "name": "st/maps/e1m7",
+    "description": "empty-description"
+  },
+  {
+    "name": "st/maps/e1m8",
+    "description": "empty-description"
+  },
+  {
+    "name": "st/maps/start",
+    "description": "empty-description"
+  },
+  {
+    "name": "start",
+    "description": "Introduction"
+  },
+  {
+    "name": "steam",
+    "description": "STEAM . by alice"
+  },
+  {
+    "name": "strafin6",
+    "description": "Quake.Addiction"
+  },
+  {
+    "name": "strideh_start",
+    "description": "Snowed In"
+  },
+  {
+    "name": "strmland",
+    "description": ".stormland.by.qurnel."
+  },
+  {
+    "name": "stronghold_b1",
+    "description": "stronghold by kwon"
+  },
+  {
+    "name": "stronghold_final",
+    "description": "stronghold by kwon"
+  },
+  {
+    "name": "subterfuge",
+    "description": "Subterfuge - by foogs"
+  },
+  {
+    "name": "summer",
+    "description": "Shall I compare thee to a summer's day? by: Borsa"
+  },
+  {
+    "name": "superdm32",
+    "description": "SUPER-DM by Alice"
+  },
+  {
+    "name": "swallow",
+    "description": "Swallow by xstephx"
+  },
+  {
+    "name": "tbsketch_05_2",
+    "description": "empty-description"
+  },
+  {
+    "name": "tbsketch_19_4",
+    "description": "empty-description"
+  },
+  {
+    "name": "techshoop",
+    "description": "tech shoop by haze, 2018 discord.megateamfortress"
+  },
+  {
+    "name": "tekno",
+    "description": "Cherry Pop Teknologi - by alice"
+  },
+  {
+    "name": "terrain2",
+    "description": "Terrain : by Drastic_Man"
+  },
+  {
+    "name": "terran",
+    "description": "Terran sector - by alice"
+  },
+  {
+    "name": "thor",
+    "description": "THOR"
+  },
+  {
+    "name": "tigra",
+    "description": "Tigger-oN's arena"
+  },
+  {
+    "name": "tigra2",
+    "description": "Tigger-oN's arena 2"
+  },
+  {
+    "name": "tigra3",
+    "description": "Tigger-oN's arena 2"
+  },
+  {
+    "name": "tigra4",
+    "description": "Tigger-oN's arena 4"
+  },
+  {
+    "name": "tigra5",
+    "description": "Tigger-oN's Arena 5"
+  },
+  {
+    "name": "timeless",
+    "description": "timeless :: by mike d"
+  },
+  {
+    "name": "toilet4",
+    "description": "sani-flush - rocketman"
+  },
+  {
+    "name": "tox",
+    "description": "TOX (remake of Toxicity) by Alice"
+  },
+  {
+    "name": "toxic_tower_dmm4",
+    "description": "The Toxic Tower by kwon"
+  },
+  {
+    "name": "travelert6",
+    "description": "le voyageur cosmique"
+  },
+  {
+    "name": "tree",
+    "description": "The Tree"
+  },
+  {
+    "name": "trick",
+    "description": "empty-description"
+  },
+  {
+    "name": "trimp",
+    "description": "Trilogy Multiplayer Publius - rtollert@tranquilit"
+  },
+  {
+    "name": "tron",
+    "description": "Megatron . by alice"
+  },
+  {
+    "name": "tumour",
+    "description": "Rise of the Tumour"
+  },
+  {
+    "name": "twingods",
+    "description": "The Twin Gods Shrine by R00k"
+  },
+  {
+    "name": "uarena1",
+    "description": "Unknown Arena by Nacho|rage"
+  },
+  {
+    "name": "ukpak1",
+    "description": "UKpak1: .Coward's Domain. By PorkY"
+  },
+  {
+    "name": "ukpak3",
+    "description": ".The Stagnant Base. By DaMaul"
+  },
+  {
+    "name": "ukpak4",
+    "description": "UKPAK4 by Aardappel"
+  },
+  {
+    "name": "ultrav",
+    "description": "UltraViolence"
+  },
+  {
+    "name": "ultrav_halloween",
+    "description": "ultrav_halloween by xstephx (original by escher)"
+  },
+  {
+    "name": "unddm2",
+    "description": "Shadowmines - by Underscore"
+  },
+  {
+    "name": "under",
+    "description": "UndersizeD By AmoK."
+  },
+  {
+    "name": "unholy",
+    "description": "Unholy Chapel - By Spanky"
+  },
+  {
+    "name": "urbana",
+    "description": "Urban Arena - by Jason the Rat"
+  },
+  {
+    "name": "utressor",
+    "description": "Utressor by hylke beck aka gibbie bech@geo.vu.nl"
+  },
+  {
+    "name": "vistest",
+    "description": "empty-description"
+  },
+  {
+    "name": "volcano",
+    "description": "Volcano! - a rocketman map"
+  },
+  {
+    "name": "waitingroomb1",
+    "description": "Waiting Room by xstephx"
+  },
+  {
+    "name": "wall",
+    "description": "The Wall by [CG]MadMike Questions, Comments --> m"
+  },
+  {
+    "name": "warehouse2023_b1",
+    "description": "Warehouse2023 by xstephx"
+  },
+  {
+    "name": "warfare3",
+    "description": ".NuBiaN CHiCKeN SeXER."
+  },
+  {
+    "name": "warhous",
+    "description": "The WARehouse Arena: By <Scare.AR>"
+  },
+  {
+    "name": "wellgl1",
+    "description": "The Well"
+  },
+  {
+    "name": "wet3",
+    "description": "empty-description"
+  },
+  {
+    "name": "wh_proto4v4",
+    "description": "empty-description"
+  },
+  {
+    "name": "wrasslin",
+    "description": "empty-description"
+  },
+  {
+    "name": "wtower10",
+    "description": "along the watchtower"
+  },
+  {
+    "name": "xarena3",
+    "description": "X Arena"
+  },
+  {
+    "name": "xeno1",
+    "description": "MidEvil-CTF by Christian Antkow / Dale 'midiguy'"
+  },
+  {
+    "name": "xeno2",
+    "description": "Sadness of Death"
+  },
+  {
+    "name": "xeno7",
+    "description": "Remix"
+  },
+  {
+    "name": "xl1dm4",
+    "description": "XL Game Over"
+  },
+  {
+    "name": "xm00s19",
+    "description": "Merry xm00s - 2019 (v. 1.1) (by lurq)"
+  },
+  {
+    "name": "xmastree",
+    "description": "QuakeWorld Christmas by MisYu"
+  },
+  {
+    "name": "xntrick",
+    "description": "Trick or Treat! http://www.planetquake.com/xenon"
+  },
+  {
+    "name": "yard1",
+    "description": "The Backyard - by KillerBee"
+  },
+  {
+    "name": "zaprmx",
+    "description": "Zaphods Arena"
+  },
+  {
+    "name": "zeal",
+    "description": "ZEAL"
+  },
+  {
+    "name": "zeit",
+    "description": "Moonzeit Joi . by alice"
+  },
+  {
+    "name": "zerg",
+    "description": "Zerg Sector - by alice"
+  },
+  {
+    "name": "ztndm2",
+    "description": "Show No Mercy"
+  },
+  {
+    "name": "ztndm3",
+    "description": "Blood Run"
+  },
+  {
+    "name": "ztndm3a",
+    "description": "Blood Run (Haemophilia Hobble remix)"
+  },
+  {
+    "name": "ztndm3frost",
+    "description": "Frost Run . ztndm3 winter edition by bps"
+  },
+  {
+    "name": "ztndm3_halloween",
+    "description": "ztndm3_halloween by xstephx (original by ztn)"
+  },
+  {
+    "name": "ztndm4",
+    "description": "The Steeler"
+  },
+  {
+    "name": "ztndm5",
+    "description": "Painkiller"
+  },
+  {
+    "name": "ztndm6",
+    "description": ".The Vomitorium. by ztn"
+  },
+  {
+    "name": "ztrain",
+    "description": "Zaqwer's Training map"
+  },
+  {
+    "name": "ztrain2",
+    "description": "Zaqwer's training map 2"
+  }
+]

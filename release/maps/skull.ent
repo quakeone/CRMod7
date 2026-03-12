@@ -1,0 +1,481 @@
+{
+"classname" "worldspawn"
+"sounds" "1"
+"light" "30"
+"message" "Skull Hunt\n\nby Zaka\n"
+}
+
+{
+"classname" "item_artifact_super_damage" // woods
+"origin" "316 -278 -7"
+"scale" "1"
+}
+
+{
+"classname" "info_player_start"
+"angle" "270"
+"origin" "192 136 -224"
+}
+{
+"classname" "trigger_push"
+"angle" "-1"
+"speed" "103"
+"model" "*1"
+}
+{
+"classname" "item_health"
+"spawnflags" "2"
+"origin" "-96 -352 -304"
+}
+{
+"classname" "item_armor2"
+"origin" "320 -464 -272"
+}
+{
+"classname" "weapon_rocketlauncher"
+"origin" "800 -432 -240"
+}
+{
+"classname" "weapon_rocketlauncher"
+"origin" "192 448 -304"
+}
+{
+"classname" "weapon_lightning"
+"origin" "800 128 -320"
+}
+{
+"classname" "item_armorInv"
+"origin" "192 448 -48"
+}
+{
+"classname" "weapon_grenadelauncher"
+"origin" "528 48 48"
+}
+{
+"classname" "item_health"
+"origin" "16 -112 48"
+}
+{
+"classname" "item_health"
+"origin" "16 -176 48"
+}
+{
+"classname" "item_health"
+"origin" "800 -176 -112"
+}
+{
+"classname" "item_health"
+"origin" "736 -176 -112"
+}
+{
+"classname" "item_cells"
+"origin" "688 112 -320"
+}
+{
+"classname" "item_rockets"
+"origin" "176 512 -304"
+}
+{
+"classname" "item_cells"
+"origin" "736 112 -320"
+}
+{
+"classname" "item_health"
+"origin" "784 -624 -240"
+}
+{
+"classname" "item_rockets"
+"spawnflags" "1"
+"origin" "-96 -464 -48"
+}
+{
+"classname" "item_health"
+"origin" "400 -288 -368"
+}
+{
+"classname" "item_health"
+"origin" "400 -224 -368"
+}
+{
+"classname" "item_rockets"
+"origin" "720 -448 -240"
+}
+{
+"classname" "item_rockets"
+"origin" "512 96 48"
+}
+{
+"classname" "item_armor1"
+"origin" "912 128 -16"
+}
+{
+"classname" "func_door"
+"angle" "-2"
+"targetname" "ra"
+"wait" "2"
+"dmg" "20"
+"sounds" "4"
+"health" "0"
+"speed" "200"
+"lip" "16"
+"model" "*2"
+}
+{
+"classname" "trigger_multiple"
+"target" "ra"
+"health" "0"
+"sounds" "0"
+"delay" "0"
+"wait" "0"
+"model" "*3"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "135"
+"origin" "808 -616 -208"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "300"
+"origin" "48 488 80"
+}
+{
+"classname" "info_teleport_destination"
+"angle" "180"
+"targetname" "tele1"
+"origin" "40 -336 128"
+}
+{
+"classname" "trigger_teleport"
+"target" "tele1"
+"model" "*4"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "270"
+"origin" "304 640 -176"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "270"
+"origin" "512 296 -144"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "180"
+"origin" "1096 128 -16"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "315"
+"origin" "-328 -440 -240"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "90"
+"origin" "-80 -456 -16"
+}
+{
+"classname" "info_teleport_destination"
+"angle" "270"
+"targetname" "tele2"
+"origin" "512 296 -128"
+}
+{
+"classname" "trigger_teleport"
+"target" "tele2"
+"model" "*5"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "225"
+"origin" "488 -408 -272"
+}
+{
+"classname" "func_door"
+"angle" "-2"
+"targetname" "lgdoor"
+"wait" "2"
+"dmg" "20"
+"sounds" "1"
+"health" "0"
+"speed" "300"
+"lip" "4"
+"model" "*6"
+}
+{
+"classname" "trigger_multiple"
+"target" "lgdoor"
+"health" "0"
+"sounds" "0"
+"delay" "0"
+"wait" "0"
+"model" "*7"
+}
+{
+"classname" "weapon_supershotgun"
+"origin" "-288 -528 -272"
+}
+{
+"classname" "weapon_supershotgun"
+"origin" "384 128 -304"
+}
+{
+"classname" "item_health"
+"origin" "16 -48 -304"
+}
+{
+"classname" "item_shells"
+"origin" "-48 240 -304"
+}
+{
+"classname" "item_shells"
+"origin" "792 -232 -240"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*8"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*9"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*10"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*11"
+}
+{
+"classname" "light"
+"light" "300"
+"wait" "0.5"
+"style" "0"
+"origin" "960 -768 -64"
+}
+{
+"classname" "light"
+"light" "400"
+"wait" "0.5"
+"style" "0"
+"origin" "1024 -304 16"
+}
+{
+"classname" "light"
+"light" "400"
+"wait" "0.5"
+"style" "0"
+"origin" "320 -832 -80"
+}
+{
+"classname" "light"
+"light" "350"
+"wait" "0.5"
+"style" "0"
+"origin" "-464 -752 -96"
+}
+{
+"classname" "light"
+"light" "200"
+"wait" "0.7"
+"origin" "752 128 -272"
+}
+{
+"classname" "light"
+"light" "200"
+"wait" "0.9"
+"origin" "-304 -528 -240"
+}
+{
+"classname" "light"
+"light" "300"
+"wait" "0.5"
+"origin" "-256 -160 -112"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.7"
+"origin" "32 -336 144"
+}
+{
+"classname" "light"
+"light" "170"
+"wait" "0.7"
+"origin" "-80 -336 -48"
+}
+{
+"classname" "light"
+"light" "300"
+"wait" "0.8"
+"origin" "-80 128 96"
+}
+{
+"classname" "light"
+"light" "300"
+"wait" "0.7"
+"origin" "192 448 -48"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.7"
+"origin" "464 272 112"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.7"
+"origin" "1040 128 112"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.8"
+"origin" "720 0 -32"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.9"
+"origin" "512 288 -128"
+}
+{
+"classname" "light"
+"light" "350"
+"wait" "0.5"
+"origin" "80 736 -112"
+}
+{
+"classname" "light"
+"light" "350"
+"wait" "0.5"
+"origin" "304 736 -112"
+}
+{
+"classname" "light"
+"light" "200"
+"wait" "0.7"
+"origin" "336 368 -176"
+}
+{
+"classname" "light"
+"light" "200"
+"wait" "0.7"
+"origin" "32 240 -176"
+}
+{
+"classname" "light"
+"light" "200"
+"wait" "0.9"
+"origin" "-80 -336 -288"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.7"
+"origin" "-32 -64 -256"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.7"
+"origin" "272 32 -240"
+}
+{
+"classname" "light"
+"wait" "0.9"
+"origin" "192 128 -336"
+}
+{
+"classname" "light"
+"light" "300"
+"wait" "0.8"
+"origin" "320 -288 -336"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.7"
+"origin" "400 -144 -80"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.7"
+"origin" "352 48 80"
+}
+{
+"classname" "light"
+"light" "250"
+"wait" "0.7"
+"origin" "208 -208 48"
+}
+{
+"classname" "light"
+"light" "200"
+"wait" "0.7"
+"origin" "224 -448 -256"
+}
+{
+"classname" "light"
+"light" "200"
+"wait" "0.7"
+"origin" "416 -448 -256"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*12"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*13"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*14"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*15"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*16"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*17"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*18"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*19"
+}
+{
+"classname" "trigger_hurt"
+"dmg" "10000"
+"model" "*20"
+}
+{
+"classname" "info_intermission"
+"mangle" "90 90 0"
+"origin" "320 -80 336"
+}

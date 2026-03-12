@@ -1,0 +1,224 @@
+{
+"classname" "worldspawn"
+"worldtype" "2"
+"light" "100"
+"message" "100m run"
+"wad" "c:\games\qoole\wads\my1.wad"
+"_sky" "mak_nightsky2_"
+}
+{
+"classname" "info_player_start"
+"angle" "90"
+"origin" "224 -1440 32"
+}
+
+// woods added
+
+
+{
+"classname" "info_player_deathmatch"
+"origin" "318 -1399 24"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "164 -1306 24"
+}
+
+
+
+{
+"classname" "info_player_coop"
+"angle" "90"
+"origin" "32 -1440 32"
+}
+{
+"classname" "info_player_coop"
+"angle" "90"
+"origin" "96 -1440 32"
+}
+{
+"classname" "info_player_coop"
+"angle" "90"
+"origin" "160 -1440 32"
+}
+{
+"classname" "info_player_coop"
+"angle" "90"
+"origin" "224 -1440 32"
+}
+{
+"classname" "info_player_coop"
+"angle" "90"
+"origin" "288 -1440 32"
+}
+{
+"classname" "info_player_coop"
+"angle" "90"
+"origin" "352 -1440 32"
+}
+{
+"classname" "info_player_coop"
+"angle" "90"
+"origin" "416 -1440 32"
+}
+{
+"classname" "info_player_coop"
+"angle" "90"
+"origin" "480 -1440 32"
+}
+{
+"classname" "trigger_changelevel"
+"map" "100m"
+"model" "*1"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "480 3072 96"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "416 3072 96"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "352 3072 96"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "288 3072 96"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "224 3072 96"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "160 3072 96"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "32 3072 96"
+}
+{
+"classname" "light"
+"light" "300"
+"origin" "96 3072 96"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 2560 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 2048 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 1536 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 1024 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 512 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 0 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 -512 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 -1024 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 -1536 152"
+}
+{
+"classname" "light"
+"light" "600"
+"origin" "-64 -2048 152"
+}
+{
+"classname" "light"
+"light" "600"
+"origin" "576 -2048 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 -1536 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 -1024 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 -512 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 0 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 512 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 1024 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 1536 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 2048 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 2560 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "576 3360 152"
+}
+{
+"classname" "light"
+"light" "500"
+"origin" "-64 3360 152"
+}

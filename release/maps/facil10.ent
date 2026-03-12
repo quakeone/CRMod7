@@ -1,0 +1,598 @@
+{
+"classname" "worldspawn"
+"worldtype" "2"
+"sounds" "2"
+"light" "0"
+"message" "storage facility"
+"wad" "c:\develop\wcraft\textures\dapak.wad;c:\develop\wcraft\textures\ctf.wad;c:\develop\wcraft"
+}
+{
+"classname" "info_player_start"
+"origin" "-164 -96 -104"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "918 352 96"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "918 32 96"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "918 -320 96"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "918 -608 96"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "-278 352 96"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "-278 -320 96"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "-278 -608 96"
+}
+{
+"classname" "light"
+"light" "525"
+"style" "0"
+"origin" "204 -128 156"
+}
+{
+"classname" "light"
+"light" "525"
+"style" "0"
+"origin" "436 -128 156"
+}
+{
+"classname" "light"
+"light" "160"
+"style" "0"
+"origin" "880 0 168"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "340"
+"targetname" "Tele1"
+"origin" "-144 320 -104"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "182"
+"targetname" "Tele2"
+"origin" "832 -224 -104"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "-278 32 96"
+}
+{
+"classname" "light"
+"light" "450"
+"style" "0"
+"origin" "176 272 168"
+}
+{
+"classname" "light"
+"light" "450"
+"style" "0"
+"origin" "80 272 168"
+}
+{
+"classname" "light"
+"light" "450"
+"style" "0"
+"origin" "688 144 168"
+}
+{
+"classname" "light"
+"light" "450"
+"style" "0"
+"origin" "784 144 168"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "300"
+"style" "0"
+"origin" "80 -360 -144"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "300"
+"style" "0"
+"origin" "56 -384 -144"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "300"
+"style" "0"
+"origin" "80 -408 -144"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "300"
+"style" "0"
+"origin" "104 -384 -144"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "1048 -624 -80"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "1024 -648 -80"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "1048 -672 -80"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "1072 -648 -80"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "560 152 -144"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "536 128 -144"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "560 104 -144"
+}
+{
+"classname" "light"
+"light" "300"
+"style" "0"
+"origin" "584 128 -144"
+}
+{
+"classname" "light"
+"light" "450"
+"style" "0"
+"origin" "-88 -336 164"
+}
+{
+"classname" "light"
+"light" "450"
+"style" "0"
+"origin" "-184 -336 164"
+}
+{
+"classname" "light"
+"light" "450"
+"style" "0"
+"origin" "560 -528 164"
+}
+{
+"classname" "light"
+"light" "450"
+"style" "0"
+"origin" "464 -528 164"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "200"
+"style" "6"
+"origin" "-400 200 -80"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "200"
+"style" "6"
+"origin" "-424 176 -80"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "200"
+"style" "6"
+"origin" "-400 152 -80"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "200"
+"style" "6"
+"origin" "-376 176 -80"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "272 -80 8"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "368 -176 8"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "272 -176 8"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "368 -80 8"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "150"
+"style" "2"
+"origin" "1032 -600 -200"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -960 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -960 -8"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -768 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -768 -40"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -576 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -576 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -576 -72"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -384 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -384 -104"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -192 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 -192 -136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 0 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1232 0 -136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1040 -960 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "848 -960 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "1040 -960 40"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "848 -960 88"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "150"
+"style" "2"
+"origin" "1032 8 -200"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "150"
+"style" "2"
+"origin" "1032 -288 -200"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "150"
+"style" "2"
+"origin" "664 -560 -200"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "688 -808 112"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "664 -784 112"
+}
+{
+"classname" "light"
+"light" "250"
+"style" "0"
+"origin" "664 -832 112"
+}
+{
+"classname" "light"
+"light" "250"
+"style" "0"
+"origin" "640 -808 112"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "-48 -808 112"
+}
+{
+"classname" "light"
+"light" "250"
+"style" "0"
+"origin" "-24 -832 112"
+}
+{
+"classname" "light"
+"light" "250"
+"style" "0"
+"origin" "0 -808 112"
+}
+{
+"classname" "light"
+"light" "200"
+"style" "0"
+"origin" "-24 -784 112"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "8 -960 128"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "216 -960 128"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "424 -960 128"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "632 -960 128"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-592 -384 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-592 -576 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-592 -768 136"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-592 -384 -104"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-592 -576 -72"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-592 -768 -40"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-592 -960 -8"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-400 -960 -8"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-208 -960 40"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-592 -960 128"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-400 -960 128"
+}
+{
+"classname" "light"
+"light" "150"
+"style" "0"
+"origin" "-208 -960 128"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "150"
+"style" "2"
+"origin" "-24 304 -200"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "150"
+"style" "2"
+"origin" "-392 344 -200"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "150"
+"style" "2"
+"origin" "-392 32 -200"
+}
+{
+"classname" "light"
+"spawnflags" "1"
+"light" "150"
+"style" "2"
+"origin" "-392 -264 -200"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "330"
+"targetname" "Tele1"
+"origin" "-400 272 -40"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "27"
+"targetname" "Tele1"
+"origin" "-192 -616 -104"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "177"
+"targetname" "Tele2"
+"origin" "608 -528 -72"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "204"
+"targetname" "Tele2"
+"origin" "760 200 -104"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "182"
+"targetname" "Tele2"
+"origin" "320 -128 -168"
+}

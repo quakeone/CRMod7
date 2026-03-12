@@ -244,6 +244,7 @@ void() teamplay_ready_player =
 		}
 		
 		self.team	= BLUE;
+		self.style	= self.style - (self.style & (CLANRING_RED_TEAM | CLANRING_BLUE_TEAM));
 		self.style	= (self.style | CLANRING_BLUE_TEAM);
 		self.height = (self.team - 1);
 		stuffcmd(self,";color 13\n");		
@@ -275,6 +276,7 @@ void() teamplay_ready_player =
 		}
 		
 		self.team  	= RED;
+		self.style 	= self.style - (self.style & (CLANRING_RED_TEAM | CLANRING_BLUE_TEAM));
 		self.style 	= (self.style | CLANRING_RED_TEAM);
 		self.height = (self.team - 1);
 		stuffcmd(self,";color 4;\n");

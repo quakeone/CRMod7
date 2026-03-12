@@ -1,0 +1,260 @@
+{
+"classname" "worldspawn"
+"worldtype" "2"
+"light" "3"
+"message" "The Backyard\n- by KillerBee"
+"wad" "c:\program files\worldcraft\all.wad"
+}
+{
+"classname" "light_fluoro"
+"light" "500"
+"style" "0"
+"origin" "-3230 2828 3518"
+}
+{
+"classname" "light_fluoro"
+"light" "500"
+"origin" "-3230 3764 3514"
+}
+{
+"classname" "light_fluoro"
+"light" "175"
+"origin" "-2447 3592 3737"
+}
+{
+"classname" "light_fluoro"
+"light" "175"
+"origin" "-2447 3308 3737"
+}
+{
+"classname" "light_fluoro"
+"light" "175"
+"origin" "-2447 3032 3736"
+}
+{
+"classname" "light_fluorospark"
+"light" "120"
+"style" "10"
+"origin" "-2308 2908 3694"
+}
+{
+"classname" "light_fluorospark"
+"light" "120"
+"style" "0"
+"origin" "-2304 3166 3696"
+}
+{
+"classname" "light_fluorospark"
+"light" "120"
+"style" "0"
+"origin" "-2304 3446 3698"
+}
+{
+"classname" "light_fluorospark"
+"light" "100"
+"style" "1"
+"origin" "-2302 3686 3702"
+}
+{
+"classname" "light_fluoro"
+"light" "200"
+"origin" "-2672 2918 3408"
+}
+{
+"classname" "light"
+"light" "200"
+"origin" "-2661 3676 3343"
+}
+{
+"classname" "light_fluoro"
+"light" "450"
+"origin" "-3236 3294 3564"
+}
+{
+"classname" "trigger_teleport"
+"target" "tele1"
+"model" "*1"
+}
+{
+"classname" "light_fluoro"
+"light" "270"
+"origin" "-2435 2948 3456"
+}
+{
+"classname" "light_fluoro"
+"light" "300"
+"origin" "-2416 3584 3456"
+}
+{
+"classname" "light_fluoro"
+"light" "300"
+"origin" "-3648 3584 3520"
+}
+{
+"classname" "light_fluoro"
+"light" "250"
+"origin" "-3648 3008 3520"
+}
+{
+"classname" "light_fluoro"
+"light" "450"
+"origin" "-3644 3296 3516"
+}
+{
+"classname" "light_fluoro"
+"light" "170"
+"origin" "-3724 2944 3334"
+}
+{
+"classname" "light_fluoro"
+"light" "170"
+"origin" "-3686 3624 3430"
+}
+{
+"classname" "light_fluoro"
+"light" "170"
+"origin" "-3720 2948 3726"
+}
+{
+"classname" "light_torch_small_walltorch"
+"light" "300"
+"style" "1"
+"origin" "-2361 3741 3545"
+}
+{
+"classname" "light_torch_small_walltorch"
+"light" "400"
+"style" "6"
+"origin" "-2277 3048 3483"
+}
+{
+"classname" "light_fluoro"
+"light" "240"
+"origin" "-2441 3396 3550"
+}
+{
+"classname" "info_teleport_destination"
+"angle" "182"
+"targetname" "tele1"
+"origin" "-2620 3736 3328"
+}
+{
+"classname" "trigger_push"
+"angle" "-1"
+"speed" "400"
+"style" "32"
+"delay" "2"
+"model" "*2"
+}
+{
+"classname" "info_teleport_destination"
+"angle" "272"
+"targetname" "tele2"
+"origin" "-3824 3724 3770"
+}
+{
+"classname" "trigger_teleport"
+"target" "tele2"
+"model" "*3"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-2305 3716 3588"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-2305 2862 3589"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-2476 2862 3586"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-2325 3654 3517"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-2368 2970 3568"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-2368 3132 3567"
+}
+{
+"classname" "info_player_start"
+"angle" "182"
+"origin" "-2804 3377 3372"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-2336 3460 3436"
+}
+{
+"classname" "light"
+"light" "400"
+"origin" "-3614 3640 3858"
+}
+{
+"classname" "light"
+"angle" "-2"
+"light" "450"
+"origin" "-3814 3709 3631"
+}
+{
+"classname" "light_fluoro"
+"angle" "-2"
+"light" "600"
+"origin" "-2756 3296 3554"
+}
+{
+"classname" "light"
+"angle" "-2"
+"light" "400"
+"origin" "-3770 3123 3564"
+}
+
+// woods fix z-fight
+
+{
+"classname" "func_illusionary"
+"model" "*4"
+"origin" "1 0 0"
+}
+{
+"classname" "ambient_suck_wind"
+"origin" "-3656 3642 3490"
+}
+{
+"classname" "ambient_suck_wind"
+"origin" "-2684 3648 3464"
+}
+{
+"classname" "ambient_suck_wind"
+"origin" "-2808 3072 3462"
+}
+{
+"classname" "ambient_suck_wind"
+"origin" "-3712 3004 3450"
+}
+{
+"classname" "ambient_suck_wind"
+"origin" "-3192 3328 3566"
+}
+{
+"classname" "ambient_suck_wind"
+"origin" "-3136 3034 3514"
+}
+{
+"classname" "ambient_suck_wind"
+"origin" "-3136 3586 3514"
+}
+{
+"classname" "trigger_multiple"
+"style" "32"
+"delay" "999999999999999"
+"wait" "999999999999999"
+"sounds" "4"
+"health" "1"
+"model" "*5"
+}

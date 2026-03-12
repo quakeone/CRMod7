@@ -1,0 +1,95 @@
+{
+"classname" "worldspawn"
+"message" "Rage Arena by Nacho|rage"
+"worldtype" "0"
+"sounds" "4"
+"light" "0"
+"wad" "c:\quake\id1\metal.wad;c:\quake\id1\rage.wad"
+}
+{
+"classname" "light"
+"light" "1300"
+"style" "0"
+"origin" "0 0 416"
+}
+{
+"classname" "info_player_start"
+"angle" "90"
+"light" "200"
+"style" "0"
+"weapon" "0"
+"origin" "-8 -752 -276"
+}
+{
+"classname" "light"
+"light" "250"
+"style" "0"
+"origin" "-160 -824 -192"
+}
+{
+"classname" "light"
+"light" "250"
+"style" "0"
+"origin" "112 -824 -192"
+}
+{
+"classname" "info_teleport_destination"
+"angle" "90"
+"targetname" "arena1"
+"origin" "0 0 -584"
+}
+{
+"classname" "trigger_teleport"
+"target" "arena1"
+"model" "*1"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "90"
+"origin" "-180 -848 -288"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "90"
+"origin" "-84 -848 -288"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "90"
+"origin" "-4 -848 -288"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "90"
+"origin" "92 -848 -288"
+}
+{
+"classname" "info_player_deathmatch"
+"angle" "90"
+"origin" "172 -848 -288"
+}
+
+// woods remove runes
+
+{
+"classname" "info_teleport_destination"
+"angle" "90"
+"targetname" "arena1"
+"origin" "64 0 -576"
+}
+{
+"classname" "info_teleport_destination"
+"angle" "90"
+"targetname" "arena1"
+"origin" "-64 0 -576"
+}
+{
+"classname" "trigger_multiple"
+"wait" "999999999"
+"health" "1"
+"style" "32"
+"sounds" "3"
+"delay" "2"
+"cnt" "0"
+"model" "*2"
+}

@@ -16,7 +16,7 @@ entity crmod_qtag_it;
 .float qtag_ct_quick;      // count of Quick Tags (<5.0s)
 .float qtag_streak_light;  // consecutive LIGHTNING TAGs
 .float qtag_best_hold;     // personal best (lowest) hold time
-.float qtag_ritual_started;     // time when 6•6•6 hold began (0 = not holding)
+.float qtag_ritual_started;     // time when - hold began (0 = not holding)
 .float qtag_ritual_used;        // once per player per Tag game
 .float qtag_ritual_surge_until; // if > time, "it" gets dimlight glow (EF_DIMLIGHT)
 .float qtag_ct_snail;      // count of SNAIL TAGs (>= 60.0s)
@@ -41,9 +41,9 @@ float QTAG_LEADER_EVERY = 5;
 // Global tag counter this round
 float qtag_global_tags;
 float QTAG_SNAIL_SEC = 60; // threshold for SNAIL TAG callout
-// 6•6•6 Lock (no cvars)
+// 666 lock (no cvars)
 float QTAG_RITUAL_HOLD   = 6.66; // seconds you must hold |pitch|?66 & |yaw|?66
-float QTAG_RITUAL_EPS    = 6;    // ± degrees window for both pitch and yaw
+float QTAG_RITUAL_EPS    = 6;    // degrees window for both pitch and yaw
 float QTAG_RITUAL_SURGE  = 66.6; // surge duration (s)
 float QTAG_RITUAL_ADD    = 32;   // surge adds this many units to tag radius
 // Secret surge movement boost
@@ -477,7 +477,7 @@ void() quaketag_start_frame =
     if (crmod_qtag_it == world) return;
     if (crmod_qtag_it.deadflag) return;
 
-    // --- Secret 6•6•6 Lock: hold |pitch|?66 and |yaw|?66 for >6.66s (only when you're "it")
+    // --- Secret 666 Lock: hold |pitch|?66 and |yaw|?66 for >6.66s (only when you're "it")
     if (!crmod_qtag_it.qtag_ritual_used)
     {
         // Normalize to signed angles
@@ -683,7 +683,7 @@ void() quaketag_start_frame =
 };
 
 // -----------------------------
-// q14ever missile follow effect — FULL legacy gag
+// q14ever missile follow effect -- FULL legacy gag
 // -----------------------------
 void() q14ever_penis_think =
 {
@@ -784,7 +784,7 @@ void(entity player_owner) q14ever_spawn_penis =
 	p.think = q14ever_penis_think;
 	p.nextthink = time + ((sys_ticrate > 0) ? sys_ticrate : 0.05);
 
-	// OPTIONAL (if your engine supports it) — true attachment for zero lag:
+	// OPTIONAL (if your engine supports it) -- true attachment for zero lag:
 	// p.movetype = MOVETYPE_FOLLOW; p.aiment = player_owner;
 	// (Keeps same visual; origin treated as offset on most engines.)
 };

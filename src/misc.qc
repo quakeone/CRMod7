@@ -1136,3 +1136,24 @@ void() misc_shadowcontroller = {
 
 	self.use = misc_shadowcontroller_use;
 }
+
+void() unsupported_entity_warning =
+{
+	print(sprintf("Warning: ignoring unsupported entity '%s' (edict %s at %s)\n",
+		self.classname,
+		ftos(num_for_edict(self)),
+		vtos(self.origin)));
+	remove(self);
+};
+
+// FTE/QSS call this when a classname has no matching spawn function.
+void() SV_OnEntityNoSpawnFunction =
+{
+	unsupported_entity_warning();
+};
+
+// Stub out known unsupported entities so older spawn paths still soft-fail.
+void() info_referee =
+{
+	unsupported_entity_warning();
+};

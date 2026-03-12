@@ -408,6 +408,7 @@ void() worldspawn =
 void() StartFrame =
 {
     local entity serverinactive;
+    local float altents_enabled;
     //this restarts the server after 6 hour if no one is on the server
     //it keeps the server running smooth
 
@@ -434,12 +435,16 @@ void() StartFrame =
     
     if (framecount == 1)	
     {
-        if ((cvar("gamecfg")) & CLANRING_ALTERNATIVE_ENTS)
+        altents_enabled = (cvar("gamecfg")) & CLANRING_ALTERNATIVE_ENTS;
+
+        if (altents_enabled)
         {
             if ((cvar("samelevel")) & CLANRING_CAPTURE_THE_FLAG)
                 cvar_set("external_ents_dir", "ctf_alt");
             else
                 cvar_set("external_ents_dir", "dm_alt");	
+
+            bprint("Alternative entity set enabled\n");
         }
         else
         {

@@ -503,6 +503,8 @@ void() observerforce =
 		bprint(self.netname);
 		bprint(" was forced \bobserver\b because of inactivity.\n");
 		respawn();//required?
+		// Prevent observer_start() from printing a second "left the game" line.
+		self.style = self.style | CLANRING_OBSERVER;
 		observer_start();
 	}
 };
@@ -771,6 +773,9 @@ void() PlayerDie =
 	self.flags = self.flags - (self.flags & FL_ONGROUND);
 	self.movetype = MOVETYPE_TOSS;
 	self.finaldest_y = MOVETYPE_TOSS;
+
+	// Ensure death transition is always considered changed for team info.
+	team_info_mark_target_dirty(self);
 
 	if (((self.health < -40) && !(clanring_playmode & CLANRING_NO_GIBS))
 		|| (clanring_playmode & CLANRING_AIRSHOT_MODE)

@@ -438,6 +438,8 @@ float() CheckValidTouch =
 		return FALSE;
 	if (self.estate != STATE_ACTIVE)
 		return FALSE;
+	if (other.leavemealone)
+		return FALSE;
 	return TRUE;
 }
 float(float a, float b) not = { return a - (a & b); } // fix not issue in client.qc - Copper -- dumptruck_ds

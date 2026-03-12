@@ -8,6 +8,10 @@
 // See Elohim.qc for a list of standard fields used.
 //
 
+// team info helpers
+void() team_info_reset_receiver_state;
+void(entity target) team_info_mark_target_dirty;
+
 // constants
 float CLANRING_SUICIDE_OK    		= 0;
 float CLANRING_TOO_MANY_SUICIDES 	= 1;
@@ -150,6 +154,14 @@ float g1v1_quad_ghosted;    // 1 if quad is ghosted (blocked) during 1v1
 float g1v1_saved_no_quad;   // remembers (clanring_playmode & CLANRING_NO_QUAD) when entering 1v1
 float g1v1_next_check_time; // next time to recheck counts in StartFrame
 
+// teammate overlay (QSS-M/FTE //tinfo)
+float TEAM_INFO_POS_GRID = 8;
+float TEAM_INFO_SPEED_BAND = 10;
+float TEAM_INFO_SPEED_DEADZONE = 20;
+float TEAM_INFO_FULLSYNC_INTERVAL = 20;
+float team_info_global_gen;
+float team_info_send_force_fullsync;
+
 // admin constants
 float ADMIN_NORMAL_MODE    	= 0;
 float ADMIN_PRACTICE_MODE   = 1;
@@ -203,6 +215,10 @@ float   clanring_numteams;			// number of teams
 float   clanring_maxsize;           // maximum allowed team size
 entity  clanring_match_timer;       // used to time match
 float   clanring_match_aborted;     // TRUE when the current match was ended early
+entity  clanring_match_inactivity_check;   // scheduled inactivity watchdog during early match
+float   clanring_match_start_time;  // timestamp of when early-match inactivity monitoring begins
+float   CLANRING_MATCH_PLAYER_RESPAWN_DELAY = 1; // ready players respawn 1 second after match begin/end
+float   CLANRING_MATCH_START_MOVEMENT_THRESHOLD = 16; // minimum distance required to count as movement
 // --- Quad control observer announcements ---
 float QUAD_RESPAWN_TIME = 60;     // seconds between quad respawns (standard QW)
 float g_quad_spawner_count;       // number of Quad spawners on the map (cached)
@@ -295,6 +311,13 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .float  saved_pos_valid;
 .float  saved_pos_last_move_time;
 
+// Early match inactivity detection
+.vector match_start_origin;
+.float  match_start_monitor_active;
+.float  match_start_origin_valid;
+.float  match_start_moved;
+.float  match_start_warned;
+
 float 	CLANRING_ANGLE_SMOOTHING    = 0.6; // CRMOD use this instead of typing the number a billion times (actually 6 times in observer.qc ;) )
 
 
@@ -315,6 +338,8 @@ void(string s1, ...) cprint;
 void(string s1, string s2) cprint2;
 void(string s1, string s2, string s3) cprint3;
 void(string s1, string s2, string s3, string s4) cprint4;
+void() votables_map_vote_prompt_display;
+float(float mapnum) votables_maybe_prompt_map_vote_mode_change;
 .float 	rotthink;//megahealth think
 
 .string name_ready;
@@ -329,6 +354,11 @@ void(string s1, string s2, string s3, string s4) cprint4;
 
 .float 	warp_episode;//chosen episode to warp
 .float 	warp_map;//chosen map to warp
+.float  pending_map_vote_mapnum;
+.float  pending_map_vote_type;
+.float  pending_map_vote_mode;
+.float  pending_map_vote_timeout;
+.float  pending_map_vote_print_time;
 
 //ctf variables from ZOID's 3wave
 float 	TEAM_CAPTURE_CAPTURE_BONUS    			    = 5;
@@ -422,6 +452,10 @@ float 	teamscr1;
 float 	teamscr2;
 .float 	statstate;
 .float 	laststattime;		// time of last status update
+.float 	f_status_enabled;	// cached f_status preference ("off" disables flag status)
+.float 	hud_last_sig_ctf;	// last emitted CTF HUD signature (skip unchanged centerprints)
+.float 	hud_last_sig_observer;	// last emitted observer heads-up HUD signature
+.float 	hud_obs_skip_count;	// consecutive unchanged observer HUD skips
 float 	lastteamscrtime;
 float 	TEAMSCRTIME    = 1;
 float 	PLAYERSTATTIME    = 1.75;
@@ -531,6 +565,24 @@ float stats_matchtype;
 
 .float  csqc_enabled;
 
+// teammate overlay delta-send cache
+.float team_info_time;
+.float team_info_seen_gen;
+.float team_info_fullsync_time;
+.float team_info_gen;
+.float team_info_check_frame;
+.float team_info_cache_init;
+.float team_info_qx;
+.float team_info_qy;
+.float team_info_qz;
+.float team_info_qh;
+.float team_info_qa;
+.float team_info_qitems;
+.float team_info_qspeed;
+.float team_info_qteam;
+.float team_info_qheight;
+.float team_info_qteam2;
+
 typedef struct 
 {
 	string	name;	// filename WITHOUT '.bsp'
@@ -608,6 +660,7 @@ entity boss;
 .float q1_per;
 .float stats_teamkill_quad;
 .float stats_powerup_denial_quad;
+.float stats_quad_secure;  // times near quad when teammate picked it up
 .float strategic_returns;  // Flag returns that lead to team captures
 entity last_red_returner;
 entity last_blue_returner;
@@ -865,15 +918,24 @@ void(entity ghost) CTF_RemoveGhostFlag;
 void() CTF_GhostFlagTouch;
 .void(entity) webhook_prepfn;   // single-slot; PREP reads ev.message
 .string hook_url;                   // prepared URL
+.string hook_url2;                  // optional second URL (stats fan-out)
+.string hook_url3;                  // optional third URL (stats fan-out)
 .string hook_payload;               // prepared JSON payload
 
 // Google Sheets integration forward declarations
 float() gsheets_enabled;
 float() gsheets_configured;
+float() gsheets_read_started_current_map;
+float() gsheets_read_inflight_current_map;
+float() gsheets_trial_records_ready_current_map;
+float() gsheets_match_records_ready_current_map;
+string() gsheets_captimes_source_title;
 void() gsheets_validate;
 void() gsheets_read_capture_stats;
+float(string lookup_map, entity requester) gsheets_read_capture_stats_lookup;
 void(float is_match, float rank, string player, float teamcolor, float captime, string rec_date, string mt_str, float ping) gsheets_write_record;
 void(float reqid, float status, string body) gsheets_callback;
 string(string json, string key) gsheets_json_get_string;
 float(string json, string key) gsheets_json_get_number;
 void(string arr, float recordset) gsheets_parse_record_array;
+string (string stats_filename, float include_mt, string empty_msg) captimes_read_top3_from_file;

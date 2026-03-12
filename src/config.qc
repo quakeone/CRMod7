@@ -9,11 +9,14 @@
 
 void(string command, string value) config_command =
 {
+	local float pubctf_runes_override;
+
 	switch(command)
 	{
         case "captimesdiscordurl":
         {
             // Store privately (not visible via serverinfo) for webhook usage
+            // Supports up to 3 URLs (comma/semicolon/newline-separated).
             // Zone a copy to avoid temp-string lifetime issues; free old if set
             if (clanring_captimesdiscordurl != string_null && clanring_captimesdiscordurl != "")
                 strunzone(clanring_captimesdiscordurl);
@@ -22,6 +25,7 @@ void(string command, string value) config_command =
         }
 		case "statsdiscordurl":
         {
+            // Supports up to 3 URLs (comma/semicolon/newline-separated).
             if (clanring_statsdiscordurl != string_null && clanring_statsdiscordurl != "")
                 strunzone(clanring_statsdiscordurl);
             clanring_statsdiscordurl = strzone(value);
@@ -365,6 +369,24 @@ void(string command, string value) config_command =
 		}
 		case "runeson":
 		{
+			// In pub CTF, honor a previously voted setrunes choice across maps.
+			// This runs during config load on every level change.
+			pubctf_runes_override = cvar("cr_pubctf_runes_override");
+			if (!sys_ready
+			 && (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+			 && (clanring_playmode & CLANRING_NORMAL_MODE)
+			 && !(clanring_playmode & CLANRING_MATCH_MODE)
+			 && !(clanring_playmode & CLANRING_PRACTICE_MODE)
+			 && (pubctf_runes_override >= 0))
+			{
+				if (pubctf_runes_override >= 1)
+					clanring_playmode = (clanring_playmode | CLANRING_RUNES);
+				else
+					clanring_playmode = (clanring_playmode - (clanring_playmode & CLANRING_RUNES));
+				utils_set_cvar("samelevel", clanring_playmode);
+				break;
+			}
+
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;
 			if (!(clanring_playmode & CLANRING_RUNES))
 			{
@@ -376,6 +398,24 @@ void(string command, string value) config_command =
 		}
 		case "runesoff":
 		{
+			// In pub CTF, honor a previously voted setrunes choice across maps.
+			// This runs during config load on every level change.
+			pubctf_runes_override = cvar("cr_pubctf_runes_override");
+			if (!sys_ready
+			 && (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+			 && (clanring_playmode & CLANRING_NORMAL_MODE)
+			 && !(clanring_playmode & CLANRING_MATCH_MODE)
+			 && !(clanring_playmode & CLANRING_PRACTICE_MODE)
+			 && (pubctf_runes_override >= 0))
+			{
+				if (pubctf_runes_override >= 1)
+					clanring_playmode = (clanring_playmode | CLANRING_RUNES);
+				else
+					clanring_playmode = (clanring_playmode - (clanring_playmode & CLANRING_RUNES));
+				utils_set_cvar("samelevel", clanring_playmode);
+				break;
+			}
+
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;
 			if (clanring_playmode & CLANRING_RUNES)
 			{
@@ -838,6 +878,37 @@ void() clanring_nextlevel_config =
 	clanring_levelcount	= -1;	// This is used throughout to check that levels.cfg has been read...
 };
 
+// Join argv tokens [start_idx..argc-1] with spaces, stopping at inline comments.
+string(float start_idx, float argc) config_join_args =
+{
+    local float i;
+    local string out, tok;
+
+    out = "";
+    for (i = start_idx; i < argc; i = i + 1)
+    {
+        tok = argv(i);
+        if (tok == "//" || tok == "#")
+            break;
+        if (out == "")
+            out = tok;
+        else
+            out = strcat(out, " ", tok);
+    }
+    return out;
+};
+
+float(string cmd) config_command_uses_full_tail =
+{
+    cmd = strtolower(cmd);
+    if (cmd == "captimesdiscordurl") return TRUE;
+    if (cmd == "statsdiscordurl") return TRUE;
+    if (cmd == "matchposturl") return TRUE;
+    if (cmd == "googlesheetsurl") return TRUE;
+    if (cmd == "googlesheetsapikey") return TRUE;
+    return FALSE;
+};
+
 void(string cfg) exec_clanring_cfg =
 {
 	filestream f = fopen(cfg, FILE_READ);
@@ -868,7 +939,11 @@ void(string cfg) exec_clanring_cfg =
 			}
 			continue;
 		}
-		string val = argv(1);
+		string val;
+		if (config_command_uses_full_tail(cmd))
+			val = config_join_args(1, argc);
+		else
+			val = argv(1);
 		dprint(cmd," ",val,"\n");
 		config_command(cmd, val);				//Parse the line.
 	}
@@ -1106,9 +1181,9 @@ void (string filename, float recordset) write_player_stats =
 
 void () write_capture_stats =
 {
-	if (!gsheets_enabled())
-		write_player_stats(sprintf("%s_captimes.crx", mapname), 0);
-	
+	// Always write local files as backup
+	write_player_stats(sprintf("%s_captimes.crx", mapname), 0);
+
 	// Sync to Google Sheets if configured
 	if (gsheets_configured())
 	{
@@ -1122,9 +1197,9 @@ void () write_capture_stats =
 };
 void () write_capture_stats_match =
 {
-	if (!gsheets_enabled())
-		write_player_stats(sprintf("%s_captimes_match.crx", mapname), 2);
-	
+	// Always write local files as backup
+	write_player_stats(sprintf("%s_captimes_match.crx", mapname), 2);
+
 	// Sync to Google Sheets if configured
 	if (gsheets_configured())
 	{
@@ -1187,6 +1262,11 @@ void() clanring_main_config =
 	print("Loading ClanRing Configuration File: \"configs/clanring.cfg\"\n");
 	// Ensure custom cvars exist before parsing config so cvar_set works on them
 	registercvar("cr_allow_leavemealone", "1");
+	registercvar("cr_pubctf_runes_override", "-1");
+	registercvar("cr_lockdown_until", "0");
+	registercvar("cr_lockdown_ips", "");
+	registercvar("cr_lockdown_labels", "");
+	registercvar("cr_lockdown_auto_release_on_match_start", "0");
 	exec_clanring_cfg("configs/clanring.cfg");
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.
@@ -1229,6 +1309,11 @@ void() clanring_exec_configs =
 	clanring_map_config();
 	clanring_nextlevel_config();
 
+	// Keep the persisted private-lock cvars aligned with the live runtime state.
+	// Lockdown restore happens earlier during world init, before deferred config execution.
+	// If a config touches cr_lockdown_*, resync the cvars here so future restores stay correct.
+	lockdown_save_to_cvars();
+	
 	clanring_ent_config();//(FIXME)
 //	clanring_cam_config();//(FIXME)
 	if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)

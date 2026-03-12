@@ -309,12 +309,12 @@ void(entity targ, entity attacker) Killed =
 
 					if (targ.airborn_pos > 650)
 					{
-						bprint("\b[\bDEEPˆ‰SPACE\b]\b\n");
+						bprint("\b[\bDEEP\x88\x89SPACE\b]\b\n");
 						as_sound = 2;
 					}
 					else if (targ.airborn_pos > 500)
 					{
-						bprint("\b[\b…Moon…Shot…\b]\b\n");
+						bprint("\b[\b\x85Moon\x85Shot\x85\b]\b\n");
 						as_sound = 3;
 					}
 					else if (targ.airborn_pos > 300)
@@ -506,7 +506,7 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 
 	if ((targ.plag)&&(attacker.classname=="player"))
 	{
-		centerprint(attacker,"\bClanring\b Lag Protection \bActivated");
+		centerprint(attacker,"\bClanring\b\xA0Lag Protection\xA0\bActivated");
 		return;
 	}
 	

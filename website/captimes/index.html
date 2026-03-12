@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>CTF Capture Records</title>
+    <meta name="description" content="CTF Capture Time Records - Quake Competitive CTF">
+    <link rel="icon" href="../img/favicon.png" sizes="32x32" type="image/png">
+    <script src="https://kit.fontawesome.com/f02f75478d.js" crossorigin="anonymous"></script>
+    <style>
+        /* === Reset & Base === */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        ::selection { background: #595858; }
+        ::-moz-selection { background: #595858; }
+
+        body {
+            background: #353535;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        a { color: #7cb4e8; text-decoration: none; transition: color .2s; }
+        a:hover { color: #a8d0f5; text-decoration: underline; }
+
+        /* === Header === */
+        .site-header {
+            background: linear-gradient(135deg, #192440 0%, #3a1a1a 100%);
+            border-bottom: 3px solid #987b5b;
+            padding: 1rem 1.5rem;
+        }
+
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-title h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: .5px;
+        }
+
+        .header-title .subtitle {
+            color: #987b5b;
+            font-size: .95rem;
+            font-weight: 400;
+        }
+
+        .header-nav a {
+            color: #987b5b;
+            font-size: .9rem;
+            transition: color .2s;
+        }
+
+        .header-nav a:hover { color: #c9a46c; text-decoration: none; }
+
+        /* === Container === */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* === Loading / Error === */
+        .loading {
+            text-align: center;
+            padding: 4rem 1rem;
+            color: #888;
+            font-size: 1.1rem;
+        }
+
+        .loading .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #555;
+            border-top-color: #987b5b;
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .error-msg {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #e05555;
+            font-size: 1rem;
+        }
+
+        /* === Stats Bar === */
+        .stats-bar {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+            padding: 1.25rem 1.5rem;
+            background: #2e2e2e;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .stat-item.has-tooltip { cursor: pointer; }
+
+        .stat-label {
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #987b5b;
+        }
+
+        /* === Custom Tooltip === */
+        .stat-tooltip {
+            display: none;
+            position: absolute;
+            top: calc(100% + 10px);
+            left: 0;
+            background: #1e1e1e;
+            border: 1px solid #987b5b;
+            border-radius: 6px;
+            padding: .6rem .8rem;
+            min-width: 180px;
+            z-index: 100;
+            box-shadow: 0 4px 16px rgba(0,0,0,.5);
+        }
+
+        .stat-tooltip::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 16px;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 6px solid #987b5b;
+        }
+
+        .stat-item.has-tooltip:hover .stat-tooltip { display: block; }
+
+        .stat-item.tooltip-right .stat-tooltip { left: auto; right: 0; }
+        .stat-item.tooltip-right .stat-tooltip::before { left: auto; right: 16px; }
+
+        .tooltip-row {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            padding: .25rem 0;
+            font-size: .8rem;
+            color: #ccc;
+            white-space: nowrap;
+        }
+
+        .tooltip-row + .tooltip-row { border-top: 1px solid #333; }
+
+        .tooltip-rank {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: .65rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .tooltip-rank-1 { background: linear-gradient(135deg, #d4a51a, #f5d26e); color: #1a1a0a; }
+        .tooltip-rank-2 { background: linear-gradient(135deg, #8a8a8a, #c0c0c0); color: #1a1a1a; }
+        .tooltip-rank-3 { background: linear-gradient(135deg, #a0603a, #cd7f32); color: #1a1a0a; }
+        .tooltip-rank-other { background: #444; color: #aaa; }
+
+        .tooltip-cat { font-size: .65rem; flex-shrink: 0; width: 16px; text-align: center; }
+        .tooltip-cat-trial { color: #6fcf97; }
+        .tooltip-cat-match { color: #cf8f6f; }
+
+        .tooltip-name { flex: 1; color: #e0e0e0; }
+
+        .tooltip-value {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: #987b5b;
+            font-weight: 600;
+        }
+
+        /* === Map Card === */
+        .map-card {
+            background: #2e2e2e;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            transition: border-color .2s;
+        }
+
+        .map-card:hover { border-color: #987b5b; }
+
+        .map-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: .6rem 1.5rem;
+            background: linear-gradient(135deg, #192440 0%, #1e2d4a 100%);
+            border-bottom: 2px solid #987b5b;
+        }
+
+        .map-name {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: .5px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+
+        .map-desc {
+            font-weight: 400;
+            font-size: .85rem;
+            color: #999;
+            margin-left: .25rem;
+        }
+
+        .map-body { padding: 0; }
+
+        /* === Category Section === */
+        .category-section { padding: 1rem 1.5rem; }
+        .category-section + .category-section { border-top: 1px solid #3a3a3a; }
+
+        .category-label {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            font-size: .8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #888;
+            margin-bottom: .75rem;
+        }
+
+        .category-label .badge-trial {
+            background: #2a5a3a;
+            color: #6fcf97;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: .7rem;
+        }
+
+        .category-label .badge-match {
+            background: #5a3a2a;
+            color: #cf8f6f;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: .7rem;
+        }
+
+        /* === Records Table === */
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .records-table .col-rank { width: 40px; padding-right: 0 !important; }
+        .records-table .col-player { width: 140px; padding-left: 8px !important; }
+        .records-table .col-time { width: 90px; }
+        .records-table .col-date { }
+        .records-table .col-matchtime { }
+        .records-table .col-server { }
+        .records-table .col-ping { width: 70px; }
+        .records-table .col-video { width: 30px; }
+
+        .records-table th {
+            text-align: left;
+            font-size: .7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            padding: .4rem .5rem;
+            border-bottom: 1px solid #3a3a3a;
+            overflow: hidden;
+        }
+
+        .records-table td {
+            padding: .6rem .5rem;
+            font-size: .95rem;
+            vertical-align: middle;
+        }
+
+        .records-table tbody tr {
+            transition: background .15s;
+        }
+
+        .records-table tbody tr:hover { background: #363636; }
+        .records-table tbody tr + tr { border-top: 1px solid #333; }
+
+        /* === Rank Styling === */
+        .rank {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            font-size: .8rem;
+            font-weight: 700;
+        }
+
+        .rank-1 { background: linear-gradient(135deg, #d4a51a, #f5d26e); color: #1a1a0a; }
+        .rank-2 { background: linear-gradient(135deg, #8a8a8a, #c0c0c0); color: #1a1a1a; }
+        .rank-3 { background: linear-gradient(135deg, #a0603a, #cd7f32); color: #1a1a0a; }
+        .rank-other { background: #444; color: #aaa; }
+
+        /* === Time Display === */
+        .record-time {
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .rank-1-row .record-time { color: #f5d26e; }
+
+        /* === Player Name === */
+        .player-name {
+            font-weight: 500;
+            color: #ddd;
+        }
+
+        /* === Date === */
+        .record-date {
+            color: #888;
+            font-size: .85rem;
+        }
+
+        /* === Server === */
+        .record-server {
+            color: #777;
+            font-size: .85rem;
+        }
+
+        /* === Ping === */
+        .record-ping {
+            font-family: monospace;
+            color: #888;
+            font-size: .85rem;
+        }
+
+        /* === Video Link Placeholder === */
+        .video-link {
+            color: #555;
+            font-size: .85rem;
+            cursor: default;
+        }
+
+        .video-link.has-video {
+            color: #987b5b;
+            cursor: pointer;
+        }
+
+        .video-link.has-video:hover { color: #c9a46c; }
+
+        .map-select {
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(0,0,0,.3) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E") no-repeat right 8px center;
+            color: #ccc;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: .3rem 2rem .3rem .5rem;
+            font-size: .8rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .map-select:hover { border-color: #987b5b; }
+        .map-select:focus { border-color: #987b5b; }
+
+        /* === Footer === */
+        .site-footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: #555;
+            font-size: .8rem;
+            border-top: 1px solid #3a3a3a;
+            margin-top: 2rem;
+        }
+
+        /* === Responsive === */
+        @media (max-width: 768px) {
+            .header-title h1 { font-size: 1.5rem; }
+            .stats-bar { gap: 1.25rem; }
+            .stat-value { font-size: 1.2rem; }
+            .category-section { padding: .75rem; }
+            .map-header { padding: .6rem .75rem; flex-wrap: wrap; gap: .4rem; }
+            .map-name { font-size: 1rem; flex-wrap: wrap; }
+            .map-desc { display: none; }
+            .map-select { font-size: .7rem; padding: .2rem 1.5rem .2rem .4rem; }
+
+            .records-table { font-size: .85rem; }
+            .records-table th, .records-table td { padding: .4rem .25rem; }
+
+            /* hide less important columns on mobile */
+            .col-server, .col-ping, .col-date, .col-matchtime, .col-video { display: none; }
+        }
+
+        @media (max-width: 480px) {
+            .header-inner { flex-direction: column; align-items: flex-start; }
+            .stats-bar { flex-direction: column; gap: .75rem; }
+            .container { padding: 1rem .75rem; }
+        }
+
+        /* === Quake Colors === */
+        .qcolor-0  { color: #ffffff; }
+        .qcolor-1  { color: #8b4513; }
+        .qcolor-2  { color: #c0c0c0; }
+        .qcolor-3  { color: #6b8e23; }
+        .qcolor-4  { color: #ff0000; }
+        .qcolor-5  { color: #d4a017; }
+        .qcolor-6  { color: #ff8c00; }
+        .qcolor-7  { color: #ffd700; }
+        .qcolor-8  { color: #9b59b6; }
+        .qcolor-9  { color: #8e44ad; }
+        .qcolor-10 { color: #2ecc71; }
+        .qcolor-11 { color: #27ae60; }
+        .qcolor-12 { color: #f1c40f; }
+        .qcolor-13 { color: #3498db; }
+        .qcolor-14 { color: #e74c3c; }
+
+        /* Quake color 5 (pants) enrichment */
+        .qpants-5 .player-name { color: #d4a017; }
+        .qpants-14 .player-name { color: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="site-header">
+        <div class="header-inner">
+            <div class="header-title">
+                <div>
+                    <h1><i class="fa-solid fa-flag" style="color: #987b5b; margin-right: .5rem;"></i>CTF Capture Records</h1>
+                    <span class="subtitle">NetQuake Competitive CTF</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Stats summary -->
+        <div class="stats-bar" id="stats-bar" style="display: none;">
+            <div class="stat-item has-tooltip">
+                <span class="stat-label">Maps</span>
+                <span class="stat-value" id="stat-maps">-</span>
+                <div class="stat-tooltip" id="tooltip-maps"></div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Records</span>
+                <span class="stat-value" id="stat-records">-</span>
+            </div>
+            <div class="stat-item has-tooltip">
+                <span class="stat-label">Players</span>
+                <span class="stat-value" id="stat-players">-</span>
+                <div class="stat-tooltip" id="tooltip-players"></div>
+            </div>
+            <div class="stat-item has-tooltip">
+                <span class="stat-label">Fastest Cap</span>
+                <span class="stat-value" id="stat-fastest">-</span>
+                <div class="stat-tooltip" id="tooltip-fastest"></div>
+            </div>
+            <div class="stat-item has-tooltip">
+                <span class="stat-label">Most Trial #1s</span>
+                <span class="stat-value" id="stat-trial-leader">-</span>
+                <div class="stat-tooltip" id="tooltip-trial"></div>
+            </div>
+            <div class="stat-item has-tooltip tooltip-right">
+                <span class="stat-label">Most Match #1s</span>
+                <span class="stat-value" id="stat-match-leader">-</span>
+                <div class="stat-tooltip" id="tooltip-match"></div>
+            </div>
+            <div class="stat-item has-tooltip tooltip-right">
+                <span class="stat-label">Most Recent</span>
+                <span class="stat-value" id="stat-recent">-</span>
+                <div class="stat-tooltip" id="tooltip-recent"></div>
+            </div>
+        </div>
+
+        <!-- Records container -->
+        <div id="records-container">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>Loading capture records...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+
+    <script>
+    // Name aliases: maps alternate names to a canonical name
+    const NAME_ALIASES = {
+        'uns': 'unspoken',
+        'unspoked': 'unspoken',
+        'fz': 'frenzy',
+        'infin': 'infiniti',
+    };
+
+    function resolveAlias(name) {
+        return NAME_ALIASES[name.toLowerCase()] || name;
+    }
+
+    const SHEET_ID = '1ClswtB2X8vMd34b-0QNiE8b1l7IDoanAHgC2gs-zLxE';
+    const GID = 1461642282;
+    const API_KEY = 'AIzaSyDBDjfZHFtA5rhuD6uo9XpE-3PCDzarkQs';
+    const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
+
+    // Step 1: Get the sheet name for our gid
+    async function getSheetName() {
+        const url = `${SHEETS_API}/${SHEET_ID}?key=${API_KEY}&fields=sheets.properties`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Metadata fetch failed: HTTP ${resp.status}`);
+        const data = await resp.json();
+        const sheet = data.sheets.find(s => s.properties.sheetId === GID);
+        if (!sheet) throw new Error(`Sheet with gid ${GID} not found`);
+        return sheet.properties.title;
+    }
+
+    // Step 2: Fetch all values from the sheet
+    async function fetchSheetData(sheetName) {
+        const url = `${SHEETS_API}/${SHEET_ID}/values/${encodeURIComponent(sheetName)}?key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Data fetch failed: HTTP ${resp.status}`);
+        const data = await resp.json();
+        return data.values || [];
+    }
+
+    // Parse the structured spreadsheet data
+    function parseRecords(rows) {
+        const maps = [];
+        let currentMap = null;
+        let currentCategory = null;
+
+        // Skip header row (row 0)
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.length === 0) continue;
+
+            const colA = String(row[0] || '').trim();
+            const colB = String(row[1] || '').trim();
+            const colC = String(row[2] || '').trim();
+            const colD = String(row[3] || '').trim();
+            const colE = String(row[4] || '').trim();
+            const colF = String(row[5] || '').trim();
+            const colG = String(row[6] || '').trim();
+            // Column H = Hex Name (skip), Column I = Ping
+            const colI = String(row[8] || '').trim();
+
+            // Check if all cells are empty
+            if (!colA && !colB && !colC && !colD) continue;
+
+            // Check for category header (TRIAL or MATCH)
+            if (colA === 'TRIAL' || colA === 'MATCH') {
+                currentCategory = colA;
+                continue;
+            }
+
+            // Check if colA is a number (rank) - this is a record row
+            const rank = parseInt(colA);
+            if (!isNaN(rank) && colB) {
+                if (currentMap && currentCategory) {
+                    const record = {
+                        rank: rank,
+                        name: resolveAlias(colB),
+                        color: colC,
+                        time: parseFloat(colD) || 0,
+                        timeStr: colD,
+                        date: colE,
+                        timeInMatch: colF,
+                        server: colG.toLowerCase().includes('denver.quakeone.com') ? 'Denver' : colG.toLowerCase().includes('dallas.quakeone.com') ? 'Dallas' : colG,
+                        ping: colI,
+                        category: currentCategory
+                    };
+
+                    if (currentCategory === 'TRIAL') {
+                        currentMap.trial.push(record);
+                    } else {
+                        currentMap.match.push(record);
+                    }
+                }
+                continue;
+            }
+
+            // Otherwise it's a map name
+            if (colA && colA !== 'Map' && isNaN(parseInt(colA))) {
+                currentMap = {
+                    name: colA,
+                    trial: [],
+                    match: []
+                };
+                maps.push(currentMap);
+                currentCategory = null;
+            }
+        }
+
+        return maps;
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        } catch {
+            return dateStr;
+        }
+    }
+
+    function getRankClass(rank) {
+        if (rank === 1) return 'rank-1';
+        if (rank === 2) return 'rank-2';
+        if (rank === 3) return 'rank-3';
+        return 'rank-other';
+    }
+
+    function buildRecordRow(record) {
+        const rankClass = getRankClass(record.rank);
+        const isFirst = record.rank === 1 ? 'rank-1-row' : '';
+        const dateFormatted = formatDate(record.date);
+
+        return `
+            <tr class="${isFirst}">
+                <td class="col-rank"><span class="rank ${rankClass}">${record.rank}</span></td>
+                <td class="col-player player-name">${escapeHtml(record.name)}</td>
+                <td class="col-time record-time">${record.time > 0 ? record.time.toFixed(3) : escapeHtml(record.timeStr)}s</td>
+                <td class="col-date record-date">${dateFormatted}</td>
+                <td class="col-matchtime">${record.timeInMatch ? escapeHtml(record.timeInMatch) : ''}</td>
+                <td class="col-server record-server">${escapeHtml(record.server)}</td>
+                <td class="col-ping record-ping">${record.ping ? escapeHtml(record.ping) + 'ms' : ''}</td>
+                <td class="col-video video-link" title="Demo/video coming soon"><i class="fa-solid fa-video" style="opacity: 0.25;"></i></td>
+            </tr>
+        `;
+    }
+
+    function buildCategorySection(category, records) {
+        if (records.length === 0) return '';
+        const badgeClass = category === 'TRIAL' ? 'badge-trial' : 'badge-match';
+        const icon = category === 'TRIAL' ? 'fa-stopwatch' : 'fa-gamepad';
+
+        return `
+            <div class="category-section">
+                <div class="category-label">
+                    <i class="fa-solid ${icon}"></i>
+                    <span class="${badgeClass}">${category}</span>
+                </div>
+                <table class="records-table">
+                    <thead>
+                        <tr>
+                            <th class="col-rank">#</th>
+                            <th class="col-player">Player</th>
+                            <th class="col-time">Time</th>
+                            <th class="col-date">Date</th>
+                            <th class="col-matchtime">Match Time</th>
+                            <th class="col-server">Server</th>
+                            <th class="col-ping">Ping</th>
+                            <th class="col-video"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${records.map(r => buildRecordRow(r)).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    let mapDescriptions = {};
+
+    async function loadMapDescriptions() {
+        try {
+            const resp = await fetch('mapdesc.json');
+            const data = await resp.json();
+            data.forEach(m => {
+                if (m.description && m.description !== 'empty-description') {
+                    mapDescriptions[m.name.toLowerCase()] = m.description;
+                }
+            });
+        } catch (e) {
+            console.warn('Could not load map descriptions:', e);
+        }
+    }
+
+    function buildMapCard(map) {
+        const desc = mapDescriptions[map.name.toLowerCase()] || '';
+        return `
+            <div class="map-card" id="map-${escapeHtml(map.name)}">
+                <div class="map-header">
+                    <span class="map-name"><i class="fa-solid fa-map" style="color: #987b5b; margin-right: .5rem; font-size: .9em;"></i>${escapeHtml(map.name)}${desc ? '<span class="map-desc"> &mdash; ' + escapeHtml(desc) + '</span>' : ''}</span>
+                    <select class="map-select" onchange="jumpToMap(this.value)"><option value="">Jump to map...</option></select>
+                </div>
+                <div class="map-body">
+                    ${buildCategorySection('TRIAL', map.trial)}
+                    ${buildCategorySection('MATCH', map.match)}
+                </div>
+            </div>
+        `;
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function jumpToMap(name) {
+        if (!name) return;
+        const el = document.getElementById('map-' + name);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        document.querySelectorAll('.map-select').forEach(s => s.value = '');
+    }
+
+    function populateMapSelect(maps) {
+        document.querySelectorAll('.map-select').forEach(select => {
+            maps.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.name;
+                opt.textContent = m.name;
+                select.appendChild(opt);
+            });
+        });
+    }
+
+    function tooltipRow(rank, name, value, category) {
+        const rankClass = rank <= 3 ? 'tooltip-rank-' + rank : 'tooltip-rank-other';
+        const catIcon = category === 'TRIAL'
+            ? '<span class="tooltip-cat tooltip-cat-trial" title="Trial"><i class="fa-solid fa-stopwatch"></i></span>'
+            : category === 'MATCH'
+            ? '<span class="tooltip-cat tooltip-cat-match" title="Match"><i class="fa-solid fa-gamepad"></i></span>'
+            : '';
+        return `<div class="tooltip-row">
+            <span class="tooltip-rank ${rankClass}">${rank}</span>
+            ${catIcon}
+            <span class="tooltip-name">${escapeHtml(name)}</span>
+            <span class="tooltip-value">${escapeHtml(value)}</span>
+        </div>`;
+    }
+
+    function getTop3FirstPlace(maps, category) {
+        const counts = {};
+        maps.forEach(m => {
+            const records = category === 'TRIAL' ? m.trial : m.match;
+            const first = records.find(r => r.rank === 1);
+            if (first) counts[first.name] = (counts[first.name] || 0) + 1;
+        });
+        return Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([name, count]) => ({ name, value: count }));
+    }
+
+    function updateStats(maps) {
+        const allRecords = maps.flatMap(m => [...m.trial, ...m.match].map(r => ({ ...r, mapName: m.name })));
+        const players = new Set(allRecords.map(r => r.name));
+
+        document.getElementById('stat-maps').textContent = maps.length;
+
+        // Most competitive maps - smallest gap between #1 and #2 trial times
+        const competitive = maps
+            .filter(m => m.trial.length >= 2 && m.trial[0].time > 0 && m.trial[1].time > 0)
+            .map(m => ({ name: m.name, gap: m.trial[1].time - m.trial[0].time }))
+            .sort((a, b) => a.gap - b.gap)
+            .slice(0, 5);
+        document.getElementById('tooltip-maps').innerHTML = competitive
+            .map((m, i) => tooltipRow(i + 1, m.name, m.gap.toFixed(4) + 's gap')).join('');
+        document.getElementById('stat-records').textContent = allRecords.length;
+        document.getElementById('stat-players').textContent = players.size;
+
+        // Players - top 3 by total records
+        const playerCounts = {};
+        allRecords.forEach(r => playerCounts[r.name] = (playerCounts[r.name] || 0) + 1);
+        const topPlayers = Object.entries(playerCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        document.getElementById('tooltip-players').innerHTML = topPlayers
+            .map(([name, count], i) => tooltipRow(i + 1, name, count + ' records')).join('');
+
+        // Fastest caps - top 3
+        const sortedByTime = allRecords.filter(r => r.time > 0).sort((a, b) => a.time - b.time);
+        if (sortedByTime.length > 0) {
+            document.getElementById('stat-fastest').textContent = sortedByTime[0].time.toFixed(3) + 's';
+            document.getElementById('tooltip-fastest').innerHTML = sortedByTime.slice(0, 3)
+                .map((r, i) => tooltipRow(i + 1, r.name + ' · ' + r.mapName, r.time.toFixed(3) + 's', r.category)).join('');
+        }
+
+        // Trial #1s - top 3
+        const trialTop3 = getTop3FirstPlace(maps, 'TRIAL');
+        if (trialTop3.length > 0) {
+            document.getElementById('stat-trial-leader').textContent = `${trialTop3[0].name} (${trialTop3[0].value})`;
+            document.getElementById('tooltip-trial').innerHTML = trialTop3
+                .map((r, i) => tooltipRow(i + 1, r.name, r.value + ' maps')).join('');
+        }
+
+        // Match #1s - top 3
+        const matchTop3 = getTop3FirstPlace(maps, 'MATCH');
+        if (matchTop3.length > 0) {
+            document.getElementById('stat-match-leader').textContent = `${matchTop3[0].name} (${matchTop3[0].value})`;
+            document.getElementById('tooltip-match').innerHTML = matchTop3
+                .map((r, i) => tooltipRow(i + 1, r.name, r.value + ' maps')).join('');
+        }
+
+        // Most recent - top 3
+        const withDates = allRecords.filter(r => r.date).map(r => ({ ...r, dateObj: new Date(r.date) })).filter(r => !isNaN(r.dateObj));
+        withDates.sort((a, b) => b.dateObj - a.dateObj);
+        if (withDates.length > 0) {
+            const fmt = d => (d.getMonth()+1) + '/' + d.getDate() + '/' + String(d.getFullYear()).slice(2);
+            document.getElementById('stat-recent').textContent = fmt(withDates[0].dateObj);
+            document.getElementById('tooltip-recent').innerHTML = withDates.slice(0, 10)
+                .map((r) => tooltipRow(r.rank, r.name + ' · ' + r.mapName, r.time.toFixed(3) + 's · ' + fmt(r.dateObj), r.category)).join('');
+        }
+
+        document.getElementById('stats-bar').style.display = 'flex';
+    }
+
+    async function loadRecords() {
+        const container = document.getElementById('records-container');
+
+        await loadMapDescriptions().catch(() => {});
+
+        try {
+            const sheetName = await getSheetName();
+            const rows = await fetchSheetData(sheetName);
+            const maps = parseRecords(rows);
+
+            if (maps.length === 0) {
+                container.innerHTML = '<div class="error-msg">No records found. The spreadsheet may be empty or the format may have changed.</div>';
+                return;
+            }
+
+            maps.sort((a, b) => a.name.localeCompare(b.name));
+            updateStats(maps);
+            container.innerHTML = maps.map(m => buildMapCard(m)).join('');
+            populateMapSelect(maps);
+
+        } catch (err) {
+            console.error('Failed to load records:', err);
+            container.innerHTML = `
+                <div class="error-msg">
+                    <p>Unable to load records.</p>
+                    <p style="margin-top: .5rem; font-size: .8rem; color: #666;">Error: ${escapeHtml(err.message)}</p>
+                </div>
+            `;
+        }
+    }
+
+    // Load on page ready
+    loadRecords();
+    </script>
+</body>
+</html>

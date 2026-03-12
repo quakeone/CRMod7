@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRMod7 - Quake 1 Competition Server</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="#hero" class="nav-logo">
+        <span class="logo-cr">CR</span><span class="logo-mod">Mod</span><span class="logo-7">7</span>
+      </a>
+      <div class="nav-links">
+        <a href="#download">Download</a>
+        <a href="#modes">Modes</a>
+        <a href="#competition">Competition</a>
+        <a href="#stats">Stats</a>
+        <a href="#play">Play</a>
+        <a href="#modern">Integrations</a>
+        <a href="#commands">Commands</a>
+        <a href="#setup">Setup</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="nav-mobile" id="navMobile">
+      <a href="#download">Download</a>
+      <a href="#modes">Modes</a>
+      <a href="#competition">Competition</a>
+      <a href="#stats">Stats</a>
+      <a href="#play">Play</a>
+      <a href="#modern">Integrations</a>
+      <a href="#commands">Commands</a>
+      <a href="#setup">Setup</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <div class="hero-badge">Quake 1 Competition Server</div>
+      <h1 class="hero-title">
+        <span class="hero-cr">CR</span><span class="hero-mod">Mod</span><span class="hero-7">7</span>
+      </h1>
+      <p class="hero-sub">The definitive Quake multiplayer competition mod. Seven game modes, deep match management, live stat tracking, and modern integrations &mdash; open source and built on a legacy that started in 1999.</p>
+      <div class="hero-actions">
+        <a href="https://github.com/quakeone/CRMod7" class="hero-gh" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          <span>View on GitHub</span>
+        </a>
+        <a href="#download" class="hero-gh hero-download">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 2v7m0 0l-3-3m3 3l3-3M3 12.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Download</span>
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-num">7</span>
+          <span class="stat-label">Game Modes</span>
+        </div>
+        <div class="stat-sep"></div>
+        <div class="stat">
+          <span class="stat-num">25+</span>
+          <span class="stat-label">Years of Legacy</span>
+        </div>
+        <div class="stat-sep"></div>
+        <div class="stat">
+          <span class="stat-num">&infin;</span>
+          <span class="stat-label">Frags</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-scroll">
+      <span>Scroll</span>
+      <svg width="16" height="24" viewBox="0 0 16 24" fill="none"><path d="M8 4v12m0 0l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+  </section>
+
+  <!-- Downloads -->
+  <section class="section" id="download">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Downloads</span>
+        <h2>Get the Stack</h2>
+        <p>Grab the mod, the recommended engine, and the common map-pack downloads used by public CRMod7 servers.</p>
+      </div>
+
+      <div class="download-grid">
+        <a href="https://github.com/quakeone/CRMod7/archive/refs/heads/main.zip" class="download-card" target="_blank" rel="noopener">
+          <div class="download-card-head">
+            <div class="download-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v9m0 0l-4-4m4 4l4-4M5 18h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>CRMod7</h3>
+              <span class="download-meta">GitHub main.zip</span>
+            </div>
+          </div>
+          <p>Download the current mod archive directly from the main branch.</p>
+        </a>
+
+        <a href="https://qssm.quakeone.com/" class="download-card" target="_blank" rel="noopener">
+          <div class="download-card-head">
+            <div class="download-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M5 6h14v12H5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 10h6M9 14h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <h3>QSS-M</h3>
+              <span class="download-meta">Windows, Linux, macOS</span>
+            </div>
+          </div>
+          <p>Recommended engine download page with current QSS-M builds and install notes.</p>
+        </a>
+
+        <a href="https://www.quaddicted.com/files/mirrors/ftp.planetquake.com/threewave/ctf/client/" class="download-card" target="_blank" rel="noopener">
+          <div class="download-card-head">
+            <div class="download-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M7 7h10v10H7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <h3>Threewave CTF PAKs</h3>
+              <span class="download-meta">Quaddicted mirror</span>
+            </div>
+          </div>
+          <p>Classic Threewave CTF pack mirror for the common server-side and client-side CTF assets.</p>
+        </a>
+
+        <a href="https://www.quaddicted.com/files/idgames2/planetquake/servers/arena/farena12.zip" class="download-card" target="_blank" rel="noopener">
+          <div class="download-card-head">
+            <div class="download-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>Rocket Arena PAK</h3>
+              <span class="download-meta">farena12.zip</span>
+            </div>
+          </div>
+          <p>Rocket Arena pack archive for the RA map rotation and supporting arena content.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game Modes -->
+  <section class="section" id="modes">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Game Modes</span>
+        <h2>Seven Ways to Frag</h2>
+        <p>From classic deathmatch to modern arena variants, every competitive format you need.</p>
+      </div>
+
+      <div class="modes-grid">
+        <div class="mode-card mode-featured">
+          <div class="mode-icon">
+            <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="2"/><path d="M24 14v10l7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="mode-content">
+            <h3>Deathmatch</h3>
+            <span class="mode-tag">FFA / TDM / Practice</span>
+            <p>Classic free-for-all combat. Configurable fraglimits, timelimits, and powerup control. Supports all standard deathmatch modes with modern match management.</p>
+          </div>
+        </div>
+
+        <div class="mode-card mode-featured">
+          <div class="mode-icon">
+            <svg viewBox="0 0 48 48" fill="none"><path d="M12 36V16l12-8 12 8v20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 8v28" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"/></svg>
+          </div>
+          <div class="mode-content">
+            <h3>Threewave Capture the Flag</h3>
+            <span class="mode-tag">Public / Team / Practice / Captimes</span>
+            <p>Full-featured CTF with grappling hook support, capture time records, team scoring, and integration with Google Sheets for persistent leaderboards.</p>
+          </div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">
+            <svg viewBox="0 0 48 48" fill="none"><rect x="10" y="10" width="28" height="28" rx="4" stroke="currentColor" stroke-width="2"/><path d="M18 24h12M24 18v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="mode-content">
+            <h3>Rocket Arena</h3>
+            <span class="mode-tag">1v1</span>
+            <p>Queue-based 1v1 elimination. Players wait in line, winner stays on. Pure aim, pure skill.</p>
+          </div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">
+            <svg viewBox="0 0 48 48" fill="none"><path d="M14 34l10-20 10 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 28h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="mode-content">
+            <h3>Clan Arena</h3>
+            <span class="mode-tag">Team Arena</span>
+            <p>Round-based team elimination. No self-damage, no pickups &mdash; just teamwork and aim. Up to 9-round matches with MVP tracking.</p>
+          </div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">
+            <svg viewBox="0 0 48 48" fill="none"><path d="M24 8c-8.8 0-16 7.2-16 16s7.2 16 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M24 8c8.8 0 16 7.2 16 16s-7.2 16-16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 4"/></svg>
+          </div>
+          <div class="mode-content">
+            <h3>Wipeout</h3>
+            <span class="mode-tag">Team Arena</span>
+            <p>A modified Clan Arena format with progressive respawn delays that ramp from 5 to 80 seconds. Wipe the enemy team completely to win. Strategic, punishing, intense.</p>
+          </div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">
+            <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="6" stroke="currentColor" stroke-width="2"/><path d="M24 12v4m0 16v4M12 24h4m16 0h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="mode-content">
+            <h3>DMM4</h3>
+            <span class="mode-tag">1v1</span>
+            <p>Arena deathmatch with timed scoring. The classic 1v1 format for structured competitive duels.</p>
+          </div>
+        </div>
+
+        <div class="mode-card">
+          <div class="mode-icon">
+            <svg viewBox="0 0 48 48" fill="none"><path d="M24 10l4 8 8 2-6 6 2 8-8-4-8 4 2-8-6-6 8-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="mode-content">
+            <h3>Airshot Arena</h3>
+            <span class="mode-tag">Skill</span>
+            <p>Dedicated airshot scoring. Height-based damage multipliers reward vertical plays. Gib streak tracking and records for the ultimate aim challenge.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Competition -->
+  <section class="section section-alt" id="competition">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Competition</span>
+        <h2>Built for Competition</h2>
+        <p>The match layer, the spectator layer, and the stat layer are all treated as first-class product features. This is where CRMod7 stops feeling like a simple mod and starts feeling like infrastructure.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M16 4l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </div>
+          <h4>Voting System</h4>
+          <p>Majority-based voting for maps, modes, settings, powerups, fraglimits, and more. Players control the server democratically.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><rect x="4" y="6" width="24" height="20" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M4 12h24" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/><circle cx="14" cy="9" r="1.5" fill="currentColor"/></svg>
+          </div>
+          <h4>Match Management</h4>
+          <p>Full match lifecycle: countdown, pause/unpause, overtime, sudden death, ghost save/restore, and auto-abort on inactivity.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M16 5c-4.8 0-8 4.1-8 8.5 0 5.5 5.3 9.3 8 12.5 2.7-3.2 8-7 8-12.5C24 9.1 20.8 5 16 5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12.5 14.5h7M16 11v7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <h4>Ghost Recovery</h4>
+          <p>Disconnect protection with ghost codes and restore flow, so players can rejoin an active match without losing their game state or collapsing the roster.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M16 5l8 4v6c0 5-3.4 9.5-8 11-4.6-1.5-8-6-8-11V9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 15l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h4>Admin Controls</h4>
+          <p>Live admin authentication, lockdowns, kick/ban controls, spawn and camera editing, and in-game server operations for running organized matches cleanly.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M6 26V12l10-8 10 8v14" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 26v-8h6v8" stroke="currentColor" stroke-width="1.5"/></svg>
+          </div>
+          <h4>Observer Mode</h4>
+          <p>Walk or fly spectating with player targeting, camera positions, QuakeTV commentary support, and AFK detection.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M4 24l7-7 5 5 5-9 7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h4>Deep Statistics</h4>
+          <p>Per-weapon damage tracking, quad stats, teamkills, suicides, gib tracking, top-5 records &mdash; weapon-level detail for every match.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="12" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M6 26c0-5.5 4.5-10 10-10s10 4.5 10 10" stroke="currentColor" stroke-width="1.5"/></svg>
+          </div>
+          <h4>Player Identification</h4>
+          <p>Real-time teammate info at 2048 units: current weapon, armor type/value, rune, ammo, and available weapons at a glance.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M16 4v8l6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 16a8 8 0 1 0 16 0 8 8 0 0 0-8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <h4>Grappling Hook</h4>
+          <p>Classic Zoid-style grappling hook, voteable per-mode. Pull mechanics with teleport safety and dynamic unhooking.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M16 6l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 22h16M10 26h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <h4>Rune System</h4>
+          <p>Four runes &mdash; Resistance, Strength, Haste, Regeneration &mdash; with spawn control, tossing, and persistent settings.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M6 6h8v8H6zM18 6h8v8h-8zM6 18h8v8H6zM18 18h8v8h-8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </div>
+          <h4>Powerup Control</h4>
+          <p>Vote on Quad, Pent, Ring, and Suit per-match. Drop tracking, ownership logging, and consecutive pickup commentary.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M4 8h10v16H4zM18 8h10v16H18" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 16h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 2"/></svg>
+          </div>
+          <h4>Alternative Entities</h4>
+          <p>Vote to swap between standard and alternative entity sets per map. Custom spawn points, item layouts, and weapon placements &mdash; separate sets for CTF and DM modes. Automatically resets on mode switch.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 32 32" fill="none"><rect x="6" y="6" width="20" height="20" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M6 13h20M6 19h20M13 6v20M19 6v20" stroke="currentColor" stroke-width="1.5" opacity="0.3"/><path d="M11 11h4v4h-4zM17 17h4v4h-4z" fill="currentColor" opacity="0.5"/></svg>
+          </div>
+          <h4>Client Compatibility</h4>
+          <p>Maximum feature support with <a href="https://qssm.quakeone.com" target="_blank" rel="noopener" class="feature-link">QSS-M</a>. Legacy compatible with <a href="https://quakeone.com/qrack" target="_blank" rel="noopener" class="feature-link">Qrack</a> and ProQuake &mdash; any NetQuake client can connect and play.</p>
+        </div>
+      </div>
+
+      <div class="competition-detail-intro">
+        <span class="section-tag">Match Infrastructure</span>
+        <p>After the rules are loaded, CRMod7 keeps the entire event moving: countdowns, spectators, reconnects, overtime, music, records, and post-game flow.</p>
+      </div>
+
+      <div class="comp-grid">
+        <div class="comp-block">
+          <h3>Match Lifecycle</h3>
+          <ul class="comp-list">
+            <li><span class="comp-bullet"></span>Pre-match warmup with leave-me-alone protection</li>
+            <li><span class="comp-bullet"></span>Countdown timers with audio cues</li>
+            <li><span class="comp-bullet"></span>Pause / unpause with team confirmation</li>
+            <li><span class="comp-bullet"></span>Overtime &amp; sudden death resolution</li>
+            <li><span class="comp-bullet"></span>Ghost save/restore for disconnects</li>
+            <li><span class="comp-bullet"></span>Auto-abort when no team movement detected</li>
+          </ul>
+        </div>
+
+        <div class="comp-block">
+          <h3>Play Modes</h3>
+          <ul class="comp-list">
+            <li><span class="comp-bullet"></span><strong>Normal</strong> &mdash; Public and pickup games</li>
+            <li><span class="comp-bullet"></span><strong>Practice</strong> &mdash; Configurable training rules</li>
+            <li><span class="comp-bullet"></span><strong>Match</strong> &mdash; Full tournament play with spectators, team management, and stat logging</li>
+          </ul>
+        </div>
+
+        <div class="comp-block">
+          <h3>CTF Capture Times</h3>
+          <ul class="comp-list">
+            <li><span class="comp-bullet"></span>Per-team trial and match records</li>
+            <li><span class="comp-bullet"></span>Google Sheets integration for persistent leaderboards</li>
+            <li><span class="comp-bullet"></span>Local disk fallback for reliability</li>
+            <li><span class="comp-bullet"></span>Historical record lookup</li>
+            <li><span class="comp-bullet"></span>Ping tracked per record</li>
+          </ul>
+        </div>
+
+        <div class="comp-block">
+          <h3>Arena Modes</h3>
+          <ul class="comp-list">
+            <li><span class="comp-bullet"></span>Round-based progression (CA up to 9 rounds)</li>
+            <li><span class="comp-bullet"></span>Queue system for Rocket Arena</li>
+            <li><span class="comp-bullet"></span>MVP tracking per match</li>
+            <li><span class="comp-bullet"></span>Auto team balancing</li>
+            <li><span class="comp-bullet"></span>Round start countdowns with audio</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Sample -->
+  <section class="section" id="stats">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Match Statistics</span>
+        <h2>Every Frag Accounted For</h2>
+        <p>End-of-match stats dump straight from the console. Weapon efficiency, damage, items, CTF stats, quad tracking, and player efficiency ratings.</p>
+      </div>
+
+      <div class="stats-console-wrap">
+        <div class="stats-console">
+          <div class="stats-console-bar">
+            <span class="stats-dot"></span>
+            <span class="stats-dot"></span>
+            <span class="stats-dot"></span>
+            <span class="stats-console-title">match statistics &mdash; ctf3m2 &mdash; 3v3 ctf match</span>
+          </div>
+          <div class="stats-console-tabs">
+            <button class="stats-tab active" data-panel="efficiency">Efficiency</button>
+            <button class="stats-tab" data-panel="weapons">Weapons</button>
+            <button class="stats-tab" data-panel="kills">Kills &amp; Damage</button>
+            <button class="stats-tab" data-panel="quad">Quad Stats</button>
+            <button class="stats-tab" data-panel="ctf">CTF</button>
+            <button class="stats-tab" data-panel="items">Items</button>
+            <button class="stats-tab" data-panel="per">PER</button>
+          </div>
+          <div class="stats-console-body">
+
+            <!-- Efficiency -->
+            <pre class="stats-panel active" id="panel-efficiency">
+match statistics
+
+map: ctf3m2
+09-07-2025 20:14
+CRMod 7 - denver.quakeone.com
+
+<span class="s-header">efficiency</span>
+
+   team  |kill |weapn|     name
+---------+-----+-----+------------------
+   <span class="s-red">red</span>   | <span class="s-hl">34</span>  |  26 | omicron
+   <span class="s-red">red</span>   | <span class="s-hl">19</span>  |  25 | baker
+   <span class="s-red">red</span>   | <span class="s-hl">17</span>  |  23 | deepfriednewbie
+         |     |     |
+   <span class="s-blue">blue</span>  |  <span class="s-hl">4</span>  |  14 | ..
+   <span class="s-blue">blue</span>  | <span class="s-hl">24</span>  |  28 | frenzy
+   <span class="s-blue">blue</span>  | <span class="s-hl">35</span>  |  29 | woods</pre>
+
+            <!-- Weapons -->
+            <pre class="stats-panel" id="panel-weapons">
+<span class="s-header">weapon efficiency</span>
+
+bul|nls|rox| lg|total|fpm |     name
+---+---+---+---+-----+----+------------------
+ 29| 16| <span class="s-hl">36</span>| 23|  26 | 1.7| omicron
+ 19|  0| <span class="s-hl">34</span>| 18|  25 | 0.9| baker
+ 21| 21| <span class="s-hl">27</span>| 20|  23 | 0.8| deepfriednewbie
+   |   |   |   |     |    |
+  0|  0| <span class="s-hl">26</span>| 11|  14 | 0.2| ..
+ 29| 20| <span class="s-hl">33</span>| 20|  28 | 1.2| frenzy
+ 25| 11| <span class="s-hl">38</span>| 22|  29 | 1.7| woods</pre>
+
+            <!-- Kills -->
+            <pre class="stats-panel" id="panel-kills">
+<span class="s-header">kill statistics</span>
+
+frags|opp|avng|slf|tm |kld| dc|  dtk  |  dgv  |  ewp  |     name
+-----+---+----+---+---+---+---+-------+-------+-------+------------------
+  106| 34|   0|  0|  0| 20|  0| <span class="s-gold">7868</span>  |<span class="s-gold">10873</span>  | 7817  | omicron
+  105| 19|   0|  4|  0| 19|  0| <span class="s-gold">6813</span>  | 5424  | 3098  | baker
+   87| 17|   0|  1|  0| 24|  0|  5430 | 6047  | 4103  | deepfriednewbie
+     |   |    |   |   |   |   |       |       |       |
+  114|  4|   0|  3|  0| 31|  0|  6555 | 1585  | 1135  | ..
+  169| 24|   0|  4|  0| 26|  0| <span class="s-gold">8371</span>  | <span class="s-gold">9085</span>  | 7029  | frenzy
+  221| 35|   0|  4|  0| 13|  0| <span class="s-gold">7418</span>  | <span class="s-gold">9441</span>  | 6177  | woods</pre>
+
+            <!-- Quad -->
+            <pre class="stats-panel" id="panel-quad">
+<span class="s-header">quad damage</span>
+
+quads| time|eff|opp|slf|tm |     name
+-----+-----+---+---+---+---+------------------
+    7|  210| 16| 12|  0|  0| omicron
+    2|   30| 29|  2|  0|  0| baker
+    1|   30|  8|  1|  0|  0| deepfriednewbie
+     |     |   |   |   |   |  <span class="s-red">red</span>  10 quads
+     |     |   |   |   |   |
+    1|    0|  0|  1|  1|  0| ..
+    3|   60| 26|  5|  0|  0| frenzy
+    6|   90| 17| 11|  1|  0| woods
+     |     |   |   |   |   |  <span class="s-blue">blue</span>  10 quads</pre>
+
+            <!-- CTF -->
+            <pre class="stats-panel" id="panel-ctf">
+<span class="s-header">capture the flag</span>
+
+flag |  time  |cap|  best  |def|rtn|fcd|fca|fck|     name
+-----+--------+---+--------+---+---+---+---+---+------------------
+    8|  <span class="s-dim">8:31</span>  |  0|  <span class="s-dim">---</span>   |  1|  6|  4|  2|  3| omicron
+   10|  <span class="s-dim">3:42</span>  |  <span class="s-hl">4</span>|  <span class="s-gold">0:10</span>  |  0|  7|  2|  3|  7| baker
+    7|  <span class="s-dim">2:50</span>  |  <span class="s-hl">1</span>|  <span class="s-gold">0:13</span>  |  0|  2|  3|  2|  3| deepfriednewbie
+     |        |   |        |   |   |   |   |   |
+    4|  <span class="s-dim">1:03</span>  |  0|  <span class="s-dim">---</span>   |  0|  1|  0|  0|  1| ..
+   10|  <span class="s-dim">4:33</span>  |  <span class="s-hl">3</span>|  <span class="s-gold">0:15</span>  |  1|  4|  1|  4|  6| frenzy
+   15| <span class="s-dim">10:23</span>  |  <span class="s-hl">8</span>|  <span class="s-gold">0:09</span>  |  0| 11|  0|  6| 11| woods
+
+ctf3m2 match capture-time record: <span class="s-gold">0:09</span> by woods
+ctf3m2 trial capture-time record: <span class="s-gold">0:08</span> by unspoken</pre>
+
+            <!-- Items -->
+            <pre class="stats-panel" id="panel-items">
+<span class="s-header">items taken</span>
+
+hlth|mega|suit| GA| YA| RA|bkpk|     name
+----+----+----+---+---+---+----+------------------
+  88|   3|   0|  4| 12| <span class="s-hl">20</span>|  41| omicron
+  59|   0|   0|  5| 16| <span class="s-hl">14</span>|  26| baker
+  55|   4|   0|  5| 17|  <span class="s-hl">6</span>|  22| deepfriednewbie
+    |    |    |   |   |   |    |
+  20|   1|   0|  3| 15|  <span class="s-hl">1</span>|   5| ..
+  58|  12|   0|  2|  8| <span class="s-hl">14</span>|  27| frenzy
+  60|  14|   0|  3| 20| <span class="s-hl">25</span>|  26| woods
+
+<span class="s-header">weapons taken             ammo taken</span>
+
+ssg| ng|sng| gl| rl| lg|shl|nls|rox|cls|     name
+---+---+---+---+---+---+---+---+---+---+------------------
+ 15|  7|  3| 13|  5| 10| 78| 19| 33| 39| omicron
+  6| 10|  2|  8| 10| 18| 28|  9| 24| 41| baker
+  8| 11|  5|  8| 15|  9| 35| 12| 48| 15| deepfriednewbie
+   |   |   |   |   |   |   |   |   |   |
+  1| 10|  5| 10| 11|  6| 16| 10| 27| 13| ..
+  5|  9|  9|  3| 15|  8| 10| 20| 68| 12| frenzy
+ 12| 14|  2| 16|  8| 14| 44| 10| 28| 28| woods</pre>
+
+            <!-- PER -->
+            <pre class="stats-panel" id="panel-per">
+<span class="s-header">player efficiency rating (PER)</span>
+
+  PER   |     name
+--------+------------------
+  <span class="s-gold">7.8</span>   | omicron
+  <span class="s-gold">7.1</span>   | woods
+   3.3   | frenzy
+   2.8   | baker
+   1.5   | deepfriednewbie
+  <span class="s-dim">-1.1</span>   | ..
+
+  woods: 8 captures, 38% rockets, 25 RA
+
+<span class="s-header">team scores</span>
+
+   <span class="s-red">Red team</span>    won: 5   lost: 11
+   <span class="s-blue">Blue team</span>   won: 11  lost: 5</pre>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Play Now -->
+  <section class="section section-alt" id="play">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Play Now</span>
+        <h2>Join a Server</h2>
+        <p>Once you know the mode stack and the match tooling, the next step is simple: pick a server, grab a record page, and get into the rotation.</p>
+      </div>
+
+      <div class="play-grid">
+        <div class="server-card" data-server-address="la.quakeone.com" data-server-port="26000">
+          <div class="server-status"></div>
+          <div class="server-info">
+            <h4>la.quakeone.com</h4>
+            <span class="server-region">Los Angeles</span>
+            <span class="server-state">Checking status</span>
+          </div>
+        </div>
+        <div class="server-card" data-server-address="denver.quakeone.com" data-server-port="26000">
+          <div class="server-status"></div>
+          <div class="server-info">
+            <h4>denver.quakeone.com</h4>
+            <span class="server-region">Denver</span>
+            <span class="server-state">Checking status</span>
+          </div>
+        </div>
+        <div class="server-card" data-server-address="dallas.quakeone.com" data-server-port="26000">
+          <div class="server-status"></div>
+          <div class="server-info">
+            <h4>dallas.quakeone.com</h4>
+            <span class="server-region">Dallas</span>
+            <span class="server-state">Checking status</span>
+          </div>
+        </div>
+        <div class="server-card" data-server-address="ohio.quakeone.com" data-server-port="26003">
+          <div class="server-status"></div>
+          <div class="server-info">
+            <h4>ohio.quakeone.com:26003</h4>
+            <span class="server-region">Ohio</span>
+            <span class="server-state">Checking status</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="play-links">
+        <a href="https://servers.quakeone.com/" class="play-link" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="1.5"/><path d="M3.6 9h16.8M3.6 15h16.8" stroke="currentColor" stroke-width="1.5"/><path d="M12 3a15 15 0 0 1 4 9 15 15 0 0 1-4 9 15 15 0 0 1-4-9 15 15 0 0 1 4-9z" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>
+            <strong>Server Browser</strong>
+            <em>servers.quakeone.com &mdash; browse all NetQuake servers</em>
+          </span>
+          <svg class="play-link-arrow" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a href="captimes/" class="play-link">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>
+            <strong>CTF Capture Times</strong>
+            <em>captimes/ &mdash; live leaderboard from all servers</em>
+          </span>
+          <svg class="play-link-arrow" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a href="https://docs.google.com/spreadsheets/d/1ClswtB2X8vMd34b-0QNiE8b1l7IDoanAHgC2gs-zLxE/edit?gid=1461642282#gid=1461642282" class="play-link" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M4 9h16M4 14h16M9 4v16" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>
+            <strong>Captimes Spreadsheet</strong>
+            <em>Raw Google Sheets data &mdash; full history of every capture time record</em>
+          </span>
+          <svg class="play-link-arrow" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modern Integrations -->
+  <section class="section" id="modern">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Integrations</span>
+        <h2>Classic Game, Modern Stack</h2>
+        <p>CRMod7 keeps the gameplay old-school and lets the surrounding tooling be modern: webhooks, JSON, Sheets, CSQC HUDs, and wide client compatibility.</p>
+      </div>
+
+      <div class="integrations-grid">
+        <div class="integration-card">
+          <div class="integration-header">
+            <div class="integration-icon">
+              <svg viewBox="0 0 32 32" fill="none"><rect x="4" y="4" width="24" height="24" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 10h24M10 10v18M4 17h24" stroke="currentColor" stroke-width="1.5"/></svg>
+            </div>
+            <h3>Google Sheets</h3>
+          </div>
+          <p>Async HTTP-based capture time records pushed directly to Google Sheets. Persistent leaderboards, queryable history, zero external tooling required.</p>
+        </div>
+
+        <div class="integration-card">
+          <div class="integration-header">
+            <div class="integration-icon">
+              <svg viewBox="0 0 32 32" fill="none"><path d="M6 8h20v16H6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 14h4M10 18h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <h3>JSON Export</h3>
+          </div>
+          <p>Streaming JSON builder with pretty-printing. Match data, last scores, and stats exported to machine-readable format for external tools and dashboards.</p>
+        </div>
+
+        <div class="integration-card">
+          <div class="integration-header">
+            <div class="integration-icon">
+              <svg viewBox="0 0 32 32" fill="none"><path d="M8 8l8 8-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 24h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <h3>Discord Webhooks</h3>
+          </div>
+          <p>HTTP POST callbacks for match statistics. Post-game results pushed to Discord channels automatically &mdash; scores, stats, and records.</p>
+        </div>
+
+        <div class="integration-card">
+          <div class="integration-header">
+            <div class="integration-icon">
+              <svg viewBox="0 0 32 32" fill="none"><rect x="6" y="4" width="20" height="24" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M12 10h8M12 14h8M12 18h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <h3>CSQC HUD &amp; Scoreboard</h3>
+          </div>
+          <p>Client-side QuakeC for custom HUD rendering (vanilla, QW, N64 styles), dynamic scoreboards with team colors, and match timer display. Requires <a href="https://qssm.quakeone.com" target="_blank" rel="noopener" class="feature-link">QSS-M</a> for full CSQC support.</p>
+        </div>
+      </div>
+
+      <div class="compat-block">
+        <h3>Client Compatibility</h3>
+        <p>CRMod7 is built for maximum feature support with <a href="https://qssm.quakeone.com" target="_blank" rel="noopener" class="feature-link">QSS-M</a> &mdash; the recommended NetQuake client, with CSQC, HTTP downloads, and modern protocol extensions. Legacy clients are fully supported too: <a href="https://quakeone.com/qrack" target="_blank" rel="noopener" class="feature-link">Qrack</a>, ProQuake, and any standard NetQuake client can connect and play with full gameplay functionality. Advanced features like custom HUDs and scoreboards gracefully degrade for older clients.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Commands -->
+  <section class="section section-alt" id="commands">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Reference</span>
+        <h2>Command Reference</h2>
+        <p>This is essential once you're playing, but it's still reference material. Keeping it collapsed makes the top-level page easier to scan while leaving the full in-game command surface one click away.</p>
+      </div>
+      <details class="reference-panel" open>
+        <summary class="reference-summary">
+          <span class="reference-summary-title">Command Reference</span>
+          <span class="reference-summary-copy">Aliases, argument rules, built-in help pages, observer tools, and admin controls</span>
+        </summary>
+
+        <div class="reference-body">
+          <!-- Command filter tabs -->
+          <div class="cmd-tabs">
+            <button class="cmd-tab active" data-filter="all">All</button>
+            <button class="cmd-tab" data-filter="game">Game Modes</button>
+            <button class="cmd-tab" data-filter="vote">Voting</button>
+            <button class="cmd-tab" data-filter="info">Info &amp; Stats</button>
+            <button class="cmd-tab" data-filter="match">Match &amp; Player</button>
+            <button class="cmd-tab" data-filter="observer">Observer</button>
+            <button class="cmd-tab" data-filter="admin">Admin</button>
+          </div>
+
+          <div class="cmd-grid" id="cmdGrid">
+
+        <!-- Game Mode Commands -->
+        <div class="cmd-row" data-cat="game">
+          <code>cmd dm <span class="cmd-arg">[mode] [map]</span></code>
+          <span>Switch to Deathmatch</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd ffa <span class="cmd-arg">[map]</span></code>
+          <span>Shortcut for public free-for-all Deathmatch</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd ctf <span class="cmd-arg">[mode] [map]</span></code>
+          <span>Switch to Capture the Flag</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd ca <span class="cmd-arg">[map]</span></code>
+          <span>Switch to Clan Arena</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd ra <span class="cmd-arg">[map]</span></code>
+          <span>Switch to Rocket Arena</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd dmm4 <span class="cmd-arg">[map]</span></code>
+          <span>Switch to Duel (1v1 DMM4)</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd airshot <span class="cmd-arg">[map]</span></code>
+          <span>Switch to Airshot Arena</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd wipeout <span class="cmd-arg">[map]</span></code>
+          <span>Switch to Wipeout</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd ctfdmm4 <span class="cmd-arg">[map]</span></code>
+          <span>Switch to CTF Duel</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd normal <span class="cmd-arg">[map]</span></code>
+          <span>Change to normal (public/pickup) play mode</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd practice <span class="cmd-arg">[map]</span></code>
+          <span>Change to practice play mode</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>cmd match <span class="cmd-arg">[map]</span></code>
+          <span>Change to competitive match play mode</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code>warp</code>
+          <span>Open the map selection menu</span>
+        </div>
+        <div class="cmd-row" data-cat="game">
+          <code><span class="cmd-arg">&lt;mapname&gt;</span></code>
+          <span>Warp directly to any map in the map list (e.g. <code class="cmd-example">dm6</code>, <code class="cmd-example">ctf1</code>)</span>
+        </div>
+
+        <!-- Voting Commands -->
+        <div class="cmd-row" data-cat="vote">
+          <code>yes</code>
+          <span>Vote yes on the current vote</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>no</code>
+          <span>Vote no on the current vote</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>sethook</code>
+          <span>Vote to toggle grappling hook</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>setrunes</code>
+          <span>Vote to toggle runes</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>setquad</code>
+          <span>Vote to toggle Quad Damage</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>setpent</code>
+          <span>Vote to toggle Pentagram of Protection</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>setring</code>
+          <span>Vote to toggle Ring of Invisibility</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>nogibs</code>
+          <span>Vote for no gibs</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>lowgibs</code>
+          <span>Vote for low gib level</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>highgibs</code>
+          <span>Vote for high gib level</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>weaponstay</code>
+          <span>Vote to toggle weapon stay</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>powerupdrop</code>
+          <span>Vote to enable/disable powerup dropping <span class="cmd-alias">alias: pudrop</span></span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>cmd timeset <span class="cmd-arg">[min]</span></code>
+          <span>Vote to set the timelimit (opens menu if no value given)</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>cmd fraglimit <span class="cmd-arg">[val]</span></code>
+          <span>Show rules, or vote to set the fraglimit</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>otset</code>
+          <span>Vote for overtime settings</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>altents</code>
+          <span>Vote to toggle alternative entity set</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>prediction</code>
+          <span>Vote to toggle movement prediction</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>faststart</code>
+          <span>Vote to toggle fast match starts</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>autopause</code>
+          <span>Vote to toggle auto-pause on disconnect</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>obits</code>
+          <span>Vote to toggle extended obituaries</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>abortmatch</code>
+          <span>Vote to abort the current match</span>
+        </div>
+        <div class="cmd-row" data-cat="vote">
+          <code>nextmap</code>
+          <span>Vote to advance to the next level in <code class="cmd-example">levels.cfg</code> (non-match public modes only)</span>
+        </div>
+
+        <!-- Info & Stats Commands -->
+        <div class="cmd-row" data-cat="info">
+          <code>stats</code>
+          <span>Show full match stats dump</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>efficiency</code>
+          <span>Show weapon efficiency summary <span class="cmd-alias">alias: eff</span></span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>killstats</code>
+          <span>Show kills, deaths, and damage breakdown</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>quadstats</code>
+          <span>Show Quad Damage pickup and kill stats</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>pentstats</code>
+          <span>Show Pentagram stats</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>badstats</code>
+          <span>Show self-kills, teamkills, lava/fall deaths</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>flagstats</code>
+          <span>Show CTF flag captures, returns, defenses</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>teamstats</code>
+          <span>Show team win/loss totals</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>wtstats</code>
+          <span>Show weapons-taken statistics</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>itstats</code>
+          <span>Show items-taken statistics</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>dstats</code>
+          <span>Show defense statistics</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>ticrate</code>
+          <span>Show the current server tickrate / <code class="cmd-example">sys_ticrate</code> value</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>autostats</code>
+          <span>Toggle automatic stats dump at end of match</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>cmd captimes <span class="cmd-arg">[map]</span></code>
+          <span>Show capture time records (defaults to current map)</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>cmd highscores <span class="cmd-arg">[map]</span></code>
+          <span>Show high scores / arena records</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>lastscores</code>
+          <span>Show scores from the previous match</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>last</code>
+          <span>Show last player disconnects</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>score</code>
+          <span>Show current match score</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>rules</code>
+          <span>Show current server rules <span class="cmd-alias">aliases: teamplay, deathmatch, timelimit, fraglimit, noexit</span></span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>levels</code>
+          <span>Show map rotation list</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>commands</code>
+          <span>Show available commands in-game</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>vinfo</code>
+          <span>Show server version / mod information</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>cmd flagstatus <span class="cmd-arg">[on|off|toggle]</span></code>
+          <span>Report or toggle the CTF flag-status HUD display</span>
+        </div>
+        <div class="cmd-row" data-cat="info">
+          <code>motd</code>
+          <span>Show the message of the day</span>
+        </div>
+
+        <!-- Match / Player Commands -->
+        <div class="cmd-row" data-cat="match">
+          <code>ready</code>
+          <span>Mark yourself as ready for match start</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>notready</code>
+          <span>Unmark yourself as ready</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>ready?</code>
+          <span>Check who is and isn't ready</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>timerstop</code>
+          <span>Pause the match timer</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>timerstart</code>
+          <span>Resume the match timer</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>force</code>
+          <span>In arena modes, vote or admin-force the waiting match to start</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>lock</code>
+          <span>Lock your team (prevent joins)</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>unlock</code>
+          <span>Unlock your team</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>ghost</code>
+          <span>Reconnect using your ghost code</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>ghostcode</code>
+          <span>Display your current ghost code</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>ghostlist</code>
+          <span>Show ghost reconnect codes currently visible to you</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>red</code>
+          <span>Join red team and ready up</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>blue</code>
+          <span>Join blue team and ready up</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>leavemealone</code>
+          <span>Toggle intangibility during pre-match warmup</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>qwsucks</code>
+          <span>Toggle QuakeTag (QWSucks) mode <span class="cmd-alias">alias: quaketag</span></span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>q14ever</code>
+          <span>Toggle QuakeTag (Q14Ever) overlay variant</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>afkon</code>
+          <span>Mark yourself as AFK <span class="cmd-alias">alias: afk</span></span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>afkoff</code>
+          <span>Remove AFK status</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>hook</code>
+          <span>Fire the grappling hook <span class="cmd-alias">also: +hook / -hook</span></span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>dropweapon</code>
+          <span>Drop your current weapon (CTF only)</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>dropammo</code>
+          <span>Drop ammo for your current weapon (CTF only)</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>droprune</code>
+          <span>Drop your held rune</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>rpickup</code>
+          <span>Vote/admin reshuffle committed teams before a team-mode match starts</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>autoweapon</code>
+          <span>Toggle automatic weapon switching <span class="cmd-alias">alias: aw</span></span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>pos_save</code>
+          <span>Save your current position (prewar only)</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>pos_move</code>
+          <span>Teleport to your saved position (prewar only)</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>pos_show</code>
+          <span>Display saved position coordinates</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>cmd pos_origin <span class="cmd-arg">x y z</span></code>
+          <span>Set position origin (* to keep current axis)</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>cmd pos_angles <span class="cmd-arg">p y r</span></code>
+          <span>Set position angles (* to keep current)</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>shownick</code>
+          <span>Show target player's nickname (teamplay)</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>cmd ignore</code>
+          <span>Add a player to your ignore list</span>
+        </div>
+        <div class="cmd-row" data-cat="match">
+          <code>cmd unignore</code>
+          <span>Remove a player from your ignore list</span>
+        </div>
+
+        <!-- Observer Commands -->
+        <div class="cmd-row" data-cat="observer">
+          <code>observer</code>
+          <span>Enter observer (spectator) mode</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>walk</code>
+          <span>Walk-mode spectating</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>flyme</code>
+          <span>Fly-mode spectating</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>chase</code>
+          <span>Chase-cam spectating <span class="cmd-alias">alias: chasecam</span></span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>cmd eyecam <span class="cmd-arg">[n]</span></code>
+          <span>First-person eye-camera spectating</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>camera</code>
+          <span>Cycle through fixed camera positions</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>autocam</code>
+          <span>Automatic camera mode <span class="cmd-alias">aliases: autocamera, quaketv</span></span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>autochase</code>
+          <span>Auto-chase mode (follows action)</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>autopov</code>
+          <span>Automatic point-of-view mode</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>rockets</code>
+          <span>List which players currently hold rocket launchers during a live team match</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>commentary</code>
+          <span>Toggle commentary mode for broadcasters</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>headsup</code>
+          <span>Toggle heads-up display for observers</span>
+        </div>
+        <div class="cmd-row" data-cat="observer">
+          <code>tourney</code>
+          <span>Tournament spectator mode</span>
+        </div>
+
+        <!-- Admin Commands -->
+        <div class="cmd-row" data-cat="admin">
+          <code>cmd admin <span class="cmd-arg">[code]</span></code>
+          <span>Authenticate as admin with 4-7 digit passcode</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>cmd lockdown <span class="cmd-arg">[sub]</span></code>
+          <span>IP-based lockdown: status, list, add, remove, on, off</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>kick!</code>
+          <span>Kick a player <span class="cmd-alias">aliases: skick, crkick</span></span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>crban</code>
+          <span>Ban a player</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>unban</code>
+          <span>Unban a player</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>bans</code>
+          <span>Show current ban list</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>ips</code>
+          <span>Show connected player IPs</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>dmset</code>
+          <span>Set deathmatch mode</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>maxteams</code>
+          <span>Set max teams</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>safepractice</code>
+          <span>Toggle safe practice mode</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>modevote</code>
+          <span>Toggle mode voting</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>options</code>
+          <span>Open server options menu</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>autoss</code>
+          <span>Force screenshot capture for anti-cheat checks</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>nextspawn</code>
+          <span>Cycle to next spawn point</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>makespawn</code>
+          <span>Create spawn point at current position</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>nextcam</code>
+          <span>Cycle to next camera position</span>
+        </div>
+        <div class="cmd-row" data-cat="admin">
+          <code>makecam</code>
+          <span>Create camera at current position</span>
+        </div>
+
+          </div>
+          <div class="cmd-notes">
+            <p class="cmd-note">Built-in help pages are also shipped as commands: <code>help-server</code>, <code>help-observer</code>, <code>help-match</code>, <code>help-stats</code>, <code>help-misc</code>, <code>help-camera</code>, <code>help-chase</code>, <code>help-fly</code>, <code>help-walk</code>; admins additionally get <code>help-admin</code>. The in-game category views <code>modes</code>, <code>gameplay</code>, <code>watch</code>, <code>stat</code>, <code>misc</code>, <code>modhelp</code>, and <code>shortcuts</code> are aliases too.</p>
+            <p class="cmd-note">Compatibility quirks in the current codebase: <code>pudrop</code> maps to <code>powerupdrop</code>, <code>quaketag</code> maps to <code>qwsucks</code>, <code>lastplayers</code> is still stuffed to clients but currently resolves to the same disconnect-log output as <code>last</code>, and <code>itemstats</code> exists as an alias name but does not have its own dedicated handler yet.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- Server Setup -->
+  <section class="section" id="setup">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">Server Setup</span>
+        <h2>Operator Reference</h2>
+        <p>Configs, admin controls, launch files, and runtime data all live here. It's operator-facing material, so it's collapsed by default instead of sitting in the middle of the showcase flow.</p>
+      </div>
+      <details class="reference-panel">
+        <summary class="reference-summary">
+          <span class="reference-summary-title">Open Server Setup</span>
+          <span class="reference-summary-copy">Admin controls, runtime configs, launch samples, and generated data formats</span>
+        </summary>
+
+        <div class="reference-body">
+          <div class="setup-stack">
+            <div class="setup-group">
+              <div class="setup-group-head">
+                <span class="section-tag">Operator Controls</span>
+                <p>These are the high-level operational features that sit above the raw config files.</p>
+              </div>
+
+              <div class="admin-grid">
+                <div class="admin-card">
+                  <h4>Lockdown Mode</h4>
+                  <p>IP-based connection whitelisting with duration timers. Lock the server for scrims, auto-release on match start.</p>
+                </div>
+                <div class="admin-card">
+                  <h4>Admin Authentication</h4>
+                  <p>Multi-password admin system with tiered access. Kick, ban, configure &mdash; all from within the game.</p>
+                </div>
+                <div class="admin-card">
+                  <h4>Spawn &amp; Camera Editing</h4>
+                  <p>Create and edit spawn points and camera positions in-game. Entity file export for map customization.</p>
+                </div>
+                <div class="admin-card">
+                  <h4>Custom Models &amp; Sounds</h4>
+                  <p>Per-entity custom models for heads, bodies, projectiles, and gibs. Mapper-settable sound effects for full map customization.</p>
+                </div>
+                <div class="admin-card">
+                  <h4>IP Management</h4>
+                  <p>Ban management, IP label tracking, IPv4/IPv6 normalization. Keep your server clean.</p>
+                </div>
+                <div class="admin-card">
+                  <h4>AFK &amp; Inactivity</h4>
+                  <p>Configurable AFK timeouts, auto-screenshots, movement validation, and spectator management.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="setup-group">
+              <div class="setup-group-head">
+                <span class="section-tag">Config &amp; Data Files</span>
+                <p>Runtime server configs live in <code>configs/</code>, packaged launch examples live in <code>release/</code>, generated state lands in <code>data/</code>, and the cleanest public deployment path is still a Linux VPS or dedicated host.</p>
+              </div>
+
+              <div class="cfg-grid">
+
+        <!-- Hosting & deployment -->
+        <div class="cfg-card cfg-card-wide">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 18h8M9 10h6M12 6v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <h3>Hosting &amp; Deployment</h3>
+              <span class="cfg-badge">Recommended</span>
+            </div>
+          </div>
+          <p class="cfg-desc">Best run on a dedicated Linux server for consistent uptime. CRMod7 can run on QSS-M Server for macOS, Windows, or Linux, and on FTEQW Server for Windows or Linux, but a Linux VPS is usually the cleanest public-hosting path.</p>
+          <div class="cfg-sections">
+            <div class="cfg-section-item">
+              <h5>Recommended Host Layout</h5>
+              <p>For public servers, use a VPS or dedicated box with a static IP, persistent storage, and a background process manager. QSS-M is the easiest deployment target because it listens on a single UDP game port, which keeps NAT and firewall setup simple.</p>
+              <ul class="cfg-list">
+                <li>Best fit: dedicated Linux server or Linux VPS for 24/7 uptime</li>
+                <li>Supported engines: QSS-M Server on macOS, Windows, Linux; FTEQW Server on Windows, Linux</li>
+                <li>Suggested approach: provision a VPS, open one UDP game port, upload the engine plus <code>id1/</code> content, then run it under <code>screen</code> or <code>systemd</code></li>
+                <li>Working reference: <a href="https://github.com/timbergeron/QSS-M-Server" target="_blank" rel="noopener" class="feature-link">QSS-M-Server</a> is an exact copy of a working server configuration directory</li>
+              </ul>
+            </div>
+            <div class="cfg-section-item">
+              <h5>Linux VPS Bootstrap</h5>
+              <p>A practical bootstrap flow is: provision a current Ubuntu LTS VPS, update the base system, install transfer and runtime packages, upload QSS-M, then run the server inside <code>screen</code>. Older notes that started on Ubuntu 16.04 and upgraded through later releases should be treated as legacy; start from a current supported LTS image instead.</p>
+              <pre class="cfg-code"><code>sudo apt update
+sudo apt upgrade -y
+sudo apt install -y vsftpd git curl screen build-essential \
+  libsdl2-2.0-0 libgl1-mesa-glx libopusfile0 libvorbisfile3 libmad0
+sudo timedatectl set-timezone America/Los_Angeles
+date
+
+# Upload the server package to /home/quake/qssm, then:
+chmod 755 QSS-M-l64
+screen -S qssm26001
+./QSS-M-l64 -dedicated -port 26001 -protocol 666 -condebug
+# detach: Ctrl+A, then D
+screen -r qssm26001</code></pre>
+            </div>
+            <div class="cfg-section-item">
+              <h5>CRMod Upload Flow</h5>
+              <p>After the base server is live, upload the mod payload into <code>id1/</code>: <code>progs.dat</code>, <code>server.cfg</code>, <code>configs/</code>, <code>maps/</code>, <code>sound/</code>, <code>locs/</code>, and any other custom assets you want available for client auto-downloads. In practice, <code>configs/</code> usually carries both the core files and map-specific overrides, <code>maps/</code> can include BSPs, per-map <code>.ent</code> files, and alternative-entity folders, and <code>sound/</code> often carries mode-specific or custom subfolders like match music, weapon audio, player sounds, ambience, and arena assets. Some deployments also keep map packs and content bundles as root-level <code>.pak</code> archives next to the unpacked folders. The mod uses <code>fteextensions.qc</code>, so older ProQuake builds are not a good server target.</p>
+              <pre class="cfg-code"><code>/home/quake/qssm/
+  QSS-M-l64
+  id1/
+    pak0.pak
+    pak1.pak
+    ctf3maps.pak
+    ctf4maps.pak
+    ctfgoldmaps.pak
+    ctflocmaps.pak
+    raexpo.pak
+    ramaps.pak
+    progs.dat
+    server.cfg
+    progs/
+    configs/
+      clanring.cfg
+      warp.cfg
+      warp_main_menu.cfg
+      levels.cfg
+      dm3.cfg
+      ultrav.cfg
+    maps/
+      dm6.bsp
+      dm6.ent
+      ctf1war.ent
+      dm_alt/
+      ctf_alt/
+      ctf/
+    sound/
+      matchsounds/
+        int001.wav
+      weapons/
+      player/
+      misc/
+      plasma/
+      ra/
+      doors/
+      fire/
+      ambience/
+    locs/
+    data/</code></pre>
+            </div>
+            <div class="cfg-section-item">
+              <h5>Network Notes</h5>
+              <p>QSS-M is the recommended public-hosting target because it only needs the single UDP game port forwarded, and it should generally be run in protocol 666 for Qrack compatibility. CRMod7 also depends on <code>fteextensions.qc</code>, which is not supported by older ProQuake versions. Older ProQuake-style server setups can require additional ephemeral UDP ports, which makes them less friendly behind NAT or restrictive firewalls.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- clanring.cfg -->
+        <div class="cfg-card cfg-card-wide">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>clanring.cfg</h3>
+              <span class="cfg-badge">Primary Config</span>
+            </div>
+          </div>
+          <p class="cfg-desc">The main server configuration file. Controls global settings, admin passwords, mode-specific rules, and external integrations.</p>
+          <div class="cfg-sections">
+            <div class="cfg-section-item">
+              <h5>Global Commands</h5>
+              <p>Executed every time the server starts a new level. Set admin passwords, powerup defaults, tick rates, and webhook URLs here.</p>
+              <pre class="cfg-code"><code>setadmin 1234567          // Main admin passcode (4-7 digits, first non-zero)
+setadmin1 9876543         // Additional admin passcode (up to 9)
+noexit 1                  // Prevent level exit in normal/practice
+pausable 0                // Disable console pause (match pause still works)
+quadon                    // Quad Damage on by default
+ringoff                   // Ring of Invisibility off by default
+pentoff                   // Pentagram off by default
+runesoff                  // Runes off by default
+autopauseon               // Auto-pause match on player disconnect
+matchsoundson             // Enable end-of-match music
+ctfticrate 0.025          // Server update rate for CTF
+tdmticrate 0.025          // Server update rate for TDM
+captimesdiscordurl &lt;url&gt;  // Discord webhook for cap time records
+statsdiscordurl &lt;url&gt;     // Discord webhook for match stats
+matchposturl &lt;url&gt;        // HTTP POST endpoint for match data
+googlesheetsurl &lt;url&gt;     // Google Sheets script URL for captimes
+googlesheetsapikey &lt;key&gt;  // Google Sheets API key
+cr_allow_leavemealone 1   // Allow leave-me-alone in prewar
+cr_allow_qwsucks "1"      // Allow QuakeTag QWSucks mode
+cr_allow_q14ever "1"      // Allow QuakeTag Q14Ever mode</code></pre>
+            </div>
+            <div class="cfg-section-item">
+              <h5>Init Section</h5>
+              <p>Executed only once when the server first starts. Use for one-time setup.</p>
+              <pre class="cfg-code"><code>-init-
+modevoteon                // Enable mode voting
+setafk 5                  // Mark inactive players AFK after 5 minutes
+kickafk 0                 // AFK kick timeout (0 = disabled)</code></pre>
+            </div>
+            <div class="cfg-section-item">
+              <h5>Mode Sections</h5>
+              <p>Each mode section executes its commands when the server enters that mode on a new level.</p>
+              <pre class="cfg-code"><code>-ffa-                     // Free For All settings
+timelimit 10
+fraglimit 40
+deathmatch 3              // 3 = weapon stay on
+powerupdropon
+
+-pub-ctf-                 // Public CTF settings
+timelimit 10
+fraglimit 100
+runeson
+deathmatch 1              // 1 = weapon stay off
+
+-practice-                // Practice mode
+safepracticeon
+timelimit 0               // 0 = no limit
+fraglimit 0
+
+-match-tdm-               // Team Deathmatch match settings
+teamplay 2                // 2 = team damage on
+timelimit 20
+setovertime 5
+deathmatch 3
+
+-match-ctf-               // CTF match settings
+timelimit 20
+setovertime 5
+pentoff
+deathmatch 1
+
+-done-                    // Finalize and apply collected cvar changes</code></pre>
+            </div>
+            <div class="cfg-section-item">
+              <h5>Parser &amp; Extra Commands</h5>
+              <p>The parser accepts regular Quake cvars, custom CRMod commands, and generic <code>set</code>/<code>seta</code> lines. These are also valid in map-specific overrides.</p>
+              <pre class="cfg-code"><code>set hostname "CRMod 7 - local"   // Generic cvar passthrough
+seta sv_demoAutoRecord 1         // FTE/QSS engine cvar passthrough
+setadmin2 2468101                // Extra admin codes up to setadmin9
+ringauto                         // Return ring handling to automatic mode logic
+allvoteoff                       // Disable all player voting globally
+powerupdropoff                   // Disable Quad/Ring/Suit dropping
+matchsoundsoff                   // Disable intermission music
+safedischargeon                  // Legacy alias for safe discharge rules
+tossruneoff                      // Prevent players from throwing runes
+cr_allow_leavemealone 0          // Disable leave-me-alone entirely
+cr_allow_qwsucks 0               // Disable QuakeTag QWSucks mode
+cr_allow_q14ever 0               // Disable QuakeTag Q14Ever mode</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map-specific configs -->
+        <div class="cfg-card">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>&lt;mapname&gt;.cfg</h3>
+              <span class="cfg-badge">Per-Map Overrides</span>
+            </div>
+          </div>
+          <p class="cfg-desc">Override mode settings for specific maps. The file name matches the map's BSP name. Only the mode sections you include are overridden.</p>
+          <pre class="cfg-code"><code>// dm3.cfg - overrides for The Abandoned Base
+-match-tdm-
+deathmatch 1              // No weapon stay for dm3
+penton                    // Enable Pent
+ringon                    // Enable Ring
+timelimit 20
+
+// ultrav.cfg - minimal override
+-match-tdm-
+deathmatch 1              // No weapon stay for ultrav</code></pre>
+        </div>
+
+        <!-- warp.cfg -->
+        <div class="cfg-card">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>warp.cfg</h3>
+              <span class="cfg-badge">Map Menu</span>
+            </div>
+          </div>
+          <p class="cfg-desc">Defines the in-game warp/map selection menu. Maps are grouped into categories separated by <code>****</code>. Max 30 maps per category, 50 categories total (1500 maps).</p>
+          <pre class="cfg-code"><code>// Each map entry is 3 lines:
+dm3                       // BSP filename (no extension)
+The Abandoned Base        // Display title
+John Romero               // Author (blank line if unknown)
+
+****                      // Category separator
+
+ctf1                      // Next category starts
+McKinley Base
+Dave "Zoid" Kirsch</code></pre>
+        </div>
+
+        <!-- warp_main_menu.cfg -->
+        <div class="cfg-card">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>warp_main_menu.cfg</h3>
+              <span class="cfg-badge">Menu Labels</span>
+            </div>
+          </div>
+          <p class="cfg-desc">Names for each category tab in the warp menu. One line per category, matching the order in warp.cfg. Current code limit: 50 category labels.</p>
+          <pre class="cfg-code"><code>e1m1-e4m8
+id deathmatch arenas
+threewave ctf         (ctf1-ctf2m8)
+league of capture     (ctf3m1-ctf3m9)
+ctf gold              (ctfgold1-ctfgold8)
+ctf revival           (rctf1-rctf5)
+ctf custom maps
+dm custom maps 1
+rocket arena maps 1
+dmm4 arenas
+holiday themed
+training</code></pre>
+        </div>
+
+        <!-- levels.cfg -->
+        <div class="cfg-card">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>levels.cfg</h3>
+              <span class="cfg-badge">Map Rotation</span>
+            </div>
+          </div>
+          <p class="cfg-desc">Automatic map rotation for each game mode. Maps cycle sequentially and loop back to the start. The current implementation stores up to 199 rotation entries per mode section.</p>
+          <pre class="cfg-code"><code>-ctf-                     // CTF rotation
+e1m1
+e1m3
+e2m2
+e4m3
+-dm-                      // Deathmatch rotation
+aerowalk
+ztndm3
+ultrav
+dm6
+dm2
+-ca-                      // Clan Arena rotation
+dm3
+ztndm3
+ultrav
+-ra-                      // Rocket Arena rotation
+23ar-a
+2pyramid
+2towers</code></pre>
+        </div>
+
+        <!-- matchsounds.cfg -->
+        <div class="cfg-card">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>matchsounds*.cfg</h3>
+              <span class="cfg-badge">Audio</span>
+            </div>
+          </div>
+          <p class="cfg-desc">End-of-match music that plays during the map vote screen. Three variants based on game outcome.</p>
+          <pre class="cfg-code"><code>// matchsounds.cfg - standard (max 20 tracks)
+matchsounds/int001.wav
+matchsounds/int002.wav
+
+// matchsounds_blowout.cfg
+// Plays if score diff > 200 (CTF) or > 40 (other)
+matchsounds/blowout.wav
+
+// matchsounds_rematch.cfg
+// Plays if score diff < 50 (CTF) or < 10 (other)
+matchsounds/rematch.wav</code></pre>
+        </div>
+
+        <!-- release configs -->
+        <div class="cfg-card">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>release/*.cfg</h3>
+              <span class="cfg-badge">Launch Samples</span>
+            </div>
+          </div>
+          <p class="cfg-desc">The <code>release/</code> folder carries deployable examples: a startup <code>autoexec.cfg</code>, an engine-level <code>fte.cfg</code>, and a mirrored <code>release/configs/</code> tree for packaging a ready-to-run server.</p>
+          <pre class="cfg-code"><code>// release/autoexec.cfg
+samelevel 2               // Boot in match rules
+teamplay 2
+sv_aim 2
+sys_ticrate 0.05
+map dm3
+
+// release/fte.cfg (selected server-facing cvars)
+hostname "localhost"
+sv_port "27500 26000"
+rcon_password ""
+sv_demoDir "demos"
+sv_demoAutoRecord "0"
+sv_loadentfiles "1"
+sv_progs "progs.dat"</code></pre>
+        </div>
+
+        <!-- Data files -->
+        <div class="cfg-card cfg-card-wide">
+          <div class="cfg-header">
+            <div class="cfg-file-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <h3>data/</h3>
+              <span class="cfg-badge">Runtime Data</span>
+            </div>
+          </div>
+          <p class="cfg-desc">Server-generated data files. These are written automatically &mdash; you don't edit them, but understanding the format is useful for external tools.</p>
+          <div class="cfg-sections">
+            <div class="cfg-section-item">
+              <h5>data/stats/*.crx &mdash; Capture Time Records</h5>
+              <p>Per-map capture time leaderboards. Trial records use <code>&lt;map&gt;_captimes.crx</code>, match records use <code>&lt;map&gt;_captimes_match.crx</code>. Each file stores the current top 3 records with team-color metadata and optional v2 record metadata.</p>
+              <pre class="cfg-code"><code>// ctf1_captimes.crx - trial records
+unspoken                  // Player name
+14                        // Team color (14=red, 5=blue, etc.)
+10.19873046875            // Capture time in seconds
+# meta v2 2026-01-09T07:12:53-0800  // Timestamp</code></pre>
+            </div>
+            <div class="cfg-section-item">
+              <h5>data/json/*.json &mdash; Match Results</h5>
+              <p>Full match stat exports in JSON. Includes per-player weapon efficiency, damage breakdown, item pickups, CTF stats, quad stats, and more. The same directory also carries snapshots like <code>lastscores.json</code>.</p>
+              <pre class="cfg-code"><code>{"match": {
+  "date": "2025-09-07 20:14:28",
+  "hostname": "CRMod 7 - denver.quakeone.com",
+  "map": "ctf3m2",
+  "gamemode": "ctf match",
+  "team size": 3,
+  "timelimit": 20,
+  "teams": [
+    { "name": "Red team", "players": [
+      { "name": "omicron", "score": 106, "kills": 34,
+        "rockets_eff": 36, "lightning_eff": 23,
+        "ctf": { "captures": 0, "returns": 6 }
+      } ...
+    ]}
+  ]
+}}</code></pre>
+            </div>
+            <div class="cfg-section-item">
+              <h5>data/stats/airshot_*.crx &mdash; Airshot Records</h5>
+              <p>Tracks airshot height records and gib streak records in the same .crx format. Used by the Airshot Arena mode.</p>
+            </div>
+            <div class="cfg-section-item">
+              <h5>data/disconnect_log.txt &mdash; Recent Disconnects</h5>
+              <p>Append-only disconnect history used by the in-game <code>last</code> command and related moderation workflows.</p>
+            </div>
+          </div>
+        </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- Legacy -->
+  <section class="section" id="legacy">
+    <div class="container">
+      <div class="legacy-content">
+        <span class="section-tag">Heritage</span>
+        <h2>From ClanRing to CRMod7</h2>
+        <p>CRMod7 is not just a straight CRMod successor. It pulls from two ClanRing lineages: <strong>CRMod++</strong> for match structure, admin flow, and competitive server tooling, and <strong>CRCTF</strong> for the ThreeWave-derived Capture the Flag branch that shaped its teamplay core. The result is a merged competitive stack carried forward with modern integrations, new modes, and open-source maintenance on <a href="https://github.com/quakeone/CRMod7" target="_blank" rel="noopener" class="feature-link">GitHub</a>.</p>
+        <div class="legacy-timeline">
+          <div class="timeline-item">
+            <span class="timeline-year">1996</span>
+            <span class="timeline-text">Quake released</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Oct 1996</span>
+            <span class="timeline-text">ThreeWave CTF establishes the baseline Capture the Flag lineage that later CRCTF servers build on</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Nov 27, 1997</span>
+            <span class="timeline-text">CRCTF 2.6 released with Expansion and All-Star map support plus a broad round of fixes</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Jan 21, 1998</span>
+            <span class="timeline-text">CRCTF 2.8D framed ClanRing CTF around both public skirmish play and clan match mode</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Mar 17, 1999</span>
+            <span class="timeline-text">CRMod 5.0 released after the Paul Baker-era CRMod 3.x/4.0 line was pushed forward by J.P. Grossman into the 4.1 and 5.x generation</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Dec 10, 1999</span>
+            <span class="timeline-text">CRMod++ 5.1 released by Mephistopheles with improved console logging and DeQuake support</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Feb 11, 2000</span>
+            <span class="timeline-text">CRMod++ 6.0 released with native ProQuake support and the first qccx-era feature wave</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">May 10, 2000</span>
+            <span class="timeline-text">CRMod++ 6.1 shipped as a fast stability update to fix a server-crash bug and match pause issues</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Apr 22, 2001</span>
+            <span class="timeline-text">CRMod v6.2 posted with per-level config files and expanded match workflow updates</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">May 26, 2002</span>
+            <span class="timeline-text">CRMod++ v6.3 available with vote-admin support and AFK detection</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">2002</span>
+            <span class="timeline-text">r00k used the Elohim and CRMod 5.x-era codebase to build CRCTF forward in parallel, adding ThreeWave CTF while tracking the competitive ClanRing feature set</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Apr 6, 2003</span>
+            <span class="timeline-text">CRMod++ v6.4 released with QuakeTag improvements and bug-fix cleanup</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Apr 2006</span>
+            <span class="timeline-text">CRCTF 3.0 rewrite line was active in deployment, marking a major modernization pass for match CTF</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">2000s</span>
+            <span class="timeline-text">Community adoption across NetQuake leagues and long-running public server use</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Apr 26, 2013</span>
+            <span class="timeline-text">CRMod++ v6.5 released with ratings work that continued through the 2013 maintenance updates</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">May 10, 2013</span>
+            <span class="timeline-text">CRCTF 3.5 beta represented continuing community maintenance on the CTF branch</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Mar 12, 2017</span>
+            <span class="timeline-text">Classic-era maintenance release with FFA ranking fixes and final cleanup</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">2017</span>
+            <span class="timeline-text">J.P. Grossman published the CRMod source on GitHub, r00k started development on CRMod7, and the project could restart from the cleaner 5.1 line without the old ProQuake and qccx lock-in for engines like FTE and DarkPlaces</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Feb 2022</span>
+            <span class="timeline-text">bucksh0t added Arena modes to CRMod7, expanding the modern ruleset beyond the original ClanRing branches</span>
+          </div>
+          <div class="timeline-item">
+            <span class="timeline-year">Now</span>
+            <span class="timeline-text">CRMod7 &mdash; open source, 7 modes, modern integrations, active development</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-logo">
+          <span class="logo-cr">CR</span><span class="logo-mod">Mod</span><span class="logo-7">7</span>
+        </div>
+        <div class="footer-links">
+          <a href="https://github.com/quakeone/CRMod7" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://servers.quakeone.com/" target="_blank" rel="noopener">Server Browser</a>
+          <a href="captimes/">Capture Times</a>
+          <a href="https://docs.google.com/spreadsheets/d/1ClswtB2X8vMd34b-0QNiE8b1l7IDoanAHgC2gs-zLxE/edit?gid=1461642282#gid=1461642282" target="_blank" rel="noopener">Captimes Sheet</a>
+        </div>
+        <p class="footer-text">Quake 1 Competition Server</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
