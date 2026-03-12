@@ -267,6 +267,9 @@ void () ban_kick_client;
 void (entity client) clanring_kick_player;
 void () modes_commands;
 void () hh_startup;
+void () hh_toss_head;
+void () hh_call_teammate;
+void () hh_auto_help_tip;
 void () gameplay_commands;
 void () watch_commands;
 void () stat_commands;
@@ -483,6 +486,7 @@ playmode: match, ffa, practice
 void () server_set_infokey_modes =
 {
     local string zmode = "", pmode = "";
+    hh_hud_enabled = 0;
 
     if (clanring_playmode & CLANRING_MATCH_MODE)
     {
@@ -540,7 +544,7 @@ void () server_set_infokey_modes =
     }
     else if (clanring_playmode & CLANRING_HH_MODE)
     {
-        pmode = "ffa";
+        pmode = teamplay ? "pug" : "ffa";
         zmode = "headhunters";
     }
     forceinfokey(world, "gametype", zmode);	//for json output; gamemode = gametype + playmode ("CTF PickUp", "CA Match", "TDM Practice")
@@ -743,7 +747,11 @@ void () clanring_init_world =
 
     utils_make_scheduled_event(clanring_find_powerups, 5);
 
-    if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
+    if (clanring_playmode & CLANRING_HH_MODE)
+    {
+        clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_NO_HOOK);
+    }
+    else if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
     {
         clanring_playmode |= CLANRING_NO_HOOK;// Set this for non ctf modes, so that when the hook is voted ON, we can check for this flag missing.
     }
@@ -988,6 +996,41 @@ void () clanring_set_warp_aliases =
 //  This is scheduled using a temporary entity; the client
 //  is stored in self.owner.
 //
+void () clanring_set_mode_aliases =
+{
+    if (clanring_playmode & CLANRING_HH_MODE)
+    {
+        stuffcmd(self, "alias hook impulse 22\n");
+        stuffcmd(self, "alias dropweapon impulse 24\n");
+        stuffcmd(self, "alias dropammo impulse 25\n");
+        stuffcmd(self, "alias rune-use echo rune-use is unavailable in Head Hunters.\n");
+        stuffcmd(self, "alias flagstatus echo flagstatus is unavailable in Head Hunters.\n");
+        stuffcmd(self, "alias passhead impulse 21\n");
+        stuffcmd(self, "alias tosshead impulse 21\n");
+        stuffcmd(self, "alias hhcall impulse 26\n");
+        stuffcmd(self, "alias callmate impulse 26\n");
+        stuffcmd(self, "alias hhhelp impulse 23\n");
+        stuffcmd(self, "alias headhelp impulse 23\n");
+        stuffcmd(self, "alias throwweapon impulse 24\n");
+        stuffcmd(self, "alias throwammo impulse 25\n");
+    }
+    else
+    {
+        stuffcmd(self, "alias hook impulse 22\n");
+        stuffcmd(self, "alias dropammo impulse 20\n");
+        stuffcmd(self, "alias rune-use impulse 20\n");
+        stuffcmd(self, "alias dropweapon impulse 21\n");
+        stuffcmd(self, "alias flagstatus impulse 23\n");
+        stuffcmd(self, "alias passhead echo passhead is only available in Head Hunters.\n");
+        stuffcmd(self, "alias tosshead echo tosshead is only available in Head Hunters.\n");
+        stuffcmd(self, "alias hhcall echo hhcall is only available in Head Hunters.\n");
+        stuffcmd(self, "alias callmate echo callmate is only available in Head Hunters.\n");
+        stuffcmd(self, "alias hhhelp echo hhhelp is only available in Head Hunters.\n");
+        stuffcmd(self, "alias headhelp echo headhelp is only available in Head Hunters.\n");
+        stuffcmd(self, "alias throwweapon echo throwweapon is only available in Head Hunters.\n");
+        stuffcmd(self, "alias throwammo echo throwammo is only available in Head Hunters.\n");
+    }
+};
 void () clanring_set_aliases =
 {
     local entity temp;
@@ -998,6 +1041,7 @@ void () clanring_set_aliases =
     // Check for binds
     if (self.style & CLANRING_FOUND_BINDINGS)
     {
+        clanring_set_mode_aliases();
         self = temp;
         remove(self);
         return;
@@ -1087,11 +1131,6 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias init echo\n");                // CRMOD - So clients only see 'init' once
     stuffcmd(self, "alias +hook impulse 98\n");
     stuffcmd(self, "alias -hook impulse 97\n");
-    stuffcmd(self, "alias hook impulse 22\n");
-    stuffcmd(self, "alias dropammo impulse 20\n");
-    stuffcmd(self, "alias rune-use impulse 20\n");
-    stuffcmd(self, "alias dropweapon impulse 21\n");
-    stuffcmd(self, "alias flagstatus cmd flagstatus\n");
     stuffcmd(self, "alias droprune impulse 19\n");
     stuffcmd(self, "alias nextmap impulse 199\n");
     stuffcmd(self, "alias faststart impulse 209\n");
@@ -1120,6 +1159,7 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias pos_origin cmd pos_origin\n");
     stuffcmd(self, "alias pos_angles cmd pos_angles\n");
     stuffcmd(self, "alias lastplayers impulse 188\n");
+    clanring_set_mode_aliases();
     
     self.style = self.style | CLANRING_FOUND_BINDINGS;
 
@@ -1755,7 +1795,7 @@ void () clanring_put_client_in_server =
         //This is called in client.qc but here again JUST to make sure.
         if (teamplay)
         {
-            if (clanring_playmode & CLANRING_NORMAL_MODE)
+            if (clanring_playmode & (CLANRING_NORMAL_MODE | CLANRING_HH_MODE))
             {
                 if  ((!(self.style & CLANRING_BLUE_TEAM)) && (!(self.style & CLANRING_RED_TEAM)))
                 {
@@ -1884,11 +1924,15 @@ void () clanring_help_misc =
     sprint(self, " autoweapon - toggle smartweapon\n");
     sprint(self, " autopause  - toggle auto pausing\n");
     sprint(self, " last       - show recently disconnected players\n");
+    if (clanring_playmode & CLANRING_HH_MODE)
+    {
+        sprint(self, " hook       - grappling hook\n");
+        sprint(self, " passhead   - pass or toss a head\n");
+        sprint(self, " hhcall     - call to teammates\n");
+        sprint(self, " hhhelp     - show Head Hunters tip\n");
+    }
 };
 
-//
-//  I N F O
-//
 void () clanring_info =
 {
     sprint(self, "\n");
@@ -1959,6 +2003,19 @@ void () modes_commands =
 
 void () gameplay_commands =
 {
+        if (clanring_playmode & CLANRING_HH_MODE)
+        {
+            sprint(self, "\n");
+            sprint(self, " \bhook\b                   grappling hook\n");
+            sprint(self, " \bpasshead\b [\btosshead\b]\b   pass or toss one carried head\n");
+            sprint(self, " \bhhhelp\b                 show Head Hunters tip\n");
+            sprint(self, " \bdropweapon\b [\bthrowweapon\b]\b teamplay-only throw weapon\n");
+            sprint(self, " \bdropammo\b [\bthrowammo\b]\b  teamplay-only throw ammo pack\n");
+            sprint(self, " \bhhcall\b [\bcallmate\b]\b     teamplay-only call to teammates\n");
+            sprint(self, "\n");
+            return;
+        }
+
         sprint(self, "\n");
         sprint(self, " \bdroprune [\bdr\b]\b   \bsetquad\b\n");
         sprint(self, " \bflagstatus\b      \bsetring\b\n");
@@ -2004,6 +2061,13 @@ void () misc_commands =
         sprint(self, " \bcaptimes\b\n");
         sprint(self, " \bdropammo\b\n");
         sprint(self, " \bdropweapon\b\n");
+        if (clanring_playmode & CLANRING_HH_MODE)
+        {
+            sprint(self, " \bhook\b\n");
+            sprint(self, " \bpasshead\b\n");
+            sprint(self, " \bhhcall\b\n");
+            sprint(self, " \bhhhelp\b\n");
+        }
         sprint(self, " \bhighscores\b\n");
         sprint(self, " \bcmd ignore\b\n");
         sprint(self, " \blast\b\n");
@@ -2563,8 +2627,12 @@ void () clanring_impulse =
         TossRune ();
     else if (self.impulse == 20)
         TossAmmo();
+    else if ((clanring_playmode & CLANRING_HH_MODE) && (self.impulse == 21))
+        hh_toss_head();
     else if (self.impulse == 21)
         TossWeapon();
+    else if ((clanring_playmode & CLANRING_HH_MODE) && (self.impulse == 26))
+        hh_call_teammate();
     else if (self.impulse == 69)
         PreviousWeaponCommand();
     else if (self.impulse == 203)
@@ -2614,11 +2682,17 @@ void () clanring_impulse =
         self.statstate = self.impulse - 71;
         sprint(self, "Status bar set\n");
     }
+    else if ((clanring_playmode & CLANRING_HH_MODE) && (self.impulse == 23))
+        hh_auto_help_tip();
     else if (self.impulse == 23)
     {
         if (teamplay)
             TeamFlagStatusReport ();
     }
+    else if ((clanring_playmode & CLANRING_HH_MODE) && (self.impulse == 24))
+        TossWeapon();
+    else if ((clanring_playmode & CLANRING_HH_MODE) && (self.impulse == 25))
+        TossAmmo();
     else if (self.impulse == 38)
         clanring_ping_reply ();
     else if (self.impulse == 39)

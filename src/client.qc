@@ -946,7 +946,7 @@ void() PutClientInServer =
     //in classic mode auto join on connect
     if (teamplay)
     {
-        if (clanring_playmode & CLANRING_NORMAL_MODE)/* && (clanring_playmode & CLANRING_CAPTURE_THE_FLAG))*///Pub team Deathmatch
+        if ((clanring_playmode & (CLANRING_NORMAL_MODE | CLANRING_HH_MODE)))/* && (clanring_playmode & CLANRING_CAPTURE_THE_FLAG))*///Pub team Deathmatch / HH team
         {
             if  ((!(self.style & CLANRING_BLUE_TEAM)) && (!(self.style & CLANRING_RED_TEAM)) && (!(self.style & CLANRING_OBSERVER)))
             {
@@ -1019,7 +1019,10 @@ void() PutClientInServer =
     self.killstreak				= 0;
     self.combo_frags 			= 0;
     self.combo_time 			= 0;
+    hh_destroy_holder_heads(self);
     self.ammo_heads             = 0;
+    self.hh_head_list           = world;
+    self.hh_head_total_value    = 0;
     self.enemy					= world;	//who shot/killed us
     self.enemy_target			= world;	//who we last shot/killed
 
@@ -2132,13 +2135,17 @@ void() PlayerPostThink =
     {
         WipeoutModePlayerUpdate();
     }
+    else if (clanring_playmode & CLANRING_HH_MODE)
+    {
+        HeadHuntersPlayerUpdate();
+    }
 
     if (self.impulse)
     {
         self.finaldest_x = time;  // player is alive
 
-        if (self.impulse == 22)
-    		W_ChangeWeapon ();
+	        if (self.impulse == 22)
+	    		W_ChangeWeapon ();
 
         // Redirect impulses 1-10 when player is entering a number
         if (self.use != SUB_Null)
@@ -2155,10 +2162,10 @@ void() PlayerPostThink =
             }
         }
 
-        if ((self.impulse >= 19) && (self.impulse != 22))
-        {
-            if (self.impulse != 39) //Remove afk status when the client issues an impulse command, *except* 39, which is our (automated) lag-out checker.
-                clear_afk_status(self);
+	        if ((self.impulse >= 19) && ((self.impulse != 22) || (clanring_playmode & CLANRING_HH_MODE)))
+	        {
+	            if (self.impulse != 39) //Remove afk status when the client issues an impulse command, *except* 39, which is our (automated) lag-out checker.
+	                clear_afk_status(self);
 
             if (self.impulse <= 250)
                 clanring_impulse ();
@@ -3957,16 +3964,44 @@ void(string cmd) SV_ParseClientCommand =
             votables_request_set_gametype_mode_map(7, -1, 0);
             return;
         case "hh":
-            if (arg1 != "")
+            if ((arg1 == "normal") || (arg1 == "ffa"))
+            {
+                if (arg2 != "")
+                {
+                    mapnumber = found_in_warp_list(arg2);
+                    if (mapnumber)
+                        votables_request_set_hh_variant(0, mapnumber);
+                    else
+                        sprint2(self, arg2, " is not a recognized map.\n");
+                    return;
+                }
+                votables_request_set_hh_variant(0, 0);
+                return;
+            }
+            else if (arg1 == "team")
+            {
+                if (arg2 != "")
+                {
+                    mapnumber = found_in_warp_list(arg2);
+                    if (mapnumber)
+                        votables_request_set_hh_variant(1, mapnumber);
+                    else
+                        sprint2(self, arg2, " is not a recognized map.\n");
+                    return;
+                }
+                votables_request_set_hh_variant(1, 0);
+                return;
+            }
+            else if (arg1 != "")
             {
                 mapnumber = found_in_warp_list(arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(8, -1, mapnumber);
+                    votables_request_set_hh(mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    sprint2(self, arg1, " is not a recognized HH mode or map.\n");
                 return;
             }
-            votables_request_set_gametype_mode_map(8, -1, 0);
+            votables_request_set_hh(0);
             return;
         case "ca":
             if (arg1 != "")

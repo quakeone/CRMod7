@@ -179,6 +179,9 @@ void() worldspawn =
     }
 
     forceinfokey (world, "intermission","off");
+    globalstat(STAT_USER + 0, EV_FLOAT, "hh_hud_enabled");
+    clientstat(STAT_USER + 1, EV_FLOAT, ammo_heads);
+    globalstat(STAT_USER + 2, EV_FLOAT, "hh_maxheads");
     
     // the area based ambient sounds MUST be the first precache_sounds
     
