@@ -1,0 +1,77 @@
+{
+"light" "0"
+"sounds" "1"
+"classname" "worldspawn"
+}
+{
+"origin" "-43 26 -679"
+"classname" "info_player_start"
+}
+{
+"origin" "-128 0 -576"
+"targetname" "tele1"
+"classname" "info_teleport_destination"
+}
+{
+"model" "*1"
+"target" "tele1"
+"angle" "-1"
+"classname" "trigger_teleport"
+}
+{
+"model" "*2"
+"target" "tele2"
+"classname" "trigger_teleport"
+}
+{
+"origin" "-48 -64 -64"
+"targetname" "tele2"
+"classname" "info_teleport_destination"
+}
+{
+"origin" "-48 -48 -80"
+"classname" "item_artifact_super_damage"
+}
+{
+"origin" "368 -184 -960"
+"classname" "monster_fish"
+}
+
+{
+"origin" "-440 428 -1092"
+"classname" "monster_dog"
+}
+{
+"model" "*3"
+"target" "tele2"
+"classname" "trigger_teleport"
+}
+{
+"model" "*4"
+"target" "tele2"
+"classname" "trigger_teleport"
+}
+{
+"model" "*5"
+"target" "tele2"
+"classname" "trigger_teleport"
+}
+{
+"origin" "204 -20 -679"
+"classname" "info_player_deathmatch"
+}
+{
+"origin" "-206 45 -679"
+"classname" "info_player_deathmatch"
+}
+
+{
+"origin" "-123 -187 -312"
+"classname" "info_player_deathmatch"
+}
+
+{
+"origin" "105 113 -297"
+"classname" "info_player_deathmatch"
+}
+

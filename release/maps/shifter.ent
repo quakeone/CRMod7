@@ -1,0 +1,305 @@
+{
+"classname" "worldspawn"
+"wad" "C:\quake\id1\quake101.wad;C:\quake\id1\cr8_set.wad;"
+"_sun_mangle" "60 -45 0"
+"message" "shifter by foogs"
+"_sunlight" "300"
+"_sunlight2" "300"
+"_sunlight_penumbra" "8"
+"_sunlight_color" "0.83 0.91 1.00"
+}
+{
+"classname" "trigger_teleport"
+"target" "info_teleport_destination1"
+"model" "*1"
+}
+
+// woods, slightly shift position to avoid tele loop
+
+{
+"classname" "info_teleport_destination"
+"origin" "613 -389 342"
+"angle" "-45.000008"
+"targetname" "info_teleport_destination1"
+}
+{
+"classname" "trigger_teleport"
+"target" "info_teleport_destination2"
+"model" "*2"
+}
+{
+"classname" "info_teleport_destination"
+"origin" "384.000000 776.000000 344.000000"
+"angle" "-90.000000"
+"targetname" "info_teleport_destination2"
+}
+{
+"classname" "trigger_teleport"
+"target" "info_teleport_destination5"
+"model" "*3"
+"wait" "4"
+}
+{
+"classname" "info_teleport_destination"
+"origin" "32.000000 -752.000000 376.000000"
+"angle" "45.000000"
+"targetname" "info_teleport_destination5"
+"_deviance" "96"
+
+"light" "100"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "384.000000 320.000000 40.000000"
+"angle" "-135.000015"
+}
+{
+"classname" "weapon_lightning"
+"origin" "256.000000 -416.000000 -32.000000"
+}
+{
+"classname" "weapon_rocketlauncher"
+"origin" "384.000000 512.000000 336.000000"
+}
+{
+"classname" "weapon_grenadelauncher"
+"origin" "296.000000 -224.000000 336.000000"
+}
+{
+"classname" "item_cells"
+"origin" "704.000000 480.000000 336.000000"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "1056.000000 -160.000000 168.000000"
+"angle" "-179.999985"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-208.000000 -240.000000 360.000000"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "960.000000 656.000000 264.000000"
+"angle" "-179.999985"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "-480.000000 560.000000 136.000000"
+"angle" "0.000003"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "632.000000 -864.000000 232.000000"
+"angle" "90.000000"
+}
+{
+"classname" "info_intermission"
+"origin" "112.000000 208.000000 528.000000"
+"mangle" "45 -45 10"
+}
+{
+"classname" "info_player_start"
+"origin" "128.000000 192.000000 384.000000"
+}
+{
+"classname" "weapon_rocketlauncher"
+"origin" "784.000000 -440.000000 -32.000000"
+}
+{
+"classname" "item_armor1"
+"origin" "752.000000 -224.000000 144.000000"
+}
+{
+"classname" "item_armor1"
+"origin" "-208.000000 -240.000000 336.000000"
+}
+{
+"classname" "item_health"
+"origin" "456.000000 -816.000000 336.000000"
+}
+{
+"classname" "item_health"
+"origin" "408.000000 -816.000000 336.000000"
+}
+{
+"classname" "item_artifact_super_damage"
+"origin" "40.000000 -24.000000 168.000000"
+}
+{
+"classname" "item_health"
+"origin" "400.000000 144.000000 16.000000"
+}
+{
+"classname" "item_health"
+"origin" "400.000000 192.000000 16.000000"
+}
+{
+"classname" "item_rockets"
+"origin" "112.000000 304.000000 16.000000"
+}
+{
+"classname" "item_health"
+"origin" "-112.000000 528.000000 80.000000"
+}
+{
+"classname" "item_health"
+"origin" "448.000000 -192.000000 144.000000"
+"spawnflags" "1"
+}
+{
+"classname" "item_health"
+"origin" "400.000000 -192.000000 144.000000"
+"spawnflags" "1"
+}
+{
+"classname" "item_health"
+"origin" "848.000000 592.000000 240.000000"
+}
+{
+"classname" "item_health"
+"origin" "-272.000000 8.000000 336.000000"
+}
+{
+"classname" "item_cells"
+"origin" "672.000000 512.000000 336.000000"
+}
+{
+"classname" "item_cells"
+"origin" "272.000000 -464.000000 -32.000000"
+}
+{
+"classname" "item_cells"
+"origin" "208.000000 -400.000000 -32.000000"
+}
+{
+"classname" "item_rockets"
+"origin" "952.000000 -760.000000 208.000000"
+}
+{
+"classname" "item_armor1"
+"origin" "416.000000 608.000000 144.000000"
+}
+{
+"classname" "item_rockets"
+"origin" "528.000000 152.000000 144.000000"
+}
+{
+"classname" "item_rockets"
+"origin" "984.000000 -728.000000 208.000000"
+}
+{
+"classname" "info_player_deathmatch"
+"origin" "792.000000 -608.000000 -8.000000"
+"angle" "90.000000"
+}
+{
+"classname" "item_armorInv"
+"origin" "-224.000000 672.000000 112.000000"
+}
+{
+"classname" "item_armor2"
+"origin" "784.000000 -256.000000 -32.000000"
+}
+{
+"classname" "item_health"
+"origin" "888.000000 152.000000 336.000000"
+"spawnflags" "2"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "20"
+"_surface" "cr8_lampbeam3"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "20"
+"_surface" "cr8_lampbeam2"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "60"
+"_surface" "cr8_lampbtrim"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "30"
+"_surface" "cr8_lamp4"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "20"
+"_surface" "cr8_trim64_38l"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "30"
+"_surface" "cr8_lamp_pan1"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "30"
+"_surface" "cr8_lamp3"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "30"
+"_surface" "cr8_28"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "30"
+"_surface" "cr8_lamp5"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "20"
+"_surface" "cr8_lamp1"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "5"
+"_surface" "cr8_lamp5_16"
+}
+{
+"classname" "light"
+"origin" "256.000000 192.000000 384.000000"
+"delay" "2"
+"wait" ".7"
+"light" "300"
+"_surface" "*lava1"
+"_color" "15 3 0"
+}

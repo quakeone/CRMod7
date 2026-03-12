@@ -1,0 +1,289 @@
+{
+"mapversion" "220"
+"wad" "D:/Quake/wads/str_delven.wad;D:/Quake/wads/developer.wad"
+"classname" "worldspawn"
+"_sun_mangle" "-15 -25 0"
+"_sunlight" "500"
+"_sunlight_color" "255 240 200"
+"_sunlight_penumbra" "8"
+"fog_color" "0.78 1.0 0.94"
+"fog_density" "0.015"
+"fog" "0.015 0.78 1.0 0.94"
+"fog_sky" "0"
+"_skyfog" "0"
+}
+
+
+
+
+{
+"classname" "info_player_deathmatch"
+"origin" "15 -1470 120"
+}
+
+{
+"classname" "info_player_deathmatch"
+"origin" "-5 -501 80"
+}
+
+
+{
+    "classname" "trigger_hurt"
+    "dmg" "1000"
+    "model" "*1"
+}
+
+
+{
+"classname" "light"
+"origin" "160 -544 48"
+"_color" "255 196 128"
+"light" "200"
+}
+{
+"classname" "light"
+"origin" "544 -864 16"
+"_color" "255 196 128"
+"light" "200"
+}
+{
+"classname" "light"
+"origin" "-160 -544 48"
+"_color" "255 196 128"
+"light" "200"
+}
+{
+"classname" "light"
+"origin" "152 -1336 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "152 -1352 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "152 -696 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "152 -712 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "-152 -1352 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "-152 -1336 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "-152 -1032 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "-152 -1016 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "-152 -712 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "-152 -696 48"
+"_color" "255 196 128"
+"light" "120"
+}
+{
+"classname" "info_player_start"
+"origin" "640 -768 24"
+"angle" "270"
+}
+{
+"classname" "light"
+"origin" "-128 -168 72"
+"_color" "255 196 128"
+"light" "200"
+}
+{
+"classname" "light"
+"origin" "128 -168 72"
+"_color" "255 196 128"
+"light" "200"
+}
+{
+"classname" "light"
+"origin" "0 -448 288"
+"_color" "210 240 255"
+"light" "65"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -832 288"
+"_color" "210 240 255"
+"light" "65"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -1216 288"
+"_color" "210 240 255"
+"light" "65"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -1600 288"
+"_color" "210 240 255"
+"light" "65"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -1984 288"
+"_color" "210 240 255"
+"light" "65"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -2368 288"
+"_color" "210 240 255"
+"light" "65"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -2752 288"
+"_color" "210 240 255"
+"light" "65"
+"wait" "0.1"
+}
+{
+"classname" "func_illusionary"
+"alpha" "0.15"
+"model" "*1"
+}
+{
+"classname" "light"
+"origin" "1672 -1096 232"
+"_color" "255 240 200"
+}
+{
+"classname" "light"
+"origin" "0 -448 544"
+"_color" "210 240 255"
+"light" "45"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -832 544"
+"_color" "210 240 255"
+"light" "45"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -1216 544"
+"_color" "210 240 255"
+"light" "45"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -1600 544"
+"_color" "210 240 255"
+"light" "45"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -1984 544"
+"_color" "210 240 255"
+"light" "45"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -2368 544"
+"_color" "210 240 255"
+"light" "45"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "0 -2752 544"
+"_color" "210 240 255"
+"light" "45"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "560 -720 120"
+"_color" "210 240 255"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "592 -720 120"
+"_color" "210 240 255"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "544 -960 192"
+"_color" "210 240 255"
+"light" "50"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "704 -960 128"
+"_color" "210 240 255"
+"light" "20"
+"wait" "0.1"
+}
+{
+"classname" "light"
+"origin" "528 -720 120"
+"_color" "210 240 255"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "496 -720 120"
+"_color" "210 240 255"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "624 -720 120"
+"_color" "210 240 255"
+"light" "120"
+}
+{
+"classname" "light"
+"origin" "656 -720 120"
+"_color" "210 240 255"
+"light" "120"
+}

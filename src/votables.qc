@@ -1177,6 +1177,8 @@ float(float mapnum) votables_maybe_prompt_map_vote_mode_change =
 
     if (self == world || !mapnum)
         return FALSE;
+    if (mode_is_arena())
+        return FALSE;
 
     maparg = warpmap[mapnum].name;
     if (!maparg || maparg == "")
