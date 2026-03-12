@@ -533,11 +533,6 @@ void() votables_set_gametype_mode_map =
 				bprint("gametype set to Head Hunters\n");
 		}
 
-		utils_set_cvar ("samelevel", clanring_playmode);
-		clanring_level = 1;//Reset the map count if we changed modes
-		utils_set_cvar ("scratch1", clanring_level);
-		if (nextmap != "") strunzone(nextmap);
-
 		new_type_flags = clanring_playmode
 			& (CLANRING_CAPTURE_THE_FLAG
 				| CLANRING_CA_MODE
