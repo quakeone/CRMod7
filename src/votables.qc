@@ -25,6 +25,57 @@ void() utils_save_disconnect_log;
 void(float ghost) G1v1_UpdateQuadAlpha;
 void() votables_map_vote_prompt_response;
 void(float newtype, float newmode, float newmap) votables_request_set_gametype_mode_map;
+void(float val) admin_dmset;
+
+float() hh_weaponstay_pref_enabled =
+{
+	local float pref;
+
+	pref = cvar("cr_hh_weaponstay_pref");
+	if (pref < 0)
+	{
+		cvar_set("cr_hh_weaponstay_pref", "1");
+		return TRUE;
+	}
+
+	return (pref != 0);
+};
+
+void(float enabled, float announce) hh_apply_weaponstay_setting =
+{
+	if (enabled)
+	{
+		admin_dmset(3);
+		utils_do_weapons(SUB_regen);
+		if (announce)
+			bprint("Deathmatch set to \3 [weaponstay \bon\b]\n");
+
+		// Clean up weapon animations when weaponstay is turned on.
+		utils_do_weapons(weapon_prewar_cleanup);
+	}
+	else
+	{
+		admin_dmset(1);
+		if (announce)
+			bprint("Deathmatch set to \1 [weaponstay \boff\b]\n");
+
+		// Set up weapon animations when weaponstay is turned off in DM mode.
+		if ((clanring_playmode & CLANRING_MATCH_MODE) &&
+			!(clanring_state & CLANRING_MATCH_STARTED) &&
+			!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
+		{
+			utils_do_weapons(weapon_prewar_setup);
+		}
+	}
+};
+
+void() hh_restore_weaponstay_pref =
+{
+	if (!(clanring_playmode & CLANRING_HH_MODE))
+		return;
+
+	hh_apply_weaponstay_setting(hh_weaponstay_pref_enabled(), FALSE);
+};
 
 void(float newmap) votables_request_set_hh =
 {
@@ -516,15 +567,14 @@ void() votables_set_gametype_mode_map =
 		else if (request_gametype == 8)
 		{
 			votables_clear_playmode_flags();
-			clanring_playmode = (clanring_playmode | CLANRING_HH_MODE);
-			clanring_playmode = clanring_playmode - (clanring_playmode & CLANRING_NO_HOOK);
+			clanring_playmode = (clanring_playmode | CLANRING_HH_MODE | CLANRING_NO_HOOK);
 			cvar_set("timelimit", "20");
 			cvar_set("fraglimit", "100");
 			if (request_teamplay >= 0)
 				cvar_set("teamplay", ftos(request_teamplay));
 			else
 				cvar_set("teamplay", "0");
-			cvar_set("deathmatch", "1");
+			hh_apply_weaponstay_setting(hh_weaponstay_pref_enabled(), FALSE);
 			if (request_teamplay > 0)
 				bprint("gametype set to Team Head Hunters\n");
 			else if (request_teamplay == 0)
@@ -946,30 +996,7 @@ void(float newtype, float newmode, float newmap) votables_request_set_gametype_m
 
 void() votables_set_weaponstay =
 {
-	if (request_weaponstay)
-	{
-		cvar_set("deathmatch", "3");
-		deathmatch = 3;
-		utils_do_weapons(SUB_regen);
-		bprint("Deathmatch set to \3 [weaponstay \bon\b]\n");
-
-		// Clean up weapon animations when weaponstay is turned on
-		utils_do_weapons(weapon_prewar_cleanup);
-	}
-	else
-	{
-		cvar_set("deathmatch", "1");
-		deathmatch = 1;
-		bprint("Deathmatch set to \1 [weaponstay \boff\b]\n");
-
-		// Set up weapon animations when weaponstay is turned off in DM mode
-		if ((clanring_playmode & CLANRING_MATCH_MODE) &&
-			!(clanring_state & CLANRING_MATCH_STARTED) &&
-			!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
-		{
-			utils_do_weapons(weapon_prewar_setup);
-		}
-	}
+	hh_apply_weaponstay_setting(request_weaponstay, TRUE);
 };
 
 void () votables_request_set_weaponstay =
@@ -1138,9 +1165,11 @@ void(float clear_screen) votables_map_vote_prompt_clear =
 
 void() votables_map_vote_prompt_display =
 {
-    local string maparg = "", intro1 = "", intro2 = "", option1 = "", option2 = "", hint = "", menu = "";
-    local string cmd_gametype = "", cmd_mode = "";
+    local string maparg = "", intro1 = "", intro2 = "";
+    local string option1 = "", option2 = "", option3 = "", option4 = "";
+    local string hint = "", menu = "", cmd_gametype = "", cmd_mode = "";
     local float option_width = 0;
+    local float has_gametype_change, offer_match, offer_practice;
 
     if (!self.pending_map_vote_mapnum)
         return;
@@ -1168,37 +1197,162 @@ void() votables_map_vote_prompt_display =
         return;
     }
 
+    has_gametype_change = (self.pending_map_vote_type >= 0);
+    offer_match = (self.pending_map_vote_mode != ADMIN_MATCH_MODE);
+    offer_practice = (self.pending_map_vote_mode != ADMIN_PRACTICE_MODE);
+
+    if (has_gametype_change)
+    {
     if (self.pending_map_vote_type == 1)
     {
         intro1 = sprintf("%s has CTF spawnpoints.", maparg);
         intro2 = "Vote it with CTF as well?";
-        option1 = "\1 also change to CTF";
     }
     else
     {
         intro1 = sprintf("%s has no CTF spawnpoints.", maparg);
         intro2 = "Vote it with DM instead?";
+        }
+
+        cmd_gametype = votables_gametype_command_name(self.pending_map_vote_type);
+
+        if (offer_match && offer_practice)
+        {
+            // Normal mode: gametype, gametype+match, gametype+practice, keep
+            if (self.pending_map_vote_type == 1)
+            {
+                option1 = "\1 also change to CTF";
+                option2 = "\2 CTF + match mode";
+                option3 = "\3 CTF + practice mode";
+            }
+            else
+            {
+                option1 = "\1 also change to DM";
+                option2 = "\2 DM + match mode";
+                option3 = "\3 DM + practice mode";
+            }
+            option4 = "\4 keep current settings";
+            hint = sprintf("ex: cmd %s match %s", cmd_gametype, maparg);
+
+            option_width = strlen(option1);
+            if (strlen(option2) > option_width) option_width = strlen(option2);
+            if (strlen(option3) > option_width) option_width = strlen(option3);
+            if (strlen(option4) > option_width) option_width = strlen(option4);
+            option1 = strpad(option_width, option1);
+            option2 = strpad(option_width, option2);
+            option3 = strpad(option_width, option3);
+            option4 = strpad(option_width, option4);
+
+            menu = strcat(
+                sprintf("%s\n\n%s\n%s\n\n%s\n%s\n",
+                    redify("\x8E map vote check \x8E"), intro1, intro2, option1, option2),
+                sprintf("%s\n%s\n\ncmd x y z\n%s", option3, option4, hint));
+        }
+        else if (offer_match)
+        {
+            // Practice mode: gametype, gametype+match, keep
+            if (self.pending_map_vote_type == 1)
+            {
+                option1 = "\1 also change to CTF";
+                option2 = "\2 CTF + match mode";
+            }
+            else
+            {
+                option1 = "\1 also change to DM";
+                option2 = "\2 DM + match mode";
+            }
+            option3 = "\3 keep current settings";
+            hint = sprintf("ex: cmd %s match %s", cmd_gametype, maparg);
+
+            option_width = strlen(option1);
+            if (strlen(option2) > option_width) option_width = strlen(option2);
+            if (strlen(option3) > option_width) option_width = strlen(option3);
+            option1 = strpad(option_width, option1);
+            option2 = strpad(option_width, option2);
+            option3 = strpad(option_width, option3);
+
+            menu = sprintf("%s\n\n%s\n%s\n\n%s\n%s\n%s\n\ncmd x y z\n%s",
+                redify("\x8E map vote check \x8E"), intro1, intro2,
+                option1, option2, option3, hint);
+        }
+        else if (offer_practice)
+        {
+            // Match mode: gametype, gametype+practice, keep
+            if (self.pending_map_vote_type == 1)
+            {
+                option1 = "\1 also change to CTF";
+                option2 = "\2 CTF + practice mode";
+            }
+            else
+            {
         option1 = "\1 also change to DM";
+                option2 = "\2 DM + practice mode";
+            }
+            option3 = "\3 keep current settings";
+            hint = sprintf("ex: cmd %s practice %s", cmd_gametype, maparg);
+
+            option_width = strlen(option1);
+            if (strlen(option2) > option_width) option_width = strlen(option2);
+            if (strlen(option3) > option_width) option_width = strlen(option3);
+            option1 = strpad(option_width, option1);
+            option2 = strpad(option_width, option2);
+            option3 = strpad(option_width, option3);
+
+            menu = sprintf("%s\n\n%s\n%s\n\n%s\n%s\n%s\n\ncmd x y z\n%s",
+                redify("\x8E map vote check \x8E"), intro1, intro2,
+                option1, option2, option3, hint);
+        }
     }
+    else
+    {
+        // No gametype change, mode-only prompt
+        cmd_mode = votables_mode_command_name(self.pending_map_vote_mode);
+        intro1 = sprintf("Currently in %s mode.", cmd_mode);
 
     if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-        option2 = "\2 keep current CTF mode";
+            cmd_gametype = "ctf";
     else
+            cmd_gametype = "dm";
+
+        if (offer_match && offer_practice)
+        {
+            // Normal mode: match, practice, keep
+            intro2 = "Switch mode?";
+            option1 = "\1 switch to match mode";
+            option2 = "\2 switch to practice mode";
+            option3 = "\3 keep current mode";
+            hint = sprintf("ex: cmd %s match %s", cmd_gametype, maparg);
+
+            option_width = strlen(option1);
+            if (strlen(option2) > option_width) option_width = strlen(option2);
+            if (strlen(option3) > option_width) option_width = strlen(option3);
+            option1 = strpad(option_width, option1);
+            option2 = strpad(option_width, option2);
+            option3 = strpad(option_width, option3);
+
+            menu = sprintf("%s\n\n%s\n%s\n\n%s\n%s\n%s\n\ncmd x y z\n%s",
+                redify("\x8E map vote check \x8E"), intro1, intro2,
+                option1, option2, option3, hint);
+        }
+        else if (offer_match)
+        {
+            // Practice mode: match, keep
+            intro2 = "Also switch to match mode?";
+            option1 = "\1 switch to match mode";
         option2 = "\2 keep current mode";
+            hint = sprintf("ex: cmd %s match %s", cmd_gametype, maparg);
 
     option_width = strlen(option1);
-    if (strlen(option2) > option_width)
-        option_width = strlen(option2);
+            if (strlen(option2) > option_width) option_width = strlen(option2);
     option1 = strpad(option_width, option1);
     option2 = strpad(option_width, option2);
 
-    cmd_gametype = votables_gametype_command_name(self.pending_map_vote_type);
-    cmd_mode = votables_mode_command_name(self.pending_map_vote_mode);
-    hint = sprintf("ex: cmd %s %s %s", cmd_gametype, cmd_mode, maparg);
+            menu = sprintf("%s\n\n%s\n%s\n\n%s\n%s\n\ncmd x y z\n%s",
+                redify("\x8E map vote check \x8E"), intro1, intro2,
+                option1, option2, hint);
+        }
+    }
 
-    menu = sprintf(
-        "%s\n\n%s\n%s\n\n%s\n%s\n\ncmd x y z\n%s",
-        redify("\x8E map vote check \x8E"), intro1, intro2, option1, option2, hint);
     centerprint(self, menu);
     self.pending_map_vote_print_time = time + 1;
 };
@@ -1206,11 +1360,17 @@ void() votables_map_vote_prompt_display =
 void() votables_map_vote_prompt_response =
 {
     local float choice, mapnum, newtype, newmode;
+    local float has_gametype_change, offer_match, offer_practice;
+    local float opt;
 
     choice = self.finaldest_z;
     mapnum = self.pending_map_vote_mapnum;
     newtype = self.pending_map_vote_type;
     newmode = self.pending_map_vote_mode;
+
+    has_gametype_change = (newtype >= 0);
+    offer_match = (newmode != ADMIN_MATCH_MODE);
+    offer_practice = (newmode != ADMIN_PRACTICE_MODE);
 
     if (!mapnum)
     {
@@ -1218,7 +1378,13 @@ void() votables_map_vote_prompt_response =
         return;
     }
 
-    if (choice == 1)
+    opt = 0;
+
+    if (has_gametype_change)
+    {
+        // Gametype change only
+        opt = opt + 1;
+        if (choice == opt)
     {
         votables_map_vote_prompt_clear(TRUE);
         stuffcmd(self, "play misc/menu1.wav\n");
@@ -1226,7 +1392,64 @@ void() votables_map_vote_prompt_response =
         return;
     }
 
-    if (choice == 2)
+        // Gametype + match
+        if (offer_match)
+        {
+            opt = opt + 1;
+            if (choice == opt)
+            {
+                votables_map_vote_prompt_clear(TRUE);
+                stuffcmd(self, "play misc/menu1.wav\n");
+                votables_request_set_gametype_mode_map(newtype, ADMIN_MATCH_MODE, mapnum);
+                return;
+            }
+        }
+
+        // Gametype + practice
+        if (offer_practice)
+        {
+            opt = opt + 1;
+            if (choice == opt)
+            {
+                votables_map_vote_prompt_clear(TRUE);
+                stuffcmd(self, "play misc/menu1.wav\n");
+                votables_request_set_gametype_mode_map(newtype, ADMIN_PRACTICE_MODE, mapnum);
+                return;
+            }
+        }
+    }
+    else
+    {
+        // Match mode
+        if (offer_match)
+        {
+            opt = opt + 1;
+            if (choice == opt)
+            {
+                votables_map_vote_prompt_clear(TRUE);
+                stuffcmd(self, "play misc/menu1.wav\n");
+                votables_request_set_gametype_mode_map(-1, ADMIN_MATCH_MODE, mapnum);
+                return;
+            }
+        }
+
+        // Practice mode
+        if (offer_practice)
+        {
+            opt = opt + 1;
+            if (choice == opt)
+            {
+                votables_map_vote_prompt_clear(TRUE);
+                stuffcmd(self, "play misc/menu1.wav\n");
+                votables_request_set_gametype_mode_map(-1, ADMIN_PRACTICE_MODE, mapnum);
+                return;
+            }
+        }
+    }
+
+    // Keep current (always last)
+    opt = opt + 1;
+    if (choice == opt)
     {
         votables_map_vote_prompt_clear(TRUE);
         stuffcmd(self, "play misc/menu2.wav\n");
@@ -1234,6 +1457,7 @@ void() votables_map_vote_prompt_response =
         return;
     }
 
+    // Unknown choice: refresh display
     stuffcmd(self, "play misc/menu2.wav\n");
     self.pending_map_vote_print_time = 0;
     votables_map_vote_prompt_display();
@@ -1267,7 +1491,8 @@ float(float mapnum) votables_maybe_prompt_map_vote_mode_change =
     else if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && map_has_ctf)
         suggested_type = 1;
 
-    if (suggested_type < 0)
+    // Also trigger if not in match mode (offer switch to match)
+    if (suggested_type < 0 && suggested_mode == ADMIN_MATCH_MODE)
         return FALSE;
 
     if (self.pending_map_vote_mapnum)

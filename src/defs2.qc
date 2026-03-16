@@ -542,6 +542,23 @@ float	clanring_afk_timeout;
 .float  hh_head_value;
 .float  hh_head_original_team;
 .float  hh_head_total_value;
+.entity hh_spirit_head;
+.vector hh_altar_pos;
+.float  hh_altar_count;
+.vector hh_altar1;
+.vector hh_altar2;
+.vector hh_altar3;
+.vector hh_altar4;
+.float  hh_is_head;
+.float  hh_on_altar;
+.float  hh_haunting;
+.float  hh_haunt_over;
+.float  hh_can_bite;
+.float  hh_camp_check;
+.float  hh_camp_countdown;
+.float  hh_help_state;
+.float  hh_help_context;
+.float  hh_head_pickup_block_until;
 
 .float stats_item_ssg;				//
 .float stats_item_ng;				//

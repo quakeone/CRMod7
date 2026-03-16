@@ -1590,7 +1590,7 @@ body {
   }
 
   .hero {
-    padding: 100px 24px 60px;
+    padding: 100px 24px 88px;
     min-height: 90vh;
   }
 
@@ -1617,6 +1617,10 @@ body {
   .hero-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .hero-scroll {
+    display: none;
   }
 
   .hero-gh {

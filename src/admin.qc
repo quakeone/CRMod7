@@ -864,7 +864,15 @@ void(float val) admin_dmset =
 	deathmatch = 1;
 	temp = ftos(deathmatch);
 	cvar_set("deathmatch", temp);
-//	announce2("deathmatch changed to ", temp);
+
+	if (clanring_playmode & CLANRING_HH_MODE)
+	{
+		if (deathmatch == 3)
+			cvar_set("cr_hh_weaponstay_pref", "1");
+		else if (deathmatch == 1)
+			cvar_set("cr_hh_weaponstay_pref", "0");
+	}
+	//	announce2("deathmatch changed to ", temp);
 };
 
 //

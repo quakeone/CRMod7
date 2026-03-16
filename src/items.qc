@@ -2175,27 +2175,27 @@ void() BackpackTouch =
 		hh_collect_heads_from_holder(other, self);
 		headtake = hh_collect_taken;
 
-		if (headtake > 0)
-		{
-			if (acount)
-				sprint(other, ", ");
+			if (headtake > 0)
+			{
+				if (acount)
+					sprint(other, ", ");
 
-			acount = 1;
-			sprint(other, ftos(headtake), " head");
-			if (headtake != 1)
-				sprint(other, "s");
-		}
+				acount = 1;
+				sprint(other, hh_number(headtake), " head");
+				if (headtake != 1)
+					sprint(other, "s");
+			}
 
 		if (hh_collect_reclaimed > 0)
-		{
-			if (acount)
-				sprint(other, ", ");
+			{
+				if (acount)
+					sprint(other, ", ");
 
-			acount = 1;
-			sprint(other, ftos(hh_collect_reclaimed), " head");
-			if (hh_collect_reclaimed != 1)
-				sprint(other, "s");
-			sprint(other, " back");
+				acount = 1;
+				sprint(other, hh_number(hh_collect_reclaimed), " head");
+				if (hh_collect_reclaimed != 1)
+					sprint(other, "s");
+				sprint(other, " back");
 		}
 	}
 	new = self.items;
@@ -2251,6 +2251,10 @@ void() BackpackTouch =
 		sprint(other, " cells");
 	}
 	sprint(other, "\n");
+
+	if ((clanring_playmode & CLANRING_HH_MODE) && (headtake > 0))
+		hh_broadcast_head_total(other);
+
 // backpack touch sound
 	sound (other, CHAN_ITEM, "weapons/lock4.wav", 1, ATTN_NORM);
 	other.stats_item_backpacks += 1;

@@ -471,6 +471,8 @@ void(string command, string value) config_command =
 		case "-practice-":
 		case "-match-tdm-":	// team deathmatch
 		case "-match-ctf-":	// team CTF subsection
+		case "-ffa-hh-":	// head hunters FFA
+		case "-team-hh-":	// head hunters team
 		case "-done-":
 		{
 			if (clanring_state & CLANRING_IGNORE_CONSOLE)
@@ -554,6 +556,28 @@ void(string command, string value) config_command =
 				else
 					clanring_state = clanring_state - (clanring_state & CLANRING_IGNORE_CONSOLE);
 				// no-op: removed debug prints
+			}
+
+			if (command == "-ffa-hh-")
+			{
+				if (!(clanring_playmode & CLANRING_HH_MODE))
+					clanring_state = clanring_state | CLANRING_IGNORE_CONSOLE;
+				else
+				if (cvar("teamplay") > 0)
+					clanring_state = clanring_state | CLANRING_IGNORE_CONSOLE;
+				else
+					clanring_state = clanring_state - (clanring_state & CLANRING_IGNORE_CONSOLE);
+			}
+
+			if (command == "-team-hh-")
+			{
+				if (!(clanring_playmode & CLANRING_HH_MODE))
+					clanring_state = clanring_state | CLANRING_IGNORE_CONSOLE;
+				else
+				if (cvar("teamplay") <= 0)
+					clanring_state = clanring_state | CLANRING_IGNORE_CONSOLE;
+				else
+					clanring_state = clanring_state - (clanring_state & CLANRING_IGNORE_CONSOLE);
 			}
 
 			if (command == "-done-")
@@ -1261,10 +1285,11 @@ void() clanring_main_config =
 {
 	print("Loading ClanRing Configuration File: \"configs/clanring.cfg\"\n");
 	// Ensure custom cvars exist before parsing config so cvar_set works on them
-	registercvar("cr_allow_leavemealone", "1");
-	registercvar("cr_pubctf_runes_override", "-1");
-	registercvar("cr_lockdown_until", "0");
-	registercvar("cr_lockdown_ips", "");
+		registercvar("cr_allow_leavemealone", "1");
+		registercvar("cr_hh_weaponstay_pref", "-1");
+		registercvar("cr_pubctf_runes_override", "-1");
+		registercvar("cr_lockdown_until", "0");
+		registercvar("cr_lockdown_ips", "");
 	registercvar("cr_lockdown_labels", "");
 	registercvar("cr_lockdown_auto_release_on_match_start", "0");
 	exec_clanring_cfg("configs/clanring.cfg");
@@ -1313,12 +1338,16 @@ void() clanring_exec_configs =
 	// Lockdown restore happens earlier during world init, before deferred config execution.
 	// If a config touches cr_lockdown_*, resync the cvars here so future restores stay correct.
 	lockdown_save_to_cvars();
-	
-	clanring_ent_config();//(FIXME)
-//	clanring_cam_config();//(FIXME)
-	if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-	{
-		read_capture_stats();
+		
+		clanring_ent_config();//(FIXME)
+	//	clanring_cam_config();//(FIXME)
+
+		if (clanring_playmode & CLANRING_HH_MODE)
+			hh_restore_weaponstay_pref();
+
+		if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+		{
+			read_capture_stats();
 	}
 	else if (clanring_playmode & CLANRING_AIRSHOT_MODE)
 	{
@@ -1395,21 +1424,21 @@ void (float soundtype) clanring_read_matchsounds =
 			if (matchsound_rematch[i] != "")
 				strunzone(matchsound_rematch[i]);
 			matchsound_rematch[i] = strzone(line);
-			clanring_matchsound_rematch_count = i;
+			clanring_matchsound_rematch_count = i + 1;
 		}
 		else if (soundtype == 2)
 		{
 			if (matchsound_blowout[i] != "")
 				strunzone(matchsound_blowout[i]);
 			matchsound_blowout[i] = strzone(line);
-			clanring_matchsound_blowout_count = i;
+			clanring_matchsound_blowout_count = i + 1;
 		}
 		else
 		{
 			if (matchsound[i] != "")
 				strunzone(matchsound[i]);
 			matchsound[i] = strzone(line);
-			clanring_matchsound_count = i;
+			clanring_matchsound_count = i + 1;
 		}
 		i++;
 	}

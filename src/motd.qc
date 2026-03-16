@@ -44,7 +44,7 @@ void() motd_think =
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		bail = TRUE;
 
-	if (self.owner.button0 || self.owner.button2 || vlen(self.owner.movement)) //cancel if they start moving too.
+	if ((self.count > 0) && (self.owner.button0 || self.owner.button2 || vlen(self.owner.movement))) //cancel after the first visible print
 		bail = TRUE;
 	
 	if ((clanring_state & CLANRING_TIMER_STARTED) && !(clanring_state & CLANRING_MATCH_STARTED))

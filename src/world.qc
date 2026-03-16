@@ -351,12 +351,32 @@ void() worldspawn =
     precache_sound ("boss1/sight1.wav"); //haste
     precache_sound ("hknight/slash1.wav"); //rune toss
     precache_sound ("misc/basekey.wav"); //flag dropped notification
-    precache_sound("buttons/switch04.wav"); //match timer countdown
-    precache_sound("crx/prepare.wav");
+	    precache_sound("buttons/switch04.wav"); //match timer countdown
+	    precache_sound("crx/prepare.wav");
 
-    precache_sound("enforcer/sight3.wav");//Item tossing "You There!"
-    precache_sound ("ra/laugh.wav"); // Powerup Denied sound.
-    //precache_model ("progs/spawn.mdl");
+	    precache_sound("enforcer/sight3.wav");//Item tossing "You There!"
+	    precache_sound ("ra/laugh.wav"); // Powerup Denied sound.
+	    precache_sound ("misc/null.wav");
+	    precache_sound ("hhsounds/altamb.wav");
+	    precache_sound ("hhsounds/altar1.wav");
+	    precache_sound ("hhsounds/altar2.wav");
+	    precache_sound ("hhsounds/altar3.wav");
+	    precache_sound ("hhsounds/altar4.wav");
+	    precache_sound ("hhsounds/catch1.wav");
+	    precache_sound ("hhsounds/catch2.wav");
+	    precache_sound ("hhsounds/catch3.wav");
+	    precache_sound ("hhsounds/catch4.wav");
+	    precache_sound ("hhsounds/bite1.wav");
+	    precache_sound ("hhsounds/bite2.wav");
+	    precache_sound ("hhsounds/pickup1.wav");
+	    precache_sound ("hhsounds/pickup2.wav");
+	    precache_sound ("hhsounds/pickup3.wav");
+	    precache_sound ("hhsounds/pickup4.wav");
+	    precache_sound ("hhsounds/pickup5.wav");
+	    precache_sound ("hhsounds/pickup6.wav");
+	    precache_sound ("hhsounds/pickup7.wav");
+	    precache_sound ("hhsounds/pickup8.wav");
+	    //precache_model ("progs/spawn.mdl");
     
     //
     // Setup light animation tables. 'a' is total darkness, 'z' is maxbright.

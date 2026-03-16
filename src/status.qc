@@ -375,34 +375,49 @@ void() TeamCapturePlayerUpdate =
 void() HeadHuntersPlayerUpdate =
 {
 	local float value;
+	local float hud_state;
 	local string res;
 	local string heads;
 
 	if (!(clanring_playmode & CLANRING_HH_MODE))
 		return;
 
-	if (strconv(1,0,0,(infokey(self, "f_status"))) == "off")
+	if (self.hh_is_head)
 		return;
 
 	if (self.statstate < 0)
 		return;
 
+	if (self.style & CLANRING_MOTD)
+		return;
+
 	if (self.laststattime > time)
 		return;
 
-	if ((self.style & CLANRING_MOTD) && (time >= self.leaderboardtime))
+	if (intermission_running)
 		return;
 
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
 
+	if (self.leaderboardtime > time)
+		return;
+
+	// QSSM 1.6.8+ reads heads/headvalue infokeys and draws its own HUD
+	if ((self.client == "QSS-M") && (self.client_ver_code >= 10608))
+		return;
+
 	self.laststattime = (time + PLAYERSTATTIME);
+	hud_state = self.statstate;
+	if (self.statstate > 7)
+		self.statstate = 7;
 	res = TeamSetStatRes2(self);
+	self.statstate = hud_state;
 	if (teamplay && (self.team > 0))
 		value = self.hh_head_total_value;
 	else
 		value = hh_score_value(self.ammo_heads);
-	heads = sprintf("\bHead Value\b %.0f   \bHeads\b %.0f", value, self.ammo_heads);
+	heads = sprintf("\bHead Value\b %.0f   \bHeads\b %.0f\n", value, self.ammo_heads);
 
 	centerprint(self, res, heads);
 };

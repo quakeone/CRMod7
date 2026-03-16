@@ -751,6 +751,12 @@ void() PlayerDie =
 	if (self.items & IT_LIGHTNING)
 		quaketv_lost_lg(self);
 
+	if (clanring_playmode & CLANRING_HH_MODE)
+	{
+		// Original HH spills carried heads into the world on carrier death.
+		hh_release_holder_heads(self, self.origin + '0 0 16', self.health);
+	}
+
 	if (deathmatch && !(clanring_playmode & CLANRING_PRACTICE_MODE) && !(mode_is_arena()))
 	{
 		DropBackpack ();
@@ -774,15 +780,20 @@ void() PlayerDie =
 	self.movetype = MOVETYPE_TOSS;
 	self.finaldest_y = MOVETYPE_TOSS;
 
-	// Ensure death transition is always considered changed for team info.
-	team_info_mark_target_dirty(self);
+		// Ensure death transition is always considered changed for team info.
+		team_info_mark_target_dirty(self);
 
-	if (((self.health < -40) && !(clanring_playmode & CLANRING_NO_GIBS))
-		|| (clanring_playmode & CLANRING_AIRSHOT_MODE)
-		|| (clanring_playmode & CLANRING_HH_MODE))
-	{
-		GibPlayer ();
-		PlayerDead ();
+		if (clanring_playmode & CLANRING_HH_MODE)
+		{
+			hh_player_die();
+			return;
+		}
+	
+		if (((self.health < -40) && !(clanring_playmode & CLANRING_NO_GIBS))
+			|| (clanring_playmode & CLANRING_AIRSHOT_MODE))
+		{
+			GibPlayer ();
+			PlayerDead ();
 		return;
 	}
 

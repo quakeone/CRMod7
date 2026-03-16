@@ -1019,12 +1019,17 @@ void() PutClientInServer =
     self.killstreak				= 0;
     self.combo_frags 			= 0;
     self.combo_time 			= 0;
-    hh_destroy_holder_heads(self);
-    self.ammo_heads             = 0;
-    self.hh_head_list           = world;
-    self.hh_head_total_value    = 0;
-    self.enemy					= world;	//who shot/killed us
-    self.enemy_target			= world;	//who we last shot/killed
+	    hh_destroy_holder_heads(self);
+	    self.ammo_heads             = 0;
+	    self.hh_head_list           = world;
+	    self.hh_head_total_value    = 0;
+	    hh_reset_player_head_state(self);
+	    self.hh_camp_check          = 0;
+	    self.hh_camp_countdown      = 0;
+	    self.hh_help_state          = 0;
+	    self.hh_help_context        = 0;
+	    self.enemy					= world;	//who shot/killed us
+	    self.enemy_target			= world;	//who we last shot/killed
 
     if ((clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_AIRSHOT_MODE))
     {
@@ -1344,6 +1349,9 @@ void() PlayerDeathThink =
         if (!(clanring_playmode & CLANRING_WIPEOUT_MODE) || ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0)))
             return;
     }
+    if ((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head && (self.hh_on_altar || self.hh_haunting))
+        return;
+
     // wait for all buttons released
     if (self.deadflag == DEAD_DEAD)
     {
@@ -1611,6 +1619,9 @@ void() PlayerPreThink =
         observer_pre_think ();
         return;
     }
+
+    if (clanring_playmode & CLANRING_HH_MODE)
+        hh_player_prethink(self);
 
     if (self.deadflag)
     {
@@ -2138,6 +2149,10 @@ void() PlayerPostThink =
     else if (clanring_playmode & CLANRING_HH_MODE)
     {
         HeadHuntersPlayerUpdate();
+        hh_update_carried_head_visuals(self);
+        hh_player_postthink(self);
+        if (self.hh_is_head)
+            return;
     }
 
     if (self.impulse)
@@ -2162,7 +2177,8 @@ void() PlayerPostThink =
             }
         }
 
-	        if ((self.impulse >= 19) && ((self.impulse != 22) || (clanring_playmode & CLANRING_HH_MODE)))
+	        if (((self.impulse >= 19) || ((clanring_playmode & CLANRING_HH_MODE) && (self.impulse == 9)))
+	            && ((self.impulse != 22) || (clanring_playmode & CLANRING_HH_MODE)))
 	        {
 	            if (self.impulse != 39) //Remove afk status when the client issues an impulse command, *except* 39, which is our (automated) lag-out checker.
 	                clear_afk_status(self);
