@@ -617,11 +617,8 @@ void() W_FireLightning =
 
 	if (self.ammo_cells < 1)
 	{
-		if (self.style & CLANRING_SMART_WEAPON)
-		{
-			self.weapon = W_BestWeapon();
-			W_SetCurrentAmmo();
-		}
+		self.weapon = W_BestWeapon();
+		W_SetCurrentAmmo();
 		self.weaponframe = 0;
 		return;
 	}
@@ -925,11 +922,8 @@ void(float ox) W_FireSpikes =
 
 	if (self.ammo_nails < 1)
 	{
-		if (self.style & CLANRING_SMART_WEAPON)
-		{
-			self.weapon = W_BestWeapon();
-			W_SetCurrentAmmo();
-		}
+		self.weapon = W_BestWeapon();
+		W_SetCurrentAmmo();
 		self.weaponframe = 0;
 		return;
 	}
@@ -1170,31 +1164,14 @@ void() W_Attack =
 
 	self.plag = FALSE;
 
-//autoswitch when letting off the fire button, unless SmartWeapon enabled.
+// Always fall back to the best available weapon when this one is empty.
 	if ((self.weapon != IT_HOOK) && (self.weapon != IT_AXE))
 	{
-		if (self.currentammo < 1)		
+		if (self.currentammo < 1)
 		{
-			self.attack_finished = time + 0.5;
-			if (self.style & CLANRING_SMART_WEAPON)
-			{
-				self.weapon = W_BestWeapon();
-				W_SetCurrentAmmo();
-			}
-			else
-			{
-				stuffcmd(self,";play weapons/g_click;\n");	// Don't require everyone to precache this.
-
-				if (self.currentammo <= 0)
-				{					
-					self.currentammo = 0.6;
-				}
-				else
-					self.currentammo -= 0.03;
-
-				self.weaponframe = 0;
-				return;
-			}
+			self.weapon = W_BestWeapon();
+			W_SetCurrentAmmo();
+			return;
 		}
 	}
 
@@ -1696,11 +1673,8 @@ void() W_WeaponFrame =
 		{
 			if (self.currentammo < 1)
 			{
-				if (self.style & CLANRING_SMART_WEAPON)
-				{
-					self.weapon = W_BestWeapon();
-					W_SetCurrentAmmo();
-				}
+				self.weapon = W_BestWeapon();
+				W_SetCurrentAmmo();
 				self.weaponframe = 0;
 			}
 		}
