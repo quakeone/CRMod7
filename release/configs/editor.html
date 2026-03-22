@@ -1,0 +1,2460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRMod7 Config Editor</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CradialGradient id='g' cx='50%25' cy='50%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%23d08a3c' stop-opacity='0.14'/%3E%3Cstop offset='100%25' stop-color='%230b080d' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cfilter id='glow' x='-40%25' y='-40%25' width='180%25' height='180%25'%3E%3CfeGaussianBlur stdDeviation='2.2' result='b'/%3E%3CfeMerge%3E%3CfeMergeNode in='b'/%3E%3CfeMergeNode in='SourceGraphic'/%3E%3C/feMerge%3E%3C/filter%3E%3C/defs%3E%3Crect width='64' height='64' rx='12' fill='%230b080d'/%3E%3Crect x='2.5' y='2.5' width='59' height='59' rx='10' fill='none' stroke='%234c2d18' stroke-width='1.5'/%3E%3Ccircle cx='32' cy='32' r='22' fill='url(%23g)'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-family='Arimo,Arial,Helvetica,sans-serif' font-weight='700' font-size='44' fill='%23cca252' filter='url(%23glow)'%3E7%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   CRMod7 Config Editor — Design System
+   Matches website palette (Quake charset derived)
+   ============================================================ */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg: #141215;
+  --bg-alt: #1a1620;
+  --surface: #1e1a1f;
+  --surface-2: #262025;
+  --surface-3: #2e272e;
+  --border: #3a3035;
+  --border-hover: rgba(200,112,48,0.3);
+  --primary: #c87030;
+  --primary-light: #e08840;
+  --secondary: #a85828;
+  --gold: #d4a040;
+  --bronze: #9c7848;
+  --text: #e8dcd0;
+  --text-dim: #b0a498;
+  --muted: #8a7e74;
+  --danger: #c44030;
+  --success: #4a9;
+  --sidebar-w: 250px;
+}
+
+html { font-size: 14px; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ---- Layout ---- */
+.app { display: flex; height: 100vh; }
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: var(--sidebar-w); min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+.sidebar-brand {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.sidebar-brand .logo { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 700; }
+.logo-cr { color: var(--primary); }
+.logo-mod { color: var(--text); }
+.logo-7 { color: var(--gold); }
+.sidebar-brand .sub { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 2px; }
+
+.sidebar-section { padding: 12px 12px 4px; }
+.sidebar-section-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--muted); padding: 0 8px; margin-bottom: 4px;
+}
+.sidebar-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-radius: 6px; cursor: pointer;
+  font-size: 0.85rem; color: var(--text-dim);
+  transition: all 0.15s;
+  position: relative;
+}
+.sidebar-item:hover { background: var(--surface-2); color: var(--text); }
+.sidebar-item.active { background: rgba(200,112,48,0.1); color: var(--primary-light); }
+.sidebar-item .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); flex-shrink: 0;
+}
+.sidebar-item.loaded .dot { background: var(--success); }
+.sidebar-item.dirty .dot { background: var(--gold); }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---- Drop zone ---- */
+.drop-zone {
+  border: 2px dashed var(--border); border-radius: 8px;
+  padding: 16px; text-align: center;
+  color: var(--muted); font-size: 0.75rem;
+  cursor: pointer; transition: all 0.2s;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--primary); color: var(--primary);
+  background: rgba(200,112,48,0.05);
+}
+.drop-zone svg { display: block; margin: 0 auto 6px; }
+
+.drop-overlay {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(20,18,21,0.92);
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+}
+.drop-overlay.active { display: flex; }
+.drop-overlay-box {
+  border: 3px dashed var(--primary); border-radius: 16px;
+  padding: 60px 80px; text-align: center;
+}
+.drop-overlay-box h3 { color: var(--primary-light); font-size: 1.3rem; }
+.drop-overlay-box p { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; }
+
+/* ---- Main ---- */
+.main { flex: 1; overflow-y: auto; background: var(--bg); }
+.main-inner { max-width: 900px; margin: 0 auto; padding: 28px 36px 60px; }
+
+/* ---- Page header ---- */
+.page-header { margin-bottom: 24px; }
+.page-header h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.3rem; font-weight: 700; color: var(--text);
+}
+.page-header .desc { font-size: 0.82rem; color: var(--text-dim); margin-top: 4px; }
+.page-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 6px; border: none;
+  font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #1a1215;
+}
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-secondary {
+  background: var(--surface-2); color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--border-hover); color: var(--text); }
+.btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+.btn-danger { background: rgba(196,64,48,0.15); color: var(--danger); border: 1px solid rgba(196,64,48,0.3); }
+.btn-danger:hover { background: rgba(196,64,48,0.25); }
+
+/* ---- Cards / Sections ---- */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px 24px; margin-bottom: 16px;
+  transition: border-color 0.2s;
+}
+.card:hover { border-color: var(--border-hover); }
+.card-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--primary); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title .icon {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: rgba(200,112,48,0.08);
+  border: 1px solid rgba(200,112,48,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem;
+}
+
+/* ---- Form Controls ---- */
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field-row { display: flex; align-items: flex-start; gap: 12px; }
+.field-row .field { flex: 1; margin-bottom: 0; }
+
+.field-label {
+  display: block; font-size: 0.75rem; font-weight: 500;
+  color: var(--text-dim); margin-bottom: 4px;
+}
+.field-hint { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+input[type="text"], input[type="number"], input[type="password"], textarea, select {
+  width: 100%; padding: 8px 12px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text);
+  font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+  transition: border-color 0.2s;
+  outline: none;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+input::placeholder, textarea::placeholder { color: var(--muted); }
+input.invalid { border-color: var(--danger); }
+textarea { resize: vertical; min-height: 60px; }
+select {
+  cursor: pointer; padding-right: 40px;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23e8dcd0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.input-reveal {
+  position: relative;
+}
+.input-reveal input { padding-right: 36px; }
+.input-reveal .reveal-btn {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 0.75rem; padding: 2px;
+}
+.input-reveal .reveal-btn:hover { color: var(--text); }
+
+/* ---- Toggle Switch ---- */
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0;
+}
+.toggle-row + .toggle-row { border-top: 1px solid var(--border); }
+.toggle-info { flex: 1; }
+.toggle-name { font-size: 0.82rem; font-weight: 500; color: var(--text); }
+.toggle-desc { font-size: 0.7rem; color: var(--muted); margin-top: 1px; }
+
+.toggle {
+  position: relative; width: 42px; height: 24px; flex-shrink: 0; margin-left: 12px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track {
+  position: absolute; inset: 0; border-radius: 12px;
+  background: var(--surface-3); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.2s;
+}
+.toggle-track::after {
+  content: ''; position: absolute; left: 3px; top: 3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--muted); transition: all 0.2s;
+}
+.toggle input:checked + .toggle-track {
+  background: rgba(200,112,48,0.2); border-color: var(--primary);
+}
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(18px); background: var(--primary-light);
+}
+
+/* ---- Tabs ---- */
+.tabs {
+  display: flex; gap: 2px; margin-bottom: 16px;
+  border-bottom: 1px solid var(--border); padding-bottom: 0;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  padding: 8px 14px; font-size: 0.78rem; font-weight: 500;
+  color: var(--muted); cursor: pointer; border-radius: 6px 6px 0 0;
+  border: 1px solid transparent; border-bottom: none;
+  transition: all 0.15s; white-space: nowrap; user-select: none;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text-dim); }
+.tab.active {
+  color: var(--primary-light); background: var(--surface);
+  border-color: var(--border); border-bottom-color: var(--surface);
+}
+
+/* ---- List Editor ---- */
+.list-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+  color: var(--text);
+  transition: background 0.1s;
+  cursor: grab;
+}
+.list-item:hover { background: var(--surface-2); }
+.list-item.dragging { opacity: 0.4; }
+.list-item .drag-handle { color: var(--muted); cursor: grab; font-size: 0.7rem; flex-shrink: 0; }
+.list-item .item-text { flex: 1; }
+.list-item .item-num { color: var(--muted); font-size: 0.7rem; width: 28px; text-align: right; flex-shrink: 0; }
+.list-item .remove-btn {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 0.8rem; padding: 2px 4px; border-radius: 3px;
+  opacity: 0; transition: all 0.15s;
+}
+.list-item:hover .remove-btn { opacity: 1; }
+.list-item .remove-btn:hover { color: var(--danger); background: rgba(196,64,48,0.1); }
+
+.list-add {
+  display: flex; gap: 6px; margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.list-add input { flex: 1; }
+.list-count { font-size: 0.7rem; color: var(--muted); margin-top: 6px; text-align: right; }
+
+/* ---- Warp Map Entry ---- */
+.warp-entry {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
+  display: grid; grid-template-columns: 140px 1fr 1fr; gap: 8px; align-items: center;
+}
+.warp-entry input { font-size: 0.78rem; padding: 6px 8px; }
+.warp-entry .warp-field-label {
+  font-size: 0.65rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.08em; margin-bottom: 2px;
+}
+/* ---- Empty / Welcome State ---- */
+.welcome {
+  text-align: center; padding: 80px 40px;
+}
+.welcome .logo-big {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.4rem; font-weight: 800; margin-bottom: 12px;
+}
+.welcome h2 { font-size: 1.2rem; color: var(--text-dim); font-weight: 400; margin-bottom: 24px; }
+.welcome .steps { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+.welcome .step {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px 24px; width: 200px; text-align: center;
+}
+.welcome .step .step-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.2rem; font-weight: 700; color: var(--primary);
+}
+.welcome .step p { font-size: 0.8rem; color: var(--text-dim); margin-top: 6px; }
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ---- Mode tab content ---- */
+.mode-content { display: none; }
+.mode-content.active { display: block; }
+
+/* ---- Warp split ---- */
+.warp-split { display: flex; gap: 16px; }
+.warp-cats { width: 220px; flex-shrink: 0; }
+.warp-maps { flex: 1; }
+.warp-cat-item {
+  padding: 7px 12px; border-radius: 6px; cursor: pointer;
+  font-size: 0.8rem; color: var(--text-dim); transition: all 0.15s;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.warp-cat-item:hover { background: var(--surface-2); color: var(--text); }
+.warp-cat-item.active { background: rgba(200,112,48,0.1); color: var(--primary-light); }
+.warp-cat-item .cat-count { font-size: 0.7rem; color: var(--muted); }
+
+/* ---- Responsive for smaller screens ---- */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main-inner { padding: 16px; }
+}
+
+/* ---- Notification ---- */
+.toast {
+  position: fixed; bottom: 52px; right: 24px; z-index: 999;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 20px;
+  font-size: 0.82rem; color: var(--text);
+  transform: translateY(80px); opacity: 0;
+  transition: all 0.3s;
+  pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.success { border-color: var(--success); }
+
+/* ---- Floating GitHub link ---- */
+.github-float {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  text-decoration: none;
+  transition: all 0.2s;
+  opacity: 0.7;
+  line-height: 0;
+}
+.github-float:hover {
+  opacity: 1;
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+.github-float svg { flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo"><span class="logo-cr">CR</span><span class="logo-mod">Mod</span><span class="logo-7">7</span></div>
+      <div class="sub">Config Editor</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Server Config</div>
+      <div class="sidebar-item" data-tab="engine" onclick="switchTab('engine')">
+        <span class="dot"></span> engine.cfg
+      </div>
+      <div class="sidebar-item" data-tab="clanring" onclick="switchTab('clanring')">
+        <span class="dot"></span> clanring.cfg
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Map Rotation</div>
+      <div class="sidebar-item" data-tab="levels" onclick="switchTab('levels')">
+        <span class="dot"></span> levels.cfg
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Map Overrides</div>
+      <div class="sidebar-item" data-tab="mapconfigs" onclick="switchTab('mapconfigs')">
+        <span class="dot"></span> maps/*.cfg
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Sounds</div>
+      <div class="sidebar-item" data-tab="matchsounds" onclick="switchTab('matchsounds')">
+        <span class="dot"></span> matchsounds.cfg
+      </div>
+      <div class="sidebar-item" data-tab="matchsounds_blowout" onclick="switchTab('matchsounds_blowout')">
+        <span class="dot"></span> matchsounds_blowout.cfg
+      </div>
+      <div class="sidebar-item" data-tab="matchsounds_rematch" onclick="switchTab('matchsounds_rematch')">
+        <span class="dot"></span> matchsounds_rematch.cfg
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Warp Menu</div>
+      <div class="sidebar-item" data-tab="warpmenu" onclick="switchTab('warpmenu')">
+        <span class="dot"></span> warp_main_menu.cfg
+      </div>
+      <div class="sidebar-item" data-tab="warp" onclick="switchTab('warp')">
+        <span class="dot"></span> warp.cfg
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn btn-primary" style="width:100%;margin-bottom:8px;justify-content:center;" onclick="exportAll()">Export All</button>
+      <div class="drop-zone" id="sidebarDrop" onclick="document.getElementById('folderInput').click()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        Import configs folder
+      </div>
+      <input type="file" id="fileInput" multiple accept=".cfg" style="display:none" onchange="handleFiles(this.files);this.value=''">
+      <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none" onchange="handleFiles(this.files);this.value=''">
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main" id="main">
+    <div class="main-inner" id="mainContent">
+      <!-- Populated by JS -->
+    </div>
+  </main>
+</div>
+
+<!-- Full-screen drop overlay -->
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-overlay-box">
+    <h3>Drop .cfg files or folders here</h3>
+    <p>The editor will auto-detect config types — drop the maps/ folder to load all overrides at once</p>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  CRMod7 Config Editor - Application Logic
+// ============================================================
+
+// ---- State ----
+const State = {
+  activeTab: 'welcome',
+  engine: null,
+  clanring: null,
+  levels: null,
+  mapConfigs: {},
+  matchsounds: null,
+  matchsoundsBlowout: null,
+  matchsoundsRematch: null,
+  warpMenu: null,
+  warp: null,
+  dirty: new Set(),
+  loaded: new Set(),
+};
+
+// Known on/off toggle commands
+const TOGGLES = {
+  quad: ['quadon','quadoff'],
+  ring: ['ringon','ringoff'],
+  pent: ['penton','pentoff'],
+  runes: ['runeson','runesoff'],
+  safepractice: ['safepracticeon','safepracticeoff'],
+  autopause: ['autopauseon','autopauseoff'],
+  matchsounds: ['matchsoundson','matchsoundsoff'],
+  modevote: ['modevoteon','modevoteoff'],
+  powerupdrop: ['powerupdropon','powerupdropoff'],
+};
+
+const MODE_SECTIONS = ['-init-','-ffa-','-pub-ctf-','-practice-','-match-tdm-','-match-ctf-','-ffa-hh-','-team-hh-','-done-'];
+const MODE_LABELS = {
+  '-ffa-': 'Free-For-All',
+  '-ffa-hh-': 'FFA Head Hunters',
+  '-team-hh-': 'Team Head Hunters',
+  '-pub-ctf-': 'Public CTF',
+  '-practice-': 'Practice',
+  '-match-tdm-': 'Match TDM',
+  '-match-ctf-': 'Match CTF',
+};
+
+// ---- Toast ----
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = 'toast', 2500);
+}
+
+// ---- Tab Switching ----
+function switchTab(tab) {
+  State.activeTab = tab;
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+  renderMain();
+}
+
+function updateSidebarState() {
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    const t = el.dataset.tab;
+    el.classList.toggle('loaded', State.loaded.has(t));
+    el.classList.toggle('dirty', State.dirty.has(t));
+  });
+}
+
+// ============================================================
+//  PARSERS
+// ============================================================
+
+// ---- engine.cfg parser ----
+function parseEngine(text) {
+  const data = {
+    cr_startmode: '2',
+    teamplay: '0',
+    map: 'ctf1',
+    hostname: '',
+    sv_public: '1',
+    net_masterextra1: '',
+    net_masterextra2: '',
+    net_masterextra3: '',
+    net_messagetimeout: '60',
+    sv_gameplayfix_bouncedownslopes: '1',
+    external_vis: '0',
+    sv_fullpitch: '0',
+    password: '',
+    rcon_password: '',
+  };
+  let sawStartMode = false;
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t || t.startsWith('//') || t.startsWith('#')) continue;
+    const sp = t.indexOf(' ');
+    if (sp < 0) continue;
+    const cmd = t.substring(0, sp).toLowerCase();
+    let val = t.substring(sp + 1).trim();
+    // Strip trailing inline comment (but preserve URLs)
+    const cm = val.match(/^(.*\S)\s+\/\/.*$/);
+    if (cm) val = cm[1];
+    if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+    if (cmd === 'set' || cmd === 'seta') {
+      const setMatch = val.match(/^([^\s]+)\s+(.+)$/);
+      if (setMatch) {
+        const setName = setMatch[1].toLowerCase();
+        let setVal = setMatch[2].trim();
+        if (setVal.startsWith('"') && setVal.endsWith('"')) setVal = setVal.slice(1, -1);
+        if (setName === 'cr_startmode') {
+          data.cr_startmode = setVal;
+          sawStartMode = true;
+        } else if (data.hasOwnProperty(setName)) {
+          data[setName] = setVal;
+        }
+      }
+      continue;
+    }
+    if (cmd === 'samelevel' && !sawStartMode) {
+      // Legacy import path for older startup configs.
+      data.cr_startmode = val;
+      continue;
+    }
+    if (data.hasOwnProperty(cmd)) data[cmd] = val;
+    // 'echo' and other non-setting lines are ignored
+  }
+  return data;
+}
+
+// ---- clanring.cfg parser ----
+function parseClanring(text) {
+  const lines = text.split('\n');
+  const data = {
+    admin: { setadmin: '', slots: ['','','','','','','','',''] },
+    webhooks: { captimesdiscordurl:'', statsdiscordurl:'', matchposturl:'', googlesheetsurl:'', googlesheetsapikey:'' },
+    network: { ctfticrate: '0.025', tdmticrate: '0.025' },
+    gameplay: { quad: true, ring: false, pent: false, runes: false, noexit: '1', pausable: '0' },
+    features: { autopause: true, matchsounds: true, safepractice: false },
+    player: { cr_allow_leavemealone: '1', cr_allow_qwsucks: '1', cr_allow_q14ever: '1' },
+    rotation: { cr_dm_randomize_start: '1', cr_ra_randomize_start: '1', cr_hh_randomize_start: '0' },
+    init: { modevote: true, kickafk: '0' },
+    modes: {}
+  };
+  for (const m of Object.keys(MODE_LABELS)) data.modes[m] = {};
+
+  let section = 'global';
+
+  for (let i = 0; i < lines.length; i++) {
+    let raw = lines[i].trim();
+    if (!raw || raw.startsWith('//') || raw.startsWith('#') || raw.startsWith('/*') || raw.startsWith('*')) continue;
+
+    // Strip inline comment carefully (preserve URLs containing //)
+    let cmd, val;
+    const spaceIdx = raw.indexOf(' ');
+    if (spaceIdx > 0) {
+      cmd = raw.substring(0, spaceIdx).toLowerCase();
+      val = raw.substring(spaceIdx + 1).trim();
+      // Strip trailing // comments only if they're after whitespace+//
+      const commentMatch = val.match(/^(.*\S)\s+\/\/.*$/);
+      if (commentMatch) val = commentMatch[1];
+      // Remove surrounding quotes
+      if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+    } else {
+      cmd = raw.toLowerCase();
+      val = '';
+    }
+
+    // Section markers
+    if (MODE_SECTIONS.includes(cmd)) {
+      section = cmd;
+      continue;
+    }
+
+    // Route by section
+    if (section === 'global') {
+      parseClanringCmd(data, 'global', cmd, val);
+    } else if (section === '-init-') {
+      parseClanringCmd(data, 'init', cmd, val);
+    } else if (data.modes[section] !== undefined) {
+      parseClanringCmd(data, section, cmd, val);
+    }
+  }
+  return data;
+}
+
+function parseClanringCmd(data, section, cmd, val) {
+  // Admin
+  if (cmd === 'setadmin') { data.admin.setadmin = val; return; }
+  const adminMatch = cmd.match(/^setadmin(\d)$/);
+  if (adminMatch) { data.admin.slots[parseInt(adminMatch[1]) - 1] = val; return; }
+
+  // Webhooks
+  if (['captimesdiscordurl','statsdiscordurl','matchposturl','googlesheetsurl','googlesheetsapikey'].includes(cmd)) {
+    data.webhooks[cmd] = val; return;
+  }
+
+  // Network
+  if (cmd === 'ctfticrate') { data.network.ctfticrate = val; return; }
+  if (cmd === 'tdmticrate') { data.network.tdmticrate = val; return; }
+
+  // Player features (cvars)
+  if (['cr_allow_leavemealone','cr_allow_qwsucks','cr_allow_q14ever'].includes(cmd)) {
+    data.player[cmd] = val; return;
+  }
+
+  // Rotation randomize cvars
+  if (['cr_dm_randomize_start','cr_ra_randomize_start','cr_hh_randomize_start'].includes(cmd)) {
+    data.rotation[cmd] = val; return;
+  }
+
+  // Toggle commands
+  for (const [key, [onCmd, offCmd]] of Object.entries(TOGGLES)) {
+    if (cmd === onCmd || cmd === offCmd) {
+      const isOn = (cmd === onCmd);
+      if (section === 'global') {
+        if (['quad','ring','pent','runes'].includes(key)) data.gameplay[key] = isOn;
+        else if (['autopause','matchsounds','safepractice'].includes(key)) data.features[key] = isOn;
+      } else if (section === 'init') {
+        if (key === 'modevote') data.init.modevote = isOn;
+      } else if (data.modes[section] !== undefined) {
+        data.modes[section][key] = isOn;
+      }
+      return;
+    }
+  }
+
+  // Numeric/cvar commands
+  if (cmd === 'noexit' && section === 'global') { data.gameplay.noexit = val; return; }
+  if (cmd === 'pausable' && section === 'global') { data.gameplay.pausable = val; return; }
+  if (cmd === 'kickafk' || cmd === 'setafk') { data.init.kickafk = val; return; }
+
+  // Mode-specific numeric settings
+  if (data.modes[section] !== undefined) {
+    if (['timelimit','fraglimit','deathmatch','teamplay','setovertime'].includes(cmd)) {
+      data.modes[section][cmd] = val;
+    }
+  }
+}
+
+// ---- levels.cfg parser ----
+function parseLevels(text) {
+  const lines = text.split('\n');
+  const data = { '-ctf-': [], '-dm-': [], '-ca-': [], '-ra-': [], '-hh-': [] };
+  let section = null;
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t || t.startsWith('//') || t.startsWith('#')) continue;
+    if (['-ctf-','-dm-','-ca-','-ra-','-hh-'].includes(t)) { section = t; continue; }
+    if (section && data[section]) data[section].push(t);
+  }
+  return data;
+}
+
+// ---- matchsounds parser ----
+function parseMatchsounds(text) {
+  const lines = text.split('\n');
+  const entries = [];
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t || t.startsWith('//') || t.startsWith('#')) continue;
+    entries.push(t);
+  }
+  return entries;
+}
+
+// ---- matchsounds special (blowout/rematch) ----
+function parseMatchsoundsSpecial(text) {
+  const lines = text.split('\n');
+  let entry = '';
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    // Check for commented-out entry
+    if (t.startsWith('//') && t.match(/\.wav$/i)) {
+      entry = t.replace(/^\/\/\s*/, '');
+      continue;
+    }
+    if (!t.startsWith('//') && !t.startsWith('#') && t.match(/\.wav$/i)) {
+      entry = t;
+    }
+  }
+  return entry;
+}
+
+// ---- warp_main_menu.cfg parser ----
+function parseWarpMenu(text) {
+  const lines = text.split('\n');
+  const entries = [];
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t || t.startsWith('//') || t.startsWith('#')) continue;
+    entries.push(t);
+  }
+  return entries;
+}
+
+// ---- warp.cfg parser ----
+function parseWarp(text) {
+  const lines = text.split('\n');
+  const categories = [];
+  let cat = { maps: [] };
+  let state = 'filename'; // filename, title, author
+  let current = {};
+  let firstCat = true;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const t = raw.trim();
+
+    if (t === '****') {
+      if (!firstCat || cat.maps.length > 0) categories.push(cat);
+      cat = { maps: [] };
+      firstCat = false;
+      state = 'filename';
+      current = {};
+      continue;
+    }
+
+    if (state === 'filename') {
+      if (!t || t.startsWith('//') || t.startsWith('#')) continue;
+      current = { filename: t, title: '', author: '' };
+      state = 'title';
+    } else if (state === 'title') {
+      current.title = raw.trimEnd();
+      state = 'author';
+    } else if (state === 'author') {
+      current.author = raw.trimEnd();
+      cat.maps.push(current);
+      current = {};
+      state = 'filename';
+    }
+  }
+  if (cat.maps.length > 0) categories.push(cat);
+  return categories;
+}
+
+// ---- map config parser ----
+function parseMapConfig(text, filename) {
+  const name = filename.replace(/\.cfg$/i, '');
+  const lines = text.split('\n');
+  const modes = {};
+  let section = null;
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t || t.startsWith('//') || t.startsWith('#')) continue;
+
+    let cmd, val;
+    const sp = t.indexOf(' ');
+    if (sp > 0) {
+      cmd = t.substring(0, sp).toLowerCase();
+      val = t.substring(sp + 1).trim();
+      const cm = val.match(/^(.*\S)\s+\/\/.*$/);
+      if (cm) val = cm[1];
+    } else {
+      cmd = t.toLowerCase();
+      val = '';
+    }
+
+    if (MODE_SECTIONS.includes(cmd)) { section = cmd; if (!modes[section]) modes[section] = {}; continue; }
+    if (!section) continue;
+
+    // Toggles
+    let matched = false;
+    for (const [key, [onCmd, offCmd]] of Object.entries(TOGGLES)) {
+      if (cmd === onCmd) { modes[section][key] = true; matched = true; break; }
+      if (cmd === offCmd) { modes[section][key] = false; matched = true; break; }
+    }
+    if (matched) continue;
+    if (['timelimit','fraglimit','deathmatch','teamplay','setovertime'].includes(cmd)) {
+      modes[section][cmd] = val;
+    }
+  }
+  return { name, filename, modes };
+}
+
+// ============================================================
+//  SERIALIZERS
+// ============================================================
+
+function serializeClanring(data) {
+  let out = '';
+  const ln = s => { out += s + '\n'; };
+  const banner = title => {
+    ln('');
+    ln('////////////////////////////////////////////////////////////////////////////////////////////////////');
+    ln('//                                                                                                //');
+    ln('//                              ' + title.padEnd(62) + '//');
+    ln('//                                                                                                //');
+    ln('////////////////////////////////////////////////////////////////////////////////////////////////////');
+    ln('');
+  };
+
+  ln('// ================================================================================================');
+  ln('//');
+  ln('//  C L A N R I N G . C F G  -  Main Server Configuration');
+  ln('//');
+  ln('//  How this file works:');
+  ln('//    - Global commands run every time the server starts a new level.');
+  ln('//    - The -init- section runs ONCE on first server start, never again.');
+  ln('//    - Mode sections (-ffa-, -practice-, -match-tdm-, etc.) only run when');
+  ln('//      the server enters that specific mode. Settings here override globals.');
+  ln('//');
+  ln('// ================================================================================================');
+
+  banner('GLOBAL  -  Admin Authentication');
+  ln('// Main admin passcode (4-7 digits, first digit must be non-zero).');
+  ln('// This is the "super admin" - can kick any other admin. Shows as code 0.');
+  if (data.admin.setadmin) ln('setadmin ' + data.admin.setadmin);
+  ln('');
+  ln('// Additional admin passcodes (slots 1-9). Same format as above.');
+  ln('// These admins CANNOT kick other admins.');
+  for (let i = 0; i < 9; i++) {
+    if (data.admin.slots[i]) ln('setadmin' + (i+1) + ' ' + data.admin.slots[i]);
+    else ln('//setadmin' + (i+1) + ' 1234567');
+  }
+
+  banner('GLOBAL  -  Webhooks & Integrations');
+  ln('// Discord webhook for CTF cap time notifications');
+  if (data.webhooks.captimesdiscordurl) ln('captimesdiscordurl ' + data.webhooks.captimesdiscordurl);
+  ln('');
+  ln('// Discord webhook for end-of-match stats');
+  if (data.webhooks.statsdiscordurl) ln('statsdiscordurl ' + data.webhooks.statsdiscordurl);
+  ln('');
+  ln('// External match result reporting endpoint');
+  if (data.webhooks.matchposturl) ln('matchposturl ' + data.webhooks.matchposturl);
+  ln('');
+  ln('// Google Sheets integration for cap time record tracking');
+  if (data.webhooks.googlesheetsurl) ln('googlesheetsurl ' + data.webhooks.googlesheetsurl);
+  if (data.webhooks.googlesheetsapikey) ln('googlesheetsapikey ' + data.webhooks.googlesheetsapikey);
+
+  banner('GLOBAL  -  Network');
+  ln('ctfticrate ' + data.network.ctfticrate);
+  ln('tdmticrate ' + data.network.tdmticrate);
+
+  banner('GLOBAL  -  Core Gameplay');
+  ln(data.gameplay.quad ? 'quadon' : 'quadoff');
+  ln(data.gameplay.ring ? 'ringon' : 'ringoff');
+  ln(data.gameplay.pent ? 'penton' : 'pentoff');
+  ln(data.gameplay.runes ? 'runeson' : 'runesoff');
+  ln('noexit ' + data.gameplay.noexit);
+  ln('pausable ' + data.gameplay.pausable);
+
+  banner('GLOBAL  -  Server Features');
+  ln(data.features.autopause ? 'autopauseon' : 'autopauseoff');
+  ln(data.features.matchsounds ? 'matchsoundson' : 'matchsoundsoff');
+  ln(data.features.safepractice ? 'safepracticeon' : 'safepracticeoff');
+
+  banner('GLOBAL  -  Player Features');
+  ln('cr_allow_leavemealone ' + data.player.cr_allow_leavemealone);
+  ln('cr_allow_qwsucks ' + data.player.cr_allow_qwsucks);
+  ln('cr_allow_q14ever ' + data.player.cr_allow_q14ever);
+
+  banner('GLOBAL  -  Map Rotation');
+  ln('cr_dm_randomize_start ' + data.rotation.cr_dm_randomize_start);
+  ln('cr_ra_randomize_start ' + data.rotation.cr_ra_randomize_start);
+  ln('cr_hh_randomize_start ' + data.rotation.cr_hh_randomize_start);
+
+  banner('INIT  -  One-Time Server Setup');
+  ln('-init-');
+  ln(data.init.modevote ? 'modevoteon' : 'modevoteoff');
+  ln('kickafk ' + data.init.kickafk);
+
+  // Modes
+  const modeOrder = ['-ffa-','-ffa-hh-','-team-hh-','-pub-ctf-','-practice-','-match-tdm-','-match-ctf-'];
+  for (const mode of modeOrder) {
+    const d = data.modes[mode];
+    if (!d) continue;
+    banner('MODE  -  ' + MODE_LABELS[mode]);
+    ln(mode);
+    if (d.teamplay !== undefined) ln('teamplay ' + d.teamplay);
+    if (d.timelimit !== undefined) ln('timelimit ' + d.timelimit);
+    if (d.fraglimit !== undefined) ln('fraglimit ' + d.fraglimit);
+    if (d.setovertime !== undefined) ln('setovertime ' + d.setovertime);
+    if (d.deathmatch !== undefined) ln('deathmatch ' + d.deathmatch);
+    for (const key of ['powerupdrop','matchsounds','safepractice','runes','ring','pent','quad']) {
+      if (d[key] !== undefined) ln(d[key] ? TOGGLES[key][0] : TOGGLES[key][1]);
+    }
+  }
+
+  return out;
+}
+
+function serializeEngine(data) {
+  let out = '';
+  const ln = s => { out += s + '\n'; };
+  const startupParsed = parseStartMode(data.cr_startmode);
+  const banner = title => {
+    ln('');
+    ln('////////////////////////////////////////////////////////////////////////////////////////////////////');
+    ln('//                                                                                                //');
+    ln('//                              ' + title.padEnd(62) + '//');
+    ln('//                                                                                                //');
+    ln('////////////////////////////////////////////////////////////////////////////////////////////////////');
+    ln('');
+  };
+
+  ln('// ================================================================================================');
+  ln('//');
+  ln('//  E N G I N E . C F G  -  Engine-Level Server Settings');
+  ln('//');
+  ln('//  This file is called "engine" because everything in it is a Quake engine');
+  ln('//  cvar or command — settings that exist regardless of which mod is loaded.');
+  ln('//  The mod\'s own gameplay settings (admin codes, powerups, mode rules, etc.)');
+  ln('//  live in clanring.cfg instead.');
+  ln('//');
+  ln('//  Loaded from server.cfg at the mod root:  exec "configs/engine.cfg"');
+  ln('//  Runs once at engine startup, before the mod initializes.');
+  ln('//');
+  ln('// ================================================================================================');
+
+  banner('Startup  -  Initial Mode & Map');
+  ln('// Print to console to confirm engine.cfg loaded');
+  ln('echo "CRMod7 engine.cfg loaded"');
+  ln('');
+  ln('// One-shot startup seed read by CRMod7 before first world init');
+  ln('// CRMod7 manages samelevel itself after startup; do not set samelevel here');
+  ln('set cr_startmode ' + data.cr_startmode);
+  if (startupParsed.gameType === 'hh') {
+    ln('// Head Hunters variant: teamplay 0 = FFA, teamplay 1 = Team HH');
+    ln('teamplay ' + (data.teamplay === '1' ? '1' : '0'));
+  }
+  ln('');
+  ln('// The first map loaded when the server starts');
+  ln('map ' + data.map);
+
+  banner('Server Identity');
+  ln('// Server name shown in the server browser and on connect');
+  ln('hostname "' + data.hostname.replace(/["\r\n]/g, '') + '"');
+  ln('');
+  ln('// Whether to advertise on master server lists (1 = public, 0 = unlisted)');
+  ln('sv_public ' + data.sv_public);
+  ln('');
+  ln('// Override the default master server addresses (empty = disable that master)');
+  ln('net_masterextra1 "' + data.net_masterextra1 + '"');
+  ln('net_masterextra2 "' + data.net_masterextra2 + '"');
+  ln('net_masterextra3 "' + data.net_masterextra3 + '"');
+
+  banner('Network');
+  ln('// Seconds before a non-responsive client is kicked (ghost client cleanup)');
+  ln('net_messagetimeout ' + data.net_messagetimeout);
+
+  banner('Engine & Physics Fixes');
+  ln('// Fix grenades making horrible buzzing noises when sliding on sloped surfaces');
+  ln('sv_gameplayfix_bouncedownslopes ' + data.sv_gameplayfix_bouncedownslopes);
+  ln('');
+  ln('// Whether to load external .vis files from the maps folder (0 = use BSP-embedded vis data)');
+  ln('external_vis ' + data.external_vis);
+  ln('');
+  ln('// Player view pitch limits (0 = original Quake limits, 1 = unrestricted up/down look)');
+  ln('sv_fullpitch ' + data.sv_fullpitch);
+
+  banner('Server Passwords');
+  if (data.password) ln('password ' + data.password);
+  else ln('// password 123');
+  ln('');
+  if (data.rcon_password) ln('rcon_password ' + data.rcon_password);
+  else ln('// rcon_password 123');
+
+  return out;
+}
+
+function serializeLevels(data) {
+  let out = '';
+  const ln = s => { out += s + '\n'; };
+  ln('// ================================================================================================');
+  ln('//');
+  ln('//  L E V E L S . C F G  -  Map Rotation');
+  ln('//');
+  ln('//  Sequential rotation — after each game, advances to the next map and loops.');
+  ln('//  Randomize-start behavior is configured per mode in clanring.cfg.');
+  ln('//  Rules: list .bsp filenames only (no extension), 128 maps max per mode.');
+  ln('//');
+  ln('// ================================================================================================');
+  ln('');
+  for (const mode of ['-ctf-','-dm-','-ca-','-ra-','-hh-']) {
+    if (!data[mode] || !data[mode].length) continue;
+    ln(mode);
+    for (const m of data[mode]) ln(m);
+    ln('');
+  }
+  return out;
+}
+
+function serializeMatchsounds(entries) {
+  let out = '// matchsounds.cfg\n// GameOver music during the nextmap vote menu (~20 seconds). Max 20 slots.\n';
+  for (const e of entries) out += e + '\n';
+  return out;
+}
+
+function serializeMatchsoundsSpecial(entry, type) {
+  if (type === 'blowout') {
+    return '//Blowout Sounds:\n//\n//For CTF: score difference > 200. For non-CTF: score difference > 40.\n' + (entry || '//matchsounds/blowout.wav') + '\n';
+  } else {
+    return '//Rematch Sounds:\n//\n//For CTF: score difference < 50. For non-CTF: score difference < 10.\n' + (entry || '//matchsounds/rematch.wav') + '\n';
+  }
+}
+
+function serializeWarpMenu(entries) {
+  let out = '// ================================================================================================\n';
+  out += '//\n//  W A R P _ M A I N _ M E N U . C F G  -  Warp Category Menu\n//\n';
+  out += '//  Each non-comment line is a numbered menu entry (50 slots max).\n';
+  out += '//  Entries correspond 1:1 to ****-separated sections in warp.cfg.\n//\n';
+  out += '// ================================================================================================\n\n';
+  for (const e of entries) out += e + '\n';
+  return out;
+}
+
+function serializeWarp(categories) {
+  let out = '// ================================================================================================\n';
+  out += '//\n//  W A R P . C F G  -  Warp Map Definitions\n//\n';
+  out += '//  Format: filename / title / author (3 lines per map). **** separates categories.\n//\n';
+  out += '// ================================================================================================\n\n';
+  for (let i = 0; i < categories.length; i++) {
+    if (i > 0) out += '****\n';
+    for (const m of categories[i].maps) {
+      out += m.filename + '\n' + m.title + '\n' + m.author + '\n//---------------------\n';
+    }
+    out += '\n';
+  }
+  return out;
+}
+
+function serializeMapConfig(mc) {
+  let out = '// ' + mc.filename + ' - Per-map overrides\n//\n';
+  out += '// Loaded after clanring.cfg. Only settings that differ from defaults.\n\n';
+  for (const [mode, settings] of Object.entries(mc.modes)) {
+    out += mode + '\n';
+    for (const [key, val] of Object.entries(settings)) {
+      if (TOGGLES[key]) {
+        out += (val ? TOGGLES[key][0] : TOGGLES[key][1]) + '\n';
+      } else {
+        out += key + ' ' + val + '\n';
+      }
+    }
+  }
+  return out;
+}
+
+// ============================================================
+//  FILE I/O
+// ============================================================
+
+function downloadFile(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function detectFileType(filename, content) {
+  const fn = filename.toLowerCase();
+  if (fn === 'engine.cfg') return 'engine';
+  if (fn === 'clanring.cfg') return 'clanring';
+  if (fn === 'levels.cfg') return 'levels';
+  if (fn === 'matchsounds_blowout.cfg') return 'matchsounds_blowout';
+  if (fn === 'matchsounds_rematch.cfg') return 'matchsounds_rematch';
+  if (fn === 'matchsounds.cfg') return 'matchsounds';
+  if (fn === 'warp_main_menu.cfg') return 'warpmenu';
+  if (fn === 'warp.cfg') return 'warp';
+  // Check content for map config patterns
+  if (content.match(/-match-tdm-|-match-ctf-|-ffa-/)) return 'mapconfig';
+  return 'unknown';
+}
+
+function handleFiles(files) {
+  const cfgFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.cfg'));
+  if (!cfgFiles.length) return;
+  const isBatch = cfgFiles.length > 1;
+  let loaded = 0;
+
+  for (const file of cfgFiles) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      const type = detectFileType(file.name, content);
+      importConfig(type, file.name, content, isBatch);
+      loaded++;
+      if (isBatch && loaded === cfgFiles.length) {
+        toast(`Imported ${loaded} config file${loaded !== 1 ? 's' : ''}`, 'success');
+        renderMain();
+      }
+    };
+    reader.readAsText(file);
+  }
+}
+
+function importConfig(type, filename, content, quiet) {
+  switch (type) {
+    case 'engine':
+      State.engine = parseEngine(content);
+      State.loaded.add('engine');
+      break;
+    case 'clanring':
+      State.clanring = parseClanring(content);
+      State.loaded.add('clanring');
+      break;
+    case 'levels':
+      State.levels = parseLevels(content);
+      State.loaded.add('levels');
+      break;
+    case 'matchsounds':
+      State.matchsounds = parseMatchsounds(content);
+      State.loaded.add('matchsounds');
+      break;
+    case 'matchsounds_blowout':
+      State.matchsoundsBlowout = parseMatchsoundsSpecial(content);
+      State.loaded.add('matchsounds_blowout');
+      break;
+    case 'matchsounds_rematch':
+      State.matchsoundsRematch = parseMatchsoundsSpecial(content);
+      State.loaded.add('matchsounds_rematch');
+      break;
+    case 'warpmenu':
+      State.warpMenu = parseWarpMenu(content);
+      State.loaded.add('warpmenu');
+      break;
+    case 'warp':
+      State.warp = parseWarp(content);
+      State.loaded.add('warp');
+      break;
+    case 'mapconfig':
+      const mc = parseMapConfig(content, filename);
+      State.mapConfigs[mc.name] = mc;
+      State.loaded.add('mapconfigs');
+      break;
+    default:
+      if (!quiet) toast('Unknown file type: ' + filename);
+      return;
+  }
+  if (!quiet) {
+    switchTab(type === 'mapconfig' ? 'mapconfigs' : type === 'warpmenu' ? 'warpmenu' : type);
+    toast('Loaded ' + filename, 'success');
+  }
+  updateSidebarState();
+}
+
+// ============================================================
+//  RENDERERS
+// ============================================================
+
+function renderMain() {
+  const el = document.getElementById('mainContent');
+  switch (State.activeTab) {
+    case 'engine': el.innerHTML = renderEngine(); break;
+    case 'clanring': el.innerHTML = renderClanring(); break;
+    case 'levels': el.innerHTML = renderLevelsPage(); break;
+    case 'matchsounds': el.innerHTML = renderMatchsoundsPage(); break;
+    case 'matchsounds_blowout': el.innerHTML = renderMatchsoundsSpecialPage('blowout'); break;
+    case 'matchsounds_rematch': el.innerHTML = renderMatchsoundsSpecialPage('rematch'); break;
+    case 'warpmenu': el.innerHTML = renderWarpMenuPage(); break;
+    case 'warp': el.innerHTML = renderWarpPage(); break;
+    case 'mapconfigs': el.innerHTML = renderMapConfigsPage(); break;
+    default: el.innerHTML = renderWelcome();
+  }
+  attachEventListeners();
+}
+
+function renderWelcome() {
+  return `
+    <div class="welcome">
+      <div class="logo-big"><span class="logo-cr">CR</span><span class="logo-mod">Mod</span><span class="logo-7">7</span></div>
+      <h2>Config Editor</h2>
+      <p style="color:var(--text-dim);font-size:0.85rem;max-width:480px;margin:0 auto;">
+        When opened from the <span style="font-family:'JetBrains Mono',monospace;color:var(--primary);">configs/</span> folder,
+        files auto-load on startup. You can also drag-and-drop or import manually.
+        All editing happens locally in your browser — nothing is uploaded.
+      </p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <p>Open this file from the configs/ folder — files load automatically</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <p>Edit settings with the visual controls</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <p>Export modified files back to your server</p>
+        </div>
+      </div>
+      <div style="margin-top:28px;display:flex;gap:8px;justify-content:center;">
+        <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()">Import Configs Folder</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Import Individual Files</button>
+      </div>
+      <p style="color:var(--muted);font-size:0.72rem;margin-top:16px;max-width:460px;margin-left:auto;margin-right:auto;">
+        Auto-load works in Safari and Firefox. Chrome blocks local file access by default —
+        use drag-and-drop import instead, or open Chrome with <span style="font-family:'JetBrains Mono',monospace;">--allow-file-access-from-files</span>.
+      </p>
+    </div>`;
+}
+
+function notLoaded(filename) {
+  return `
+    <div class="page-header">
+      <h1>${escHtml(filename)}</h1>
+      <p class="desc">Not yet loaded. Import the file to begin editing.</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Import</button>
+      </div>
+    </div>`;
+}
+
+// ---- Helpers ----
+function toggleHtml(id, label, desc, checked) {
+  return `
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <div class="toggle-name">${label}</div>
+        ${desc ? '<div class="toggle-desc">' + desc + '</div>' : ''}
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} onchange="handleToggle('${id}', this.checked)">
+        <span class="toggle-track"></span>
+      </label>
+    </div>`;
+}
+
+function revealInput(id, value, label, placeholder) {
+  return `
+    <div class="field">
+      ${label ? '<label class="field-label">' + label + '</label>' : ''}
+      <div class="input-reveal">
+        <input type="password" id="${id}" value="${escHtml(value || '')}" placeholder="${placeholder || ''}" onchange="handleInput('${id}', this.value)">
+        <button class="reveal-btn" onclick="toggleReveal(this)" type="button">show</button>
+      </div>
+    </div>`;
+}
+
+function textInput(id, value, label, placeholder, hint) {
+  return `
+    <div class="field">
+      ${label ? '<label class="field-label">' + label + '</label>' : ''}
+      <input type="text" id="${id}" value="${escHtml(value || '')}" placeholder="${placeholder || ''}" onchange="handleInput('${id}', this.value)">
+      ${hint ? '<div class="field-hint">' + hint + '</div>' : ''}
+    </div>`;
+}
+
+function numInput(id, value, label, hint) {
+  return `
+    <div class="field">
+      ${label ? '<label class="field-label">' + label + '</label>' : ''}
+      <input type="text" id="${id}" value="${escHtml(String(value ?? ''))}" placeholder="0" onchange="handleInput('${id}', this.value)">
+      ${hint ? '<div class="field-hint">' + hint + '</div>' : ''}
+    </div>`;
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ---- engine.cfg ----
+// Game types and their startup-mode bitmask components
+const GAME_TYPES = [
+  { id: 'dm',   label: 'Deathmatch',   hasSubMode: true,  base: 0 },
+  { id: 'ctf',  label: 'Capture the Flag', hasSubMode: true, base: 1024 },
+  { id: 'ca',   label: 'Clan Arena',   hasSubMode: false, value: '4194304' },
+  { id: 'wo',   label: 'Wipeout',      hasSubMode: false, value: '4227072' },
+  { id: 'ra',   label: 'Rocket Arena', hasSubMode: false, value: '8388608' },
+  { id: 'hh',   label: 'Head Hunters', hasSubMode: false, value: '16777216' },
+  { id: 'air',  label: 'Airshot',      hasSubMode: false, value: '65536' },
+  { id: 'dmm4', label: 'DMM4',         hasSubMode: false, value: '1048576' },
+];
+const SUB_MODES = [
+  { id: 'match',    label: 'Match',    bit: 2 },
+  { id: 'ffa',      label: 'FFA',      bit: 1 },
+  { id: 'practice', label: 'Practice', bit: 4 },
+];
+
+// Resolve cr_startmode value to game type + sub mode
+function parseStartMode(val) {
+  const v = parseInt(val) || 0;
+  for (const gt of GAME_TYPES) {
+    if (!gt.hasSubMode && String(v) === gt.value) return { gameType: gt.id, subMode: null };
+  }
+  const hasCTF = (v & 1024) !== 0;
+  const base = v & ~1024;
+  for (const sm of SUB_MODES) {
+    if (base === sm.bit) return { gameType: hasCTF ? 'ctf' : 'dm', subMode: sm.id };
+  }
+  return { gameType: '_custom', subMode: null };
+}
+
+// Build cr_startmode value from game type + sub mode
+function buildStartMode(gameType, subMode) {
+  const gt = GAME_TYPES.find(g => g.id === gameType);
+  if (!gt) return '2';
+  if (!gt.hasSubMode) return gt.value;
+  const sm = SUB_MODES.find(s => s.id === subMode) || SUB_MODES[0];
+  return String(gt.base + sm.bit);
+}
+
+
+function renderEngine() {
+  if (!State.engine) return notLoaded('engine.cfg');
+  const d = State.engine;
+
+  let html = `
+    <div class="page-header">
+      <h1>engine.cfg</h1>
+      <p class="desc">Engine-level server settings — identity, network, physics, and startup mode. These are Quake engine cvars, not mod settings.</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="exportEngine()">Export</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Re-import</button>
+      </div>
+    </div>`;
+
+  // Startup
+  html += `<div class="card"><div class="card-title"><span class="icon">&#x25B6;</span> Startup Mode & Map</div>`;
+  const parsed = parseStartMode(d.cr_startmode);
+  const isCustom = parsed.gameType === '_custom';
+
+  // Game Type dropdown
+  html += `<div class="field">
+    <label class="field-label">Game Type</label>
+    <select id="eng_gametype" onchange="handleGameTypeChange(this.value)">`;
+  for (const gt of GAME_TYPES) {
+    html += `<option value="${gt.id}" ${parsed.gameType === gt.id ? 'selected' : ''}>${gt.label}</option>`;
+  }
+  html += `<option value="_custom" ${isCustom ? 'selected' : ''}>Custom value...</option>`;
+  html += `</select></div>`;
+
+  // Sub-mode (Match/FFA/Practice) — only for DM and CTF
+  const showSub = parsed.gameType === 'dm' || parsed.gameType === 'ctf';
+  html += `<div class="field" id="eng_submode_wrap" style="display:${showSub ? 'block' : 'none'}">
+    <label class="field-label">Mode</label>
+    <select id="eng_submode" onchange="handleSubModeChange(this.value)">`;
+  for (const sm of SUB_MODES) {
+    html += `<option value="${sm.id}" ${parsed.subMode === sm.id ? 'selected' : ''}>${sm.label}</option>`;
+  }
+  html += `</select></div>`;
+
+  // Custom value input
+  html += `<div class="field" id="eng_startmode_custom_wrap" style="display:${isCustom ? 'block' : 'none'}">
+    <label class="field-label">Custom startup mode value</label>
+    <input type="text" id="eng_startmode_custom" value="${isCustom ? escHtml(d.cr_startmode) : ''}" placeholder="e.g. 1026" onchange="handleEngineInput('cr_startmode_custom', this.value)">
+  </div>`;
+
+  const showHHVariant = parsed.gameType === 'hh';
+  html += `<div class="field" id="eng_hh_variant_wrap" style="display:${showHHVariant ? 'block' : 'none'}">
+    <label class="field-label">Head Hunters Variant</label>
+    <select id="eng_hh_variant" onchange="handleEngineInput('hh_teamplay', this.value)">
+      <option value="0" ${d.teamplay === '1' ? '' : 'selected'}>FFA Head Hunters</option>
+      <option value="1" ${d.teamplay === '1' ? 'selected' : ''}>Team Head Hunters</option>
+    </select>
+    <div class="field-hint">Head Hunters startup uses teamplay: 0 = FFA, 1 = Team HH.</div>
+  </div>`;
+
+  // Resolved value display
+  html += `<div class="field-hint">cr_startmode = ${escHtml(d.cr_startmode)}. This seeds first boot only. The editor still imports legacy samelevel startup values, but it exports cr_startmode only.</div>`;
+
+  html += textInput('eng_map', d.map, 'First Map', 'Map filename without .bsp (e.g. ctf1)', 'The first map loaded when the server starts');
+  html += `</div>`;
+
+  // Server Identity
+  html += `<div class="card"><div class="card-title"><span class="icon">&#x1F3F7;</span> Server Identity</div>`;
+  html += textInput('eng_hostname', d.hostname, 'Hostname', 'Server name shown in browser', 'Shown in the server browser and on connect');
+  html += `<div class="field">
+    <label class="field-label">Public Server</label>
+    <select id="eng_sv_public" onchange="handleEngineInput('sv_public', this.value)">
+      <option value="1" ${d.sv_public === '1' ? 'selected' : ''}>Yes — advertise on master servers</option>
+      <option value="0" ${d.sv_public === '0' ? 'selected' : ''}>No — unlisted / private</option>
+    </select>
+  </div>`;
+  html += textInput('eng_master1', d.net_masterextra1, 'Master Server 1', 'Leave empty to disable', 'QSS default: master.frag-net.com');
+  html += textInput('eng_master2', d.net_masterextra2, 'Master Server 2', 'Leave empty to disable', 'QSS default: dpmaster.deathmask.net');
+  html += textInput('eng_master3', d.net_masterextra3, 'Master Server 3', 'Leave empty to disable', 'QSS default: dpmaster.tchr.no');
+  html += `</div>`;
+
+  // Network
+  html += `<div class="card"><div class="card-title"><span class="icon">&#x1F4E1;</span> Network</div>`;
+  html += numInput('eng_timeout', d.net_messagetimeout, 'Client Timeout (seconds)', 'Seconds before a non-responsive client is kicked');
+  html += `</div>`;
+
+  // Physics
+  html += `<div class="card"><div class="card-title"><span class="icon">&#x2699;</span> Engine & Physics Fixes</div>`;
+  html += toggleHtml('eng_bounce', 'Fix Bounce Down Slopes', 'Prevents grenades from making horrible buzzing noises on slopes', d.sv_gameplayfix_bouncedownslopes === '1');
+  html += toggleHtml('eng_extvis', 'External Vis Files', 'Load .vis files from maps folder instead of BSP-embedded data', d.external_vis === '1');
+  html += toggleHtml('eng_fullpitch', 'Full Pitch', 'Unrestricted up/down look (0 = original Quake limits)', d.sv_fullpitch === '1');
+  html += `</div>`;
+
+  // Passwords
+  html += `<div class="card"><div class="card-title"><span class="icon">&#x1F512;</span> Server Passwords</div>`;
+  html += `<p style="font-size:0.72rem;color:var(--muted);margin-bottom:12px;">Engine-level passwords enforced by QSS/Ironwail. The mod has separate admin passcodes in clanring.cfg.</p>`;
+  html += revealInput('eng_password', d.password, 'Connect Password', 'Leave empty for no password (public)');
+  html += `<div class="field-hint" style="margin-top:-8px;margin-bottom:12px;">Clients must type <span style="font-family:'JetBrains Mono',monospace;">password &lt;value&gt;</span> before connecting.</div>`;
+  html += revealInput('eng_rcon', d.rcon_password, 'RCON Password', 'Leave empty to disable remote console');
+  html += `<div class="field-hint" style="margin-top:-8px;">Clients type <span style="font-family:'JetBrains Mono',monospace;">rcon_password &lt;value&gt;</span> then <span style="font-family:'JetBrains Mono',monospace;">rcon &lt;command&gt;</span> to control the server remotely.</div>`;
+  html += `</div>`;
+
+  return html;
+}
+
+// ---- clanring.cfg ----
+function renderClanring() {
+  if (!State.clanring) return notLoaded('clanring.cfg');
+  const d = State.clanring;
+  let html = `
+    <div class="page-header">
+      <h1>clanring.cfg</h1>
+      <p class="desc">Main mod configuration — init runs once on first boot, then per-mode sections apply settings conditionally based on the active game mode.</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="exportClanring()">Export</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Re-import</button>
+      </div>
+    </div>`;
+
+  // Admin
+  html += `<div class="card"><div class="card-title"><span class="icon">🔑</span> Admin Authentication</div>`;
+  html += revealInput('admin_main', d.admin.setadmin, 'Main Admin Passcode (code 0)', '4-7 digits, first non-zero');
+  for (let i = 0; i < 9; i++) {
+    html += revealInput('admin_' + i, d.admin.slots[i], 'Admin Slot ' + (i+1), 'Leave empty to disable');
+  }
+  html += `</div>`;
+
+  // Webhooks
+  html += `<div class="card"><div class="card-title"><span class="icon">🔗</span> Webhooks & Integrations</div>`;
+  html += revealInput('wh_captimes', d.webhooks.captimesdiscordurl, 'Cap Times Discord Webhook', 'Up to 3 comma-separated URLs');
+  html += revealInput('wh_stats', d.webhooks.statsdiscordurl, 'Stats Discord Webhook', 'Up to 3 comma-separated URLs');
+  html += revealInput('wh_matchpost', d.webhooks.matchposturl, 'Match Post URL', 'External match reporting endpoint');
+  html += revealInput('wh_gsheets', d.webhooks.googlesheetsurl, 'Google Sheets URL', 'Apps Script web app URL');
+  html += revealInput('wh_gsheetskey', d.webhooks.googlesheetsapikey, 'Google Sheets API Key', 'API key');
+  html += `</div>`;
+
+  // Network
+  html += `<div class="card"><div class="card-title"><span class="icon">📡</span> Network</div>`;
+  html += `<div class="field-row">`;
+  html += numInput('net_ctf', d.network.ctfticrate, 'CTF Ticrate', '0.025 = modern, 0.5 = classic 1999');
+  html += numInput('net_tdm', d.network.tdmticrate, 'TDM Ticrate', '0.025 = modern, 0.5 = classic 1999');
+  html += `</div></div>`;
+
+  // Gameplay
+  html += `<div class="card"><div class="card-title"><span class="icon">⚔️</span> Core Gameplay</div>`;
+  html += toggleHtml('gp_quad', 'Quad Damage', 'Spawns on the map', d.gameplay.quad);
+  html += toggleHtml('gp_ring', 'Ring of Shadows', 'Invisibility powerup', d.gameplay.ring);
+  html += toggleHtml('gp_pent', 'Pentagram of Protection', 'Invulnerability powerup', d.gameplay.pent);
+  html += toggleHtml('gp_runes', 'CTF Runes', 'Haste, Regen, Resistance, Strength', d.gameplay.runes);
+  html += `<div style="margin-top:12px;">`;
+  html += `<div class="field-row">`;
+  html += numInput('gp_noexit', d.gameplay.noexit, 'noexit', '1 = players cannot trigger level exits');
+  html += numInput('gp_pausable', d.gameplay.pausable, 'pausable', '0 = players cannot pause the server');
+  html += `</div></div></div>`;
+
+  // Server Features
+  html += `<div class="card"><div class="card-title"><span class="icon">🖥️</span> Server Features</div>`;
+  html += toggleHtml('sf_autopause', 'Auto Pause', 'Automatically pause match when a player disconnects', d.features.autopause);
+  html += toggleHtml('sf_matchsounds', 'Match Sounds', 'Game-over music during nextmap vote screen', d.features.matchsounds);
+  html += toggleHtml('sf_safepractice', 'Safe Practice', 'Anti-spam: limits grenade spam, discharge kills self only', d.features.safepractice);
+  html += `</div>`;
+
+  // Player Features
+  html += `<div class="card"><div class="card-title"><span class="icon">👤</span> Player Features</div>`;
+  html += toggleHtml('pf_lma', 'Leave Me Alone', 'Players become intangible during match prewar', d.player.cr_allow_leavemealone !== '0');
+  html += toggleHtml('pf_qwsucks', 'QuakeTag (QWSUCKS)', 'Tag mode — "it" player glows, tag to pass it on', d.player.cr_allow_qwsucks !== '0');
+  html += toggleHtml('pf_q14ever', 'QuakeTag (Q14EVER)', 'Cosmetic overlay variant (mutually exclusive with QWSUCKS)', d.player.cr_allow_q14ever !== '0');
+  html += `</div>`;
+
+  // Map Rotation
+  html += `<div class="card"><div class="card-title"><span class="icon">🗺️</span> Map Rotation</div>`;
+  html += toggleHtml('rot_dm', 'FFA Randomize Start', 'Randomize starting map position when entering FFA mode', d.rotation.cr_dm_randomize_start !== '0');
+  html += toggleHtml('rot_ra', 'RA Randomize Start', 'Randomize starting map position when entering Rocket Arena mode', d.rotation.cr_ra_randomize_start !== '0');
+  html += toggleHtml('rot_hh', 'HH Randomize Start', 'Randomize starting map position when entering Head Hunters mode', d.rotation.cr_hh_randomize_start !== '0');
+  html += `</div>`;
+
+  // Init
+  html += `<div class="card"><div class="card-title"><span class="icon">🚀</span> Init (One-Time Setup)</div>`;
+  html += toggleHtml('init_modevote', 'Mode Voting', 'Players can vote to switch between FFA, practice, and match', d.init.modevote);
+  html += numInput('init_kickafk', d.init.kickafk, 'AFK Kick Timeout (minutes)', '0 = disabled');
+  html += `</div>`;
+
+  // Mode sections
+  html += `<div class="card"><div class="card-title"><span class="icon">🎮</span> Mode Settings</div>`;
+  const modes = Object.keys(MODE_LABELS);
+  html += `<div class="tabs">`;
+  for (let i = 0; i < modes.length; i++) {
+    html += `<div class="tab ${i===0?'active':''}" onclick="switchModeTab(this, '${modes[i]}')">${MODE_LABELS[modes[i]]}</div>`;
+  }
+  html += `</div>`;
+  for (let i = 0; i < modes.length; i++) {
+    const m = modes[i];
+    const md = d.modes[m] || {};
+    html += `<div class="mode-content ${i===0?'active':''}" data-mode="${m}">`;
+    html += `<div class="field-row">`;
+    html += numInput('mode_tl_'+m, md.timelimit, 'timelimit', 'Minutes');
+    html += numInput('mode_fl_'+m, md.fraglimit, 'fraglimit', 'Frag count');
+    html += numInput('mode_dm_'+m, md.deathmatch, 'deathmatch', '1=no weaponstay, 3=weaponstay');
+    html += `</div><div class="field-row" style="margin-top:8px;">`;
+    html += numInput('mode_tp_'+m, md.teamplay, 'teamplay', '0=off, 2=friendly fire');
+    html += numInput('mode_ot_'+m, md.setovertime, 'setovertime', 'Overtime minutes');
+    html += `</div>`;
+    for (const key of ['powerupdrop','matchsounds','safepractice','runes','ring','pent','quad']) {
+      if (md[key] !== undefined) {
+        const labels = { powerupdrop:'Powerup Drop', matchsounds:'Match Sounds', safepractice:'Safe Practice', runes:'Runes', ring:'Ring of Shadows', pent:'Pentagram', quad:'Quad Damage' };
+        html += toggleHtml('mode_'+key+'_'+m, labels[key], '', md[key]);
+      }
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  return html;
+}
+
+// ---- levels.cfg ----
+function renderLevelsPage() {
+  if (!State.levels) return notLoaded('levels.cfg');
+  const d = State.levels;
+  const modes = ['-ctf-','-dm-','-ca-','-ra-','-hh-'];
+  const labels = { '-ctf-':'CTF', '-dm-':'Deathmatch', '-ca-':'Clan Arena', '-ra-':'Rocket Arena', '-hh-':'Head Hunters' };
+
+  let html = `
+    <div class="page-header">
+      <h1>levels.cfg</h1>
+      <p class="desc">Sequential map rotation per game mode. 128 maps max per mode. Randomize-start behavior is configured per mode in clanring.cfg.</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="exportLevels()">Export</button>
+      </div>
+    </div>`;
+
+  html += `<div class="tabs">`;
+  for (let i = 0; i < modes.length; i++) {
+    html += `<div class="tab ${i===0?'active':''}" onclick="switchLevelTab(this, '${modes[i]}')">${labels[modes[i]]}</div>`;
+  }
+  html += `</div>`;
+
+  for (let i = 0; i < modes.length; i++) {
+    const m = modes[i];
+    const maps = d[m] || [];
+    html += `<div class="mode-content ${i===0?'active':''}" data-mode="${m}">`;
+    html += `<div class="list-editor" id="levelslist_${m}">`;
+    for (let j = 0; j < maps.length; j++) {
+      html += `<div class="list-item" draggable="true" data-mode="${m}" data-idx="${j}">
+        <span class="drag-handle">⠿</span>
+        <span class="item-num">${j+1}</span>
+        <span class="item-text">${escHtml(maps[j])}</span>
+        <button class="remove-btn" onclick="removeLevelMap('${m}', ${j})">✕</button>
+      </div>`;
+    }
+    html += `</div>`;
+    html += `<div class="list-add">
+      <input type="text" id="addlevel_${m}" placeholder="Map filename (no .bsp)" onkeydown="if(event.key==='Enter')addLevelMap('${m}')">
+      <button class="btn btn-sm btn-secondary" onclick="addLevelMap('${m}')">Add</button>
+    </div>`;
+    html += `<div class="list-count">${maps.length} / 128 maps</div>`;
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+// ---- matchsounds.cfg ----
+function renderMatchsoundsPage() {
+  if (!State.matchsounds) return notLoaded('matchsounds.cfg');
+  const entries = State.matchsounds;
+
+  let html = `
+    <div class="page-header">
+      <h1>matchsounds.cfg</h1>
+      <p class="desc">Game-over music — a random track is picked from this list during the nextmap vote screen. Max 20 slots.</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="exportMatchsounds()">Export</button>
+      </div>
+    </div>`;
+
+  html += `<div class="card"><div class="list-editor">`;
+  for (let i = 0; i < entries.length; i++) {
+    html += `<div class="list-item">
+      <span class="item-num">${i+1}</span>
+      <input type="text" value="${escHtml(entries[i])}" style="flex:1;font-size:0.78rem;" onchange="State.matchsounds[${i}]=this.value;markDirty('matchsounds')">
+      <button class="remove-btn" style="opacity:1;" onclick="State.matchsounds.splice(${i},1);markDirty('matchsounds');renderMain()">✕</button>
+    </div>`;
+  }
+  html += `</div>`;
+  html += `<div class="list-add">
+    <input type="text" id="addms" placeholder="matchsounds/track.wav" onkeydown="if(event.key==='Enter')addMatchsound()">
+    <button class="btn btn-sm btn-secondary" onclick="addMatchsound()">Add</button>
+  </div>`;
+  html += `<div class="list-count">${entries.length} / 20 slots</div>`;
+  html += `</div>`;
+
+  return html;
+}
+
+// ---- matchsounds special ----
+function renderMatchsoundsSpecialPage(type) {
+  const key = type === 'blowout' ? 'matchsoundsBlowout' : 'matchsoundsRematch';
+  const tabKey = 'matchsounds_' + type;
+  const filename = 'matchsounds_' + type + '.cfg';
+  if (!State.loaded.has(tabKey)) return notLoaded(filename);
+  const val = State[key] || '';
+  const desc = type === 'blowout'
+    ? 'Plays when score difference is large (CTF: >200, non-CTF: >40).'
+    : 'Plays when score difference is small (CTF: <50, non-CTF: <10).';
+
+  return `
+    <div class="page-header">
+      <h1>${filename}</h1>
+      <p class="desc">${desc}</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="exportMatchsoundsSpecial('${type}')">Export</button>
+      </div>
+    </div>
+    <div class="card">
+      ${textInput('ms_'+type, val, 'Sound File Path', 'matchsounds/' + type + '.wav')}
+    </div>`;
+}
+
+// ---- warp_main_menu.cfg ----
+function renderWarpMenuPage() {
+  if (!State.warpMenu) return notLoaded('warp_main_menu.cfg');
+  const entries = State.warpMenu;
+
+  let html = `
+    <div class="page-header">
+      <h1>warp_main_menu.cfg</h1>
+      <p class="desc">Category names for the in-game warp menu. 50 slots max. Must match warp.cfg sections 1:1 in order.</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="exportWarpMenu()">Export</button>
+      </div>
+    </div>`;
+
+  html += `<div class="card"><div class="list-editor">`;
+  for (let i = 0; i < entries.length; i++) {
+    html += `<div class="list-item" draggable="true" data-mode="warpmenu" data-idx="${i}">
+      <span class="drag-handle">⠿</span>
+      <span class="item-num">${i+1}</span>
+      <input type="text" value="${escHtml(entries[i])}" style="flex:1;font-size:0.78rem;" onchange="State.warpMenu[${i}]=this.value;markDirty('warpmenu')">
+      <button class="remove-btn" onclick="State.warpMenu.splice(${i},1);markDirty('warpmenu');renderMain()">✕</button>
+    </div>`;
+  }
+  html += `</div>`;
+  html += `<div class="list-add">
+    <input type="text" id="addwarpmenu" placeholder="Category name" onkeydown="if(event.key==='Enter')addWarpMenuItem()">
+    <button class="btn btn-sm btn-secondary" onclick="addWarpMenuItem()">Add</button>
+  </div>`;
+  html += `<div class="list-count">${entries.length} / 50 slots</div>`;
+  html += `</div>`;
+
+  return html;
+}
+
+// ---- warp.cfg ----
+let warpActiveCat = 0;
+
+function renderWarpPage() {
+  if (!State.warp) return notLoaded('warp.cfg');
+  const cats = State.warp;
+  if (warpActiveCat >= cats.length) warpActiveCat = 0;
+
+  let html = `
+    <div class="page-header">
+      <h1>warp.cfg</h1>
+      <p class="desc">Map definitions organized by category. Each category holds up to 30 maps, with up to 50 categories total.</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="exportWarp()">Export</button>
+      </div>
+    </div>`;
+
+  html += `<div class="warp-split">`;
+
+  // Category list
+  html += `<div class="warp-cats"><div class="card" style="padding:12px;">`;
+  html += `<div class="card-title">Categories</div>`;
+  for (let i = 0; i < cats.length; i++) {
+    const label = State.warpMenu && State.warpMenu[i] ? escHtml(State.warpMenu[i]) : 'Category ' + (i+1);
+    html += `<div class="warp-cat-item ${i===warpActiveCat?'active':''}" onclick="warpActiveCat=${i};renderMain()">
+      <span>${label}</span>
+      <span class="cat-count">${cats[i].maps.length}</span>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // Maps for selected category
+  html += `<div class="warp-maps">`;
+  if (cats[warpActiveCat]) {
+    const maps = cats[warpActiveCat].maps;
+    for (let i = 0; i < maps.length; i++) {
+      html += `<div class="warp-entry" style="position:relative;">
+        <div>
+          <div class="warp-field-label">Filename</div>
+          <input type="text" value="${escHtml(maps[i].filename)}" onchange="State.warp[${warpActiveCat}].maps[${i}].filename=this.value;markDirty('warp')">
+        </div>
+        <div>
+          <div class="warp-field-label">Title</div>
+          <input type="text" value="${escHtml(maps[i].title)}" onchange="State.warp[${warpActiveCat}].maps[${i}].title=this.value;markDirty('warp')">
+        </div>
+        <div style="display:flex;gap:6px;align-items:end;">
+          <div style="flex:1;">
+            <div class="warp-field-label">Author</div>
+            <input type="text" value="${escHtml(maps[i].author)}" onchange="State.warp[${warpActiveCat}].maps[${i}].author=this.value;markDirty('warp')">
+          </div>
+          <button class="btn btn-sm btn-danger" onclick="State.warp[${warpActiveCat}].maps.splice(${i},1);markDirty('warp');renderMain()">✕</button>
+        </div>
+      </div>`;
+    }
+    html += `<div style="margin-top:10px;">
+      <button class="btn btn-sm btn-secondary" onclick="if(State.warp[${warpActiveCat}].maps.length>=30){toast('Max 30 maps per category');return;}State.warp[${warpActiveCat}].maps.push({filename:'',title:'',author:''});markDirty('warp');renderMain()">+ Add Map</button>
+    </div>`;
+    html += `<div class="list-count">${maps.length} / 30 maps</div>`;
+  }
+  html += `</div></div>`;
+
+  return html;
+}
+
+// ---- Map Configs ----
+let mapConfigActive = null;
+
+function renderMapConfigsPage() {
+  const names = Object.keys(State.mapConfigs);
+  if (!names.length) {
+    return `
+      <div class="page-header">
+        <h1>Per-Map Config Overrides</h1>
+        <p class="desc">No map configs loaded yet. Create a new one, import files, or select the maps/ folder.</p>
+        <div class="page-actions">
+          <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">Select maps/ Folder</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Import Files</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Create New Map Config</div>
+        <div class="list-add" style="border:none;padding:0;margin:0;">
+          <input type="text" id="addmapconfig" placeholder="Map name (e.g. dm6)" onkeydown="if(event.key==='Enter')addMapConfig()">
+          <button class="btn btn-sm btn-primary" onclick="addMapConfig()">+ New Map</button>
+        </div>
+      </div>`;
+  }
+
+  if (!mapConfigActive || !State.mapConfigs[mapConfigActive]) mapConfigActive = names[0];
+
+  let html = `
+    <div class="page-header">
+      <h1>Per-Map Config Overrides</h1>
+      <p class="desc">Per-map overrides for clanring.cfg settings. The server loads configs/maps/&lt;map&gt;.cfg on each level change, falling back to configs/&lt;map&gt;.cfg.</p>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="exportMapConfig('${escHtml(mapConfigActive)}')">Export ${escHtml(mapConfigActive)}.cfg</button>
+        <button class="btn btn-primary" onclick="exportAllMapConfigs()">Export All Maps</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">Select maps/ Folder</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Import Files</button>
+      </div>
+    </div>`;
+
+  // Tabs for each map + add new
+  html += `<div class="tabs">`;
+  for (const n of names) {
+    html += `<div class="tab ${n===mapConfigActive?'active':''}" onclick="mapConfigActive='${escHtml(n)}';renderMain()">${escHtml(n)}.cfg</div>`;
+  }
+  html += `</div>`;
+  html += `<div class="list-add" style="margin-top:-8px;margin-bottom:16px;">
+    <input type="text" id="addmapconfig" placeholder="Map name (e.g. dm6)" onkeydown="if(event.key==='Enter')addMapConfig()">
+    <button class="btn btn-sm btn-secondary" onclick="addMapConfig()">+ New Map</button>
+    <button class="btn btn-sm btn-danger" onclick="removeMapConfig('${escHtml(mapConfigActive)}')">Delete ${escHtml(mapConfigActive)}.cfg</button>
+  </div>`;
+
+  const mc = State.mapConfigs[mapConfigActive];
+  if (mc) {
+    // Show all possible mode sections — user can add overrides for any mode
+    const allModes = ['-match-tdm-','-match-ctf-','-ffa-','-pub-ctf-','-practice-','-ffa-hh-','-team-hh-'];
+    const numFields = ['timelimit','fraglimit','deathmatch','teamplay','setovertime'];
+    const toggleKeys = ['powerupdrop','matchsounds','safepractice','runes','ring','pent','quad'];
+    const toggleLabels = { powerupdrop:'Powerup Drop', matchsounds:'Match Sounds', safepractice:'Safe Practice', runes:'Runes', ring:'Ring of Shadows', pent:'Pentagram', quad:'Quad Damage' };
+    const numHints = { timelimit:'Minutes', fraglimit:'Frag count', deathmatch:'1=no weaponstay, 3=weaponstay', teamplay:'0=off, 2=friendly fire', setovertime:'Overtime minutes' };
+
+    for (const mode of allModes) {
+      const settings = mc.modes[mode] || {};
+      const hasAny = Object.keys(settings).length > 0;
+      const modeId = mode.replace(/-/g, '');
+
+      html += `<div class="card">`;
+      html += `<div class="card-title">`;
+      html += `${MODE_LABELS[mode] || mode}`;
+      html += `<span style="margin-left:auto;font-size:0.65rem;color:var(--muted);font-family:Inter,sans-serif;text-transform:none;letter-spacing:0;">${hasAny ? Object.keys(settings).length + ' override' + (Object.keys(settings).length !== 1 ? 's' : '') : 'no overrides'}</span>`;
+      html += `</div>`;
+
+      // Numeric fields — show all, empty string if not set
+      html += `<div class="field-row">`;
+      for (const f of numFields) {
+        const val = settings[f] !== undefined ? settings[f] : '';
+        html += numInput('mc_'+f+'_'+modeId+'_'+mapConfigActive, val, f, numHints[f] || '');
+      }
+      html += `</div>`;
+
+      // Toggle fields — show all, unchecked if not set
+      for (const key of toggleKeys) {
+        const val = settings[key] !== undefined ? settings[key] : false;
+        const isSet = settings[key] !== undefined;
+        html += `
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="toggle-name" style="${isSet ? '' : 'color:var(--muted);'}">${toggleLabels[key]}</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="mc_${key}_${modeId}_${mapConfigActive}" ${val ? 'checked' : ''} onchange="handleMapConfigToggle('${mapConfigActive}','${mode}','${key}',this.checked)">
+              <span class="toggle-track"></span>
+            </label>
+          </div>`;
+      }
+
+      html += `</div>`;
+    }
+  }
+
+  return html;
+}
+
+// ============================================================
+//  EVENT HANDLERS
+// ============================================================
+
+function markDirty(tab) {
+  State.dirty.add(tab);
+  updateSidebarState();
+}
+
+function handleGameTypeChange(gameType) {
+  const d = State.engine;
+  if (!d) return;
+  const subWrap = document.getElementById('eng_submode_wrap');
+  const customWrap = document.getElementById('eng_startmode_custom_wrap');
+  const hhWrap = document.getElementById('eng_hh_variant_wrap');
+  if (gameType === '_custom') {
+    if (subWrap) subWrap.style.display = 'none';
+    if (customWrap) customWrap.style.display = 'block';
+    if (hhWrap) hhWrap.style.display = 'none';
+    return;
+  }
+  const gt = GAME_TYPES.find(g => g.id === gameType);
+  if (gt && gt.hasSubMode) {
+    if (subWrap) subWrap.style.display = 'block';
+    const subSel = document.getElementById('eng_submode');
+    const subMode = subSel ? subSel.value : 'match';
+    d.cr_startmode = buildStartMode(gameType, subMode);
+  } else {
+    if (subWrap) subWrap.style.display = 'none';
+    d.cr_startmode = buildStartMode(gameType, null);
+  }
+  if (gameType === 'hh') {
+    if (d.teamplay !== '0' && d.teamplay !== '1') d.teamplay = '0';
+    if (hhWrap) hhWrap.style.display = 'block';
+  } else if (hhWrap) {
+    hhWrap.style.display = 'none';
+  }
+  if (customWrap) customWrap.style.display = 'none';
+  markDirty('engine');
+  renderMain();
+}
+
+function handleSubModeChange(subMode) {
+  const d = State.engine;
+  if (!d) return;
+  const gtSel = document.getElementById('eng_gametype');
+  const gameType = gtSel ? gtSel.value : 'dm';
+  d.cr_startmode = buildStartMode(gameType, subMode);
+  markDirty('engine');
+  renderMain();
+}
+
+function handleEngineInput(key, value) {
+  const d = State.engine;
+  if (!d) return;
+  if (key === 'cr_startmode_custom') {
+    d.cr_startmode = value;
+  } else if (key === 'hh_teamplay') {
+    d.teamplay = value;
+  } else if (key === 'sv_public') {
+    d.sv_public = value;
+  }
+  markDirty('engine');
+}
+
+function handleToggle(id, checked) {
+  // Engine toggles
+  if (id.startsWith('eng_')) {
+    const d = State.engine;
+    if (!d) return;
+    if (id === 'eng_bounce') d.sv_gameplayfix_bouncedownslopes = checked ? '1' : '0';
+    if (id === 'eng_extvis') d.external_vis = checked ? '1' : '0';
+    if (id === 'eng_fullpitch') d.sv_fullpitch = checked ? '1' : '0';
+    markDirty('engine');
+    return;
+  }
+
+  const d = State.clanring;
+  if (!d) return;
+
+  // Global gameplay
+  if (id === 'gp_quad') d.gameplay.quad = checked;
+  if (id === 'gp_ring') d.gameplay.ring = checked;
+  if (id === 'gp_pent') d.gameplay.pent = checked;
+  if (id === 'gp_runes') d.gameplay.runes = checked;
+
+  // Server features
+  if (id === 'sf_autopause') d.features.autopause = checked;
+  if (id === 'sf_matchsounds') d.features.matchsounds = checked;
+  if (id === 'sf_safepractice') d.features.safepractice = checked;
+
+  // Player features
+  if (id === 'pf_lma') d.player.cr_allow_leavemealone = checked ? '1' : '0';
+  if (id === 'pf_qwsucks') d.player.cr_allow_qwsucks = checked ? '1' : '0';
+  if (id === 'pf_q14ever') d.player.cr_allow_q14ever = checked ? '1' : '0';
+
+  // Rotation
+  if (id === 'rot_dm') d.rotation.cr_dm_randomize_start = checked ? '1' : '0';
+  if (id === 'rot_ra') d.rotation.cr_ra_randomize_start = checked ? '1' : '0';
+  if (id === 'rot_hh') d.rotation.cr_hh_randomize_start = checked ? '1' : '0';
+
+  // Init
+  if (id === 'init_modevote') d.init.modevote = checked;
+
+  // Mode toggles
+  const modeToggleMatch = id.match(/^mode_(\w+)_(-[\w-]+-)/);
+  if (modeToggleMatch) {
+    const [, key, mode] = modeToggleMatch;
+    if (d.modes[mode]) d.modes[mode][key] = checked;
+  }
+
+  markDirty('clanring');
+}
+
+// Dedicated handler for map config toggles — creates the mode/key if it doesn't exist yet
+function handleMapConfigToggle(mapName, mode, key, checked) {
+  const mc = State.mapConfigs[mapName];
+  if (!mc) return;
+  if (!mc.modes[mode]) mc.modes[mode] = {};
+  mc.modes[mode][key] = checked;
+  markDirty('mapconfigs');
+}
+
+function handleInput(id, value) {
+  // Engine inputs
+  if (id.startsWith('eng_')) {
+    const d = State.engine;
+    if (!d) return;
+    const map = {
+      eng_map: 'map', eng_hostname: 'hostname',
+      eng_timeout: 'net_messagetimeout',
+      eng_master1: 'net_masterextra1', eng_master2: 'net_masterextra2', eng_master3: 'net_masterextra3',
+      eng_password: 'password', eng_rcon: 'rcon_password',
+    };
+    if (map[id]) { d[map[id]] = value; markDirty('engine'); return; }
+  }
+
+  const d = State.clanring;
+
+  // Admin
+  if (id === 'admin_main' && d) { d.admin.setadmin = value; markDirty('clanring'); return; }
+  const adminMatch = id.match(/^admin_(\d)$/);
+  if (adminMatch && d) { d.admin.slots[parseInt(adminMatch[1])] = value; markDirty('clanring'); return; }
+
+  // Webhooks
+  const whMap = { wh_captimes:'captimesdiscordurl', wh_stats:'statsdiscordurl', wh_matchpost:'matchposturl', wh_gsheets:'googlesheetsurl', wh_gsheetskey:'googlesheetsapikey' };
+  if (whMap[id] && d) { d.webhooks[whMap[id]] = value; markDirty('clanring'); return; }
+
+  // Network
+  if (id === 'net_ctf' && d) { d.network.ctfticrate = value; markDirty('clanring'); return; }
+  if (id === 'net_tdm' && d) { d.network.tdmticrate = value; markDirty('clanring'); return; }
+
+  // Gameplay
+  if (id === 'gp_noexit' && d) { d.gameplay.noexit = value; markDirty('clanring'); return; }
+  if (id === 'gp_pausable' && d) { d.gameplay.pausable = value; markDirty('clanring'); return; }
+
+  // Init
+  if (id === 'init_kickafk' && d) { d.init.kickafk = value; markDirty('clanring'); return; }
+
+  // Mode numeric fields
+  const modeMatch = id.match(/^mode_(tl|fl|dm|tp|ot)_(-[\w-]+-)/);
+  if (modeMatch && d) {
+    const [, field, mode] = modeMatch;
+    const fieldMap = { tl:'timelimit', fl:'fraglimit', dm:'deathmatch', tp:'teamplay', ot:'setovertime' };
+    if (d.modes[mode]) {
+      if (value === '') delete d.modes[mode][fieldMap[field]];
+      else d.modes[mode][fieldMap[field]] = value;
+    }
+    markDirty('clanring');
+    return;
+  }
+
+  // Map config numeric — ID format: mc_<field>_<modeId>_<mapName>
+  // modeId is the mode with dashes stripped, e.g. "matchtdm" for "-match-tdm-"
+  const mcMatch = id.match(/^mc_(timelimit|fraglimit|deathmatch|teamplay|setovertime)_(\w+?)_(.+)$/);
+  if (mcMatch) {
+    const [, field, modeId, mapName] = mcMatch;
+    const mc = State.mapConfigs[mapName];
+    if (mc) {
+      // Reconstruct mode key from modeId (e.g. "matchtdm" -> "-match-tdm-")
+      const modeKey = Object.keys(MODE_LABELS).find(m => m.replace(/-/g, '') === modeId);
+      if (modeKey) {
+        if (!mc.modes[modeKey]) mc.modes[modeKey] = {};
+        if (value === '') {
+          delete mc.modes[modeKey][field];
+          // Clean up empty mode
+          if (Object.keys(mc.modes[modeKey]).length === 0) delete mc.modes[modeKey];
+        } else {
+          mc.modes[modeKey][field] = value;
+        }
+      }
+    }
+    markDirty('mapconfigs');
+    return;
+  }
+
+  // Matchsounds special
+  if (id === 'ms_blowout') { State.matchsoundsBlowout = value; markDirty('matchsounds_blowout'); return; }
+  if (id === 'ms_rematch') { State.matchsoundsRematch = value; markDirty('matchsounds_rematch'); return; }
+}
+
+function toggleReveal(btn) {
+  const input = btn.parentElement.querySelector('input');
+  if (input.type === 'password') { input.type = 'text'; btn.textContent = 'hide'; }
+  else { input.type = 'password'; btn.textContent = 'show'; }
+}
+
+function switchModeTab(el, mode) {
+  const card = el.closest('.card');
+  card.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  card.querySelectorAll('.mode-content').forEach(c => {
+    c.classList.toggle('active', c.dataset.mode === mode);
+  });
+}
+
+function switchLevelTab(el, mode) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.mode-content[data-mode]').forEach(c => {
+    c.classList.toggle('active', c.dataset.mode === mode);
+  });
+}
+
+// ---- List operations ----
+function addLevelMap(mode) {
+  if (State.levels[mode].length >= 128) { toast('Max 128 maps per mode'); return; }
+  const input = document.getElementById('addlevel_' + mode);
+  const val = input.value.trim();
+  if (!val) return;
+  State.levels[mode].push(val);
+  input.value = '';
+  markDirty('levels');
+  renderMain();
+  // Re-activate the right tab after re-render
+  setTimeout(() => {
+    document.querySelectorAll('.tab').forEach(t => {
+      if (t.getAttribute('onclick') && t.getAttribute('onclick').indexOf(mode) !== -1) {
+        switchLevelTab(t, mode);
+      }
+    });
+  }, 10);
+}
+
+function removeLevelMap(mode, idx) {
+  State.levels[mode].splice(idx, 1);
+  markDirty('levels');
+  renderMain();
+  setTimeout(() => {
+    document.querySelectorAll('.tab').forEach(t => {
+      if (t.getAttribute('onclick') && t.getAttribute('onclick').indexOf(mode) !== -1) {
+        switchLevelTab(t, mode);
+      }
+    });
+  }, 10);
+}
+
+function addMatchsound() {
+  const input = document.getElementById('addms');
+  const val = input.value.trim();
+  if (!val || State.matchsounds.length >= 20) return;
+  State.matchsounds.push(val);
+  input.value = '';
+  markDirty('matchsounds');
+  renderMain();
+}
+
+function addWarpMenuItem() {
+  const input = document.getElementById('addwarpmenu');
+  const val = input.value.trim();
+  if (!val || State.warpMenu.length >= 50) return;
+  State.warpMenu.push(val);
+  input.value = '';
+  markDirty('warpmenu');
+  renderMain();
+}
+
+function addMapConfig() {
+  const input = document.getElementById('addmapconfig');
+  let val = input.value.trim().toLowerCase().replace(/\.cfg$/i, '').replace(/[^a-z0-9_-]/g, '');
+  if (!val) return;
+  if (State.mapConfigs[val]) { toast(val + '.cfg already exists'); return; }
+  State.mapConfigs[val] = { name: val, filename: val + '.cfg', modes: {} };
+  State.loaded.add('mapconfigs');
+  mapConfigActive = val;
+  input.value = '';
+  markDirty('mapconfigs');
+  updateSidebarState();
+  renderMain();
+  toast('Created ' + val + '.cfg', 'success');
+}
+
+function removeMapConfig(name) {
+  if (!State.mapConfigs[name]) return;
+  delete State.mapConfigs[name];
+  mapConfigActive = null;
+  markDirty('mapconfigs');
+  renderMain();
+  toast('Removed ' + name + '.cfg', 'success');
+}
+
+// ---- Export functions ----
+function clearDirty(key) { State.dirty.delete(key); updateSidebarState(); }
+function exportEngine() {
+  if (!State.engine) { toast('No engine.cfg loaded'); return; }
+  downloadFile('engine.cfg', serializeEngine(State.engine));
+  clearDirty('engine'); toast('Exported engine.cfg', 'success');
+}
+function exportClanring() {
+  if (!State.clanring) { toast('No clanring.cfg loaded'); return; }
+  downloadFile('clanring.cfg', serializeClanring(State.clanring));
+  clearDirty('clanring'); toast('Exported clanring.cfg', 'success');
+}
+function exportLevels() {
+  if (!State.levels) { toast('No levels.cfg loaded'); return; }
+  downloadFile('levels.cfg', serializeLevels(State.levels));
+  clearDirty('levels'); toast('Exported levels.cfg', 'success');
+}
+function exportMatchsounds() {
+  if (!State.matchsounds) { toast('No matchsounds.cfg loaded'); return; }
+  downloadFile('matchsounds.cfg', serializeMatchsounds(State.matchsounds));
+  clearDirty('matchsounds'); toast('Exported matchsounds.cfg', 'success');
+}
+function exportMatchsoundsSpecial(type) {
+  const val = type === 'blowout' ? State.matchsoundsBlowout : State.matchsoundsRematch;
+  downloadFile('matchsounds_' + type + '.cfg', serializeMatchsoundsSpecial(val, type));
+  clearDirty('matchsounds_' + type); toast('Exported matchsounds_' + type + '.cfg', 'success');
+}
+function exportWarpMenu() {
+  if (!State.warpMenu) { toast('No warp_main_menu.cfg loaded'); return; }
+  downloadFile('warp_main_menu.cfg', serializeWarpMenu(State.warpMenu));
+  clearDirty('warpmenu'); toast('Exported warp_main_menu.cfg', 'success');
+}
+function exportWarp() {
+  if (!State.warp) { toast('No warp.cfg loaded'); return; }
+  downloadFile('warp.cfg', serializeWarp(State.warp));
+  clearDirty('warp'); toast('Exported warp.cfg', 'success');
+}
+function exportMapConfig(name) {
+  const mc = State.mapConfigs[name];
+  if (!mc) return;
+  downloadFile(mc.filename, serializeMapConfig(mc));
+  clearDirty('mapconfigs'); toast('Exported ' + mc.filename, 'success');
+}
+function exportAllMapConfigs() {
+  const entries = Object.entries(State.mapConfigs);
+  if (!entries.length) { toast('No map configs to export'); return; }
+  for (const [, mc] of entries) downloadFile(mc.filename, serializeMapConfig(mc));
+  clearDirty('mapconfigs'); toast(`Exported ${entries.length} map config${entries.length !== 1 ? 's' : ''}`, 'success');
+}
+function exportAll() {
+  const queue = [];
+  if (State.engine) queue.push(['engine.cfg', serializeEngine(State.engine)]);
+  if (State.clanring) queue.push(['clanring.cfg', serializeClanring(State.clanring)]);
+  if (State.levels) queue.push(['levels.cfg', serializeLevels(State.levels)]);
+  if (State.matchsounds) queue.push(['matchsounds.cfg', serializeMatchsounds(State.matchsounds)]);
+  if (State.loaded.has('matchsounds_blowout')) queue.push(['matchsounds_blowout.cfg', serializeMatchsoundsSpecial(State.matchsoundsBlowout, 'blowout')]);
+  if (State.loaded.has('matchsounds_rematch')) queue.push(['matchsounds_rematch.cfg', serializeMatchsoundsSpecial(State.matchsoundsRematch, 'rematch')]);
+  if (State.warpMenu) queue.push(['warp_main_menu.cfg', serializeWarpMenu(State.warpMenu)]);
+  if (State.warp) queue.push(['warp.cfg', serializeWarp(State.warp)]);
+  for (const [, mc] of Object.entries(State.mapConfigs)) queue.push([mc.filename, serializeMapConfig(mc)]);
+  if (!queue.length) { toast('No configs loaded to export'); return; }
+  queue.forEach(([fn, content], i) => setTimeout(() => downloadFile(fn, content), i * 300));
+  toast(`Exported ${queue.length} config file${queue.length !== 1 ? 's' : ''}`, 'success');
+  State.dirty.clear();
+  updateSidebarState();
+}
+
+// ---- Drag & Drop (global) ----
+let dragCounter = 0;
+let internalDrag = false;
+document.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  if (internalDrag) return;
+  dragCounter++;
+  document.getElementById('dropOverlay').classList.add('active');
+});
+document.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  if (internalDrag) return;
+  dragCounter--;
+  if (dragCounter <= 0) {
+    dragCounter = 0;
+    document.getElementById('dropOverlay').classList.remove('active');
+  }
+});
+document.addEventListener('dragover', (e) => e.preventDefault());
+document.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  if (internalDrag) return;
+  dragCounter = 0;
+  document.getElementById('dropOverlay').classList.remove('active');
+
+  // Handle dropped folders (reads directory entries recursively for .cfg files)
+  const items = e.dataTransfer.items;
+  if (items && items.length) {
+    const filePromises = [];
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+      if (entry) {
+        filePromises.push(readEntry(entry));
+      } else if (item.kind === 'file') {
+        filePromises.push(Promise.resolve([item.getAsFile()]));
+      }
+    }
+    const nested = await Promise.all(filePromises);
+    const allFiles = nested.flat();
+    if (allFiles.length) handleFiles(allFiles);
+  } else if (e.dataTransfer.files.length) {
+    handleFiles(e.dataTransfer.files);
+  }
+});
+
+// Recursively read files from a dropped directory entry
+function readEntry(entry) {
+  return new Promise((resolve) => {
+    if (entry.isFile) {
+      entry.file(f => resolve([f]), () => resolve([]));
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const allEntries = [];
+      const readBatch = () => {
+        reader.readEntries(async (entries) => {
+          if (!entries.length) {
+            const files = await Promise.all(allEntries.map(e => readEntry(e)));
+            resolve(files.flat());
+          } else {
+            allEntries.push(...entries);
+            readBatch();
+          }
+        }, () => resolve([]));
+      };
+      readBatch();
+    } else {
+      resolve([]);
+    }
+  });
+}
+
+// Sidebar drop zone
+const sidebarDrop = document.getElementById('sidebarDrop');
+sidebarDrop.addEventListener('dragenter', (e) => { e.stopPropagation(); sidebarDrop.classList.add('dragover'); });
+sidebarDrop.addEventListener('dragleave', () => sidebarDrop.classList.remove('dragover'));
+sidebarDrop.addEventListener('drop', (e) => { e.stopPropagation(); sidebarDrop.classList.remove('dragover'); });
+
+// ---- Drag reorder for lists ----
+let dragSrc = null;
+function attachEventListeners() {
+  document.querySelectorAll('.list-item[draggable]').forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      dragSrc = item;
+      internalDrag = true;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      dragSrc = null;
+      internalDrag = false;
+    });
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!dragSrc || dragSrc === item) return;
+      const mode = item.dataset.mode;
+      const fromIdx = parseInt(dragSrc.dataset.idx);
+      const toIdx = parseInt(item.dataset.idx);
+      if (isNaN(fromIdx) || isNaN(toIdx)) return;
+
+      if (mode === 'warpmenu' && State.warpMenu) {
+        const [moved] = State.warpMenu.splice(fromIdx, 1);
+        State.warpMenu.splice(toIdx, 0, moved);
+        if (State.warp && State.warp[fromIdx]) {
+          const [movedCat] = State.warp.splice(fromIdx, 1);
+          State.warp.splice(toIdx, 0, movedCat);
+          markDirty('warp');
+        }
+        markDirty('warpmenu');
+      } else if (State.levels && State.levels[mode]) {
+        const [moved] = State.levels[mode].splice(fromIdx, 1);
+        State.levels[mode].splice(toIdx, 0, moved);
+        markDirty('levels');
+      }
+      renderMain();
+    });
+  });
+}
+
+// ============================================================
+//  AUTO-LOAD from filesystem (works when opened from configs/)
+// ============================================================
+
+const AUTO_LOAD_FILES = [
+  { path: './engine.cfg',                type: 'engine',              name: 'engine.cfg' },
+  { path: './clanring.cfg',              type: 'clanring',            name: 'clanring.cfg' },
+  { path: './levels.cfg',                type: 'levels',              name: 'levels.cfg' },
+  { path: './matchsounds.cfg',           type: 'matchsounds',        name: 'matchsounds.cfg' },
+  { path: './matchsounds_blowout.cfg',   type: 'matchsounds_blowout',name: 'matchsounds_blowout.cfg' },
+  { path: './matchsounds_rematch.cfg',   type: 'matchsounds_rematch',name: 'matchsounds_rematch.cfg' },
+  { path: './warp_main_menu.cfg',        type: 'warpmenu',           name: 'warp_main_menu.cfg' },
+  { path: './warp.cfg',                  type: 'warp',               name: 'warp.cfg' },
+  // Per-map overrides
+  { path: './maps/castlev2.cfg',  type: 'mapconfig', name: 'castlev2.cfg' },
+  { path: './maps/dm2.cfg',       type: 'mapconfig', name: 'dm2.cfg' },
+  { path: './maps/dm3.cfg',       type: 'mapconfig', name: 'dm3.cfg' },
+  { path: './maps/schloss.cfg',   type: 'mapconfig', name: 'schloss.cfg' },
+  { path: './maps/ultrav.cfg',    type: 'mapconfig', name: 'ultrav.cfg' },
+];
+
+async function autoLoad() {
+  let loaded = 0;
+  let failed = 0;
+
+  for (const file of AUTO_LOAD_FILES) {
+    try {
+      const resp = await fetch(file.path);
+      if (!resp.ok) { failed++; continue; }
+      const text = await resp.text();
+      // Sanity check: skip if we got an HTML page back (some browsers return directory listings)
+      if (text.trim().startsWith('<!') || text.trim().startsWith('<html')) { failed++; continue; }
+      importConfig(file.type, file.name, text, true);
+      loaded++;
+    } catch (e) {
+      failed++;
+    }
+  }
+
+  if (loaded > 0) {
+    // Default to clanring tab if it loaded, otherwise engine
+    if (State.loaded.has('clanring')) switchTab('clanring');
+    else if (State.loaded.has('engine')) switchTab('engine');
+    toast(`Auto-loaded ${loaded} config file${loaded !== 1 ? 's' : ''}`, 'success');
+  } else if (failed > 0) {
+    // All fetches failed — likely Chrome blocking file:// access
+    switchTab('welcome');
+    renderMain();
+  }
+
+  updateSidebarState();
+}
+
+// ---- Init ----
+renderMain();
+autoLoad();
+</script>
+
+<a class="github-float" href="https://github.com/quakeone/CRMod7" target="_blank" rel="noopener">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+</a>
+
+</body>
+</html>
