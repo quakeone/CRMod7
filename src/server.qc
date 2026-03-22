@@ -196,6 +196,7 @@
 void () clanring_remove_start_teleport;
 void () clanring_find_powerups;
 void () clanring_exec_configs;
+void () clanring_clear_matchsounds;
 void () clanring_precache_matchsounds;
 void () votables_disable_item;
 void () SUB_regen;
@@ -204,6 +205,7 @@ void (float value) clanring_set_teamplay;
 void (float value) clanring_set_fraglimit;
 void () stats_reset_player;
 void () stats_impulse;
+void () arena_update_round_infokeys;
 string(string s) utils_strip_newline;
 string(float seconds) utils_format_time;
 void(string player_name, float disconnect_time) utils_log_disconnect;
@@ -306,7 +308,16 @@ float() CountActivePlayersDM =
     {
         // Count only connected, non-observer players as "active"
         if ((p.style & CLANRING_CONNECTED) && !(p.style & CLANRING_OBSERVER))
+        {
+            // HH head victims are out of play and should not affect HH FFA 1v1 quad logic.
+            if ((clanring_playmode & CLANRING_HH_MODE) && p.hh_is_head)
+            {
+                p = find(p, classname, "player");
+                continue;
+            }
+
             n = n + 1;
+        }
         p = find(p, classname, "player");
     }
     return n;
@@ -314,7 +325,10 @@ float() CountActivePlayersDM =
 
 float() InDMNormalMode =
 {
-    // "Normal" (FFA) only - exclude arena/CTF/etc.
+    // Normal DM plus HH FFA only. Exclude team HH, arena, CTF, etc.
+    if (clanring_playmode & CLANRING_HH_MODE)
+        return (cvar("teamplay") <= 0);
+
     if (!(clanring_playmode & CLANRING_NORMAL_MODE))
         return FALSE;
     if (clanring_playmode & (CLANRING_CAPTURE_THE_FLAG
@@ -345,7 +359,7 @@ void() AutoGhostQuad_Refresh =
 {
     local float active, want_ghost, quad_spawners;
 
-    // Only relevant in DM normal
+    // Only relevant in normal DM and HH FFA
     if (!InDMNormalMode())
     {
         // ensure we're not stuck in a ghosting state if mode changed
@@ -550,10 +564,66 @@ void () server_set_infokey_modes =
     forceinfokey(world, "gametype", zmode);	//for json output; gamemode = gametype + playmode ("CTF PickUp", "CA Match", "TDM Practice")
     forceinfokey(world, "mode", zmode);
     forceinfokey(world, "playmode", pmode);
+    arena_update_round_infokeys();
 };
 
 /**/
 void () W_Precache;
+
+float(float playmode) clanring_startup_mode_bits =
+{
+    local float bits;
+
+    if (playmode & CLANRING_HH_MODE)
+        return CLANRING_HH_MODE;
+    if (playmode & CLANRING_RA_MODE)
+        return CLANRING_RA_MODE;
+    if (playmode & CLANRING_CA_MODE)
+    {
+        bits = CLANRING_CA_MODE;
+        if (playmode & CLANRING_WIPEOUT_MODE)
+            bits = bits | CLANRING_WIPEOUT_MODE;
+        return bits;
+    }
+    if (playmode & CLANRING_DMM4_MODE)
+        return CLANRING_DMM4_MODE;
+    if (playmode & CLANRING_AIRSHOT_MODE)
+        return CLANRING_AIRSHOT_MODE;
+
+    bits = 0;
+    if (playmode & CLANRING_PRACTICE_MODE)
+        bits = CLANRING_PRACTICE_MODE;
+    else if (playmode & CLANRING_MATCH_MODE)
+        bits = CLANRING_MATCH_MODE;
+    else if (playmode & CLANRING_NORMAL_MODE)
+        bits = CLANRING_NORMAL_MODE;
+
+    if (bits && (playmode & CLANRING_CAPTURE_THE_FLAG))
+        bits = bits | CLANRING_CAPTURE_THE_FLAG;
+
+    return bits;
+};
+
+float(float playmode) clanring_clear_startup_mode_bits =
+{
+    playmode = playmode - (playmode & CLANRING_NORMAL_MODE);
+    playmode = playmode - (playmode & CLANRING_MATCH_MODE);
+    playmode = playmode - (playmode & CLANRING_PRACTICE_MODE);
+    playmode = playmode - (playmode & CLANRING_CAPTURE_THE_FLAG);
+    playmode = playmode - (playmode & CLANRING_WIPEOUT_MODE);
+    playmode = playmode - (playmode & CLANRING_AIRSHOT_MODE);
+    playmode = playmode - (playmode & CLANRING_DMM4_MODE);
+    playmode = playmode - (playmode & CLANRING_CA_MODE);
+    playmode = playmode - (playmode & CLANRING_RA_MODE);
+    playmode = playmode - (playmode & CLANRING_HH_MODE);
+    return playmode;
+};
+
+float(float playmode) clanring_has_explicit_startup_mode =
+{
+    return clanring_startup_mode_bits(playmode);
+};
+
 //
 //  I N I T  W O R L D
 //
@@ -562,6 +632,9 @@ void () W_Precache;
 void () clanring_init_world =
 {
     local float mode;
+    local float startup_playmode;
+    local float current_startup_bits;
+    local float desired_startup_bits;
     local string szmode;
     local float temp;
 
@@ -581,8 +654,20 @@ void () clanring_init_world =
     clanring_sentinel = spawn();
     banent = spawn();
 
+    registercvar("cr_startmode", "0");
     clanring_playmode = cvar("samelevel");
+    startup_playmode = cvar("cr_startmode");
+    current_startup_bits = clanring_startup_mode_bits(clanring_playmode);
+    desired_startup_bits = clanring_startup_mode_bits(startup_playmode);
+    if (clanring_has_explicit_startup_mode(startup_playmode)
+        && current_startup_bits != desired_startup_bits)
+    {
+        clanring_playmode = clanring_clear_startup_mode_bits(clanring_playmode);
+        clanring_playmode = clanring_playmode | desired_startup_bits;
+        utils_set_cvar("samelevel", clanring_playmode);
+    }
     clanring_gameconfig = cvar("gamecfg");	//R00k TODO: migrate settings
+    clanring_clear_matchsounds();
 
     if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
     {
@@ -680,8 +765,16 @@ void () clanring_init_world =
 
         clanring_playmode 	= clanring_playmode | CLANRING_EXTENDED_OBITS;
         clanring_playmode 	= clanring_playmode | CLANRING_RUNETOSS;	//can toss runes on by default.
+
+        // Respect an explicit first-boot startup mode when one was seeded by
+        // server.cfg/engine.cfg. DM/CTF needs a base mode bit; arena and
+        // special modes are standalone.
+        if (!clanring_has_explicit_startup_mode(clanring_playmode))
+        {
         clanring_playmode 	= clanring_playmode | CLANRING_MATCH_MODE;
-        clanring_playmode 	= clanring_playmode | CLANRING_CAPTURE_THE_FLAG;//default match clanring ctf
+            clanring_playmode 	= clanring_playmode | CLANRING_CAPTURE_THE_FLAG;
+        }
+
         clanring_playmode 	= clanring_playmode | CLANRING_SERVER_INITIALIZED;
         clanring_state 		= clanring_state 	| CLANRING_TEAM_CAPTURE_CUSTOM;
 
@@ -886,13 +979,70 @@ void (float value) clanring_set_teamplay =
     localcmd3("teamplay \"", temp, "\"\n");
 };
 
+string () clanring_query_mode_label =
+{
+    if (clanring_playmode & CLANRING_MATCH_MODE)
+    {
+        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+            return "CRCTF Match";
+
+        if (teamplay)
+            return "CRMod++ Match";
+
+        return "CRMod++ Duel";
+    }
+
+    if (mode_is_arena())
+    {
+        if (clanring_playmode & CLANRING_AIRSHOT_MODE)
+            return "Airshot";
+
+        if (clanring_playmode & CLANRING_DMM4_MODE)
+            return "PovDuel";
+
+        if (clanring_playmode & CLANRING_RA_MODE)
+            return "RocketArena";
+
+        if (clanring_playmode & CLANRING_CA_MODE)
+        {
+            if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+                return "ClanArenaWipeout";
+
+            return "ClanArena";
+        }
+    }
+
+    if (clanring_playmode & CLANRING_HH_MODE)
+    {
+        if (teamplay)
+            return "ClanRing Head Hunters Team";
+
+        return "ClanRing Head Hunters FFA";
+    }
+
+    if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+    {
+        if (clanring_playmode & CLANRING_PRACTICE_MODE)
+            return "CRCTF Practice";
+
+        return "CRCTF PickUp";
+    }
+
+    if (clanring_playmode & CLANRING_PRACTICE_MODE)
+        return "ClanRing Practice";
+
+    if (teamplay)
+        return "ClanRing Team DeathMatch";
+
+    return "ClanRing Classic";
+};
+
 //
 //  S E T  F R A G L I M I T
 //
-//  Sets the fraglimit server variable to show fraglimit, "CRMod++",
-//  and either "FFA", "Practice", "Match" or "Individual" depending on the
-//  current mode.  If value = -1 then the fraglimit variable is preserved;
-//  otherwise it is changed to 'value'.
+//  Sets the fraglimit server variable and updates the legacy server-query
+//  banner to reflect the current mode.  If value = -1 then the fraglimit
+//  variable is preserved; otherwise it is changed to 'value'.
 //
 void (float value) clanring_set_fraglimit =
 {
@@ -916,52 +1066,8 @@ void (float value) clanring_set_fraglimit =
     }
 
     temp = ftos(fraglimit);
-
-    if (clanring_playmode & CLANRING_MATCH_MODE)
-    {
-        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-            localcmd3("fraglimit \"", temp, " : CRCTF ");
-        else
-            localcmd3("fraglimit \"", temp, " : CRMod++ ");
-
-        if (teamplay)
-            localcmd("Match\"\n");
-        else
-            localcmd("Duel\"\n");
-    }
-    else if (mode_is_arena())
-    {
-        if (clanring_playmode & CLANRING_AIRSHOT_MODE)
-        {
-            localcmd3("fraglimit \"", temp, " : Airshot\"\n");
-        }
-        else if (clanring_playmode & CLANRING_DMM4_MODE)
-        {
-            localcmd3("fraglimit \"", temp, " : PovDuel\"\n");
-        }
-        else if (clanring_playmode & CLANRING_RA_MODE)
-        {
-            localcmd3("fraglimit \"", temp, " : RocketArena\"\n");
-        }
-        else if (clanring_playmode & CLANRING_CA_MODE)
-        {
-            localcmd3("fraglimit \"", temp, " : ClanArena");
-            if (clanring_playmode & CLANRING_WIPEOUT_MODE)
-            {
-                localcmd("Wipeout\"\n");
-            }
-            else
+    localcmd4("fraglimit \"", temp, " : ", clanring_query_mode_label());
                 localcmd("\"\n");
-        }
-    }
-    else
-    {
-        localcmd3("fraglimit \"", temp, " : ClanRing ");
-        if (clanring_playmode & CLANRING_PRACTICE_MODE)
-            localcmd("Practice\"\n");
-        else
-            localcmd("Classic\"\n");
-    }
 };
 
 void () clanring_set_warp_aliases =

@@ -1,5 +1,6 @@
 void () observer_start;
 void () observer_end;
+void () clanring_load_matchsounds;
 void () stats_final_summary;
 void () stats_reset_player;
 void () observer_walk_start;
@@ -93,6 +94,19 @@ void () arena_init_world =
 		rocket_arena_init_world();
 		return;
 	}
+};
+
+void () arena_update_round_infokeys =
+{
+	if (!(clanring_playmode & CLANRING_CA_MODE) || boss == world)
+	{
+		forceinfokey(world, "round", "");
+		forceinfokey(world, "roundtotal", "");
+		return;
+	}
+
+	forceinfokey(world, "round", ftos(boss.round));
+	forceinfokey(world, "roundtotal", ftos(boss.max_rounds));
 };
 
 void () arena_client_disconnect =
@@ -1656,6 +1670,9 @@ void () arena_match_end =
 
 			if (clanring_playmode & CLANRING_RA_MODE)
 			{
+				if (clanring_gameconfig & CLANRING_ENABLE_MATCHSOUNDS)
+					clanring_load_matchsounds();
+
 				if (team_first_place.chain_gang != world)
 					announce2((team_first_place.chain_gang.netname)," has won the match.");
 
@@ -1701,6 +1718,7 @@ void () arena_match_end =
 	boss.wait 		 = 0;
 	boss.timetofight = FALSE;
 	boss.state 		 = CA_MATCH_CLEANUP;
+	arena_update_round_infokeys();
 
     gameover = FALSE;
 
@@ -1765,6 +1783,7 @@ void() reset_round =
 	boss.wait   = 0;
 	boss.count  = (clanring_playmode & CLANRING_RA_MODE) ? 6 : 10;
 	boss.round  = boss.round + 1;
+	arena_update_round_infokeys();
 	temp = ftos(boss.round);
 	localcmd("skill \"", temp, "\"\n");
 

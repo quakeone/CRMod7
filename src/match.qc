@@ -60,6 +60,7 @@ void() match_clear_initial_movement_state;
 void() match_refresh_spawn_markers;
 void(void(entity) prepfn, string content) webhook_post_deferred;
 void(entity ev) webhook_captime_info;
+void () clanring_load_matchsounds;
 // Random Pickup (reshuffle teams without repeats per roster)
 void() match_rpickup;
 void() match_request_rpickup;
@@ -1091,9 +1092,15 @@ void() match_check_autoss =
 
 void(float score_diff) match_postgame_sound =
 {
+    local string chosen = "";
+    local entity player;
     local float prnd;
 
-    if ((!(clanring_gameconfig & CLANRING_ENABLE_MATCHSOUNDS))||(!(clanring_matchsound_count)))
+    if (!(clanring_gameconfig & CLANRING_ENABLE_MATCHSOUNDS))
+        return;
+
+    clanring_load_matchsounds();
+    if (!(clanring_matchsound_count))
         return;
 
     prnd = random();
@@ -1107,8 +1114,7 @@ void(float score_diff) match_postgame_sound =
                 prnd = floor(random() * clanring_matchsound_blowout_count);
                 if (matchsound_blowout[prnd] != "")
                 {
-                    sound (world, CHAN_AUTO, matchsound_blowout[prnd], 1, ATTN_NONE);
-                    return;
+                    chosen = matchsound_blowout[prnd];
                 }
             }
         }
@@ -1120,8 +1126,7 @@ void(float score_diff) match_postgame_sound =
                 prnd = floor(random() * clanring_matchsound_rematch_count);
                 if (matchsound_rematch[prnd] != "")
                 {
-                    sound (world, CHAN_AUTO, matchsound_rematch[prnd], 1, ATTN_NONE);
-                    return;
+                    chosen = matchsound_rematch[prnd];
                 }
             }
         }
@@ -1132,12 +1137,30 @@ void(float score_diff) match_postgame_sound =
                 prnd = floor(random() * clanring_matchsound_count);
                 if (matchsound[prnd] != "")
                 {
-                    sound (world, CHAN_AUTO, matchsound[prnd], 1, ATTN_NONE);
-                    return;
+                    chosen = matchsound[prnd];
                 }
             }
         }
     }
+
+    if (chosen != "")
+    {
+        if (clanring_matchsounds_precached)
+        {
+            sound (world, CHAN_AUTO, chosen, 1, ATTN_NONE);
+            return;
+        }
+
+        player = find(world, classname, "player");
+        while (player != world)
+        {
+            if (player.style & CLANRING_CONNECTED)
+                stuffcmd(player, strcat("play ", chosen, "\n"));
+            player = find(player, classname, "player");
+        }
+        return;
+    }
+
     sound (world, CHAN_AUTO, "ra/gong.wav", 1 , ATTN_NONE);
 };
 

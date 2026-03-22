@@ -664,6 +664,83 @@ void(string command, string value) config_command =
 		}
 	}
 };
+
+float clanring_config_block_comment;
+
+string(string raw, float skip_comment_only) config_normalize_config_line =
+{
+	local float pos, endpos;
+
+	if (!raw)
+		return "";
+
+	if (clanring_config_block_comment)
+	{
+		pos = strstrofs(raw, "*/", 0);
+		if (pos < 0)
+			return "";
+		clanring_config_block_comment = FALSE;
+		raw = substring(raw, pos + 2, -1);
+	}
+
+	while (TRUE)
+	{
+		pos = strstrofs(raw, "/*", 0);
+		if (pos < 0)
+			break;
+
+		endpos = strstrofs(raw, "*/", pos + 2);
+		if (endpos < 0)
+		{
+			clanring_config_block_comment = TRUE;
+			raw = substring(raw, 0, pos);
+			break;
+		}
+
+		raw = strcat(substring(raw, 0, pos), substring(raw, endpos + 2, -1));
+	}
+
+	raw = strtrim(raw);
+
+	if (!skip_comment_only)
+		return raw;
+
+	if (raw == "")
+		return "";
+	if (substring(raw, 0, 2) == "//")
+		return "";
+	if (substring(raw, 0, 1) == "#")
+		return "";
+
+	return raw;
+};
+
+string(filestream f) config_read_next_line =
+{
+	local string raw;
+
+	while (TRUE)
+	{
+		raw = fgets(f);
+		if (!raw)
+			return "";
+
+		raw = config_normalize_config_line(raw, TRUE);
+		if (raw != "")
+			return raw;
+	}
+};
+
+string(filestream f) config_read_fixed_line =
+{
+	local string raw;
+
+	raw = fgets(f);
+	if (!raw)
+		return "";
+
+	return config_normalize_config_line(raw, FALSE);
+};
 //Todo: combine exec_warp_* functions to read the top portion of the file as the main menu
 //find the "xxxxx" string then start parsing mapnames/info for the map menus.
 void () exec_warp_main_menu =
@@ -681,10 +758,8 @@ void () exec_warp_main_menu =
 	while ((line = fgets(f)) && (i < WARP_CATEGORY_SIZE))
 	{
 		float argc = tokenize(line);
-
 		if (!argc)
 			continue;
-
 		if (argv(0) == "//" || argv(0) == "#")
 			continue;
 		i++;
@@ -710,13 +785,11 @@ void() exec_warp_cfg =
 	while ((line = fgets(f)))
 	{
 		float argc = tokenize(line);
-
 		if (!argc)
 			continue;
 
 		mapfile = argv(0);
-
-		if (mapfile == "//" || mapfile == "#") continue;	// Skip comments
+		if (mapfile == "//" || mapfile == "#") continue;
 
 		if (mapfile == "****")
 		{
@@ -811,7 +884,7 @@ void(string mode) clanring_count_maps =
 		        if (!argc) continue;
 		        if (argv(0) == "//" || argv(0) == "#") continue;
 
-                if ((argv(0) == "-ctf-") || (argv(0) == "-ca-") || (argv(0) == "-dm-") || (argv(0) == "-ra-"))
+                if ((argv(0) == "-ctf-") || (argv(0) == "-ca-") || (argv(0) == "-dm-") || (argv(0) == "-ra-") || (argv(0) == "-hh-"))
                     break;
 
                 if (found_in_warp_list(argv(0))) //The map must be installed in the warp.cfg so that we can grab the title string.
@@ -849,18 +922,39 @@ void() clanring_nextlevel_config =
         mode = "-ca-";
     else if (clanring_playmode & CLANRING_RA_MODE)
         mode = "-ra-";
+    else if (clanring_playmode & CLANRING_HH_MODE)
+        mode = "-hh-";
     else
         mode = "-dm-";
 
 	clanring_count_maps(mode);	//Set clanring_lastcount for this mode.
 
+	// Older levels.cfg files may not have a dedicated HH section yet.
+	// Fall back to the DM rotation instead of looping the current map forever.
+	if ((clanring_playmode & CLANRING_HH_MODE) && (clanring_lastcount <= 0))
+	{
+		print("[Rotation] HH section missing, falling back to -dm-\n");
+		clanring_count_maps("-dm-");
+	}
+
 	// When switching into RA mode, start rotation at a random map once
 	if ((clanring_playmode & CLANRING_RA_MODE) && (clanring_level <= 1))
 	{
-		if (clanring_lastcount > 0)
+		if (clanring_lastcount > 0 && cvar("cr_ra_randomize_start"))
 		{
 			clanring_level = (floor(random() * clanring_lastcount) + 1);
 			print(sprintf("[Rotation] RA start randomized to %s of %s\n",
+						  ftos(clanring_level), ftos(clanring_lastcount)));
+		}
+	}
+
+	// When switching into HH mode, start rotation at a random map once
+	if ((clanring_playmode & CLANRING_HH_MODE) && (clanring_level <= 1))
+	{
+		if (clanring_lastcount > 0 && cvar("cr_hh_randomize_start"))
+		{
+			clanring_level = (floor(random() * clanring_lastcount) + 1);
+			print(sprintf("[Rotation] HH start randomized to %s of %s\n",
 						  ftos(clanring_level), ftos(clanring_lastcount)));
 		}
 	}
@@ -870,9 +964,10 @@ void() clanring_nextlevel_config =
     if ((clanring_playmode & CLANRING_NORMAL_MODE)
         && !(clanring_playmode & CLANRING_MATCH_MODE)
         && !(clanring_playmode & CLANRING_PRACTICE_MODE)
+        && !(clanring_playmode & CLANRING_HH_MODE)
         && (clanring_level <= 1))
     {
-        if (clanring_lastcount > 0)
+        if (clanring_lastcount > 0 && cvar("cr_dm_randomize_start"))
         {
             clanring_level = (floor(random() * clanring_lastcount) + 1);
             print(sprintf("[Rotation] DM start randomized to %s of %s\n",
@@ -1272,11 +1367,23 @@ void() clanring_cam_config =
 void() clanring_map_config =
 {
 	//Map specific settings
-	print(sprintf("Loading Map Configuration File: \"configs/%s.cfg\n", mapname));
-//	print("\"It is OPTIONAL - there is nothing wrong if it can't be found.\"\n");
 	// Reset per-map timelimit force before applying map cfg
 	clanring_force_timelimit = 0;
-	exec_clanring_cfg((strcat("configs/", mapname, ".cfg")));
+	// Try configs/maps/ first, fall back to configs/
+	string maps_path = strcat("configs/maps/", mapname, ".cfg");
+	string flat_path = strcat("configs/", mapname, ".cfg");
+	filestream f = fopen(maps_path, FILE_READ);
+	if (f >= 0)
+	{
+		fclose(f);
+		print(sprintf("Loading Map Configuration File: \"%s\"\n", maps_path));
+		exec_clanring_cfg(maps_path);
+	}
+	else
+	{
+		print(sprintf("Loading Map Configuration File: \"%s\"\n", flat_path));
+		exec_clanring_cfg(flat_path);
+	}
 	// Trace current key cvars after map cfg
 	bprint("after map cfg: deathmatch ", ftos(cvar("deathmatch")), ", timelimit ", ftos(cvar("timelimit")), ", forceTL ", ftos(clanring_force_timelimit), "\n");
 };
@@ -1292,6 +1399,9 @@ void() clanring_main_config =
 		registercvar("cr_lockdown_ips", "");
 	registercvar("cr_lockdown_labels", "");
 	registercvar("cr_lockdown_auto_release_on_match_start", "0");
+	registercvar("cr_dm_randomize_start", "1");
+	registercvar("cr_ra_randomize_start", "1");
+	registercvar("cr_hh_randomize_start", "0");
 	exec_clanring_cfg("configs/clanring.cfg");
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.
@@ -1302,6 +1412,31 @@ void() clanring_main_config =
 //
 void() clanring_exec_configs =
 {
+	local float startup_playmode;
+	local float current_startup_bits;
+	local float desired_startup_bits;
+
+	startup_playmode = cvar("cr_startmode");
+	current_startup_bits = clanring_startup_mode_bits(cvar("samelevel"));
+	desired_startup_bits = clanring_startup_mode_bits(startup_playmode);
+	if (clanring_has_explicit_startup_mode(startup_playmode)
+		&& current_startup_bits != desired_startup_bits)
+	{
+		print(sprintf("Startup mode correction: samelevel %s -> %s, restarting %s\n",
+			ftos(current_startup_bits), ftos(desired_startup_bits), mapname));
+		clanring_playmode = cvar("samelevel");
+		clanring_playmode = clanring_clear_startup_mode_bits(clanring_playmode);
+		clanring_playmode = clanring_playmode | desired_startup_bits;
+		utils_set_cvar("samelevel", clanring_playmode);
+		localcmd("restart\n");
+		remove(self);
+		return;
+	}
+	else if (clanring_has_explicit_startup_mode(startup_playmode))
+	{
+		cvar_set("cr_startmode", "0");
+	}
+
 	if (cvar ("deathmatch") == 0)
 		utils_set_cvar ("deathmatch", 1);
 
@@ -1391,9 +1526,38 @@ void() clanring_exec_configs =
 // 0 - normal match end sounds
 // 1 - rematch sounds
 // 2 - blowout sounds
+void () clanring_clear_matchsounds =
+{
+	for (float i = 0; i < MAX_CUSTOM_MATCH_SOUNDS; i++)
+	{
+		if (matchsound[i] != "")
+		{
+			strunzone(matchsound[i]);
+			matchsound[i] = "";
+		}
+		if (matchsound_rematch[i] != "")
+		{
+			strunzone(matchsound_rematch[i]);
+			matchsound_rematch[i] = "";
+		}
+		if (matchsound_blowout[i] != "")
+		{
+			strunzone(matchsound_blowout[i]);
+			matchsound_blowout[i] = "";
+		}
+	}
+
+	clanring_matchsounds_loaded = FALSE;
+	clanring_matchsounds_precached = FALSE;
+	clanring_matchsound_count = 0;
+	clanring_matchsound_rematch_count = 0;
+	clanring_matchsound_blowout_count = 0;
+};
+
 void (float soundtype) clanring_read_matchsounds =
 {
 	string line, fname = "";
+	string entry;
 	filestream f;
 	float i = 0;
 
@@ -1419,25 +1583,27 @@ void (float soundtype) clanring_read_matchsounds =
 			continue;
 		if (argv(0) == "//" || argv(0) == "#") continue;
 
+		entry = argv(0);
+
 		if (soundtype == 1)
 		{
 			if (matchsound_rematch[i] != "")
 				strunzone(matchsound_rematch[i]);
-			matchsound_rematch[i] = strzone(line);
+			matchsound_rematch[i] = strzone(entry);
 			clanring_matchsound_rematch_count = i + 1;
 		}
 		else if (soundtype == 2)
 		{
 			if (matchsound_blowout[i] != "")
 				strunzone(matchsound_blowout[i]);
-			matchsound_blowout[i] = strzone(line);
+			matchsound_blowout[i] = strzone(entry);
 			clanring_matchsound_blowout_count = i + 1;
 		}
 		else
 		{
 			if (matchsound[i] != "")
 				strunzone(matchsound[i]);
-			matchsound[i] = strzone(line);
+			matchsound[i] = strzone(entry);
 			clanring_matchsound_count = i + 1;
 		}
 		i++;
@@ -1445,9 +1611,20 @@ void (float soundtype) clanring_read_matchsounds =
 	fclose(f);
 };
 
+void () clanring_load_matchsounds =
+{
+	if (clanring_matchsounds_loaded)
+		return;
+
+	clanring_matchsounds_loaded = TRUE;
+	clanring_read_matchsounds(0);
+	clanring_read_matchsounds(1);
+	clanring_read_matchsounds(2);
+};
+
 void () clanring_precache_matchsounds =
 {
-	clanring_read_matchsounds(0);
+	clanring_load_matchsounds();
 	if (clanring_matchsound_count)
 	{
 		dprint("precaching ");
@@ -1464,7 +1641,6 @@ void () clanring_precache_matchsounds =
 	else
 		dprint("no match end sounds found.\n");
 
-	clanring_read_matchsounds(1);
 	if (clanring_matchsound_rematch_count)
 	{
 		dprint("precaching ");
@@ -1478,7 +1654,6 @@ void () clanring_precache_matchsounds =
 	else
 		dprint("no rematch sounds found.\n");
 
-	clanring_read_matchsounds(2);
 	if (clanring_matchsound_blowout_count)
 	{
 		dprint("precaching ");
@@ -1491,4 +1666,6 @@ void () clanring_precache_matchsounds =
 	}
 	else
 		dprint("no blowout sounds found.\n");
+
+	clanring_matchsounds_precached = TRUE;
 };

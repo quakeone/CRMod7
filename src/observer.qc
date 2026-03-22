@@ -28,6 +28,7 @@ void () observer_set_demo_position;
 void () observer_heads_up;
 void () SetNewParms2;
 void () observer_get_target;
+void () observer_cancel_leave;
 void () observer_next_target;
 void () WaterMove;
 void () CheckWaterJump;
@@ -1683,6 +1684,9 @@ void () observer_confirm =
 	if (self.style & CLANRING_CONFIRM_LEAVE)
 		return;
 
+	if ((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head && self.hh_eyecam_target != world)
+		sprint(self, "Your head was picked up by ", self.hh_eyecam_target.netname, ". Leave match? Type yes to confirm.\n");
+	else
 	sprint(self, "Leave match?  Type yes to confirm.\n");
 	self.style = self.style | CLANRING_CONFIRM_LEAVE;
 	utils_make_scheduled_event(observer_cancel_leave, 5);
@@ -1783,7 +1787,8 @@ void () observer_impulse =
 			}
 			
             if (((clanring_playmode & CLANRING_MATCH_MODE) & (clanring_state & CLANRING_MATCH_STARTED)) ||
-				((mode_is_arena()) && (boss.state != CA_MATCH_WAITING)))
+				((mode_is_arena()) && (boss.state != CA_MATCH_WAITING)) ||
+				((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head && self.hh_eyecam_target != world))
                 observer_confirm();
             else
                 observer_start();

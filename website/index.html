@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CRMod7 - Quake 1 Competition Server</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" href="7.png" sizes="64x64" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
@@ -133,6 +133,19 @@
             </div>
           </div>
           <p>Classic Threewave CTF pack mirror for the common server-side and client-side CTF assets.</p>
+        </a>
+
+        <a href="https://www.gamers.org/pub/idgames2/planetquake/headhunters/client/hh30cl.zip" class="download-card" target="_blank" rel="noopener">
+          <div class="download-card-head">
+            <div class="download-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 2a4 4 0 0 0-4 4v1a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 20l1-6h6l1 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 14h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <h3>Headhunters PAK</h3>
+              <span class="download-meta">hh30cl.zip</span>
+            </div>
+          </div>
+          <p>Client-side Headhunters pack with models and sounds for the Head Hunters game mode.</p>
         </a>
 
         <a href="https://www.quaddicted.com/files/idgames2/planetquake/servers/arena/farena12.zip" class="download-card" target="_blank" rel="noopener">
@@ -1477,8 +1490,10 @@ deathmatch 1
             <div class="cfg-section-item">
               <h5>Parser &amp; Extra Commands</h5>
               <p>The parser accepts regular Quake cvars, custom CRMod commands, and generic <code>set</code>/<code>seta</code> lines. These are also valid in map-specific overrides.</p>
-              <pre class="cfg-code"><code>set hostname "CRMod 7 - local"   // Generic cvar passthrough
-seta sv_demoAutoRecord 1         // FTE/QSS engine cvar passthrough
+              <pre class="cfg-code"><code>// Generic cvar passthrough
+set hostname "CRMod 7 - local"
+// FTE/QSS engine cvar passthrough
+seta sv_demoAutoRecord 1
 setadmin2 2468101                // Extra admin codes up to setadmin9
 ringauto                         // Return ring handling to automatic mode logic
 allvoteoff                       // Disable all player voting globally
@@ -1636,22 +1651,17 @@ matchsounds/rematch.wav</code></pre>
               <span class="cfg-badge">Launch Samples</span>
             </div>
           </div>
-          <p class="cfg-desc">The <code>release/</code> folder carries deployable examples: a startup <code>autoexec.cfg</code>, an engine-level <code>fte.cfg</code>, and a mirrored <code>release/configs/</code> tree for packaging a ready-to-run server.</p>
-          <pre class="cfg-code"><code>// release/autoexec.cfg
-samelevel 2               // Boot in match rules
-teamplay 2
-sv_aim 2
-sys_ticrate 0.05
-map dm3
+          <p class="cfg-desc">The <code>release/</code> folder carries deployable examples: a minimal root <code>server.cfg</code> wrapper and a mirrored <code>configs/</code> tree that holds the actual engine-facing startup settings.</p>
+          <pre class="cfg-code"><code>// release/server.cfg
+exec "configs/engine.cfg"
 
-// release/fte.cfg (selected server-facing cvars)
+// release/configs/engine.cfg
+set cr_startmode 2
+map dm3
 hostname "localhost"
-sv_port "27500 26000"
-rcon_password ""
-sv_demoDir "demos"
-sv_demoAutoRecord "0"
-sv_loadentfiles "1"
-sv_progs "progs.dat"</code></pre>
+sv_public 1
+net_messagetimeout 60
+sv_gameplayfix_bouncedownslopes 1</code></pre>
         </div>
 
         <!-- Data files -->

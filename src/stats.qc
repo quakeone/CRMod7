@@ -204,6 +204,17 @@ void() stats_reset_player =
 	self.flag_carry_start = 0;
 	self.last_carry_pos = '0 0 0';
 	self.last_pos_check = 0;
+	self.hh_stats_heads_picked = 0;
+	self.hh_stats_heads_reclaimed = 0;
+	self.hh_stats_heads_scored = 0;
+	self.hh_stats_score_value = 0;
+	self.hh_stats_peak_value = 0;
+	self.hh_stats_heads_dropped = 0;
+	self.hh_stats_haunts_started = 0;
+	self.hh_stats_haunt_bites = 0;
+	self.hh_stats_haunt_kills = 0;
+	self.hh_stats_haunt_time = 0;
+	self.hh_stats_haunt_start = 0;
 	self.q1_per = 0;
 };
 
@@ -666,6 +677,70 @@ void() stats_show_fstats =
 	ttr = stats_format_captime_record(FALSE);
 	sprint(self, mapname, " trial capture-time record: ", ttr);
 	sprint(self,"\n");
+};
+
+void() stats_show_hhstats =
+{
+	local entity player;
+	local float c;
+	local float haunt_time;
+
+	c = 16;
+
+	sprint(self, "\n");
+	sprint(self, "\bHeadhunters\b\n");
+	sprint(self, "\n");
+	sprint(self, "pick\b:\brec\b:\bscr\b:\b val\b:\bpeak\b:\bdrop\b:\b     name      \n");
+	sprint(self, "\b----:---:---:----:----:----:---------------\b\n");
+
+	player = clanring_sentinel.next_player;
+	while (player != world)
+	{
+		if (c < 1)
+			break;
+
+		sprint(self, sprintf("%4g\b:\b%3g\b:\b%3g\b:\b%4g\b:\b%4g\b:\b%4g\b:\b %s",
+			player.hh_stats_heads_picked,
+			player.hh_stats_heads_reclaimed,
+			player.hh_stats_heads_scored,
+			player.hh_stats_score_value,
+			player.hh_stats_peak_value,
+			player.hh_stats_heads_dropped,
+			player.netname));
+
+		sprint(self, "\n");
+		player = player.next_player;
+		c = c - 1;
+	}
+
+	sprint(self, "\n");
+	sprint(self, "hunt\b:\bbite\b:\bkil\b:\b time \b:\b     name      \n");
+	sprint(self, "\b----:----:---:------:---------------\b\n");
+
+	player = clanring_sentinel.next_player;
+	c = 16;
+	while (player != world)
+	{
+		if (c < 1)
+			break;
+
+		haunt_time = player.hh_stats_haunt_time;
+		if (player.hh_stats_haunt_start > 0)
+			haunt_time = haunt_time + max(0, time - player.hh_stats_haunt_start);
+
+		sprint(self, sprintf("%4g\b:\b%4g\b:\b%3g\b:\b ",
+			player.hh_stats_haunts_started,
+			player.hh_stats_haunt_bites,
+			player.hh_stats_haunt_kills));
+		utils_sprint_stat_time(self, haunt_time);
+		sprint(self, "\b:\b ", player.netname);
+
+		sprint(self, "\n");
+		player = player.next_player;
+		c = c - 1;
+	}
+
+	sprint(self, "\n");
 };
 
 void () stats_team_stats =
@@ -1327,6 +1402,29 @@ float(entity p) PER_HasNontrivialActivity =
 	return FALSE;
 };
 
+float(entity p) stats_has_nontrivial_activity =
+{
+	if (PER_HasNontrivialActivity(p))
+		return TRUE;
+
+	if (!(clanring_playmode & CLANRING_HH_MODE))
+		return FALSE;
+
+	if (p.hh_stats_heads_picked) return TRUE;
+	if (p.hh_stats_heads_reclaimed) return TRUE;
+	if (p.hh_stats_heads_scored) return TRUE;
+	if (p.hh_stats_score_value) return TRUE;
+	if (p.hh_stats_peak_value) return TRUE;
+	if (p.hh_stats_heads_dropped) return TRUE;
+	if (p.hh_stats_haunts_started) return TRUE;
+	if (p.hh_stats_haunt_bites) return TRUE;
+	if (p.hh_stats_haunt_kills) return TRUE;
+	if (p.hh_stats_haunt_time) return TRUE;
+	if (p.hh_stats_haunt_start) return TRUE;
+
+	return FALSE;
+};
+
 // ---------------------------------------------------------
 // Helper: print top-3 contributing reasons for player's PER
 // (normalized per minute, so it aligns with the table)
@@ -1510,7 +1608,7 @@ void() stats_show_per =
             // Normalize to PER/minute with a 1-minute floor so very short aborts don't blow up values.
             mins_norm = max(1, match_secs / 60);
             // Mirror your "don't show PER on short (0:00) + no activity"
-            short_and_empty = (match_secs < 60) && (!PER_HasNontrivialActivity(p));
+            short_and_empty = (match_secs < 60) && (!stats_has_nontrivial_activity(p));
 
             final_per = Q1_PER_Calc_Eff(p) / mins_norm;
             if (final_per < 0.1) final_per = 0.1;
@@ -1557,13 +1655,41 @@ void() stats_autodump =
 {
 		sprint(self, "\n");
 		sprint(self, "\n");
-		sprint(self, "\bmatch statistics\n");
-		sprint(self, "\n");		
-		sprint(self, sprintf("map: %s\n",mapname));
 		string date = strftime(TRUE, "%m-%d-%Y %H:%M");
 		
 		local string hname = infokey(world,"hostname");
-		sprint(self, sprintf("%s\n%s\n",date,hname));
+		local string mode_label = "";
+		local string tplay = teamplay ? "on" : "off";
+
+		if (clanring_playmode & CLANRING_HH_MODE)
+			mode_label = teamplay ? "headhunters team" : "headhunters ffa";
+		else if (clanring_playmode & CLANRING_CA_MODE)
+			mode_label = "clan arena";
+		else if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+			mode_label = "wipeout";
+		else if (clanring_playmode & CLANRING_RA_MODE)
+			mode_label = "rocket arena";
+		else if (clanring_playmode & CLANRING_DMM4_MODE)
+			mode_label = "dmm4";
+		else if (clanring_playmode & CLANRING_AIRSHOT_MODE)
+			mode_label = "airshot";
+		else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+			mode_label = (clanring_playmode & CLANRING_MATCH_MODE) ? "ctf match" : "ctf";
+		else if (mode_is_arena())
+			mode_label = "arena";
+		else if (clanring_playmode & CLANRING_MATCH_MODE)
+			mode_label = "dm match";
+		else
+			mode_label = "standard";
+
+		sprint(self, "match statistics\n");
+		sprint(self, "\n");
+		sprint(self, "map      \b:\b ", mapname, "\n");
+		sprint(self, "date     \b:\b ", date, "\n");
+		sprint(self, "server   \b:\b ", hname, "\n");
+		sprint(self, "mode     \b:\b ", mode_label, "\n");
+		sprint(self, "teamplay \b:\b ", tplay, "\n");
+		sprint(self, "\n");
 
 		stats_show_summary ();
 		//sprint(self, "\n");
@@ -1598,6 +1724,11 @@ void() stats_autodump =
 			(clanring_playmode & CLANRING_WIPEOUT_MODE))
 		{
 			stats_show_badstats();
+		}
+
+		if (clanring_playmode & CLANRING_HH_MODE)
+		{
+			stats_show_hhstats();
 		}
 
 		if (teamplay)
@@ -1637,20 +1768,11 @@ void() stats_autodump =
         // (Full text capture can be added later by routing
         // the stats_prints through a capture helper.)
         // -------------------------------------------------
-        local string modes, tplay, msg;
-
-        modes = "";
-        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) modes = strcat(modes, "[CTF] ");
-        if (clanring_playmode & CLANRING_CA_MODE)          modes = strcat(modes, "[CA] ");
-        if (clanring_playmode & CLANRING_WIPEOUT_MODE)     modes = strcat(modes, "[Wipeout] ");
-        if (mode_is_arena())                               modes = strcat(modes, "[Arena] ");
-        if (modes == "")                                   modes = "[Std] ";
-
-        tplay = teamplay ? "on" : "off";
+        local string msg;
 
         // Compact, Discord-friendly header; you can add more lines here anytime.
-        msg = sprintf("**Match statistics**\n%s\n%s\nMap: %s\nTeamplay: %s\nModes: %s\n",
-                      date, hname, mapname, tplay, modes);
+        msg = sprintf("**Match statistics**\n%s\n%s\nMap: %s\nTeamplay: %s\nMode: %s\n",
+                      date, hname, mapname, tplay, mode_label);
 
         if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
             msg = strcat(msg, sprintf("%s set a new match capture record!\n", clanring_new_record_player));
@@ -1714,6 +1836,22 @@ void () stats_help =
 	sprint(self, "self - percent damage done to self\n");
 	sprint(self, "team - percent damage done to team\n");
 	
+	sprint(self, "\n");
+
+	sprint(self, "\n");
+	sprint(self, "\bHeadhunters\b\n");
+	sprint(self, "\n");
+	sprint(self, "pick - heads picked up\n");
+	sprint(self, "rec  - team heads reclaimed\n");
+	sprint(self, "scr  - heads scored at the altar\n");
+	sprint(self, "val  - total altar score value\n");
+	sprint(self, "peak - best carried head value\n");
+	sprint(self, "drop - heads dropped on death\n");
+	sprint(self, "hunt - haunting runs started\n");
+	sprint(self, "bite - successful haunt bites\n");
+	sprint(self, "kil  - kills while haunting\n");
+	sprint(self, "time - total haunting time\n");
+
 	sprint(self, "\n");
 
 	sprint(self, "\n");

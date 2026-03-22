@@ -22,6 +22,10 @@ void(entity player) hh_player_prethink;
 void(entity player) hh_player_postthink;
 void() hh_player_die;
 void(entity altar) hh_configure_altar;
+void(entity player, entity target) hh_set_eyecam;
+vector(float slot) hh_pile_offset;
+vector(float slot) hh_pile_angles;
+void(entity player) hh_finish_haunting_stats;
 
 string() hh_random_pickup_sound =
 {
@@ -112,19 +116,57 @@ void(entity holder, float dropped_heads) hh_broadcast_dropheads =
 
 void(entity altar) hh_clear_altar_head =
 {
-	if (altar.chain != world)
+	local entity e, next;
+
+	e = altar.chain;
+	while (e != world)
 	{
-		remove(altar.chain);
-		altar.chain = world;
+		next = e.chain;
+		remove(e);
+		e = next;
 	}
+	altar.chain = world;
 };
 
 void(entity altar) hh_spawn_altar_head =
 {
-	local entity head;
+	local entity head, prev;
+	local float i;
+	local float count;
+	local vector ground;
 
-	hh_clear_altar_head(altar);
+	ground = altar.dest;
 
+	count = 18;
+	prev = world;
+	i = 0;
+	while (i < count)
+	{
+		head = spawn();
+		head.classname = "hh_altar_head";
+		head.owner = altar;
+		head.movetype = MOVETYPE_NONE;
+		head.solid = SOLID_NOT;
+		head.touch = SUB_Null;
+		head.effects = 0;
+		head.avelocity = '0 0 0';
+		head.angles = hh_pile_angles(i);
+		head.skin = floor(random() * 12);
+		setmodel(head, "progs/h_player.mdl");
+		setsize(head, '0 0 0', '0 0 0');
+		setorigin(head, ground + hh_pile_offset(i));
+
+		if (i == 0)
+			altar.chain = head;
+		else
+			prev.chain = head;
+
+		head.chain = world;
+		prev = head;
+		i = i + 1;
+	}
+
+	// Spinning head on top of the spike
 	head = spawn();
 	head.classname = "hh_altar_head";
 	head.owner = altar;
@@ -137,8 +179,9 @@ void(entity altar) hh_spawn_altar_head =
 	head.angles = altar.angles;
 	setmodel(head, "progs/h_player.mdl");
 	setsize(head, '0 0 0', '0 0 0');
-	setorigin(head, altar.origin + '0 0 6');
-	altar.chain = head;
+	setorigin(head, ground + '0 0 86');
+	prev.chain = head;
+	head.chain = world;
 };
 
 float(float heads) hh_score_value =
@@ -147,6 +190,30 @@ float(float heads) hh_score_value =
 		return 0;
 
 	return (heads * (heads + 1)) * 0.5;
+};
+
+float(entity holder) hh_current_carry_value =
+{
+	if (holder == world)
+		return 0;
+
+	if (teamplay && (holder.team > 0))
+		return holder.hh_head_total_value;
+
+	return hh_score_value(holder.ammo_heads);
+};
+
+void(entity player) hh_finish_haunting_stats =
+{
+	if (player == world)
+		return;
+
+	if (player.hh_stats_haunt_start > 0)
+	{
+		if (time > player.hh_stats_haunt_start)
+			player.hh_stats_haunt_time = player.hh_stats_haunt_time + (time - player.hh_stats_haunt_start);
+		player.hh_stats_haunt_start = 0;
+	}
 };
 
 void(entity altar) hh_disable_altar =
@@ -661,6 +728,7 @@ void(entity holder) hh_refresh_holder_heads =
 	local entity head;
 	local float count;
 	local float value;
+	local float carry_value;
 
 	if (holder == world)
 		return;
@@ -679,6 +747,10 @@ void(entity holder) hh_refresh_holder_heads =
 
 	if (holder.classname == "player")
 	{
+		carry_value = hh_current_carry_value(holder);
+		if (carry_value > holder.hh_stats_peak_value)
+			holder.hh_stats_peak_value = carry_value;
+
 		forceinfokey(holder, "heads", ftos(holder.ammo_heads));
 		if (teamplay && (holder.team > 0))
 			forceinfokey(holder, "headvalue", ftos(value));
@@ -924,6 +996,10 @@ void(entity player) hh_reset_player_head_state =
 	if (player == world)
 		return;
 
+	if (player.hh_eyecam_target != world)
+		hh_set_eyecam(player, world);
+
+	hh_finish_haunting_stats(player);
 	player.hh_spirit_head = world;
 	player.hh_altar_pos = '0 0 0';
 	player.hh_is_head = FALSE;
@@ -931,6 +1007,7 @@ void(entity player) hh_reset_player_head_state =
 	player.hh_haunting = FALSE;
 	player.hh_haunt_over = 0;
 	player.hh_can_bite = 0;
+	player.hh_eyecam_target = world;
 	player.hh_help_state = 0;
 	player.hh_help_context = 0;
 };
@@ -961,8 +1038,8 @@ void(entity player) hh_show_spirit_player =
 	setmodel(player, "progs/spike.mdl");
 	player.frame = 0;
 	player.solid = SOLID_NOT;
-	player.movetype = MOVETYPE_FLY;
-	player.finaldest_y = MOVETYPE_FLY;
+	player.movetype = MOVETYPE_NOCLIP;
+	player.finaldest_y = MOVETYPE_NOCLIP;
 	player.touch = SUB_Null;
 	player.takedamage = DAMAGE_NO;
 	player.view_ofs = '0 0 8';
@@ -971,7 +1048,7 @@ void(entity player) hh_show_spirit_player =
 
 void(entity head, float reclaimed) hh_unlink_spirit_head =
 {
-	local entity player;
+	local entity player, oself;
 
 	if (head == world)
 		return;
@@ -981,11 +1058,20 @@ void(entity head, float reclaimed) hh_unlink_spirit_head =
 	{
 		player.hh_spirit_head = world;
 
-		if (player.hh_is_head && !player.hh_on_altar && !player.hh_haunting)
-			hh_hide_spirit_player(player);
+		hh_set_eyecam(player, world);
 
-		if (reclaimed && player.hh_is_head)
-			centerprint(player, "Your head was recovered by your team\nYou can't be picked up!");
+		// Force a clean respawn — never leave the player in limbo
+		// (hh_is_head with no spirit head and no altar/haunt state)
+		if (player.hh_is_head && !player.hh_on_altar && !player.hh_haunting)
+		{
+			if (reclaimed)
+				centerprint(player, "Your head was recovered by your team");
+
+			oself = self;
+			self = player;
+			respawn();
+			self = oself;
+		}
 	}
 
 	head.hh_on_altar = FALSE;
@@ -1069,25 +1155,86 @@ void(entity player) hh_check_camp =
 	player.hh_camp_check = time + 2;
 };
 
+vector(float slot) hh_pile_offset =
+{
+	local float i, layer;
+	local vector v;
+
+	layer = floor(slot / 18);
+	i = slot - (layer * 18);
+	if (i > 17) i = 17;
+
+	// Bottom row: wide spread, 9 heads
+	if (i == 0)       v = '-34 -20 0';
+	else if (i == 1)  v = '-18 -26 2';
+	else if (i == 2)  v = '0 -22 1';
+	else if (i == 3)  v = '16 -18 3';
+	else if (i == 4)  v = '30 -12 0';
+	else if (i == 5)  v = '-26 -4 1';
+	else if (i == 6)  v = '34 2 2';
+	else if (i == 7)  v = '-10 8 0';
+	else if (i == 8)  v = '12 10 2';
+	// Middle row: 5 heads
+	else if (i == 9)  v = '-24 -10 13';
+	else if (i == 10) v = '-8 -14 15';
+	else if (i == 11) v = '8 -6 16';
+	else if (i == 12) v = '22 1 14';
+	else if (i == 13) v = '-2 4 13';
+	// Upper row: 3 heads
+	else if (i == 14) v = '-12 3 27';
+	else if (i == 15) v = '6 6 29';
+	else if (i == 16) v = '-4 -8 28';
+	// Top
+	else              v = '0 0 39';
+
+	// Extra layers stack higher and pull inward
+	v_x = v_x * 0.82;
+	v_y = v_y * 0.82;
+	v_z = v_z + (layer * 14);
+
+	return v;
+};
+
+vector(float slot) hh_pile_angles =
+{
+	local float i;
+
+	i = slot - (floor(slot / 18) * 18);
+
+	if (i == 0)       return '72 18 -34';
+	else if (i == 1)  return '96 140 -12';
+	else if (i == 2)  return '84 250 16';
+	else if (i == 3)  return '66 40 48';
+	else if (i == 4)  return '92 310 -26';
+	else if (i == 5)  return '78 195 30';
+	else if (i == 6)  return '86 85 -18';
+	else if (i == 7)  return '62 155 -40';
+	else if (i == 8)  return '100 290 36';
+	else if (i == 9)  return '48 75 -58';
+	else if (i == 10) return '110 180 8';
+	else if (i == 11) return '58 12 66';
+	else if (i == 12) return '88 285 -44';
+	else if (i == 13) return '74 330 22';
+	else if (i == 14) return '36 120 -72';
+	else if (i == 15) return '52 230 54';
+	else if (i == 16) return '94 50 42';
+
+	return '12 0 -90';
+};
+
+void() hh_altar_head_expire =
+{
+	SUB_Remove();
+};
+
 void(entity altar, entity head, float slot) hh_send_head_to_altar =
 {
-	local float x;
-	local float y;
-	local float z;
 	local vector altar_pos;
 
 	if ((altar == world) || (head == world))
 		return;
 
-	x = slot - (floor(slot / 4) * 4);
-	y = floor(slot / 4);
-	z = floor(y / 4);
-	y = y - (z * 4);
-
-	altar_pos = altar.origin + '0 0 12';
-	altar_pos_x = altar_pos_x + (x * 16) - 24;
-	altar_pos_y = altar_pos_y + (y * 16) - 24;
-	altar_pos_z = altar_pos_z + (z * 16);
+	altar_pos = altar.dest + hh_pile_offset(slot);
 
 	head.owner = world;
 	head.hh_head_next = world;
@@ -1097,14 +1244,72 @@ void(entity altar, entity head, float slot) hh_send_head_to_altar =
 	head.movetype = MOVETYPE_NONE;
 	head.solid = SOLID_NOT;
 	head.touch = SUB_Null;
-	head.think = SUB_Null;
-	head.nextthink = 0;
+	head.think = hh_altar_head_expire;
+	head.nextthink = time + 30;
 	head.velocity = '0 0 0';
-	head.avelocity = '0 120 0';
+	head.avelocity = '0 0 0';
+	head.angles = hh_pile_angles(slot);
 	head.frame = 0;
 	setmodel(head, "progs/h_player.mdl");
 	setsize(head, '0 0 0', '0 0 0');
 	setorigin(head, altar_pos);
+};
+
+void(entity player, entity target) hh_set_eyecam =
+{
+	local float target_changed;
+
+	if (player == world)
+		return;
+
+	target_changed = (player.hh_eyecam_target != target);
+
+	// Sync position, angles, weapon viewmodel, and HUD stats every frame
+	if (target != world)
+	{
+		setorigin(player, target.origin);
+		player.v_angle = player.angles = target.v_angle;
+		player.fixangle = TRUE;
+		player.view_ofs = '0 0 22';
+		player.weaponmodel = target.weaponmodel;
+		player.weaponframe = target.weaponframe;
+		player.items = target.items;
+		player.weapon = target.weapon;
+		player.currentammo = target.currentammo;
+		player.ammo_shells = target.ammo_shells;
+		player.ammo_nails = target.ammo_nails;
+		player.ammo_rockets = target.ammo_rockets;
+		player.ammo_cells = target.ammo_cells;
+		player.health = target.health;
+		player.armorvalue = target.armorvalue;
+	}
+	else
+	{
+		player.weaponmodel = string_null;
+		player.weaponframe = 0;
+	}
+
+	// Only send viewport message when the target actually changes
+	if (!target_changed)
+		return;
+
+	player.hh_eyecam_target = target;
+	msg_entity = player;
+	WriteByte(MSG_ONE, SVC_SETVIEWPORT);
+	if (target != world)
+	{
+		WriteEntity(MSG_ONE, target);
+		forceinfokey(player, "*observer", "eyecam");
+		forceinfokey(player, "observer", "eyecam");
+		forceinfokey(player, "observing", target.netname);
+	}
+	else
+	{
+		WriteEntity(MSG_ONE, player);
+		forceinfokey(player, "*observer", "off");
+		forceinfokey(player, "observer", "off");
+		forceinfokey(player, "observing", "off");
+	}
 };
 
 void(entity player) hh_head_takeover =
@@ -1117,6 +1322,8 @@ void(entity player) hh_head_takeover =
 	head = player.hh_spirit_head;
 	if (head == world)
 		return;
+
+	hh_set_eyecam(player, world);
 
 	if (vlen(head.hh_altar_pos) > 0)
 		player.hh_altar_pos = head.hh_altar_pos;
@@ -1160,6 +1367,9 @@ void() hh_haunt_touch =
 		sound(self, CHAN_VOICE, "hhsounds/bite2.wav", 1, ATTN_NONE);
 
 	T_Damage(other, self, self, 5);
+	self.hh_stats_haunt_bites = self.hh_stats_haunt_bites + 1;
+	if (other.deadflag || (other.health <= 0))
+		self.hh_stats_haunt_kills = self.hh_stats_haunt_kills + 1;
 	self.hh_can_bite = time + 0.25;
 };
 
@@ -1170,12 +1380,14 @@ void(entity player) hh_start_haunting =
 	if ((player == world) || !player.hh_is_head)
 		return;
 
+	hh_finish_haunting_stats(player);
 	player.hh_haunting = TRUE;
-	player.solid = SOLID_BBOX;
-	player.movetype = MOVETYPE_FLY;
-	player.finaldest_y = MOVETYPE_FLY;
+	player.hh_stats_haunts_started = player.hh_stats_haunts_started + 1;
+	player.solid = SOLID_NOT;
+	player.movetype = MOVETYPE_NOCLIP;
+	player.finaldest_y = MOVETYPE_NOCLIP;
 	player.origin_z = player.origin_z + 24;
-	player.touch = hh_haunt_touch;
+	player.touch = SUB_Null;
 	player.velocity = '0 0 0';
 	player.takedamage = DAMAGE_NO;
 	player.hh_can_bite = time + 1;
@@ -1183,8 +1395,12 @@ void(entity player) hh_start_haunting =
 	if (haunt_limit < 10)
 		haunt_limit = 10;
 	player.hh_haunt_over = time + haunt_limit;
+	player.hh_stats_haunt_start = time;
+	player.angles_x = -90;
+	player.angles_z = 0;
 	setsize(player, '-16 -16 0', '16 16 16');
 	setorigin(player, player.origin);
+	player.effects = player.effects | EF_GREEN;
 };
 
 void(entity player) hh_check_haunt =
@@ -1200,19 +1416,63 @@ void(entity player) hh_check_haunt =
 
 void(entity player) hh_hauntmove =
 {
+	local entity head, oself;
+	local float spd;
+
 	if ((player == world) || !player.hh_haunting)
 		return;
 
-	if (time > player.hh_haunt_over)
+	if ((player.hh_haunt_over <= 0) || (time >= player.hh_haunt_over))
 	{
+		player.effects = player.effects - (player.effects & EF_GREEN);
+		hh_set_eyecam(player, world);
+		oself = self;
+		self = player;
 		respawn();
+		self = oself;
 		return;
 	}
 
+	// Keep the head model upright and facing the look direction
+	player.angles_x = -90;
+	player.angles_y = player.v_angle_y;
+	player.angles_z = 0;
+
+	// Fly movement matching observer camera style
+	makevectors(player.v_angle);
+	player.velocity = v_forward * player.movement_x + v_right * player.movement_y;
 	if (player.button2)
-		player.velocity = aim(player, 2000) * 350;
+		player.velocity_z = player.velocity_z + 200;
 	else
-		player.velocity = '0 0 0';
+		player.velocity_z = player.velocity_z + player.movement_z;
+
+	spd = vlen(player.velocity);
+	if (spd > 2000)
+		player.velocity = normalize(player.velocity) * 2000;
+
+	// Proximity bite check (replaces touch-based biting since NOCLIP has no collision)
+	if (player.hh_can_bite > time)
+		return;
+
+	head = findradius(player.origin, 48);
+	while (head != world)
+	{
+		if (head.classname == "player" && head != player && !head.deadflag && head.health > 0 && head.takedamage)
+		{
+			if (random() < 0.5)
+				sound(player, CHAN_VOICE, "hhsounds/bite1.wav", 1, ATTN_NONE);
+			else
+				sound(player, CHAN_VOICE, "hhsounds/bite2.wav", 1, ATTN_NONE);
+
+			T_Damage(head, player, player, 5);
+			player.hh_stats_haunt_bites = player.hh_stats_haunt_bites + 1;
+			if (head.deadflag || (head.health <= 0))
+				player.hh_stats_haunt_kills = player.hh_stats_haunt_kills + 1;
+			player.hh_can_bite = time + 0.25;
+			break;
+		}
+		head = head.chain;
+	}
 };
 
 void(entity player) hh_player_prethink =
@@ -1247,15 +1507,38 @@ void(entity player) hh_player_postthink =
 
 	if (player.hh_spirit_head != world)
 	{
+		local entity carrier;
+
 		if (player.hh_spirit_head.hh_on_altar)
 		{
 			hh_head_takeover(player);
 			return;
 		}
 
+		carrier = player.hh_spirit_head.owner;
+
+		if ((carrier != world)
+			&& (carrier.classname == "player")
+			&& (carrier.health > 0)
+			&& !carrier.deadflag
+			&& (carrier.style & CLANRING_CONNECTED)
+			&& !(carrier.style & CLANRING_OBSERVER))
+		{
+			// Head is being carried — eyecam on the carrier
+			hh_hide_spirit_player(player);
+			player.velocity = '0 0 0';
+			hh_set_eyecam(player, carrier);
+		}
+		else
+		{
+			// Head on ground or carrier invalid — own view, follow head
+			if (carrier != world)
+				player.hh_spirit_head.owner = world;
 		hh_show_spirit_player(player);
 		setorigin(player, player.hh_spirit_head.origin);
 		player.velocity = '0 0 0';
+			hh_set_eyecam(player, world);
+		}
 		return;
 	}
 
@@ -1292,10 +1575,6 @@ void() hh_player_die =
 	self.weaponframe = 0;
 	self.weapon = IT_AXE;
 	self.flags = self.flags - (self.flags & FL_ONGROUND);
-	self.hh_on_altar = FALSE;
-	self.hh_haunting = FALSE;
-	self.hh_haunt_over = 0;
-	self.hh_can_bite = 0;
 	hh_show_spirit_player(self);
 	setorigin(self, head.origin);
 
@@ -1344,6 +1623,8 @@ float(entity collector, entity head) hh_collect_head =
 		if (hh_can_reclaim_head(head, collector))
 		{
 			hh_award_player_frag(collector, 1);
+			if (collector.classname == "player")
+				collector.hh_stats_heads_reclaimed = collector.hh_stats_heads_reclaimed + 1;
 			hh_unlink_spirit_head(head, TRUE);
 			remove(head);
 			return 2;
@@ -1353,6 +1634,8 @@ float(entity collector, entity head) hh_collect_head =
 	}
 
 	hh_stow_head(head, collector, TRUE);
+	if (collector.classname == "player")
+		collector.hh_stats_heads_picked = collector.hh_stats_heads_picked + 1;
 	return 1;
 };
 
@@ -1552,6 +1835,8 @@ void(entity holder, vector spawn_origin, float damage) hh_release_holder_heads =
 
 	hh_ensure_holder_heads(holder);
 	dropped_heads = holder.ammo_heads;
+	if ((holder.classname == "player") && (dropped_heads > 0))
+		holder.hh_stats_heads_dropped = holder.hh_stats_heads_dropped + dropped_heads;
 
 	head = holder.hh_head_list;
 	holder.hh_head_list = world;
@@ -1715,9 +2000,11 @@ void() hh_head_touch =
 	else if (self.netname != "")
 		sprint(other, "You got ", self.netname, "'s head\n");
 	else
-	{
 		sprint(other, "You got a head\n");
-	}
+
+	// Notify the head owner that their head was picked up (only if still dead/spectating as head)
+	if (self.hh_head_owner != world && self.hh_head_owner != other && self.hh_head_owner.classname == "player" && self.hh_head_owner.hh_is_head)
+		centerprint(self.hh_head_owner, other.netname, " picked up your head");
 
 	hh_broadcast_head_total(other);
 };
@@ -1752,18 +2039,16 @@ void() hh_altar_touch =
 		other.hh_head_list = world;
 		other.ammo_heads = 0;
 		other.hh_head_total_value = 0;
+		forceinfokey(other, "heads", "0");
+		forceinfokey(other, "headvalue", "0");
 
 		while (head != world)
 		{
 			next = head.hh_head_next;
 			score = score + hh_score_teamplay_head(other, head);
-			if ((head.hh_head_owner != world) && (head.hh_head_owner.classname == "player") && head.hh_head_owner.hh_is_head)
-				hh_send_head_to_altar(self, head, altar_slot);
-			else
-			{
+			if (!((head.hh_head_owner != world) && (head.hh_head_owner.classname == "player") && head.hh_head_owner.hh_is_head))
 				hh_unlink_spirit_head(head, FALSE);
-				remove(head);
-			}
+			hh_send_head_to_altar(self, head, altar_slot);
 			altar_slot = altar_slot + 1;
 			head = next;
 		}
@@ -1774,19 +2059,17 @@ void() hh_altar_touch =
 		other.hh_head_list = world;
 		other.ammo_heads = 0;
 		other.hh_head_total_value = 0;
+		forceinfokey(other, "heads", "0");
+		forceinfokey(other, "headvalue", "0");
 		score = hh_score_value(recovered);
 		hh_award_player_frag(other, score);
 
 		while (head != world)
 		{
 			next = head.hh_head_next;
-			if ((head.hh_head_owner != world) && (head.hh_head_owner.classname == "player") && head.hh_head_owner.hh_is_head)
-				hh_send_head_to_altar(self, head, altar_slot);
-			else
-			{
+			if (!((head.hh_head_owner != world) && (head.hh_head_owner.classname == "player") && head.hh_head_owner.hh_is_head))
 				hh_unlink_spirit_head(head, FALSE);
-				remove(head);
-			}
+			hh_send_head_to_altar(self, head, altar_slot);
 			altar_slot = altar_slot + 1;
 			head = next;
 		}
@@ -1795,6 +2078,8 @@ void() hh_altar_touch =
 	if (other.invincible_finished < time)
 		other.invincible_finished = time;
 	other.invincible_finished = other.invincible_finished + (3 * recovered);
+	other.hh_stats_heads_scored = other.hh_stats_heads_scored + recovered;
+	other.hh_stats_score_value = other.hh_stats_score_value + score;
 	other.invincible_time = 1;
 	other.items = other.items | IT_INVULNERABILITY;
 	other.effects = other.effects | EF_RED | EF_DIMLIGHT;
@@ -1822,7 +2107,16 @@ void() hh_backpack_expire =
 
 void(entity altar) hh_configure_altar =
 {
+	local vector ground;
+
 	hh_clear_altar_head(altar);
+
+	// Find the ground below the altar
+	traceline(altar.origin, altar.origin - '0 0 256', TRUE, altar);
+	ground = trace_endpos;
+	altar.dest = ground;
+
+	// Position the spike model above the ground
 	setmodel(altar, "progs/v_spike.mdl");
 	altar.movetype = MOVETYPE_NOCLIP;
 	altar.solid = SOLID_TRIGGER;
@@ -1830,8 +2124,8 @@ void(entity altar) hh_configure_altar =
 	altar.scale = 3;
 	altar.effects = altar.effects | EF_FULLBRIGHT | EF_RED;
 	altar.avelocity = '0 120 0';
-	setsize(altar, '-128 -128 -112', '128 128 0');
-	setorigin(altar, altar.origin);
+	setorigin(altar, ground + '0 0 80');
+	setsize(altar, '-128 -128 -80', '128 128 48');
 	sound(altar, CHAN_AUTO, "hhsounds/altamb.wav", 0.7, ATTN_STATIC);
 	hh_spawn_altar_head(altar);
 };

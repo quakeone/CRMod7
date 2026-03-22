@@ -1717,6 +1717,9 @@ void () powerup_pickup =
 	// how much time remains NOW; we cannot just give them the amount of time unused, as there's another quad going to spawn at nextthink + 30...
 	float timeleft = floor(self.nextthink - time); 		// R00k: We use the .nexthink here not timeleft[i] because match_pause_item updates the entity's nextthink
 
+	if (self.items == IT_QUAD)
+		sound (other, CHAN_ITEM, self.noise, 1, ATTN_NORM);
+	else
 	sound (other, CHAN_VOICE, self.noise, 1, ATTN_NORM);
 	other.items = other.items | self.items;
 
@@ -1817,7 +1820,7 @@ void() powerup_touch =
 	if (other.health <= 0)
 		return;
 
-    // --- 1v1 DM normal auto-ghost: block Quad pickup and centerprint (once per client per map) ---
+    // --- 1v1 normal DM / HH FFA auto-ghost: block Quad pickup and centerprint (once per client per map) ---
     if (self.items == IT_QUAD)
     {
         if (g1v1_in_effect && g1v1_quad_ghosted)
@@ -1915,9 +1918,9 @@ void() powerup_touch =
 	if (self.items == IT_QUAD)
 	{	// R00k: TODO: count number of quads on the map; if only one then use global attenuation.
 		if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
-			sound (other, CHAN_VOICE, self.noise, 1, ATTN_NORM);
+			sound (other, CHAN_ITEM, self.noise, 1, ATTN_NORM);
 		else
-			sound (other, CHAN_VOICE, self.noise, 1, ATTN_NONE);//R00k: most dm maps only have one quad, so announce it globally
+			sound (other, CHAN_ITEM, self.noise, 1, ATTN_NONE);//R00k: most dm maps only have one quad, so announce it globally
 
 		self.solid = SOLID_NOT;
 		other.items = other.items | self.items;

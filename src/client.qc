@@ -43,6 +43,7 @@ void () TeamFlagStatusReport;
 float() lockdown_check_connect;
 void(string arg1, string arg2, float argc) lockdown_command;
 void () clanring_show_rules;
+void () clanring_load_matchsounds;
 
 // Entity field declarations
 .float just_suicided; // set briefly when a death is a self-kill/suicide
@@ -467,7 +468,7 @@ void() IntermissionThink =
 void() execute_changelevel =
 {
     entity tmp;
-    float prnd = 0;
+    float prnd = -1;
 //	local float bcount;
 
     intermission_running = 1;	// enforce a wait time before allowing changelevel
@@ -481,8 +482,11 @@ void() execute_changelevel =
     WriteByte(MSG_ALL, 3);
 */
     if (clanring_gameconfig & CLANRING_ENABLE_MATCHSOUNDS)
-    if (clanring_matchsound_count)
-        prnd = floor(random() * clanring_matchsound_count);
+    {
+        clanring_load_matchsounds();
+        if (clanring_matchsound_count)
+            prnd = floor(random() * clanring_matchsound_count);
+    }
 
     intermission_pos = FindIntermission ();
     clanring_angle = intermission_pos.mangle;
@@ -510,7 +514,7 @@ void() execute_changelevel =
         other.items 		= 0;
         other.effects 		= 0;
 
-        if (prnd)
+        if ((prnd >= 0) && (matchsound[prnd] != ""))
             stuffcmd(other, strcat(";play ", matchsound[prnd], ";\n"));
         tmp   = self;
         self  = other;
@@ -1349,8 +1353,12 @@ void() PlayerDeathThink =
         if (!(clanring_playmode & CLANRING_WIPEOUT_MODE) || ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0)))
             return;
     }
-    if ((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head && (self.hh_on_altar || self.hh_haunting))
+    if ((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head)
+    {
+        // HH head victims stay dead until HH flow resolves them
+        // (carried to altar, haunt timeout, reclaim, or head expiry).
         return;
+    }
 
     // wait for all buttons released
     if (self.deadflag == DEAD_DEAD)
@@ -2152,7 +2160,24 @@ void() PlayerPostThink =
         hh_update_carried_head_visuals(self);
         hh_player_postthink(self);
         if (self.hh_is_head)
+        {
+            // Keep lagout protection from kicking HH head victims
+            self.finaldest_x = time;
+            if (self.impulse == 39)
+            {
+                self.lagcheck    = self.finaldest_x;
+                self.finaldest_x = time;
+                if (self.finaldest_x - self.lagcheck <= 5)
+                    self.lagcount = self.lagcount + 1;
+                if (self.lagcount > 2)
+                {
+                    self.lagcount = 0.00;
+                    self.plag     = 0.00;
+                }
+                self.impulse = 0;
+            }
             return;
+        }
     }
 
     if (self.impulse)
@@ -3047,7 +3072,10 @@ void(entity targ, entity attacker) ClientObituary =
                         // else
                             deathstring3 = "";
 
-                        announce5(targ.netname, deathstring, attacker.netname, deathstring2, deathstring3);
+                        if (attacker.hh_haunting)
+                            announce4(attacker.netname, " haunted ", targ.netname, " to death");
+                        else
+                            announce5(targ.netname, deathstring, attacker.netname, deathstring2, deathstring3);
 
                         if (attacker.killstreak == 5)
                         {
@@ -3076,7 +3104,10 @@ void(entity targ, entity attacker) ClientObituary =
                     }
                     else
                     {
-                        announce4(targ.netname, deathstring, attacker.netname, deathstring2);
+                        if (attacker.hh_haunting)
+                            announce4(attacker.netname, " haunted ", targ.netname, " to death");
+                        else
+                            announce4(targ.netname, deathstring, attacker.netname, deathstring2);
                     }
                 }
             }
@@ -3493,7 +3524,8 @@ void(string cmd) SV_ParseClientCommand =
             else
             {
                 self.oflags = self.oflags | OBSERVER_DEMO;
-                if (((clanring_playmode & CLANRING_MATCH_MODE) & (clanring_state & CLANRING_MATCH_STARTED)) || ((mode_is_arena()) && (boss.state != CA_MATCH_WAITING)))
+                if (((clanring_playmode & CLANRING_MATCH_MODE) & (clanring_state & CLANRING_MATCH_STARTED)) || ((mode_is_arena()) && (boss.state != CA_MATCH_WAITING)) ||
+                    ((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head && self.hh_eyecam_target != world))
                     observer_confirm();
                 else
                     observer_start();    

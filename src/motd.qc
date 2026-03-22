@@ -85,6 +85,28 @@ void() motd_think =
 	self.count = self.count + 1;
 };
 
+void(entity player) motd_cancel_for_client =
+{
+	local entity intro;
+
+	if (player == world)
+		return;
+
+	player.style = player.style - (player.style & CLANRING_MOTD);
+
+	intro = find(world, classname, "scheduled_event_entity");
+	while (intro)
+	{
+		if ((intro.owner == player) && (intro.think == motd_think))
+		{
+			remove(intro);
+			return;
+		}
+
+		intro = find(intro, classname, "scheduled_event_entity");
+	}
+};
+
 //
 //  C R E A T E
 //

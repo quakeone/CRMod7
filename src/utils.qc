@@ -2417,6 +2417,7 @@ void() utils_load_disconnect_log =
 string json_escape(string s);                 // from json.qc
 float (entity p) Q1_PER_Calc_Eff;            // PER helper
 float(entity p) PER_HasNontrivialActivity;   // from stats.qc
+float(entity p) stats_has_nontrivial_activity; // from stats.qc
 
 // Private, non-serverinfo storage for webhook URL configured via clanring.cfg
 string clanring_captimesdiscordurl;
@@ -2547,12 +2548,20 @@ string(string s) utils_dequake_for_discord =
     local float i, j;
     if (!s) return "";
 
-    // A) 128..255 -> 0..127 (red -> white). If target < 32, make '.'.
+    // A) 128..255 -> 0..127 (red -> white).
+    // Preserve the control-range glyphs we explicitly decode below so
+    // colored digits/brackets/arrows survive dequakeing; other low controls
+    // still degrade to '.'.
     for (i = 128; i <= 255; i = i + 1)
     {
         j = i - 128; // 0..127
         if (j < 32)
+        {
+            if (j == 1 || j == 5 || j == 12 || j == 14 || j == 15 || (j >= 16 && j <= 31))
+                s = strreplace(sprintf("%c", i), sprintf("%c", j), s);
+            else
             s = strreplace(sprintf("%c", i), ".", s);
+        }
         else
             s = strreplace(sprintf("%c", i), sprintf("%c", j), s);
     }
@@ -2875,6 +2884,7 @@ void(entity ev) webhook_stats_info =
     local float obs_participant;
     local float row_frags;
     local float participant_cutoff;
+    local float hh_has_activity;
 
     // shared tempstring-safe buffers
     local string line;          // reusable line buffer
@@ -2900,6 +2910,7 @@ void(entity ev) webhook_stats_info =
     // or if every player has 0 frags (idle/afk game).
     eligible_players = 0;
     total_frags = 0;
+    hh_has_activity = 0;
     name_col_w = 4; // at least width of "Name"
     if (use_find) p = find(world, classname, "player");
     else p = clanring_sentinel.next_player;
@@ -2909,7 +2920,7 @@ void(entity ev) webhook_stats_info =
                            (p.style & CLANRING_OBSERVER) &&
                            p.join_time > 0 &&
                            p.join_time >= participant_cutoff &&
-                           PER_HasNontrivialActivity(p));
+                           stats_has_nontrivial_activity(p));
 
         if ((is_arena && p.next_team != world) ||
             (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
@@ -2920,6 +2931,8 @@ void(entity ev) webhook_stats_info =
 
             eligible_players = eligible_players + 1;
             total_frags = total_frags + row_frags;
+            if ((clanring_playmode & CLANRING_HH_MODE) && stats_has_nontrivial_activity(p))
+                hh_has_activity = TRUE;
             name_len = strlen(utils_dequake_for_discord(p.netname));
             if (name_len > name_col_w) name_col_w = name_len;
         }
@@ -2929,7 +2942,7 @@ void(entity ev) webhook_stats_info =
     name_col_w = bound(4, name_col_w, 15);
     if (eligible_players < 2)
         return;
-    if (total_frags <= 0)
+    if ((total_frags <= 0) && !hh_has_activity)
         return;
 
     // Resolve + sanitize URL
@@ -3025,7 +3038,7 @@ void(entity ev) webhook_stats_info =
         else if (clanring_playmode & CLANRING_WIPEOUT_MODE)     modes = "Wipeout";
         else if (clanring_playmode & CLANRING_DMM4_MODE)        modes = "DMM4";
         else if (clanring_playmode & CLANRING_AIRSHOT_MODE)     modes = "Airshot";
-        else if (clanring_playmode & CLANRING_HH_MODE)          modes = "Head Hunters";
+        else if (clanring_playmode & CLANRING_HH_MODE)          modes = "Headhunters";
         else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
         {
             if      (clanring_playmode & CLANRING_MATCH_MODE)    modes = "CTF Match";
@@ -3103,7 +3116,7 @@ void(entity ev) webhook_stats_info =
                                (p.style & CLANRING_OBSERVER) &&
                                p.join_time > 0 &&
                                p.join_time >= participant_cutoff &&
-                               PER_HasNontrivialActivity(p));
+                               stats_has_nontrivial_activity(p));
             if (!(p.style & CLANRING_OBSERVER) || obs_participant)
             {
                 p.cnt = 0; // reset printed flag
@@ -3136,7 +3149,7 @@ void(entity ev) webhook_stats_info =
                                    (p.style & CLANRING_OBSERVER) &&
                                    p.join_time > 0 &&
                                    p.join_time >= participant_cutoff &&
-                                   PER_HasNontrivialActivity(p));
+                                   stats_has_nontrivial_activity(p));
                 if ((!(p.style & CLANRING_OBSERVER) || obs_participant) && (p.cnt == 0))
                 {
                     row_frags = p.frags;
@@ -3166,7 +3179,7 @@ void(entity ev) webhook_stats_info =
                                    (best_player.style & CLANRING_OBSERVER) &&
                                    best_player.join_time > 0 &&
                                    best_player.join_time >= participant_cutoff &&
-                                   PER_HasNontrivialActivity(best_player));
+                                   stats_has_nontrivial_activity(best_player));
                 if (obs_participant && row_frags <= -90)
                     row_frags = best_player.true_kills - best_player.mangle_z;
                 
@@ -3203,7 +3216,7 @@ void(entity ev) webhook_stats_info =
                                (p.style & CLANRING_OBSERVER) &&
                                p.join_time > 0 &&
                                p.join_time >= participant_cutoff &&
-                               PER_HasNontrivialActivity(p));
+                               stats_has_nontrivial_activity(p));
             if ((is_arena && p.next_team != world) ||
                 (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
             {
@@ -3278,7 +3291,7 @@ void(entity ev) webhook_stats_info =
                                (p.style & CLANRING_OBSERVER) &&
                                p.join_time > 0 &&
                                p.join_time >= participant_cutoff &&
-                               PER_HasNontrivialActivity(p));
+                               stats_has_nontrivial_activity(p));
             if ((is_arena && p.next_team != world) ||
                 (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
             {
@@ -3298,6 +3311,89 @@ void(entity ev) webhook_stats_info =
         }
     }
     APPEND_SAFE("```\n");
+
+    if (clanring_playmode & CLANRING_HH_MODE)
+    {
+        APPEND_SAFE("\n**Headhunters**\n");
+        APPEND_SAFE("```\n");
+        APPEND_SAFE(sprintf("%s  pick rec scr  val peak drop\n", strpad(name_col_w, "name")));
+        lines = 0; maxlines = 16;
+        if (use_find) p = find(world, classname, "player");
+        else p = clanring_sentinel.next_player;
+
+        while (p && lines < maxlines)
+        {
+            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                               (p.style & CLANRING_OBSERVER) &&
+                               p.join_time > 0 &&
+                               p.join_time >= participant_cutoff &&
+                               stats_has_nontrivial_activity(p));
+            if ((is_arena && p.next_team != world) ||
+                (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
+            {
+                zname = strzone(utils_dequake_for_discord(p.netname));
+                APPEND_SAFE(sprintf("%s  %4g %3g %3g %4g %4g %4g\n",
+                                    strpad(name_col_w, zname),
+                                    p.hh_stats_heads_picked,
+                                    p.hh_stats_heads_reclaimed,
+                                    p.hh_stats_heads_scored,
+                                    p.hh_stats_score_value,
+                                    p.hh_stats_peak_value,
+                                    p.hh_stats_heads_dropped));
+                strunzone(zname);
+
+                lines = lines + 1;
+                if (webhook_stats_len > (maxlen - 120)) break;
+            }
+            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
+        }
+
+        APPEND_SAFE("\n");
+        APPEND_SAFE(sprintf("%s  hunt bite kil  time\n", strpad(name_col_w, "name")));
+        lines = 0; maxlines = 16;
+        if (use_find) p = find(world, classname, "player");
+        else p = clanring_sentinel.next_player;
+
+        while (p && lines < maxlines)
+        {
+            local float haunt_time;
+
+            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+                               (p.style & CLANRING_OBSERVER) &&
+                               p.join_time > 0 &&
+                               p.join_time >= participant_cutoff &&
+                               stats_has_nontrivial_activity(p));
+            if ((is_arena && p.next_team != world) ||
+                (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
+            {
+                haunt_time = p.hh_stats_haunt_time;
+                if (p.hh_stats_haunt_start > 0)
+                    haunt_time = haunt_time + max(0, time - p.hh_stats_haunt_start);
+                m = floor(haunt_time / 60);
+                s = floor(haunt_time - (m * 60));
+                ss_str = ftos(s);
+                if (s < 10) ss_str = strcat("0", ss_str);
+                mmss_tmp = strcat(ftos(m), ":", ss_str);
+                z_mmss = strzone(mmss_tmp);
+
+                zname = strzone(utils_dequake_for_discord(p.netname));
+                APPEND_SAFE(sprintf("%s  %4g %4g %3g %5s\n",
+                                    strpad(name_col_w, zname),
+                                    p.hh_stats_haunts_started,
+                                    p.hh_stats_haunt_bites,
+                                    p.hh_stats_haunt_kills,
+                                    z_mmss));
+                strunzone(zname);
+                strunzone(z_mmss);
+
+                lines = lines + 1;
+                if (webhook_stats_len > (maxlen - 120)) break;
+            }
+            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
+        }
+
+        APPEND_SAFE("```\n");
+    }
 
     if (!mode_is_arena())
     {
@@ -3319,7 +3415,7 @@ void(entity ev) webhook_stats_info =
                                    (p.style & CLANRING_OBSERVER) &&
                                    p.join_time > 0 &&
                                    p.join_time >= participant_cutoff &&
-                                   PER_HasNontrivialActivity(p));
+                                   stats_has_nontrivial_activity(p));
 
                 if ((p.style & CLANRING_OBSERVER) && !obs_participant) { q_obs += 1; }
                 else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world) && !obs_participant)   { q_noteam += 1; }
@@ -3382,7 +3478,7 @@ void(entity ev) webhook_stats_info =
                                    (p.style & CLANRING_OBSERVER) &&
                                    p.join_time > 0 &&
                                    p.join_time >= participant_cutoff &&
-                                   PER_HasNontrivialActivity(p));
+                                   stats_has_nontrivial_activity(p));
 
                 if ((p.style & CLANRING_OBSERVER) && !obs_participant) { b_obs += 1; }
                 else if ((p.next_team == world) && !obs_participant)   { b_noteam += 1; }
@@ -3451,7 +3547,7 @@ void(entity ev) webhook_stats_info =
                                    (p.style & CLANRING_OBSERVER) &&
                                    p.join_time > 0 &&
                                    p.join_time >= participant_cutoff &&
-                                   PER_HasNontrivialActivity(p));
+                                   stats_has_nontrivial_activity(p));
 
                 if ((p.style & CLANRING_OBSERVER) && !obs_participant) { it_obs += 1; }
                 else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world) && !obs_participant)   { it_noteam += 1; }
@@ -3498,7 +3594,7 @@ void(entity ev) webhook_stats_info =
                                    (p.style & CLANRING_OBSERVER) &&
                                    p.join_time > 0 &&
                                    p.join_time >= participant_cutoff &&
-                                   PER_HasNontrivialActivity(p));
+                                   stats_has_nontrivial_activity(p));
                 if (((!(p.style & CLANRING_OBSERVER) && p.next_team != world) || obs_participant) && p.join_time > 0)
                 {
                     mins_norm = max(1, (time - p.join_time) / 60);
@@ -3695,7 +3791,7 @@ void(entity ev) webhook_stats_info =
                                    (p.style & CLANRING_OBSERVER) &&
                                    p.join_time > 0 &&
                                    p.join_time >= participant_cutoff &&
-                                   PER_HasNontrivialActivity(p));
+                                   stats_has_nontrivial_activity(p));
                 if ((!(p.style & CLANRING_OBSERVER) && p.next_team != world) || obs_participant)
                 {
                     if (!opened4) {

@@ -23,6 +23,7 @@ void() UnHookPlayer;
 void() utils_update_server_time;
 void() utils_save_disconnect_log;
 void(float ghost) G1v1_UpdateQuadAlpha;
+void(entity player) motd_cancel_for_client;
 void() votables_map_vote_prompt_response;
 void(float newtype, float newmode, float newmap) votables_request_set_gametype_mode_map;
 void(float val) admin_dmset;
@@ -1472,6 +1473,8 @@ float(float mapnum) votables_maybe_prompt_map_vote_mode_change =
         return FALSE;
     if (mode_is_arena())
         return FALSE;
+    if (clanring_playmode & CLANRING_HH_MODE)
+        return FALSE;
 
     maparg = warpmap[mapnum].name;
     if (!maparg || maparg == "")
@@ -1498,6 +1501,7 @@ float(float mapnum) votables_maybe_prompt_map_vote_mode_change =
     if (self.pending_map_vote_mapnum)
         votables_map_vote_prompt_clear(TRUE);
 
+    motd_cancel_for_client(self);
     self.pending_map_vote_mapnum = mapnum;
     self.pending_map_vote_type = suggested_type;
     self.pending_map_vote_mode = suggested_mode;
@@ -2182,7 +2186,7 @@ void () votables_disable_item =
 //
 void () votables_set_quad =
 {
-    // Special behavior while auto-ghost is active in DM normal (1v1):
+    // Special behavior while auto-ghost is active in normal DM / HH FFA (1v1):
     // - Toggle "ghost/unghost" without physically removing the item
     if (g1v1_in_effect)
     {

@@ -148,7 +148,7 @@ float CLANRING_DELAYED_AUTOSS    	= 2097152;
 float CLANRING_TAKING_AUTOSS    	= 4194304;
 float CLANRING_NULL_FLAG		    = 8388608;//R00k: added, used to make the flags untouchable during match start countdown, ie "Match begins in T minus"...
 
-// --- Auto-ghost Quad (1v1 in DM normal) state ---
+// --- Auto-ghost Quad (1v1 in normal DM / HH FFA) state ---
 float g1v1_in_effect;       // 1 while the special 1v1 window is active
 float g1v1_quad_ghosted;    // 1 if quad is ghosted (blocked) during 1v1
 float g1v1_saved_no_quad;   // remembers (clanring_playmode & CLANRING_NO_QUAD) when entering 1v1
@@ -433,7 +433,7 @@ float  	last_capture_team;
 float	EF_YELLOW 		    = 32;
 float   EF_BLUE         	= 64;
 float   EF_RED          	= 128;
-//float   EF_GREEN          	= 256;
+float   EF_GREEN          	= 256;
 
 float  	sys_ticrate;
 //float	sv_friction;
@@ -554,11 +554,23 @@ float	clanring_afk_timeout;
 .float  hh_haunting;
 .float  hh_haunt_over;
 .float  hh_can_bite;
+.entity hh_eyecam_target;
 .float  hh_camp_check;
 .float  hh_camp_countdown;
 .float  hh_help_state;
 .float  hh_help_context;
 .float  hh_head_pickup_block_until;
+.float  hh_stats_heads_picked;
+.float  hh_stats_heads_reclaimed;
+.float  hh_stats_heads_scored;
+.float  hh_stats_score_value;
+.float  hh_stats_peak_value;
+.float  hh_stats_heads_dropped;
+.float  hh_stats_haunts_started;
+.float  hh_stats_haunt_bites;
+.float  hh_stats_haunt_kills;
+.float  hh_stats_haunt_time;
+.float  hh_stats_haunt_start;
 
 .float stats_item_ssg;				//
 .float stats_item_ng;				//
@@ -638,6 +650,8 @@ float map_choices[6];
 string default_nextmap;
 
 float MAX_CUSTOM_MATCH_SOUNDS = 20;	//Upped
+float clanring_matchsounds_loaded;
+float clanring_matchsounds_precached;
 float clanring_matchsound_count;
 float clanring_matchsound_rematch_count;
 float clanring_matchsound_blowout_count;
