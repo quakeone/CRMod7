@@ -1286,7 +1286,10 @@ void () clanring_pre_set_aliases =
         else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)			//R00k
             sprint(self.owner, "Type \bRED\b or \bBLUE\b to join\n");
     }
-    sprint(self.owner, sprintf("NextMap is %s.\n", nextmap));
+    if ((clanring_playmode & CLANRING_NORMAL_MODE)
+        && !(clanring_playmode & CLANRING_MATCH_MODE)
+        && !(clanring_playmode & CLANRING_PRACTICE_MODE))
+        sprint(self.owner, sprintf("NextMap is %s.\n", nextmap));
     self.think = clanring_set_aliases;
     self.nextthink = time + 1;
 };

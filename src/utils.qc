@@ -2540,24 +2540,30 @@ string(string raw) Webhook_MakeContentPayload =
 // Quake -> Discord sanitizer (preserve whitespace/padding)
 // ------------------------------------------------------------
 // - Fold 128..255 to 0..127 (avoid introducing C0 controls)
-// - Map common QC control glyphs to ASCII
+// - Map common QC control glyphs to ASCII/UTF-8 equivalents
 // - Drop remaining C0 controls except TAB(9) and LF(10)
 // - Do NOT trim/collapse spaces
 string(string s) utils_dequake_for_discord =
 {
     local float i, j;
+    local string middle_dot;
+    local string square;
+    local string play_arrow;
     if (!s) return "";
+    middle_dot = "\xC2\xB7";
+    square = "\xE2\x96\xA0";
+    play_arrow = "\xE2\x96\xB6";
 
     // A) 128..255 -> 0..127 (red -> white).
     // Preserve the control-range glyphs we explicitly decode below so
     // colored digits/brackets/arrows survive dequakeing; other low controls
-    // still degrade to '.'.
+    // still degrade to '.' unless we decode them explicitly below.
     for (i = 128; i <= 255; i = i + 1)
     {
         j = i - 128; // 0..127
         if (j < 32)
         {
-            if (j == 1 || j == 5 || j == 12 || j == 14 || j == 15 || (j >= 16 && j <= 31))
+            if (j == 1 || j == 5 || j == 11 || j == 12 || j == 13 || j == 14 || j == 15 || (j >= 16 && j <= 31))
                 s = strreplace(sprintf("%c", i), sprintf("%c", j), s);
             else
             s = strreplace(sprintf("%c", i), ".", s);
@@ -2568,10 +2574,12 @@ string(string s) utils_dequake_for_discord =
 
     // B) Control glyphs ? readable
     s = strreplace(sprintf("%c", 1 ), ".", s);
-    s = strreplace(sprintf("%c", 5 ), ".", s);
-    s = strreplace(sprintf("%c", 14), ".", s);
-    s = strreplace(sprintf("%c", 15), ".", s);
-    s = strreplace(sprintf("%c", 28), ".", s);
+    s = strreplace(sprintf("%c", 5 ), middle_dot, s);
+    s = strreplace(sprintf("%c", 11), square, s);
+    s = strreplace(sprintf("%c", 13), play_arrow, s);
+    s = strreplace(sprintf("%c", 14), middle_dot, s);
+    s = strreplace(sprintf("%c", 15), middle_dot, s);
+    s = strreplace(sprintf("%c", 28), middle_dot, s);
     s = strreplace(sprintf("%c", 16), "[", s);
     s = strreplace(sprintf("%c", 17), "]", s);
 
