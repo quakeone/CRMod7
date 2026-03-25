@@ -41,7 +41,7 @@ void() W_Precache =
 	precache_sound ("knight/sword1.wav");		//server modules hook
 	precache_sound ("shambler/smack.wav");  	// hook tear
 
-	if ((clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM) || (mode_is_arena())) //FIXME: Forcing these precaches requires all connecting clients to have these assets, even in pub modes :|
+	if (clanring_use_custom_hook_assets()) //FIXME: Forcing these precaches requires all connecting clients to have these assets, even in pub modes :|
 	{		
 		precache_sound ("weapons/chain1.wav");
 		precache_sound ("weapons/chain2.wav");
@@ -1060,10 +1060,7 @@ void W_SetCurrentAmmo(void) =
 	if (self.weapon == IT_HOOK)
 	{
 		self.currentammo = 0;
-		if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
-			self.weaponmodel = "progs/v_star.mdl";
-		else
-			self.weaponmodel = "progs/v_axe.mdl";
+			self.weaponmodel = clanring_hook_weapon_model();
 	}
 	else
 	if (self.weapon == IT_AXE)
@@ -1714,13 +1711,13 @@ void() SuperDamageSound =
 			{
 				if ((self.super_damage_finished > time) && (self.player_flag & ITEM_RUNE2_FLAG))
 				{
-					sound (self, CHAN_BODY, "rune/rune22.wav", 1, ATTN_NORM);// quad and str
+					clanring_play_compat_sound(self, CHAN_BODY, "rune/rune22.wav", "", 1, ATTN_NORM);// quad and str
 				}
 				else
 				{
 					if (self.player_flag & ITEM_RUNE2_FLAG)
 					{
-						sound (self, CHAN_BODY, "rune/rune2.wav", 1, ATTN_NORM);//str only
+						clanring_play_compat_sound(self, CHAN_BODY, "rune/rune2.wav", "", 1, ATTN_NORM);//str only
 					}
 					else
 					{					
@@ -1742,7 +1739,7 @@ void() RegenerationSound =
 			if (!(clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM))
 				sound (self, CHAN_BODY, "items/r_item1.wav", 1, ATTN_NORM);
 			else
-				sound(self, CHAN_BODY, "rune/rune4.wav", 1, ATTN_NORM);			
+				clanring_play_compat_sound(self, CHAN_BODY, "rune/rune4.wav", "", 1, ATTN_NORM);			
 		}
 	}
 };
@@ -1757,7 +1754,7 @@ void(entity who) ResistanceSound =
 			if (!(clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM))
 				sound (who, CHAN_BODY, "items/protect3.wav", 1, ATTN_NORM);			
 			else
-				sound (who, CHAN_BODY, "rune/rune1.wav", 1, ATTN_NORM);
+				clanring_play_compat_sound(who, CHAN_BODY, "rune/rune1.wav", "", 1, ATTN_NORM);
 		}
 	}
 };
@@ -1772,7 +1769,7 @@ void() HasteSound =
  			if (!(clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM))
  				sound (self, CHAN_BODY, "boss1/sight1.wav", 1, ATTN_NORM);
  			else
- 				sound(self, CHAN_BODY, "rune/rune3.wav", 1, ATTN_NORM);
+ 				clanring_play_compat_sound(self, CHAN_BODY, "rune/rune3.wav", "", 1, ATTN_NORM);
 		}
 	}
 };

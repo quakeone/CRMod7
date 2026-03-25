@@ -1147,7 +1147,7 @@ void(float score_diff) match_postgame_sound =
     {
         if (clanring_matchsounds_precached)
         {
-            sound (world, CHAN_AUTO, chosen, 1, ATTN_NONE);
+            clanring_play_compat_sound(world, CHAN_AUTO, chosen, "", 1, ATTN_NONE);
             return;
         }
 
@@ -1155,13 +1155,13 @@ void(float score_diff) match_postgame_sound =
         while (player != world)
         {
             if (player.style & CLANRING_CONNECTED)
-                stuffcmd(player, strcat("play ", chosen, "\n"));
+                clanring_stuffcmd_compat_play(player, chosen, "");
             player = find(player, classname, "player");
         }
         return;
     }
 
-    sound (world, CHAN_AUTO, "ra/gong.wav", 1 , ATTN_NONE);
+    clanring_play_compat_sound(world, CHAN_AUTO, "ra/gong.wav", "", 1 , ATTN_NONE);
 };
 
 //
@@ -1275,7 +1275,7 @@ void() match_end =
                             server_host_m);
             webhook_post_deferred(webhook_captime_info, msg_m);
         }
-        sound(world, CHAN_AUTO, "crx/congrats.wav", 1, ATTN_NONE);
+        clanring_play_compat_sound(world, CHAN_AUTO, "crx/congrats.wav", "", 1, ATTN_NONE);
     }
     else if (new_player_record_match == 2)
     {
@@ -1287,7 +1287,7 @@ void() match_end =
             bprint4(playerrecord2[1].player, " - ", record_time, " ");
             bprint2(team_letter, "\n");
         }
-        sound(world, CHAN_AUTO, "crx/goodstat.wav", 1, ATTN_NONE);
+        clanring_play_compat_sound(world, CHAN_AUTO, "crx/goodstat.wav", "", 1, ATTN_NONE);
     }
     else if (new_player_record_match == 3)
     {
@@ -1299,7 +1299,7 @@ void() match_end =
             bprint4(playerrecord2[2].player, " - ", record_time, " ");
             bprint2(team_letter, "\n");
     }
-        sound(world, CHAN_AUTO, "crx/goodstat.wav", 1, ATTN_NONE);
+        clanring_play_compat_sound(world, CHAN_AUTO, "crx/goodstat.wav", "", 1, ATTN_NONE);
     }
 
     console_show_score();

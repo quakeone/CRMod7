@@ -177,7 +177,7 @@ void(entity player, float cast) Request_Poll_Vote =
 					{
 						bprint("Vote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n");
 						clanring_request.touch();
-						sound(world, CHAN_AUTO, "misc/runekey.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_AUTO, "misc/runekey.wav", "misc/medkey.wav", 1, ATTN_NONE);
 					}
 					else
 					{
@@ -214,7 +214,7 @@ void(entity player, float cast) Request_Poll_Vote =
             {
                 bprint("Vote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n");
                 clanring_request.touch();
-                sound(world, CHAN_AUTO, "misc/runekey.wav", 1, ATTN_NONE);
+	                clanring_play_compat_sound(world, CHAN_AUTO, "misc/runekey.wav", "misc/medkey.wav", 1, ATTN_NONE);
                 Request_Poll_Cleanup();
                 return;
             }
@@ -226,7 +226,7 @@ void(entity player, float cast) Request_Poll_Vote =
 			// Example: "woods voted yes. Vote passed."
 			bprint(player.netname, " voted \byes\b. \n\nVote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n\n");
 			clanring_request.touch();
-			sound(world, CHAN_AUTO, "misc/runekey.wav", 1, ATTN_NONE);
+			clanring_play_compat_sound(world, CHAN_AUTO, "misc/runekey.wav", "misc/medkey.wav", 1, ATTN_NONE);
 			Request_Poll_Cleanup();
 			return;
 		}
@@ -379,7 +379,7 @@ float (string captiona, string captionb, void() passfunc, string pollname = "") 
 
 	if (clanring_gameconfig & CLANRING_DISABLE_VOTE)
 	{
-		stuffcmd(self,"play doors/runetry.wav\n");
+			clanring_stuffcmd_compat_play(self, "doors/runetry.wav", "");
 		sprint(self, "Voting has been disabled.\n");
 		return FALSE;
 	}
@@ -400,7 +400,7 @@ float (string captiona, string captionb, void() passfunc, string pollname = "") 
 
    	if ((self.style & CLANRING_OBSERVER) && (clanring_state & CLANRING_MATCH_STARTED))//R00k
 	{
-		stuffcmd(self,"play doors/runetry.wav\n");
+			clanring_stuffcmd_compat_play(self, "doors/runetry.wav", "");
 		sprint(self, "Observers cannot initiate votes during match.\n");
 		return FALSE;
 	}
@@ -460,7 +460,7 @@ void() Request_Poll_Recount =
     {
         bprint("\nVote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n\n");
         clanring_request.touch();
-        sound(world, CHAN_AUTO, "misc/runekey.wav", 1, ATTN_NONE);
+        clanring_play_compat_sound(world, CHAN_AUTO, "misc/runekey.wav", "misc/medkey.wav", 1, ATTN_NONE);
         Request_Poll_Cleanup();
         return;
     }

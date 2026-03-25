@@ -182,6 +182,7 @@ float CLANRING_MANUAL_SPAWN = 1;
 float   clanring_devparam;          // used for development
 float   clanring_playmode;          // current play mode (non volatile flags)
 float	clanring_gameconfig;		// playmode sub-settings (non volatile flags)
+float   clanring_sv_pak0_only;      // runtime snapshot of cvar sv_pak0_only
 float   clanring_state;             // server state (volatile flags)
 float   clanring_timelimit;         // timelimit for matches (default 20 minutes)
 float   default_timelimit;          // reset timelimit between matches in case of overtime or interrupted match abort

@@ -454,8 +454,8 @@ void() item_health_vial =
 	  self.mdl_body = world.h_vial_mdl;
 	}
 
-	precache_body_model ("progs/h_mdls/pd_vial.mdl"); // model from Hexen 2 -- dumptruck_ds
-	body_model("progs/h_mdls/pd_vial.mdl");
+	precache_body_model (clanring_vial_model()); // model from Hexen 2 -- dumptruck_ds
+	body_model(clanring_vial_model());
 	precache_sound_misc("items/r_item1.wav");
 	if !(self.snd_misc) //set the custom noise in editor -- dumptruck_ds
 	self.snd_misc = "items/r_item1.wav";
@@ -657,7 +657,7 @@ void() shard_touch = // this from RMQ shard_touch
 	if (self.snd_misc != "")
 		sound_misc(other, CHAN_AUTO, self.snd_misc, 1, ATTN_NORM);	// armor touch sound
 	else
-		sound_misc(other, CHAN_AUTO,"items/armsh1.wav", 1, ATTN_NORM); // dumptruck_ds custom models and sounds END
+		clanring_play_compat_sound(other, CHAN_AUTO, "items/armsh1.wav", "", 1, ATTN_NORM); // dumptruck_ds custom models and sounds END
 
 	stuffcmd (other, "bf\n");
 
@@ -765,17 +765,24 @@ void() item_armor_shard =
 	if (SUB_Inhibit ())  // new spawnflags for all entities -- iw
 		return;
 
-	if (!self.mdl_body && world.a_shr_mdl)
+	if (clanring_sv_pak0_only)
+	{
+		self.mdl_body = "";
+		self.snd_misc = clanring_shard_sound();
+	}
+	else if (!self.mdl_body && world.a_shr_mdl)
 	{
 		self.mdl_body = world.a_shr_mdl;
 	}
 
 	self.armorvalue = 5;
 	self.touch = shard_touch;
-	//moved to world.qc precache_model ("progs/armshr.mdl"); // dumptruck_ds custom models and sounds START
-	//precache_body_model ("progs/armshr.mdl");
-	// setmodel (self, "progs/armor.mdl");
-	body_model ("progs/armshr.mdl");
+	precache_body_model (clanring_shard_model());
+	if (self.snd_misc != "")
+		precache_sound (self.snd_misc);
+	else
+		clanring_precache_compat_sound("items/armsh1.wav", "");
+	body_model (clanring_shard_model());
 
 	if !(self.skin) // dumptruck_ds custom models and sounds END
 		self.skin = 0;
@@ -1473,13 +1480,15 @@ void() key_setsounds =
 	}
 	if (world.worldtype == WORLDTYPE_METAL)
 	{
-		precache_sound ("misc/runekey.wav");
-		self.noise = "misc/runekey.wav";
+			self.noise = clanring_vote_pass_sound();
+			if (self.noise != "")
+				precache_sound(self.noise);
 	}
 	if (world.worldtype == WORLDTYPE_BASE)
 	{
-		precache_sound2 ("misc/basekey.wav");
-		self.noise = "misc/basekey.wav";
+			self.noise = clanring_flag_drop_sound();
+			if (self.noise != "")
+				precache_sound(self.noise);
 	}
 };
 
@@ -1688,7 +1697,7 @@ void () powerup_denied =
         {
 			// TODO: other.stats_denied_powerup += 1;
 			centerprint (e, "\bdenied!\n");
-			sound(other, CHAN_BODY, "ra/laugh.wav", 1, ATTN_NORM);
+				clanring_play_compat_sound(other, CHAN_BODY, "ra/laugh.wav", "", 1, ATTN_NORM);
 		}
         e = e.chain;
     }
@@ -2694,7 +2703,7 @@ void() TossWeapon =
 	// R00k: "You There!" so my teammates will look at me when dropping items...
 	if ((time > self.toss_time)||(self.toss_time == 0))
 	{
-		sound(self, CHAN_VOICE, "enforcer/sight3.wav", 1, ATTN_NORM);
+		clanring_play_compat_sound(self, CHAN_VOICE, "enforcer/sight3.wav", "", 1, ATTN_NORM);
 		self.toss_time = time + 5;
 	}
 	else self.toss_time = time + 2;//more spamming more duration
@@ -2919,7 +2928,7 @@ void() TossAmmo =
 	// R00k: "You There!" so my teammates will look at me when dropping items...
 	if (time > self.toss_time)
 	{
-		sound(self, CHAN_VOICE, "enforcer/sight3.wav", 1, ATTN_NORM);
+		clanring_play_compat_sound(self, CHAN_VOICE, "enforcer/sight3.wav", "", 1, ATTN_NORM);
 		self.toss_time = time + 5;
 	}
 
@@ -2982,13 +2991,13 @@ void() DropKey1 =
 	{
 		precache_model ("progs/m_s_key.mdl");
 		setmodel (item, "progs/m_s_key.mdl");
-		item.noise = "misc/runekey.wav";
+			item.noise = clanring_vote_pass_sound();
 	}
 	else if (world.worldtype == WORLDTYPE_BASE)
 	{
 		precache_model2 ("progs/b_s_key.mdl");
 		setmodel (item, "progs/b_s_key.mdl");
-		item.noise = "misc/basekey.wav";
+			item.noise = clanring_flag_drop_sound();
 	}
 	item.netname = SilverKeyName ();
 	item.effects = 8;
@@ -3021,13 +3030,13 @@ void() DropKey2 =
 	{
 		precache_model ("progs/m_g_key.mdl");
 		setmodel (item, "progs/m_g_key.mdl");
-		item.noise = "misc/runekey.wav";
+			item.noise = clanring_vote_pass_sound();
 	}
 	else if (world.worldtype == WORLDTYPE_BASE)
 	{
 		precache_model ("progs/b_g_key.mdl");
 		setmodel (item, "progs/b_g_key.mdl");
-		item.noise = "misc/basekey.wav";
+			item.noise = clanring_flag_drop_sound();
 	}
 	item.netname = GoldKeyName ();
 	item.effects = 8;
@@ -3050,8 +3059,8 @@ void() DropVial = //
 	item.velocity_x = -100 + (random() * 200);
 	item.velocity_y = -100 + (random() * 200);
 
-	precache_model("progs/h_mdls/pd_vial.mdl");
-	setmodel(item, "progs/h_mdls/pd_vial.mdl");
+	precache_model(clanring_vial_model());
+	setmodel(item, clanring_vial_model());
 	item.solid = SOLID_TRIGGER;
 	item.movetype = MOVETYPE_TOSS;
 	setsize (item, '-16 -16 0', '16 16 56');
@@ -3103,7 +3112,8 @@ void() DropShardTouch =
 		}
 	}
 
-	sound_misc(other, CHAN_AUTO, self.snd_misc, 1, ATTN_NORM);
+	if (self.snd_misc != "")
+		sound(other, CHAN_AUTO, self.snd_misc, 1, ATTN_NORM);
 
 	self.solid = SOLID_NOT;
 	self.model = string_null;
@@ -3126,12 +3136,12 @@ void(vector o, float a) DropShard = //
 	item.velocity_x = 0;
 	item.velocity_y = 0;
 
-	setmodel(item, "progs/armshr.mdl");
+	setmodel(item, clanring_shard_model());
 	item.solid = SOLID_TRIGGER;
 	item.movetype = MOVETYPE_TOSS;
 	setsize(item, '-16 -16 0', '16 16 56');
 	item.touch = DropShardTouch;	// R00k
-	item.snd_misc = "items/armsh1.wav";
+	item.snd_misc = clanring_shard_sound();
 	item.flags = FL_ITEM;		// make extra wide
 };
 

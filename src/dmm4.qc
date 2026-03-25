@@ -204,7 +204,7 @@ void () dmm4_main_loop =
 				if (boss.count == 0)
 				{
 					utils_do_arena_players(arena_restart_player);
-					sound (world, CHAN_ITEM, "crx/fight.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_ITEM, "crx/fight.wav", "", 1, ATTN_NONE);
 					//ctprint ("\bFIGHT!");
 					utils_do_arena_players(arena_fight_and_shoot);
 					boss.timetofight = TRUE;
@@ -223,17 +223,17 @@ void () dmm4_main_loop =
 				else if (boss.count == 1)
 				{
 					//ctprint ("1");
-					sound (world, CHAN_ITEM, "crx/one.wav",1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_ITEM, "crx/one.wav", "", 1, ATTN_NONE);
 				}
 				else if (boss.count == 2)
 				{
 					//ctprint ("2");
-					sound (world, CHAN_ITEM, "crx/two.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_ITEM, "crx/two.wav", "", 1, ATTN_NONE);
 				}
 				else if (boss.count == 3)
 				{
 					//ctprint("3");
-					sound(world, CHAN_ITEM, "crx/three.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_ITEM, "crx/three.wav", "", 1, ATTN_NONE);
 				}
 				else if (boss.count == 5)
 				{
@@ -473,7 +473,7 @@ void () arena_timer_think =
 			if (clanring_playmode & CLANRING_AIRSHOT_MODE)
 			{
 				announce("\bQuad Juggling\b activated");
-				sound (world, CHAN_ITEM, "crx/activate.wav", 1, ATTN_NONE);
+					clanring_play_compat_sound(world, CHAN_ITEM, "crx/activate.wav", "", 1, ATTN_NONE);
 			}
 			// if (clanring_overtime > 0)
 			// {

@@ -3,7 +3,7 @@ float () crandom;
 
 void() HookVanish2 =
 {
-	if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+	if (clanring_use_custom_hook_assets())
 	{
 		sound (self.owner, CHAN_WEAPON, "weapons/bounce2.wav", 1, ATTN_NORM);
 	}
@@ -59,7 +59,7 @@ void() HookPull2 =
 
 			if (self.hookdmg >= 1)
 			{
-				sound (self, CHAN_WEAPON, "blob/land1.wav", 1, ATTN_NORM);
+				clanring_play_compat_sound(self, CHAN_WEAPON, "blob/land1.wav", "player/axhit1.wav", 1, ATTN_NORM);
 				T_Damage (self.enemy, self, self.owner, 1);
 				if (self.enemy.classname == "player")
 				{
@@ -119,7 +119,7 @@ void() HookPull2 =
 		self.owner.velocity = ((1 - ((0.8 * self.owner.waterlevel) * frametime)) * self.owner.velocity);
 	}
 
-	if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+	if (clanring_use_custom_hook_assets())
 	{
 		dorg = vlen(self.owner.origin - self.dest);
 
@@ -351,14 +351,14 @@ void(entity myself) W_FireHook2 =
 	setsize (hook, '0 0 0', '0 0 0');
 	setorigin(hook, myself.origin + (v_forward*16) + '0 0 16' );
 
-	if (!(clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM))
-	{
-		sound (self, CHAN_WEAPON, "hknight/hit.wav", 1, ATTN_NORM);
-	}
-	else
-	{
-		sound (self, CHAN_WEAPON, "weapons/chain1.wav", 1, ATTN_NORM);
-	}
+		if (!clanring_use_custom_hook_assets())
+		{
+			clanring_play_compat_sound(self, CHAN_WEAPON, "hknight/hit.wav", "knight/sword1.wav", 1, ATTN_NORM);
+		}
+		else
+		{
+			clanring_play_compat_sound(self, CHAN_WEAPON, "weapons/chain1.wav", "knight/sword1.wav", 1, ATTN_NORM);
+		}
 
 	linknum = 8;
 	prevlink = world;

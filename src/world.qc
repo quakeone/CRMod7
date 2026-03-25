@@ -182,6 +182,7 @@ void() worldspawn =
     globalstat(STAT_USER + 0, EV_FLOAT, "hh_hud_enabled");
     clientstat(STAT_USER + 1, EV_FLOAT, ammo_heads);
     globalstat(STAT_USER + 2, EV_FLOAT, "hh_maxheads");
+    clanring_refresh_pak0_only();
     
     // the area based ambient sounds MUST be the first precache_sounds
     
@@ -260,7 +261,7 @@ void() worldspawn =
     precache_sound ("misc/menu1.wav");
     precache_sound ("misc/menu2.wav");
     precache_sound ("fish/bite.wav");
-    precache_sound ("boss2/pop2.wav");
+    clanring_precache_compat_sound("boss2/pop2.wav", "");
     precache_model ("progs/player.mdl");
     precache_model ("progs/eyes.mdl");
     precache_model ("progs/h_player.mdl");
@@ -313,7 +314,7 @@ void() worldspawn =
     precache_model ("maps/b_batt0.bsp");
     precache_model ("progs/invulner.mdl");
     precache_model ("progs/v_spike.mdl");
-    precache_sound ("blob/land1.wav");
+    clanring_precache_compat_sound("blob/land1.wav", "player/axhit1.wav");
     precache_sound ("hknight/hit.wav");
     precache_sound ("items/protect.wav");
     precache_sound ("items/protect2.wav");
@@ -340,42 +341,48 @@ void() worldspawn =
     precache_model ("maps/b_shell0.bsp");
     //---
 
-    //--Runes-
-    precache_model ("progs/end1.mdl");
-    precache_model ("progs/end2.mdl");
-    precache_model ("progs/end3.mdl");
-    precache_model ("progs/end4.mdl");
-    //--Runes-
-    precache_sound("misc/runekey.wav");
+    clanring_precache_compat_sound("misc/runekey.wav", "misc/medkey.wav");
+    if (!clanring_sv_pak0_only)
+    {
+        //--Runes-
+        precache_model ("progs/end1.mdl");
+        precache_model ("progs/end2.mdl");
+        precache_model ("progs/end3.mdl");
+        precache_model ("progs/end4.mdl");
+        //--Runes-
+    }
 
     precache_sound ("boss1/sight1.wav"); //haste
-    precache_sound ("hknight/slash1.wav"); //rune toss
-    precache_sound ("misc/basekey.wav"); //flag dropped notification
+    clanring_precache_compat_sound("hknight/slash1.wav", ""); //rune toss
+    clanring_precache_compat_sound("misc/basekey.wav", "misc/medkey.wav"); //flag dropped notification
 	    precache_sound("buttons/switch04.wav"); //match timer countdown
-	    precache_sound("crx/prepare.wav");
+	    clanring_precache_compat_sound("crx/prepare.wav", "");
 
-	    precache_sound("enforcer/sight3.wav");//Item tossing "You There!"
-	    precache_sound ("ra/laugh.wav"); // Powerup Denied sound.
+	    clanring_precache_compat_sound("enforcer/sight3.wav", "");//Item tossing "You There!"
+	    clanring_precache_compat_sound("ra/laugh.wav", ""); // Powerup Denied sound.
 	    precache_sound ("misc/null.wav");
-	    precache_sound ("hhsounds/altamb.wav");
-	    precache_sound ("hhsounds/altar1.wav");
-	    precache_sound ("hhsounds/altar2.wav");
-	    precache_sound ("hhsounds/altar3.wav");
-	    precache_sound ("hhsounds/altar4.wav");
-	    precache_sound ("hhsounds/catch1.wav");
-	    precache_sound ("hhsounds/catch2.wav");
-	    precache_sound ("hhsounds/catch3.wav");
-	    precache_sound ("hhsounds/catch4.wav");
-	    precache_sound ("hhsounds/bite1.wav");
-	    precache_sound ("hhsounds/bite2.wav");
-	    precache_sound ("hhsounds/pickup1.wav");
-	    precache_sound ("hhsounds/pickup2.wav");
-	    precache_sound ("hhsounds/pickup3.wav");
-	    precache_sound ("hhsounds/pickup4.wav");
-	    precache_sound ("hhsounds/pickup5.wav");
-	    precache_sound ("hhsounds/pickup6.wav");
-	    precache_sound ("hhsounds/pickup7.wav");
-	    precache_sound ("hhsounds/pickup8.wav");
+        if (!clanring_sv_pak0_only)
+        {
+	        precache_sound ("hhsounds/altamb.wav");
+	        precache_sound ("hhsounds/altar1.wav");
+	        precache_sound ("hhsounds/altar2.wav");
+	        precache_sound ("hhsounds/altar3.wav");
+	        precache_sound ("hhsounds/altar4.wav");
+	        precache_sound ("hhsounds/catch1.wav");
+	        precache_sound ("hhsounds/catch2.wav");
+	        precache_sound ("hhsounds/catch3.wav");
+	        precache_sound ("hhsounds/catch4.wav");
+	        precache_sound ("hhsounds/bite1.wav");
+	        precache_sound ("hhsounds/bite2.wav");
+	        precache_sound ("hhsounds/pickup1.wav");
+	        precache_sound ("hhsounds/pickup2.wav");
+	        precache_sound ("hhsounds/pickup3.wav");
+	        precache_sound ("hhsounds/pickup4.wav");
+	        precache_sound ("hhsounds/pickup5.wav");
+	        precache_sound ("hhsounds/pickup6.wav");
+	        precache_sound ("hhsounds/pickup7.wav");
+	        precache_sound ("hhsounds/pickup8.wav");
+        }
 	    //precache_model ("progs/spawn.mdl");
     
     //

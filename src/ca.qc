@@ -262,7 +262,7 @@ void () arena_main_loop =
 				{
 					// Clear any active vote as the match starts to prevent mid-start changes
 					Request_Poll_Cleanup();
-					sound (world, CHAN_AUTO, "crx/fight.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_AUTO, "crx/fight.wav", "", 1, ATTN_NONE);
 					CA_CenterprintToAll("\bFIGHT!");
 					utils_do_arena_players(arena_fight_and_shoot);
 					boss.timetofight = TRUE;
@@ -276,17 +276,17 @@ void () arena_main_loop =
 				if (boss.count == 1)
 				{
 					if (boss.round > 1) CA_CenterprintToAll("1");
-					sound (world, CHAN_AUTO, "crx/one.wav",1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_AUTO, "crx/one.wav", "", 1, ATTN_NONE);
 				}
 				else if (boss.count == 2)
 				{
 					if (boss.round > 1) CA_CenterprintToAll("2");
-					sound (world, CHAN_AUTO, "crx/two.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_AUTO, "crx/two.wav", "", 1, ATTN_NONE);
 				}
 				else if (boss.count == 3)
 				{
 					if (boss.round > 1) CA_CenterprintToAll("3");
-					sound(world, CHAN_AUTO, "crx/three.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_AUTO, "crx/three.wav", "", 1, ATTN_NONE);
 				}
 				else if (boss.count == 5)
 				{

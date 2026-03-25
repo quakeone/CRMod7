@@ -39,37 +39,37 @@ void () arena_precache =
 	//precache_sound ("ra/2.wav");
 	//precache_sound ("ra/3.wav");
 	//precache_sound ("ra/fight.wav");
-	precache_sound ("crx/one.wav");
-	precache_sound ("crx/two.wav");
-	precache_sound ("crx/three.wav");
-	precache_sound ("crx/fight.wav");
+	clanring_precache_compat_sound("crx/one.wav", "");
+	clanring_precache_compat_sound("crx/two.wav", "");
+	clanring_precache_compat_sound("crx/three.wav", "");
+	clanring_precache_compat_sound("crx/fight.wav", "");
 	//precache_sound ("ra/laugh.wav"); Moved to world.qc --R00k
 	//precache_sound ("ra/flawless.wav");  //not used
-	precache_sound ("ra/outstand.wav");	
+	clanring_precache_compat_sound("ra/outstand.wav", "");	
 	//precache_sound ("ra/excellent.wav");	
-	precache_sound ("ra/welldone.wav");
+	clanring_precache_compat_sound("ra/welldone.wav", "");
 	precache_sound ("ambience/thunder1.wav");
 	//airshot
-	precache_sound ("crx/activate.wav");
-	precache_sound ("crx/gasp.wav");
-	precache_sound ("crx/gasp2.wav");
-	precache_sound ("crx/space.wav");
-	precache_sound ("crx/onfire.wav");
-	precache_sound ("crx/kaboom.wav");
-	precache_sound ("crx/excell3.wav");
-	precache_sound ("crx/superb.wav");
-	precache_sound ("crx/onemore.wav");
-	precache_sound ("crx/yeah.wav");
+	clanring_precache_compat_sound("crx/activate.wav", "");
+	clanring_precache_compat_sound("crx/gasp.wav", "");
+	clanring_precache_compat_sound("crx/gasp2.wav", "");
+	clanring_precache_compat_sound("crx/space.wav", "");
+	clanring_precache_compat_sound("crx/onfire.wav", "");
+	clanring_precache_compat_sound("crx/kaboom.wav", "");
+	clanring_precache_compat_sound("crx/excell3.wav", "");
+	clanring_precache_compat_sound("crx/superb.wav", "");
+	clanring_precache_compat_sound("crx/onemore.wav", "");
+	clanring_precache_compat_sound("crx/yeah.wav", "");
 	//wipeout
-	precache_sound ("crx/lastone.wav");
+	clanring_precache_compat_sound("crx/lastone.wav", "");
 	//precache_sound ("crx/itembk3.wav");
-	precache_sound ("crx/laugh2.wav");
-	precache_sound ("crx/laugh4.wav");
-	precache_sound ("crx/laugh7.wav");
+	clanring_precache_compat_sound("crx/laugh2.wav", "");
+	clanring_precache_compat_sound("crx/laugh4.wav", "");
+	clanring_precache_compat_sound("crx/laugh7.wav", "");
 	//precache_sound ("crx/helpyou.wav");
 	//ra
-	precache_sound ("crx/excell2.wav");
-	precache_sound ("crx/flawless.wav");
+	clanring_precache_compat_sound("crx/excell2.wav", "");
+	clanring_precache_compat_sound("crx/flawless.wav", "");
 }
 
 void () arena_init_world =
@@ -842,15 +842,15 @@ void () im_dead_now_what =
 				bprint3 ("The ", self.next_team.netname, " has been \bwiped out\b\n");
 				prnd = floor(random() * 6) + 1;
 				if (prnd == 1)
-					sound (world, CHAN_VOICE, "crx/laugh2.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_VOICE, "crx/laugh2.wav", "", 1, ATTN_NONE);
 				else if (prnd == 2)
-					sound (world, CHAN_VOICE, "crx/laugh3.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_VOICE, "crx/laugh3.wav", "", 1, ATTN_NONE);
 				else if (prnd == 3)
-					sound (world, CHAN_VOICE, "crx/laugh4.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_VOICE, "crx/laugh4.wav", "", 1, ATTN_NONE);
 				else if (prnd == 4)
-					sound (world, CHAN_VOICE, "crx/laugh7.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_VOICE, "crx/laugh7.wav", "", 1, ATTN_NONE);
 				else
-					sound (world, CHAN_VOICE, "ra/laugh.wav", 1, ATTN_NONE); //R00k, this might be annoying?
+						clanring_play_compat_sound(world, CHAN_VOICE, "ra/laugh.wav", "", 1, ATTN_NONE); //R00k, this might be annoying?
 
 				e = self.next_team.chain_gang;
 				while (e)
@@ -864,7 +864,7 @@ void () im_dead_now_what =
 			{
 				if (self.next_team.teamalive == 1)
 				{
-					sound(world, CHAN_AUTO, "crx/lastone.wav", 1, ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_AUTO, "crx/lastone.wav", "", 1, ATTN_NONE);
 				}
 
 				//set player's respawn and update team nextspawn for huds
@@ -1516,7 +1516,7 @@ void () arena_unpause_countdown_think =
 	{
 		boss.unpausing = FALSE;
 		arena_unpause ();
-		sound(world, CHAN_AUTO, "crx/fight.wav", 1, ATTN_NONE);
+			clanring_play_compat_sound(world, CHAN_AUTO, "crx/fight.wav", "", 1, ATTN_NONE);
 		remove (self);
 	}
 	else
@@ -1681,7 +1681,7 @@ void () arena_match_end =
 				bprint ("The match is over\n");//required for Qrack cl_autodemo 2
 	
 				if ((!(clanring_gameconfig & CLANRING_ENABLE_MATCHSOUNDS)) || (!clanring_matchsound_count))
-					sound (world, CHAN_AUTO, "ra/gong.wav", 1 , ATTN_NONE);
+						clanring_play_compat_sound(world, CHAN_AUTO, "ra/gong.wav", "", 1 , ATTN_NONE);
 	
 				NextLevel();
 				return;
@@ -1702,7 +1702,7 @@ void () arena_match_end =
 
 	bprint ("The match is over\n");//required for Qrack cl_autodemo 2
 
-	sound (world, CHAN_AUTO, "ra/gong.wav", 1 , ATTN_NONE);
+	clanring_play_compat_sound(world, CHAN_AUTO, "ra/gong.wav", "", 1 , ATTN_NONE);
 
 	// if ((boss.round == 5) && (clanring_playmode & CLANRING_CA_MODE) && (team_first_place != world) && (team_first_place.wins == 5))
 	// {
@@ -1805,26 +1805,26 @@ void (float x,float y) announce_winner =
 {
 	if (x == 200 && y == 100)
 	{
-		sound(world, CHAN_AUTO, "crx/flawless.wav", 1, ATTN_NONE);// Health = 100 Armor == 200 = 300
+		clanring_play_compat_sound(world, CHAN_AUTO, "crx/flawless.wav", "", 1, ATTN_NONE);// Health = 100 Armor == 200 = 300
 		ctprint("\bFLAWLESS VICTORY\b");
 
 	}
 	else
 	if (x >= 100 && y >= 75)
 	{
-		sound(world, CHAN_AUTO, "ra/outstand.wav", 1, ATTN_NONE);// Health >= 75 Armor >= 100 = 175
+		clanring_play_compat_sound(world, CHAN_AUTO, "ra/outstand.wav", "", 1, ATTN_NONE);// Health >= 75 Armor >= 100 = 175
 		//ctprint("Outstanding");
 	}
 	else
 	if (x >= 75 && y >= 50)
 	{
-		sound(world, CHAN_AUTO, "crx/excell2.wav", 1, ATTN_NONE);// Health >= 50 Armor >= 75 == 125
+		clanring_play_compat_sound(world, CHAN_AUTO, "crx/excell2.wav", "", 1, ATTN_NONE);// Health >= 50 Armor >= 75 == 125
 		//ctprint("Excellent");
 	}
 	else
 	if (x >= 50 && y >= 50)
 	{
-		sound(world, CHAN_AUTO, "ra/welldone.wav", 1, ATTN_NONE);// Health >=50 Armor >= 50 == 100
+		clanring_play_compat_sound(world, CHAN_AUTO, "ra/welldone.wav", "", 1, ATTN_NONE);// Health >=50 Armor >= 50 == 100
 		//ctprint("Well Done");
 	}
 };

@@ -842,7 +842,7 @@ void () rocket_arena_main_loop =
             {
                 Request_Poll_Cleanup();
 				RA_CenterprintToAll("\bFIGHT!");
-				sound (world, CHAN_ITEM, "crx/fight.wav", 1, ATTN_NONE);
+					clanring_play_compat_sound(world, CHAN_ITEM, "crx/fight.wav", "", 1, ATTN_NONE);
 				utils_do_arena_players(arena_fight_and_shoot);
 				boss.timetofight = TRUE;
 				boss.state = CA_MATCH_PLAYING;
@@ -854,17 +854,17 @@ void () rocket_arena_main_loop =
             else if (boss.count == 1)
             {
                 if ((boss.round > 1) || ra_initial_rules_shown) RA_CenterprintToAll("1");
-				sound (world, CHAN_ITEM, "crx/one.wav",1, ATTN_NONE);
+					clanring_play_compat_sound(world, CHAN_ITEM, "crx/one.wav", "", 1, ATTN_NONE);
             }
             else if (boss.count == 2)
             {
                 if ((boss.round > 1) || ra_initial_rules_shown) RA_CenterprintToAll("2");
-				sound (world, CHAN_ITEM, "crx/two.wav", 1, ATTN_NONE);
+					clanring_play_compat_sound(world, CHAN_ITEM, "crx/two.wav", "", 1, ATTN_NONE);
             }
             else if (boss.count == 3)
             {
                 if ((boss.round > 1) || ra_initial_rules_shown) RA_CenterprintToAll("3");
-				sound(world, CHAN_ITEM, "crx/three.wav", 1, ATTN_NONE);
+					clanring_play_compat_sound(world, CHAN_ITEM, "crx/three.wav", "", 1, ATTN_NONE);
             }
 			else if (boss.count == 4)
 			{

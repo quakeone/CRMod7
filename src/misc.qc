@@ -888,6 +888,12 @@ For optimzation testing, starts a lot of sounds.
 void() misc_noisemaker =
 
 {
+	if (clanring_sv_pak0_only)
+	{
+		remove(self);
+		return;
+	}
+
 	precache_sound2 ("enforcer/enfire.wav");
 	precache_sound2 ("enforcer/enfstop.wav");
 	precache_sound2 ("enforcer/sight1.wav");

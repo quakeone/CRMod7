@@ -2542,6 +2542,12 @@ void() votables_set_runes =
 {
 	local float is_pub_ctf;
 
+	if (clanring_sv_pak0_only)
+	{
+		sprint(self, "Runes are unavailable while sv_pak0_only is enabled.\n");
+		return;
+	}
+
 	is_pub_ctf = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
 		&& (clanring_playmode & CLANRING_NORMAL_MODE)
 		&& !(clanring_playmode & CLANRING_MATCH_MODE)
@@ -2571,6 +2577,12 @@ void() votables_set_runes =
 void() votables_request_set_runes =
 {
 	local string newstate;
+
+	if (clanring_sv_pak0_only)
+	{
+		sprint(self, "Runes are unavailable while sv_pak0_only is enabled.\n");
+		return;
+	}
 
 	if ((self.style) & CLANRING_ADMINISTRATOR) 
 	{

@@ -24,7 +24,7 @@ void() HookVanish =
 	self.owner.hook_out = FALSE;
 	self.owner.hook2 = (self.owner.hook2 - (self.owner.hook2 & HOOK_OUT));	
 
-	if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+	if (clanring_use_custom_hook_assets())
 	{
 		sound (self.owner, CHAN_WEAPON, "weapons/bounce2.wav", 1, ATTN_NORM);
 	}
@@ -127,7 +127,7 @@ void() HookPull =
 
 			if (self.hookdmg >= 1)
 			{
-				sound (self, CHAN_WEAPON, "blob/land1.wav", 1, ATTN_NORM);
+					clanring_play_compat_sound(self, CHAN_WEAPON, "blob/land1.wav", "player/axhit1.wav", 1, ATTN_NORM);
 				T_Damage (self.enemy, self, self.owner, 1);
 				if (self.enemy.classname == "player")
 				{
@@ -174,7 +174,7 @@ void() HookPull =
 		self.owner.velocity = ((1 - ((0.8 * self.owner.waterlevel) * frametime)) * self.owner.velocity);
 	}
 
-	if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+	if (clanring_use_custom_hook_assets())
 	{
 		dorg = vlen(self.owner.origin - self.dest);
 
@@ -264,7 +264,7 @@ void() T_HookTouch =
 
 				self.weapon = other.nextthink - time;
 
-				if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+				if (clanring_use_custom_hook_assets())
 				{
 					sound (self.owner, CHAN_WEAPON, "weapons/chain2.wav", 1, ATTN_NORM);
 				}
@@ -340,27 +340,27 @@ void() W_FireHook =
 	hook.nextthink 	= time + 0.3;//instead lets check if we let off the button in mid-flight! eh?
 	hook.think 		= Hook_Check;
 
-	if (!(clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM))
-	{
-		setmodel (hook, "progs/v_spike.mdl");
-		hook.effects |= EF_NOMODELFLAGS;	// Remove the trail.
-	}
-	else
-	{
-		setmodel (hook, "progs/star.mdl");
-	}
+		if (!clanring_use_custom_hook_assets())
+		{
+			setmodel (hook, clanring_hook_projectile_model());
+			hook.effects |= EF_NOMODELFLAGS;	// Remove the trail.
+		}
+		else
+		{
+			setmodel (hook, clanring_hook_projectile_model());
+		}
 
 	setorigin(hook, self.origin + (v_forward*16) + '0 0 16' );
 	setsize (hook, '0 0 0', '0 0 0');
 		
-	if (!(clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM))
-	{
-		sound (self, CHAN_WEAPON, "hknight/hit.wav", 1, ATTN_NORM);
-	}
-	else
-	{
-		sound (self, CHAN_WEAPON, "weapons/chain1.wav", 1, ATTN_NORM);
-	}
+		if (!clanring_use_custom_hook_assets())
+		{
+			clanring_play_compat_sound(self, CHAN_WEAPON, "hknight/hit.wav", "knight/sword1.wav", 1, ATTN_NORM);
+		}
+		else
+		{
+			clanring_play_compat_sound(self, CHAN_WEAPON, "weapons/chain1.wav", "knight/sword1.wav", 1, ATTN_NORM);
+		}
 
 	linknum = 5;
 	prevlink = world;
@@ -377,14 +377,14 @@ void() W_FireHook =
 		link.solid = SOLID_NOT;
 		link.angles = hook.angles;
 
-		if (!(clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM))
-		{
-			setmodel (link, "progs/s_spike.mdl");
-		}
-		else
-		{
-			setmodel (link, "progs/bit.mdl");
-		}
+			if (!clanring_use_custom_hook_assets())
+			{
+				setmodel (link, clanring_hook_chain_model());
+			}
+			else
+			{
+				setmodel (link, clanring_hook_chain_model());
+			}
 		makevectors (self.v_angle);
 		setorigin(link, hook.origin + (((self.origin + (v_up * 16 * (!self.button2)) + (v_forward * 16)) - hook.origin) * (link.weapon)));
 		setsize (link, '0 0 0', '0 0 0');

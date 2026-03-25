@@ -632,6 +632,7 @@ function parseClanring(text) {
     network: { ctfticrate: '0.025', tdmticrate: '0.025' },
     gameplay: { quad: true, ring: false, pent: false, runes: false, noexit: '1', pausable: '0' },
     features: { autopause: true, matchsounds: true, safepractice: false },
+    compatibility: { sv_pak0_only: '0' },
     player: { cr_allow_leavemealone: '1', cr_allow_qwsucks: '1', cr_allow_q14ever: '1' },
     rotation: { cr_dm_randomize_start: '1', cr_ra_randomize_start: '1', cr_hh_randomize_start: '0' },
     init: { modevote: true, kickafk: '0' },
@@ -693,6 +694,11 @@ function parseClanringCmd(data, section, cmd, val) {
   // Network
   if (cmd === 'ctfticrate') { data.network.ctfticrate = val; return; }
   if (cmd === 'tdmticrate') { data.network.tdmticrate = val; return; }
+
+  // Compatibility
+  if (cmd === 'sv_pak0_only' && section === 'global') {
+    data.compatibility.sv_pak0_only = val; return;
+  }
 
   // Player features (cvars)
   if (['cr_allow_leavemealone','cr_allow_qwsucks','cr_allow_q14ever'].includes(cmd)) {
@@ -941,6 +947,7 @@ function serializeClanring(data) {
   ln(data.features.autopause ? 'autopauseon' : 'autopauseoff');
   ln(data.features.matchsounds ? 'matchsoundson' : 'matchsoundsoff');
   ln(data.features.safepractice ? 'safepracticeon' : 'safepracticeoff');
+  ln('sv_pak0_only ' + data.compatibility.sv_pak0_only);
 
   banner('GLOBAL  -  Player Features');
   ln('cr_allow_leavemealone ' + data.player.cr_allow_leavemealone);
@@ -1543,6 +1550,7 @@ function renderClanring() {
   html += toggleHtml('sf_autopause', 'Auto Pause', 'Automatically pause match when a player disconnects', d.features.autopause);
   html += toggleHtml('sf_matchsounds', 'Match Sounds', 'Game-over music during nextmap vote screen', d.features.matchsounds);
   html += toggleHtml('sf_safepractice', 'Safe Practice', 'Anti-spam: limits grenade spam, discharge kills self only', d.features.safepractice);
+  html += toggleHtml('sf_pak0_only', 'Pak0-Only Compatibility', 'Restrict assets to shareware-safe pak0 content; disables runes and skips unsupported custom sounds/models', d.compatibility.sv_pak0_only !== '0');
   html += `</div>`;
 
   // Player Features
@@ -1991,6 +1999,7 @@ function handleToggle(id, checked) {
   if (id === 'sf_autopause') d.features.autopause = checked;
   if (id === 'sf_matchsounds') d.features.matchsounds = checked;
   if (id === 'sf_safepractice') d.features.safepractice = checked;
+  if (id === 'sf_pak0_only') d.compatibility.sv_pak0_only = checked ? '1' : '0';
 
   // Player features
   if (id === 'pf_lma') d.player.cr_allow_leavemealone = checked ? '1' : '0';

@@ -368,42 +368,42 @@ void(entity targ, entity attacker) Killed =
 					{
 						prand = floor(random() * 5) + 1;
 						if (prand == 1)
-							sound (self, CHAN_VOICE, "crx/onemore.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/onemore.wav", "", 1, ATTN_NORM);
 						else if (prand == 2)
 							sound (self, CHAN_VOICE, "misc/power.wav", 1, ATTN_NORM);
 						else if (prand == 3)
-							sound (self, CHAN_VOICE, "crx/laugh6.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/laugh6.wav", "", 1, ATTN_NORM);
 						else if (prand == 4)
-							sound (self, CHAN_VOICE, "crx/yeah.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/yeah.wav", "", 1, ATTN_NORM);
 						else
-							sound (self, CHAN_VOICE, "crx/onfire.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/onfire.wav", "", 1, ATTN_NORM);
 					}
 					else if (as_sound == 2)
-						sound (self, CHAN_VOICE, "crx/space.wav", 1, ATTN_NORM);
+							clanring_play_compat_sound(self, CHAN_VOICE, "crx/space.wav", "", 1, ATTN_NORM);
 					else if (as_sound == 3)
-						sound (self, CHAN_VOICE, "crx/gasp.wav", 1, ATTN_NORM);
+							clanring_play_compat_sound(self, CHAN_VOICE, "crx/gasp.wav", "", 1, ATTN_NORM);
 					else if (as_sound == 4)
 					{
 						prand = floor(random() * 3) + 1;
 						if (prand == 1)
-							sound (self, CHAN_VOICE, "crx/gasp2.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/gasp2.wav", "", 1, ATTN_NORM);
 						else if (prand == 2)
-							sound (self, CHAN_VOICE, "crx/kaboom.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/kaboom.wav", "", 1, ATTN_NORM);
 						else
-							sound (self, CHAN_VOICE, "crx/excell3.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/excell3.wav", "", 1, ATTN_NORM);
 					}
 					else if (as_sound == 5)
 					{
 						prand = floor(random() * 3) + 1;
 						if (prand == 1)
-							sound (self, CHAN_VOICE, "crx/superb.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/superb.wav", "", 1, ATTN_NORM);
 						else if (prand == 2)
-							sound (self, CHAN_VOICE, "crx/excell2.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "crx/excell2.wav", "", 1, ATTN_NORM);
 						else
-							sound (self, CHAN_VOICE, "ra/outstand.wav", 1, ATTN_NORM);
+								clanring_play_compat_sound(self, CHAN_VOICE, "ra/outstand.wav", "", 1, ATTN_NORM);
 					}
 					else if (as_sound == 6)
-						sound (self, CHAN_VOICE, "crx/hiscore.wav", 1, ATTN_NORM);
+							clanring_play_compat_sound(self, CHAN_VOICE, "crx/hiscore.wav", "", 1, ATTN_NORM);
 				}
 				else
 				{

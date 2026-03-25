@@ -16,6 +16,7 @@ string(float code) utils_qf_chr;
 float (string a, string b) utils_str_eq;
 void  (entity ent, string c_name) updatename;
 void  (void () dofunc) utils_do_players;
+void  (void () dofunc, string item_name) utils_do_item;
 void  () utils_refresh_overlay_if_renamed;   // <-- updated
 //(FIXME: replace with just centerprint or bprint)
 // Overloaded centerprints
@@ -40,6 +41,263 @@ void (string s, ...) bprint4 = #23;
 void (string s, ...) bprint5 = #23; 
 void (string s, ...) bprint6 = #23; 
 void (string s, ...) bprint7 = #23; 
+
+void() clanring_clear_player_runes;
+
+void() clanring_refresh_pak0_only =
+{
+    registercvar("sv_pak0_only", "0");
+    clanring_sv_pak0_only = (cvar("sv_pak0_only") != 0);
+};
+
+float() clanring_can_probe_assets =
+{
+    if (checkextension("DP_QC_WHICHPACK")) return TRUE;
+    if (checkextension("FTE_QC_WHICHPACK")) return TRUE;
+    return FALSE;
+};
+
+float(string s, string prefix) clanring_startswith =
+{
+    local float n;
+
+    n = strlen(prefix);
+    if (strlen(s) < n)
+        return FALSE;
+
+    return (substring(s, 0, n) == prefix);
+};
+
+float(string path) clanring_known_non_pak0_asset =
+{
+    if (path == "") return FALSE;
+
+    if (clanring_startswith(path, "crx/")) return TRUE;
+    if (clanring_startswith(path, "ra/")) return TRUE;
+    if (clanring_startswith(path, "hhsounds/")) return TRUE;
+    if (clanring_startswith(path, "rune/")) return TRUE;
+    if (clanring_startswith(path, "progs/h_mdls/")) return TRUE;
+
+    if (path == "misc/basekey.wav") return TRUE;
+    if (path == "misc/flagtk.wav") return TRUE;
+    if (path == "misc/flagcap.wav") return TRUE;
+    if (path == "boss2/pop2.wav") return TRUE;
+    if (path == "blob/land1.wav") return TRUE;
+    if (path == "hknight/slash1.wav") return TRUE;
+    if (path == "enforcer/sight3.wav") return TRUE;
+    if (path == "items/armsh1.wav") return TRUE;
+    if (path == "weapons/chain1.wav") return TRUE;
+    if (path == "weapons/chain2.wav") return TRUE;
+    if (path == "weapons/chain3.wav") return TRUE;
+    if (path == "weapons/bounce2.wav") return TRUE;
+
+    if (path == "progs/flag.mdl") return TRUE;
+    if (path == "progs/star.mdl") return TRUE;
+    if (path == "progs/bit.mdl") return TRUE;
+    if (path == "progs/v_star.mdl") return TRUE;
+    if (path == "progs/end2.mdl") return TRUE;
+    if (path == "progs/end3.mdl") return TRUE;
+    if (path == "progs/end4.mdl") return TRUE;
+
+    return FALSE;
+};
+
+float(string path) clanring_asset_is_pak0 =
+{
+    local string pkg;
+    local string lookup;
+    local float n;
+
+    if (path == "")
+        return FALSE;
+
+    if (clanring_known_non_pak0_asset(path))
+        return FALSE;
+
+    if (!clanring_can_probe_assets())
+        return TRUE;
+
+    n = strlen(path);
+    pkg = whichpack(path);
+    if ((!pkg || pkg == "") && n >= 4 && substring(path, n - 4, 4) == ".wav")
+    {
+        lookup = strcat("sound/", path);
+        pkg = whichpack(lookup);
+    }
+    if (!pkg || pkg == "")
+        return FALSE;
+
+    n = strlen(pkg);
+    if (n >= 8 && substring(pkg, n - 8, 8) == "pak0.pak")
+        return TRUE;
+
+    if (strstrofs(pkg, "/pak0.pak", 0) >= 0)
+        return TRUE;
+    if (strstrofs(pkg, "\\pak0.pak", 0) >= 0)
+        return TRUE;
+
+    return FALSE;
+};
+
+string(string full, string fallback) clanring_compat_sound_path =
+{
+    if (!clanring_sv_pak0_only)
+        return full;
+
+    if (clanring_asset_is_pak0(full))
+        return full;
+
+    if (fallback != "" && clanring_asset_is_pak0(fallback))
+        return fallback;
+
+    return "";
+};
+
+string(string full, string fallback) clanring_compat_model_path =
+{
+    if (!clanring_sv_pak0_only)
+        return full;
+
+    if (clanring_asset_is_pak0(full))
+        return full;
+
+    if (fallback != "" && clanring_asset_is_pak0(fallback))
+        return fallback;
+
+    return "";
+};
+
+void(string full, string fallback) clanring_precache_compat_sound =
+{
+    local string path;
+
+    path = clanring_compat_sound_path(full, fallback);
+    if (path != "")
+        precache_sound(path);
+    else if (clanring_sv_pak0_only && full != "")
+        dprint(sprintf("[pak0] skipping sound %s\n", full));
+};
+
+void(string full, string fallback) clanring_precache_compat_model =
+{
+    local string path;
+
+    path = clanring_compat_model_path(full, fallback);
+    if (path != "")
+        precache_model(path);
+    else if (clanring_sv_pak0_only && full != "")
+        dprint(sprintf("[pak0] skipping model %s\n", full));
+};
+
+void(entity target, float chan, string full, string fallback, float vol, float attn) clanring_play_compat_sound =
+{
+    local string path;
+
+    path = clanring_compat_sound_path(full, fallback);
+    if (path != "")
+        sound(target, chan, path, vol, attn);
+};
+
+void(entity target, string full, string fallback) clanring_stuffcmd_compat_play =
+{
+    local string path;
+
+    path = clanring_compat_sound_path(full, fallback);
+    if (path != "")
+        stuffcmd(target, strcat("play ", path, "\n"));
+};
+
+float() clanring_use_custom_hook_assets =
+{
+    return (!clanring_sv_pak0_only)
+        && (((clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)) || mode_is_arena());
+};
+
+float() clanring_use_custom_ctf_flag_assets =
+{
+    return (!clanring_sv_pak0_only) && (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM);
+};
+
+string() clanring_hook_projectile_model =
+{
+    if (clanring_use_custom_hook_assets())
+        return "progs/star.mdl";
+    return "progs/v_spike.mdl";
+};
+
+string() clanring_hook_chain_model =
+{
+    if (clanring_use_custom_hook_assets())
+        return "progs/bit.mdl";
+    return "progs/s_spike.mdl";
+};
+
+string() clanring_hook_weapon_model =
+{
+    if (clanring_use_custom_hook_assets())
+        return "progs/v_star.mdl";
+    return "progs/v_axe.mdl";
+};
+
+string() clanring_hook_fire_sound =
+{
+    if (clanring_use_custom_hook_assets())
+        return clanring_compat_sound_path("weapons/chain1.wav", "knight/sword1.wav");
+    return clanring_compat_sound_path("hknight/hit.wav", "knight/sword1.wav");
+};
+
+string() clanring_hook_tick_sound =
+{
+    return clanring_compat_sound_path("blob/land1.wav", "player/axhit1.wav");
+};
+
+string() clanring_vote_pass_sound =
+{
+    return clanring_compat_sound_path("misc/runekey.wav", "misc/medkey.wav");
+};
+
+string() clanring_flag_drop_sound =
+{
+    return clanring_compat_sound_path("misc/basekey.wav", "misc/medkey.wav");
+};
+
+string() clanring_shard_model =
+{
+    return clanring_compat_model_path("progs/armshr.mdl", "progs/armor.mdl");
+};
+
+string() clanring_shard_sound =
+{
+    return clanring_compat_sound_path("items/armsh1.wav", "");
+};
+
+string() clanring_vial_model =
+{
+    return clanring_compat_model_path("progs/h_mdls/pd_vial.mdl", "maps/b_bh10.bsp");
+};
+
+void() clanring_clear_player_runes =
+{
+    if (self == world)
+        return;
+
+    if (self.player_flag & ITEM_RUNE4_FLAG)
+        self.max_health = 100;
+
+    self.player_flag = self.player_flag - (self.player_flag & ITEM_RUNE_MASK);
+    self.items2 = self.items2 - (self.items2 & (IT2_SIGIL1 | IT2_SIGIL2 | IT2_SIGIL3 | IT2_SIGIL4));
+    self.regen_time = 0;
+};
+
+void() clanring_apply_pak0_only_mode =
+{
+    if (!clanring_sv_pak0_only)
+        return;
+
+    clanring_playmode = clanring_playmode - (clanring_playmode & (CLANRING_RUNES | CLANRING_RUNETOSS));
+    utils_do_players(clanring_clear_player_runes);
+    utils_do_item(SUB_Remove, "item_rune");
+};
 
 //
 // Functions for printing to console

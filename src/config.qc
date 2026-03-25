@@ -1401,11 +1401,12 @@ void() clanring_main_config =
 		registercvar("cr_lockdown_until", "0");
 		registercvar("cr_lockdown_ips", "");
 	registercvar("cr_lockdown_labels", "");
-	registercvar("cr_lockdown_auto_release_on_match_start", "0");
-	registercvar("cr_dm_randomize_start", "1");
-	registercvar("cr_ra_randomize_start", "1");
-	registercvar("cr_hh_randomize_start", "0");
-	exec_clanring_cfg("configs/clanring.cfg");
+		registercvar("cr_lockdown_auto_release_on_match_start", "0");
+		registercvar("cr_dm_randomize_start", "1");
+		registercvar("cr_ra_randomize_start", "1");
+		registercvar("cr_hh_randomize_start", "0");
+		registercvar("sv_pak0_only", "0");
+		exec_clanring_cfg("configs/clanring.cfg");
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.
 }
@@ -1418,8 +1419,11 @@ void() clanring_exec_configs =
 	local float startup_playmode;
 	local float current_startup_bits;
 	local float desired_startup_bits;
+	local float pak0_only_before;
+	local entity pak0_player;
 
 	startup_playmode = cvar("cr_startmode");
+	pak0_only_before = clanring_sv_pak0_only;
 	current_startup_bits = clanring_startup_mode_bits(cvar("samelevel"));
 	desired_startup_bits = clanring_startup_mode_bits(startup_playmode);
 	if (clanring_has_explicit_startup_mode(startup_playmode)
@@ -1468,11 +1472,28 @@ void() clanring_exec_configs =
 
 	clanring_main_config();
 	gsheets_validate(); // Validate Google Sheets connection if configured
-	clanring_warp_config();
-	clanring_map_config();
-	clanring_nextlevel_config();
+		clanring_warp_config();
+		clanring_map_config();
+		clanring_nextlevel_config();
+		clanring_refresh_pak0_only();
+		clanring_apply_pak0_only_mode();
+		if (clanring_sv_pak0_only)
+			cvar_set("cr_pubctf_runes_override", "0");
+		if (clanring_sv_pak0_only != pak0_only_before)
+		{
+			pak0_player = find(world, classname, "player");
+			if (pak0_player == world)
+			{
+				print(sprintf("sv_pak0_only changed to %s, restarting %s to rebuild precaches\n",
+					ftos(clanring_sv_pak0_only), mapname));
+				localcmd("restart\n");
+				remove(self);
+				return;
+			}
+			bprint("sv_pak0_only changed and will take effect on the next map load.\n");
+		}
 
-	// Keep the persisted private-lock cvars aligned with the live runtime state.
+		// Keep the persisted private-lock cvars aligned with the live runtime state.
 	// Lockdown restore happens earlier during world init, before deferred config execution.
 	// If a config touches cr_lockdown_*, resync the cvars here so future restores stay correct.
 	lockdown_save_to_cvars();
@@ -1627,6 +1648,13 @@ void () clanring_load_matchsounds =
 
 void () clanring_precache_matchsounds =
 {
+	if (clanring_sv_pak0_only)
+	{
+		dprint("sv_pak0_only: skipping match end sounds.\n");
+		clanring_matchsounds_precached = FALSE;
+		return;
+	}
+
 	clanring_load_matchsounds();
 	if (clanring_matchsound_count)
 	{

@@ -253,7 +253,7 @@ void(entity flg) RegenFlag =
 	flg.movetype  	= MOVETYPE_TOSS;
 	flg.solid     	= SOLID_TRIGGER;
 
-	if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+	if (clanring_use_custom_ctf_flag_assets())
 	{			
 		flg.mins 	= '-16 -16 0';
 		flg.maxs	= '16 16 74';		
@@ -405,14 +405,14 @@ void(entity flg) TeamDropFlag =
 	else
 		forceinfokey (world, "blue flag","dropped");
 
-	sound(flg, CHAN_AUTO, "misc/basekey.wav", 1, ATTN_NONE);
+	clanring_play_compat_sound(flg, CHAN_AUTO, "misc/basekey.wav", "misc/medkey.wav", 1, ATTN_NONE);
 	
-	if (!(clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM))
+	if (!clanring_use_custom_ctf_flag_assets())
 	{
 		flg.angles = flg.angles + '0 0 180';
 	}
 
-	if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+	if (clanring_use_custom_ctf_flag_assets())
 	setsize (flg, '-16 -16 0', '16 16 74');
 	else
 	setsize(flg, '-16 -16 -24', '16 16 32');
@@ -483,7 +483,7 @@ void() TeamCaptureFlagTouch =
 		if (self.cnt == FLAG_AT_BASE) 
 		{
 			setorigin(self, self.oldorigin);	// E1M3 squish BLUE flag bug fix!!
-			if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+			if (clanring_use_custom_ctf_flag_assets())
 			setsize (self, '-16 -16 0', '16 16 74');
 			else
 			setsize(self, '-16 -16 -24', '16 16 32');
@@ -601,12 +601,12 @@ void() TeamCaptureFlagTouch =
 								{
 									if (new_player_record == 1)
 									{
-										sound(world,CHAN_AUTO,"crx/congrats.wav",1,ATTN_NONE);
+											clanring_play_compat_sound(world, CHAN_AUTO, "crx/congrats.wav", "", 1, ATTN_NONE);
 										if (clanring_new_record_player != "") strunzone(clanring_new_record_player);
 										clanring_new_record_player = strzone(other.netname);
 									}
 									else if ((new_player_record == 2) || (new_player_record == 3))
-										sound(world,CHAN_AUTO,"crx/goodstat.wav",1,ATTN_NONE);
+											clanring_play_compat_sound(world, CHAN_AUTO, "crx/goodstat.wav", "", 1, ATTN_NONE);
 									write_capture_stats();
 									// Webhook: time trial record (top 3)
 									if (new_player_record == 1)
@@ -677,7 +677,8 @@ void() TeamCaptureFlagTouch =
 				if (((clanring_playmode & CLANRING_MATCH_MODE) && (clanring_state & CLANRING_MATCH_STARTED))
 					|| (clanring_playmode & CLANRING_NORMAL_MODE))
 				{
-					sound (world, CHAN_AUTO, self.noise2, 1, ATTN_NONE);
+					if (self.noise2 != "")
+						sound (world, CHAN_AUTO, self.noise2, 1, ATTN_NONE);
 					
 					client_frag(other, TEAM_CAPTURE_CAPTURE_BONUS);//score for capture
 					other.fcaptures = (other.fcaptures + 1);//fstats
@@ -891,7 +892,7 @@ void() flag_check_size =
 {
 	if ((self.maxs_x < 16) || (self.maxs_y < 16))
 	{
-		if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+		if (clanring_use_custom_ctf_flag_assets())
 		{			
 			self.mins 	= '-16 -16 0';
 			self.maxs	= '16 16 74';		
@@ -1174,7 +1175,7 @@ void() item_flag_team1 =
 
 	forceinfokey (world, "red flag","at base");
 	
-	if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+	if (clanring_use_custom_ctf_flag_assets())
 	{
 		self.skin      	= 0;				
 		precache_model 	("progs/flag.mdl");		
@@ -1203,7 +1204,7 @@ void() item_flag_team1 =
 		precache_sound ("doors/runetry.wav");
 		self.noise     = "shambler/ssight.wav";//take
 		self.noise1    = "doors/runetry.wav";//return				
-		self.noise2    = "boss2/pop2.wav";//cap//added noise2
+		self.noise2    = clanring_compat_sound_path("boss2/pop2.wav", "");//cap//added noise2
 		//self.noise3
 		self.mins 	= '-16 -16 -24';
 		self.maxs	= '16 16 32';
@@ -1229,7 +1230,7 @@ void() item_flag_team2 =
 
 	forceinfokey (world, "blue flag","at base");
 	
-	if (clanring_state & CLANRING_TEAM_CAPTURE_CUSTOM)
+	if (clanring_use_custom_ctf_flag_assets())
 	{		
 		precache_model ("progs/flag.mdl");
 		setmodel (self, "progs/flag.mdl");
@@ -1260,7 +1261,7 @@ void() item_flag_team2 =
 		//self.noise     = "misc/medkey.wav";//take
 		self.noise     = "shambler/ssight.wav";//take
 		self.noise1    = "doors/runetry.wav";//return				
-		self.noise2    = "boss2/pop2.wav";//cap//added noise2
+		self.noise2    = clanring_compat_sound_path("boss2/pop2.wav", "");//cap//added noise2
 		//self.noise3
 		//setsize(self, '-16 -16 -24', '16 16 32');
 		self.mins 	= '-16 -16 -24';
@@ -1384,7 +1385,7 @@ void() RuneTouch =
 			}
 		}
 	}
-	sound (other, CHAN_ITEM, "misc/runekey.wav", 1, ATTN_NORM);
+	clanring_play_compat_sound(other, CHAN_ITEM, "misc/runekey.wav", "misc/medkey.wav", 1, ATTN_NORM);
 	remove(self);
 };
 
@@ -1401,6 +1402,9 @@ void() RuneRespawn =
 void(float flag) Do_DropRune =
 {
 	local entity item;
+
+	if (clanring_sv_pak0_only)
+		return;
 
 	item = spawn();
 	item.owner = item;
@@ -1453,6 +1457,12 @@ void() DropRune =
 {
 //	local entity e;
 
+	if (clanring_sv_pak0_only)
+	{
+		clanring_clear_player_runes();
+		return;
+	}
+
 	if (self.player_flag & ITEM_RUNE1_FLAG)
 	{
 		self.items2 = self.items2 - (self.items2 & IT2_SIGIL1);
@@ -1494,6 +1504,11 @@ void() SpawnRunes =
 	local float i;
 
 	oself = self;
+	if (clanring_sv_pak0_only)
+	{
+		remove(oself);
+		return;
+	}
 	if (clanring_map_has_runes == FALSE)
 	{
 		i = (random() * 10);
@@ -1536,7 +1551,7 @@ void() StartRuneSpawn =
 
 void()StartRuneSpawnStart =
 {
-	if (!(clanring_playmode & CLANRING_RUNES))
+	if (clanring_sv_pak0_only || !(clanring_playmode & CLANRING_RUNES))
 	{
 		remove(self);
 		return;
@@ -1566,6 +1581,9 @@ void() TossRune =
 {
 	local entity item;
 //	local entity e;
+
+	if (clanring_sv_pak0_only)
+		return;
 
 	if (self.style & CLANRING_OBSERVER)
 		return;
@@ -1742,12 +1760,12 @@ void() CTF_GhostFlagTouch =
 				{
 					if (new_player_record == 1)
 					{
-						sound(world,CHAN_AUTO,"crx/congrats.wav",1,ATTN_NONE);
+							clanring_play_compat_sound(world, CHAN_AUTO, "crx/congrats.wav", "", 1, ATTN_NONE);
 						if (clanring_new_record_player != "") strunzone(clanring_new_record_player);
 						clanring_new_record_player = strzone(other.netname);
 					}
 					else if ((new_player_record == 2) || (new_player_record == 3))
-						sound(world,CHAN_AUTO,"crx/goodstat.wav",1,ATTN_NONE);
+							clanring_play_compat_sound(world, CHAN_AUTO, "crx/goodstat.wav", "", 1, ATTN_NONE);
 					write_capture_stats();
 					// Webhook: time trial record (top 3)
 					if (new_player_record == 1)

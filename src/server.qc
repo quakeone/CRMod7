@@ -666,7 +666,9 @@ void () clanring_init_world =
         clanring_playmode = clanring_playmode | desired_startup_bits;
         utils_set_cvar("samelevel", clanring_playmode);
     }
+    clanring_refresh_pak0_only();
     clanring_gameconfig = cvar("gamecfg");	//R00k TODO: migrate settings
+    clanring_apply_pak0_only_mode();
     clanring_clear_matchsounds();
 
     if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
@@ -721,13 +723,13 @@ void () clanring_init_world =
     precache_sound("ogre/ogwake.wav");
     precache_sound("shambler/ssight.wav");
     precache_sound("soldier/sight1.wav");
-    precache_sound ("crx/goodstat.wav");
-    precache_sound ("crx/congrats.wav");
-    precache_sound ("crx/hiscore.wav");
-    precache_sound ("crx/laugh3.wav");
-    precache_sound ("crx/laugh6.wav");
+    clanring_precache_compat_sound("crx/goodstat.wav", "");
+    clanring_precache_compat_sound("crx/congrats.wav", "");
+    clanring_precache_compat_sound("crx/hiscore.wav", "");
+    clanring_precache_compat_sound("crx/laugh3.wav", "");
+    clanring_precache_compat_sound("crx/laugh6.wav", "");
     //end
-    precache_sound ("ra/gong.wav");
+    clanring_precache_compat_sound("ra/gong.wav", "");
     // legacy tip-check gag sounds
     precache_sound ("player/death1.wav");
     precache_sound ("player/death2.wav");
@@ -910,8 +912,8 @@ void () clanring_init_world =
 
     if (clanring_gameconfig & CLANRING_DROP_DEATH_SHARDS)
     {
-        precache_model ("progs/armshr.mdl");
-        precache_sound ("items/armsh1.wav");
+        clanring_precache_compat_model("progs/armshr.mdl", "progs/armor.mdl");
+        clanring_precache_compat_sound("items/armsh1.wav", "");
     }
 
     // schedule the config files for a bit later so that they don't

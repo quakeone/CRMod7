@@ -514,8 +514,8 @@ void() execute_changelevel =
         other.items 		= 0;
         other.effects 		= 0;
 
-        if ((prnd >= 0) && (matchsound[prnd] != ""))
-            stuffcmd(other, strcat(";play ", matchsound[prnd], ";\n"));
+	        if ((prnd >= 0) && (matchsound[prnd] != ""))
+	            clanring_stuffcmd_compat_play(other, matchsound[prnd], "");
         tmp   = self;
         self  = other;
         teamplay_final_stats();//display score and stats
@@ -1907,7 +1907,7 @@ void() CheckPowerups =
                         {
                             bprint(self.netname);
                             bprint(" set the new \bair-gib streak\b\n");
-                            sound (self, CHAN_VOICE, "crx/hiscore.wav", 1, ATTN_NORM);
+	                            clanring_play_compat_sound(self, CHAN_VOICE, "crx/hiscore.wav", "", 1, ATTN_NORM);
                         }
                         write_airshot_streak_stats();
                     }
@@ -2738,9 +2738,9 @@ void(entity targ, entity attacker) ClientObituary =
                 if ((self.super_damage_finished > time) && (self.items & IT_QUAD))
                 {
                     if (rnum < 0.5)
-                        sound (world, CHAN_VOICE, "crx/laugh3.wav", 1, ATTN_NONE);
-                    else
-                        sound (world, CHAN_VOICE, "crx/laugh6.wav", 1, ATTN_NONE);
+	                        clanring_play_compat_sound(world, CHAN_VOICE, "crx/laugh3.wav", "", 1, ATTN_NONE);
+	                    else
+	                        clanring_play_compat_sound(world, CHAN_VOICE, "crx/laugh6.wav", "", 1, ATTN_NONE);
                 }
                 return;
             }

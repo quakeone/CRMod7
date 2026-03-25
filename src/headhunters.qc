@@ -31,6 +31,9 @@ string() hh_random_pickup_sound =
 {
 	local float roll;
 
+	if (clanring_sv_pak0_only)
+		return "";
+
 	roll = floor(random() * 8);
 
 	if (roll < 1) return "hhsounds/pickup1.wav";
@@ -47,6 +50,9 @@ string() hh_random_catch_sound =
 {
 	local float roll;
 
+	if (clanring_sv_pak0_only)
+		return "";
+
 	roll = floor(random() * 4);
 
 	if (roll < 1) return "hhsounds/catch1.wav";
@@ -58,6 +64,9 @@ string() hh_random_catch_sound =
 string() hh_random_altar_sound =
 {
 	local float roll;
+
+	if (clanring_sv_pak0_only)
+		return "";
 
 	roll = floor(random() * 4);
 
@@ -1362,9 +1371,9 @@ void() hh_haunt_touch =
 		return;
 
 	if (random() < 0.5)
-		sound(self, CHAN_VOICE, "hhsounds/bite1.wav", 1, ATTN_NONE);
+		clanring_play_compat_sound(self, CHAN_VOICE, "hhsounds/bite1.wav", "", 1, ATTN_NONE);
 	else
-		sound(self, CHAN_VOICE, "hhsounds/bite2.wav", 1, ATTN_NONE);
+		clanring_play_compat_sound(self, CHAN_VOICE, "hhsounds/bite2.wav", "", 1, ATTN_NONE);
 
 	T_Damage(other, self, self, 5);
 	self.hh_stats_haunt_bites = self.hh_stats_haunt_bites + 1;
@@ -1459,10 +1468,10 @@ void(entity player) hh_hauntmove =
 	{
 		if (head.classname == "player" && head != player && !head.deadflag && head.health > 0 && head.takedamage)
 		{
-			if (random() < 0.5)
-				sound(player, CHAN_VOICE, "hhsounds/bite1.wav", 1, ATTN_NONE);
-			else
-				sound(player, CHAN_VOICE, "hhsounds/bite2.wav", 1, ATTN_NONE);
+				if (random() < 0.5)
+					clanring_play_compat_sound(player, CHAN_VOICE, "hhsounds/bite1.wav", "", 1, ATTN_NONE);
+				else
+					clanring_play_compat_sound(player, CHAN_VOICE, "hhsounds/bite2.wav", "", 1, ATTN_NONE);
 
 			T_Damage(head, player, player, 5);
 			player.hh_stats_haunt_bites = player.hh_stats_haunt_bites + 1;
@@ -1984,7 +1993,7 @@ void() hh_head_touch =
 	if (result <= 0)
 		return;
 
-	sound(other, CHAN_ITEM, hh_random_pickup_sound(), 1, ATTN_NORM);
+	clanring_play_compat_sound(other, CHAN_ITEM, hh_random_pickup_sound(), "", 1, ATTN_NORM);
 	stuffcmd(other, "bf\n");
 
 	if (result == 2)
@@ -2083,7 +2092,7 @@ void() hh_altar_touch =
 	other.invincible_time = 1;
 	other.items = other.items | IT_INVULNERABILITY;
 	other.effects = other.effects | EF_RED | EF_DIMLIGHT;
-	sound(self, CHAN_ITEM, hh_random_altar_sound(), 1, ATTN_NORM);
+	clanring_play_compat_sound(self, CHAN_ITEM, hh_random_altar_sound(), "", 1, ATTN_NORM);
 	stuffcmd(other, "bf\n");
 
 	if (teamplay && (other.team > 0))
@@ -2126,7 +2135,7 @@ void(entity altar) hh_configure_altar =
 	altar.avelocity = '0 120 0';
 	setorigin(altar, ground + '0 0 80');
 	setsize(altar, '-128 -128 -80', '128 128 48');
-	sound(altar, CHAN_AUTO, "hhsounds/altamb.wav", 0.7, ATTN_STATIC);
+	clanring_play_compat_sound(altar, CHAN_AUTO, "hhsounds/altamb.wav", "", 0.7, ATTN_STATIC);
 	hh_spawn_altar_head(altar);
 };
 
@@ -2302,7 +2311,7 @@ void() hh_call_teammate =
 	if (!(clanring_playmode & CLANRING_HH_MODE))
 		return;
 
-	sound(self, CHAN_VOICE, hh_random_catch_sound(), 1, ATTN_NONE);
+	clanring_play_compat_sound(self, CHAN_VOICE, hh_random_catch_sound(), "", 1, ATTN_NONE);
 };
 
 void() hh_auto_help_tip =
