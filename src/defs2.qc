@@ -207,6 +207,7 @@ float   clanring_num_starts;        // number of match extra start points
 float   clanring_num_cameras;       // number of cameras
 string  clanring_version;           // used for motd and help-server
 string  clanring_version_info;      // text info including rev. and compile time
+string  clanring_modname_info;      // human-facing mod name with dynamic version
 string  clanring_version_number;    // text info storing version number (ie "4.0")
 entity  clanring_debug_client;      // used for debugging
 entity  clanring_quad;		        // pointer to quad for quick reference
@@ -223,6 +224,7 @@ entity  clanring_match_inactivity_check;   // scheduled inactivity watchdog duri
 float   clanring_match_start_time;  // timestamp of when early-match inactivity monitoring begins
 float   CLANRING_MATCH_PLAYER_RESPAWN_DELAY = 1; // ready players respawn 1 second after match begin/end
 float   CLANRING_MATCH_START_MOVEMENT_THRESHOLD = 16; // minimum distance required to count as movement
+.float last_demomark_time;
 // --- Quad control observer announcements ---
 float QUAD_RESPAWN_TIME = 60;     // seconds between quad respawns (standard QW)
 float g_quad_spawner_count;       // number of Quad spawners on the map (cached)

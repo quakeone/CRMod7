@@ -337,7 +337,7 @@ void() IntermissionThink =
     // Keep typing/AFK status synced during intermission
     check_client_status();
 
-    if (self.button0 || self.button2) 								//Jump or fire to wake up
+    if ((self.client != "QSS-M") && (self.button0 || self.button2)) // Jump or fire to wake up on clients without chat status sync
         client_afk_off();
 
     if ((self.impulse > 0) && (self.impulse < 6))
@@ -468,6 +468,7 @@ void() IntermissionThink =
 void() execute_changelevel =
 {
     entity tmp;
+    string matchsound_path = "";
     float prnd = -1;
 //	local float bcount;
 
@@ -485,7 +486,11 @@ void() execute_changelevel =
     {
         clanring_load_matchsounds();
         if (clanring_matchsound_count)
+        {
             prnd = floor(random() * clanring_matchsound_count);
+            if ((prnd >= 0) && (prnd < clanring_matchsound_count))
+                matchsound_path = matchsound[prnd];
+        }
     }
 
     intermission_pos = FindIntermission ();
@@ -514,8 +519,8 @@ void() execute_changelevel =
         other.items 		= 0;
         other.effects 		= 0;
 
-	        if ((prnd >= 0) && (matchsound[prnd] != ""))
-	            clanring_stuffcmd_compat_play(other, matchsound[prnd], "");
+	        if (matchsound_path != "")
+	            clanring_stuffcmd_compat_play(other, matchsound_path, "");
         tmp   = self;
         self  = other;
         teamplay_final_stats();//display score and stats
@@ -1020,6 +1025,7 @@ void() PutClientInServer =
     self.watertype 				= CONTENT_EMPTY;
     self.waterlevel 			= 0;
     self.velocity 				= '0 0 0';
+    self.last_demomark_time     = 0;
     self.killstreak				= 0;
     self.combo_frags 			= 0;
     self.combo_time 			= 0;
@@ -3508,6 +3514,17 @@ void(string cmd) SV_ParseClientCommand =
         case "ignore":
         case "unignore":
             clientcommand(self, cmd);
+            return;
+
+        case "markdemo":
+            if ((self.last_demomark_time > 0) && ((time - self.last_demomark_time) < 5))
+            {
+                sprint(self, "Try again in 5 seconds...\n");
+                return;
+            }
+
+            self.last_demomark_time = time;
+            demomark_manual(self);
             return;
 
         case "altents":

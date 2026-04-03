@@ -17,6 +17,7 @@ float (string a, string b) utils_str_eq;
 void  (entity ent, string c_name) updatename;
 void  (void () dofunc) utils_do_players;
 void  (void () dofunc, string item_name) utils_do_item;
+void  () afk_name;
 void  () utils_refresh_overlay_if_renamed;   // <-- updated
 //(FIXME: replace with just centerprint or bprint)
 // Overloaded centerprints
@@ -612,6 +613,12 @@ void (entity ent, string c_name) updatename =
 
 void () clear_name =
 {			
+    if (self.style & CLANRING_AFK_CLIENT)
+    {
+        afk_name();
+        return;
+    }
+
     if (self.name_ready) { strunzone(self.name_ready); self.name_ready = string_null; }
     if (self.style & CLANRING_CONNECTED)
         updatename(self,self.netname);		

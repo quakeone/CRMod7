@@ -161,6 +161,8 @@ void() votables_send_aliases =
 	stuffcmd(self, "alias powerupdrop cmd powerupdrop;\n");
 	stuffcmd(self, "alias leavemealone \"cmd leavemealone\"\n");
 	stuffcmd(self, "alias prediction \"cmd prediction\"\n");
+	if (self.client != "QSS-M")
+		stuffcmd(self, "alias markdemo \"cmd markdemo\"\n");
 
 	// QuakeTag aliases (only two commands now)
 	stuffcmd(self, "alias qwsucks \"cmd qwsucks\"\n");
@@ -1177,6 +1179,8 @@ float(float mapnum, float suggested_type, float suggested_mode) votables_begin_m
 {
     if (self == world || !mapnum)
         return FALSE;
+    if ((self.style & CLANRING_OBSERVER) && (self.oflags & (OBSERVER_CHASE | OBSERVER_DEMO)))
+        return FALSE;
 
     if (self.pending_map_vote_mapnum)
         votables_map_vote_prompt_clear(TRUE);
@@ -1542,7 +1546,7 @@ void() votables_map_vote_prompt_response =
 float(float mapnum) votables_maybe_prompt_map_vote_mode_change =
 {
     local string maparg = "";
-    local float map_has_ctf, suggested_type, suggested_mode;
+    local float map_has_ctf, map_is_ctf_category, suggested_type, suggested_mode;
 
     if (self == world || !mapnum)
         return FALSE;
@@ -1556,18 +1560,27 @@ float(float mapnum) votables_maybe_prompt_map_vote_mode_change =
         return FALSE;
 
     map_has_ctf = votables_map_has_ctf_layout(mapnum, maparg);
+    map_is_ctf_category = votables_map_is_ctf_category(mapnum);
 
     suggested_type = -1;
     suggested_mode = votables_map_vote_suggested_mode();
 
     if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && !map_has_ctf)
         suggested_type = 0;
-    else if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && map_has_ctf)
+    // Optional ctf/*.ent layouts on ordinary DM maps should not advertise a
+    // full gametype switch. Only auto-suggest CTF when the map was chosen
+    // from an actual CTF warp category.
+    else if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && map_is_ctf_category)
         suggested_type = 1;
 
-    // Also trigger if not in match mode (offer switch to match)
-    if (suggested_type < 0 && suggested_mode == ADMIN_MATCH_MODE)
-        return FALSE;
+    // Same-gametype map votes in normal mode should go straight to the vote
+    // instead of prompting for a mode change. Keep the prompt available from
+    // practice mode, where switching back to match is often intentional.
+    if (suggested_type < 0)
+    {
+        if ((suggested_mode == ADMIN_MATCH_MODE) || (suggested_mode == ADMIN_NORMAL_MODE))
+            return FALSE;
+    }
 
     return votables_begin_map_vote_prompt(mapnum, suggested_type, suggested_mode);
 };

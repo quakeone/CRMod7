@@ -42,6 +42,29 @@ void (string cmd) quaketv_stuffcmd =
 	}
 };
 
+void(entity marker) demomark_manual =
+{
+	local entity p;
+
+	if (marker == world)
+		return;
+
+	p = find(world, classname, "player");
+	while (p)
+	{
+		if (p.style & CLANRING_CONNECTED)
+		{
+			if (p == marker)
+				stuffcmd(p, "//markdemo local\n");
+			else
+				stuffcmd(p, "//markdemo\n");
+		}
+		p = find(p, classname, "player");
+	}
+
+	bprint(marker.netname, " marked the demo.\n");
+};
+
 //
 //  A N N O U N C E 2
 //

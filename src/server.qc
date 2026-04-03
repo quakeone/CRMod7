@@ -259,6 +259,8 @@ void () observer_start;
 void () W_ChangeWeapon;
 void () TeamFlagStatusReport;
 void () UnHookPlayer;
+void () client_afk_on;
+void () client_afk_off;
 void () votables_request_set_runes;
 void () PreviousWeaponCommand;
 void () StartRuneSpawnStart;
@@ -458,8 +460,8 @@ if (client.style & CLANRING_AFK_CLIENT && (client.style & CLANRING_CONNECTED))
         local entity oldself = self;
         self = client;
 
-        clear_name();
         self.style &= ~CLANRING_AFK_CLIENT;
+        clear_name();
         forceinfokey(self, "afk","no");// woods
         forceinfokey(self, "chat", "0");  // Set chat status to normal
         
@@ -471,6 +473,7 @@ if (client.style & CLANRING_AFK_CLIENT && (client.style & CLANRING_CONNECTED))
 void () restore_afk_status =
 {
     local entity player = self.owner;
+    local string chat_status;
     
     if (player == world || !player.netname)
     {
@@ -485,6 +488,9 @@ void () restore_afk_status =
     self.style = self.style | CLANRING_AFK_CLIENT;
     afk_name();
     forceinfokey(self, "afk", "yes");
+    chat_status = infokey(self, "chat");
+    if (chat_status != "2" && chat_status != "3")
+        forceinfokey(self, "chat", "2");
     
     self = oldself;
     remove(self); // Clean up the scheduled event entity
@@ -646,7 +652,8 @@ void () clanring_init_world =
     string vstring = strftime(TRUE, "%y.%m");
 
     clanring_version        = strzone(sprintf("\bClanRing\b\n(v1.%s)",vstring));		// This is used in the server console, the 'vinfo' display, and on connect.
-    clanring_version_info   = strzone(sprintf("nqCRx (v1.%s)",vstring));				// This is the value for the forced server infokey named "mod" for QSSM.
+    clanring_version_info   = strzone(sprintf("nqCRx (v1.%s)",vstring));				// Legacy compatibility value for the forced server infokey named "mod".
+    clanring_modname_info   = strzone(sprintf("CRMod 7 (v1.%s)",vstring));				// Human-facing serverinfo key for newer clients/tools.
     clanring_version_number = strzone(sprintf("(1.%s)",vstring));						// This is only used once when typing 'commands' in the server console. :|
     //clanring_version_red    = strzone(sprintf("\bClanRing\b\nCRx (v1.%s)",vstring));	// This isn't used anywhere :(
 
@@ -928,8 +935,9 @@ void () clanring_init_world =
     // keep name overlays in sync if players rename mid-status (AFK/Ready/etc)
     utils_make_scheduled_event(utils_namewatch_think, 1);
 
-    // woods set serverinfo mod name
+    // Keep legacy mod token for older QSS-M clients and publish a human-facing name separately.
     forceinfokey(world, "mod", clanring_version_info);
+    forceinfokey(world, "modname", clanring_modname_info);
     server_set_infokey_modes();
 };
 
@@ -2754,13 +2762,10 @@ void () clanring_impulse =
         {
             if (clanring_afk_timeout > 0)
                 sprint(self, "Press FIRE or JUMP to disable '\bafk\b' status.\n");
-            afk_name();
-            forceinfokey(self, "afk","yes");// woods
-            self.style = self.style | CLANRING_AFK_CLIENT;
-            self.afk_time = time;
+            client_afk_on();
         }
         else
-            clear_afk_status(self);
+            client_afk_off();
     }
     else if (self.impulse == 58)
     {

@@ -1605,9 +1605,10 @@ void (float soundtype) clanring_read_matchsounds =
 		float argc = tokenize(line);
 		if (!argc)
 			continue;
-		if (argv(0) == "//" || argv(0) == "#") continue;
 
 		entry = argv(0);
+		if (substring(entry, 0, 2) == "//" || substring(entry, 0, 1) == "#")
+			continue;
 
 		if (soundtype == 1)
 		{
