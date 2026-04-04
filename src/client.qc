@@ -1019,6 +1019,7 @@ void() PutClientInServer =
     self.radsuit_finished 		= 0;
     self.invisible_finished 	= 0;
     self.invincible_finished 	= 0;
+    self.spawn_protect_finished = 0;
     self.effects 				= 0;
     self.regen_time   			= 0;
     self.invincible_time 		= 0;
@@ -1040,20 +1041,6 @@ void() PutClientInServer =
 	    self.hh_help_context        = 0;
 	    self.enemy					= world;	//who shot/killed us
 	    self.enemy_target			= world;	//who we last shot/killed
-
-    if ((clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_AIRSHOT_MODE))
-    {
-        if ((self.ca_player_flag == PF_PLAYING) && (boss.state == CA_MATCH_PLAYING) && (boss.wait == 0))
-        {
-            self.health = 250;
-            self.max_health = 250;
-
-            self.invincible_finished 	= time + 2;
-            self.invincible_time 		= 1;
-            self.effects = self.effects | EF_DIMLIGHT;
-            self.effects = self.effects | EF_RED;
-        }
-    }
 
     W_SetCurrentAmmo();
 
@@ -1817,11 +1804,12 @@ void() CheckPowerups =
     if (self.invincible_finished)
     {
         // R00k remove powerups in "real-time"
-        if (clanring_playmode & CLANRING_NO_PENT)
+        if ((clanring_playmode & CLANRING_NO_PENT) && !(self.spawn_protect_finished > time))
         {
             self.items = self.items - (self.items & IT_INVULNERABILITY);
             self.invincible_time = 0;
             self.invincible_finished = 0;
+            self.spawn_protect_finished = 0;
             if (!self.super_damage_finished)
                 self.effects = self.effects - (self.effects & EF_DIMLIGHT);
             self.effects = self.effects - (self.effects & EF_RED);
@@ -1830,6 +1818,14 @@ void() CheckPowerups =
         {
             if ((self.style & CLANRING_ADMINISTRATOR)&&(clanring_playmode & CLANRING_PRACTICE_MODE))
                 admin_pushplayers();
+
+            if (self.invincible_finished > time)
+            {
+                self.items = self.items | IT_INVULNERABILITY;
+
+                if (self.spawn_protect_finished > time)
+                    self.effects = self.effects | EF_DIMLIGHT | EF_RED;
+            }
 
             if (self.invincible_finished < time + 3)
             {
@@ -1852,6 +1848,7 @@ void() CheckPowerups =
                 self.items = self.items - (self.items & IT_INVULNERABILITY);
                 self.invincible_time = 0;
                 self.invincible_finished = 0;
+                self.spawn_protect_finished = 0;
                 if (!self.super_damage_finished)
                     self.effects = self.effects - (self.effects & EF_DIMLIGHT);
                 self.effects = self.effects - (self.effects & EF_RED);

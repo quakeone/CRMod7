@@ -580,9 +580,9 @@ void() PlayerDead =
         else
         {
             self.think = respawn;
-            if (deathmatch == 4)
+            if (clanring_playmode & CLANRING_DMM4_MODE)
             {
-                self.nextthink = time + 1;
+                self.nextthink = time + 0.5;
             }
             else if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait == 0))
             {
@@ -737,11 +737,12 @@ void() PlayerDie =
 		}
 	}
 
-	self.items 					= self.items - (self.items & (IT_INVISIBILITY | IT_INVULNERABILITY | IT_SUIT | IT_QUAD| IT_SUPERHEALTH));	
+	self.items 					= self.items - (self.items & (IT_INVISIBILITY | IT_INVULNERABILITY | IT_SUIT | IT_QUAD| IT_SUPERHEALTH));
 	self.invisible_finished 	= 0;
 	self.invincible_finished 	= 0;
+	self.spawn_protect_finished = 0;
 	self.super_damage_finished 	= 0;
-	self.radsuit_finished 		= 0;	
+	self.radsuit_finished 		= 0;
 	self.effects 				= (self.effects - (self.effects & (EF_DIMLIGHT | EF_RED | EF_BLUE)));
 	self.modelindex 			= modelindex_player;
 
@@ -766,9 +767,9 @@ void() PlayerDie =
 	{
 		DropBackpack ();
 	}
-	
+
 	DropRune ();
-	
+
 	self.style = self.style | CLANRING_NO_POST_THINK;
 	self.clanring_chase_score = CLANRING_NEGINF;
 	self.clanring_cam_delay = time + 1;

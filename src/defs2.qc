@@ -262,6 +262,7 @@ float intermission_running;         // moved here from Client.qc
 float intermission_exittime;        // moved here from Client.qc
 .float rounddeaths;
 .float respawntime;
+.float spawn_protect_finished;
 .float teamalive;
 .float teamtotal;
 .float quadtime;

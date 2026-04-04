@@ -1774,6 +1774,7 @@ void () clanring_client_disconnect =
     self.items 					= self.items - (self.items & (IT_INVISIBILITY | IT_INVULNERABILITY | IT_SUIT | IT_QUAD | IT_SUPERHEALTH));
     self.invisible_finished 	= 0;	// don't die as eyes
     self.invincible_finished 	= 0;
+    self.spawn_protect_finished = 0;
     self.super_damage_finished 	= 0;
     self.radsuit_finished 		= 0;
     self.effects 				= 0;
@@ -1935,6 +1936,18 @@ void () clanring_put_client_in_server =
             self.cc_queue_vote	= 0;//R00k - test
             self.ca_player_flag = PF_PLAYING;
             self.respawntime = 0;
+
+            if (((clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_AIRSHOT_MODE))
+                && (boss.state == CA_MATCH_PLAYING) && (boss.wait == 0))
+            {
+                self.health = 250;
+                self.max_health = 250;
+                self.items = self.items | IT_INVULNERABILITY;
+                self.invincible_finished = time + 2;
+                self.spawn_protect_finished = self.invincible_finished;
+                self.invincible_time = 1;
+                self.effects = self.effects | EF_DIMLIGHT | EF_RED;
+            }
 
             if (clanring_timelimit & CLANRING_RA_MODE)
             {
