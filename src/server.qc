@@ -198,6 +198,7 @@ void () clanring_find_powerups;
 void () clanring_exec_configs;
 void () clanring_clear_matchsounds;
 void () clanring_precache_matchsounds;
+void () ra_apply_worldspawn_gravity;
 void () votables_disable_item;
 void () SUB_regen;
 float() QuadControl_CountSpawners;
@@ -677,6 +678,7 @@ void () clanring_init_world =
     clanring_gameconfig = cvar("gamecfg");	//R00k TODO: migrate settings
     clanring_apply_pak0_only_mode();
     clanring_clear_matchsounds();
+    ra_apply_worldspawn_gravity();
 
     if (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG))
     {

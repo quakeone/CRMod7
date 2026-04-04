@@ -547,6 +547,7 @@ float	clanring_afk_timeout;
 .float  hh_head_total_value;
 .entity hh_spirit_head;
 .vector hh_altar_pos;
+.float  cr_ra_gravity;
 .float  hh_altar_count;
 .vector hh_altar1;
 .vector hh_altar2;

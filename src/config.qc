@@ -7,6 +7,8 @@
 // console.qc doesnt read config files anymore, but can still be used to rcon/exec server console commands.
 //
 
+void() ra_apply_worldspawn_gravity;
+
 void(string command, string value) config_command =
 {
 	local float pubctf_runes_override;
@@ -1500,6 +1502,7 @@ void() clanring_exec_configs =
 		
 		clanring_ent_config();//(FIXME)
 	//	clanring_cam_config();//(FIXME)
+		ra_apply_worldspawn_gravity();
 
 		if (clanring_playmode & CLANRING_HH_MODE)
 			hh_restore_weaponstay_pref();

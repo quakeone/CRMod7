@@ -1,5 +1,36 @@
 void (float value) clanring_set_fraglimit;
 
+/* RA worldspawn override key:
+"cr_ra_gravity" "150"
+
+Legacy fallback remains for bunmoo3/lowgrav until those maps ship a full
+external .ent with the key on worldspawn.
+*/
+float() ra_worldspawn_gravity =
+{
+	if (world.cr_ra_gravity > 0)
+		return world.cr_ra_gravity;
+
+	if (mapname == "bunmoo3")	return 150;
+	if (mapname == "lowgrav")	return 150;
+
+	return 0;
+};
+
+void() ra_apply_worldspawn_gravity =
+{
+	local float gravity;
+
+	if (!(clanring_playmode & CLANRING_RA_MODE))
+		return;
+
+	gravity = ra_worldspawn_gravity();
+	if (gravity <= 0)
+		return;
+
+	cvar_set("sv_gravity", ftos(gravity));
+};
+
 void () rocket_arena_init_world =
 {
 	boss 				= spawn ();
