@@ -746,11 +746,47 @@ void() PlayerDie =
 	self.effects 				= (self.effects - (self.effects & (EF_DIMLIGHT | EF_RED | EF_BLUE)));
 	self.modelindex 			= modelindex_player;
 
+	// Decide whether DropBackpack (called below) is going to print
+	// "<name> dropped a RL/LG". If so, suppress the "lost a ..." line so we
+	// don't double-print. The conditions mirror DropBackpack's own checks:
+	//  - a backpack is actually going to drop (PlayerDie's call conditions)
+	//  - the player has any ammo (otherwise DropBackpack early-returns)
+	//  - deathmatch == 1 and match started
+	//  - the dropped item (= self.weapon at death) is RL or LG
+	local float will_drop_backpack, drop_announces_rl, drop_announces_lg;
+	will_drop_backpack = 0;
+	drop_announces_rl = 0;
+	drop_announces_lg = 0;
+	if (deathmatch && !(clanring_playmode & CLANRING_PRACTICE_MODE) && !(mode_is_arena()))
+		will_drop_backpack = 1;
+	else if ((clanring_playmode & CLANRING_AIRSHOT_MODE) && (self.airborn_pos >= 200))
+		will_drop_backpack = 1;
+
+	if (will_drop_backpack
+	    && (deathmatch == 1)
+	    && (clanring_state & CLANRING_MATCH_STARTED)
+	    && (self.ammo_shells + self.ammo_nails + self.ammo_rockets + self.ammo_cells
+	        + ((clanring_playmode & CLANRING_HH_MODE) ? self.ammo_heads : 0) > 0))
+	{
+		if (self.weapon == IT_ROCKET_LAUNCHER)
+			drop_announces_rl = 1;
+		else if (self.weapon == IT_LIGHTNING)
+			drop_announces_lg = 1;
+	}
+
 	if (self.items & IT_ROCKET_LAUNCHER)
-		quaketv_lost_rl (self);
+	{
+		if (drop_announces_rl)
+			quaketv_lost_rl_bookkeeping (self);
+		else
+			quaketv_lost_rl (self);
+	}
 
 	if (self.items & IT_LIGHTNING)
-		quaketv_lost_lg(self);
+	{
+		if (!drop_announces_lg)
+			quaketv_lost_lg(self);
+	}
 
 	if (clanring_playmode & CLANRING_HH_MODE)
 	{

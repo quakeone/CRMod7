@@ -329,7 +329,10 @@ void(entity picker) QuadControl_MaybeAnnounce =
     // One-time "majority" milestone (>50%), but only after at least 3 quads possible
     if ((possible >= 3) && (share > 0.5) && (!picker.quad_majority_announced))
     {
-        local string msg = sprintf("has the majority of Quads so far (%g/%g)", taken, possible);
+        local string msg = sprintf("has the %s of Quads so far (%s/%s)",
+                                   redify("majority"),
+                                   strings_ftos_gold(taken),
+                                   strings_ftos_gold(possible));
         QuadControl_AnnounceObservers(msg, picker);
         picker.quad_majority_announced = 1;
     }

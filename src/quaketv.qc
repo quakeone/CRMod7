@@ -181,17 +181,19 @@ void (entity player) quaketv_obtained_rl =
 };
 
 //
-//  L O S T  R L
+//  L O S T  R L  ( B O O K K E E P I N G )
 //
-void (entity player) quaketv_lost_rl = 
+//  Decrements team rocket count and manages sentinel control. No announce.
+//  Used by quaketv_lost_rl, and directly by PlayerDie when DropBackpack is
+//  going to print "<name> dropped a RL" so we don't double-print.
+//
+void (entity player) quaketv_lost_rl_bookkeeping =
 {
 	if (match_prewar())	//R00k: fix assignment to world entity when someone type kill in prewar
 		return;
 
 	if (teamplay && (clanring_playmode & CLANRING_MATCH_MODE))
 	{
-		if (deathmatch != 3)
-			quaketv_announce2(player.netname, " lost a rocket launcher!");	//9/27/24
 		player.next_team.ammo_rockets = player.next_team.ammo_rockets - 1;
 		clanring_sentinel.ammo_rockets = clanring_sentinel.ammo_rockets - 1;
 		if (player.next_team == clanring_sentinel.movetarget)  // team lost control
@@ -203,6 +205,22 @@ void (entity player) quaketv_lost_rl =
 		else if (!player.next_team.ammo_rockets && (clanring_sentinel.ammo_rockets > 1))
 			quaketv_check_control();
 	}
+};
+
+//
+//  L O S T  R L
+//
+void (entity player) quaketv_lost_rl =
+{
+	if (match_prewar())	//R00k: fix assignment to world entity when someone type kill in prewar
+		return;
+
+	if (teamplay && (clanring_playmode & CLANRING_MATCH_MODE))
+	{
+		if (deathmatch != 3)
+			quaketv_announce2(player.netname, " lost a rocket launcher!");	//9/27/24
+	}
+	quaketv_lost_rl_bookkeeping(player);
 };
 
 //
