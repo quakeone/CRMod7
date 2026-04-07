@@ -240,6 +240,8 @@ string 	CLANRING_STRING_TIED;       // initialized to "   Tied at "
 float   clanring_score_count;	    // number of clients looking at score
 entity 	clanring_first_place;
 entity 	clanring_second_place;
+float   match_last_ts1_color;       // -1=unposted, -2=teamscore1:none, >=0=teamscore1:<color>
+float   match_last_ts2_color;       // -1=unposted, -2=teamscore2:none, >=0=teamscore2:<color>
 
 // console global variables
 float 	console_deathmatch;

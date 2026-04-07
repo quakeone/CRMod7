@@ -69,6 +69,11 @@ void(entity player) match_remove_player_silent;
 // Utility: add a player to a team without announcements
 void(entity player, float targetColor) match_add_player_silent;
 
+// match_last_ts1_color / match_last_ts2_color live in defs2.qc; they track the
+// last team color we posted a teamscoreN:<color> infokey for, so we can clear
+// the old key when the leader's color changes.  -1 = no color key posted.
+// score_init_world resets these on each map load.
+
 void() match_clear_leavemealone =
 {
     if (!self.leavemealone)
@@ -577,36 +582,82 @@ void() match_gib_player =
     }
 };
 
+// Blank a previously-posted teamscoreN key so it doesn't linger alongside a
+// newer key with a different shape.  See match_update_score_info for the
+// sentinel meanings of `color`:  -1 = never posted (nothing to blank),
+// -2 = the "slot:none" placeholder is live, >= 0 = a colored slot:<color> key.
+void(string slot, float color) match_clear_teamscore_key =
+{
+    if (color == -1)
+        return;
+    if (color == -2)
+        forceinfokey(world, sprintf("%s:none", slot), "");
+    else
+        forceinfokey(world, sprintf("%s:%s", slot, strings_get_colour(color)), "");
+};
+
+// Without this, when the leader's team color changes mid-match the old key
+// (e.g. teamscore1:red) sticks around in worldspawn with a stale value
+// alongside the new one (teamscore1:blue), so external readers see
+// contradictory data.  We track the last-written team color per slot and
+// blank the previous key whenever its color no longer matches.
 void() match_update_score_info =
 {
     local string score;
-    local string temp, tc = "";
+    local float new_color1 = -1, new_color2 = -1;
+
+    // If the team list has been torn down (e.g. just after match_delete_teams),
+    // first/second_place may still point at freed entities; resync them so we
+    // take the "no teams" cleanup branch instead of dereferencing garbage.
+    if (clanring_sentinel.next_team == world)
+    {
+        clanring_first_place = clanring_sentinel;
+        clanring_second_place = clanring_sentinel;
+    }
 
     if (clanring_first_place != clanring_sentinel)
     {
+        new_color1 = clanring_first_place.height;
         score = ftos(clanring_first_place.frags);
-        tc = strings_get_colour(clanring_first_place.height);
-        temp = sprintf("teamscore1:%s ",tc);
 
-        forceinfokey (world, temp, score);
+        if (match_last_ts1_color != new_color1)
+            match_clear_teamscore_key("teamscore1", match_last_ts1_color);
+        forceinfokey(world, sprintf("teamscore1:%s", strings_get_colour(new_color1)), score);
 
         if (clanring_second_place != clanring_sentinel)
         {
+            new_color2 = clanring_second_place.height;
             score = ftos(clanring_second_place.frags);
-            tc = strings_get_colour(clanring_second_place.height);
-            temp = sprintf("teamscore2:%s ",tc);
-            forceinfokey (world, temp, score);
+
+            if (match_last_ts2_color != new_color2)
+                match_clear_teamscore_key("teamscore2", match_last_ts2_color);
+            forceinfokey(world, sprintf("teamscore2:%s", strings_get_colour(new_color2)), score);
         }
         else
         {
+            // No second-place team: drop any prior key (color or stale :none),
+            // post the placeholder so readers see something deterministic, and
+            // record -2 so the next color transition knows to blank :none.
+            match_clear_teamscore_key("teamscore2", match_last_ts2_color);
             forceinfokey (world, "teamscore2:none","0");
+            new_color2 = -2;
         }
     }
     else
     {
+        // No teams at all: blank whatever was last posted in either slot,
+        // post both :none placeholders, and mark trackers as -2 so the
+        // next color transition knows to clear them.
+        match_clear_teamscore_key("teamscore1", match_last_ts1_color);
+        match_clear_teamscore_key("teamscore2", match_last_ts2_color);
         forceinfokey (world, "teamscore1:none","0");
         forceinfokey (world, "teamscore2:none","0");
+        new_color1 = -2;
+        new_color2 = -2;
     }
+
+    match_last_ts1_color = new_color1;
+    match_last_ts2_color = new_color2;
 };
 
 //
@@ -2849,8 +2900,20 @@ void(entity pteam) match_remove_team =
         plast = plast.next_team;
     plast.next_team = pteam.next_team;  // fix list
     pqc_erase_team(pteam.height);
+    // If first/second place still pointed at the team we're about to free,
+    // null them out so subsequent code doesn't dereference a freed entity.
+    if (clanring_first_place == pteam)
+        clanring_first_place = clanring_sentinel;
+    if (clanring_second_place == pteam)
+        clanring_second_place = clanring_sentinel;
     remove(pteam);
     clanring_numteams = clanring_numteams - 1;
+    // Re-rank now that the team list has changed, and refresh the worldspawn
+    // teamscore keys; otherwise they (and any code that reads first/second_place)
+    // keep showing the disbanded team as the leader until the next 5-minute tick.
+    score_get_top2();
+    if (clanring_state & CLANRING_MATCH_STARTED)
+        match_update_score_info();
 };
 
 //
@@ -3732,6 +3795,9 @@ void() match_abort_pause_timeout =
     clanring_state = (clanring_state | CLANRING_MATCH_OVER);
     //TODO: Play some custom sound here... 
     clanring_sentinel.movetarget = world;
+    // Teams just got deleted; clear the stale teamscoreN:<color> infokeys
+    // so they don't bleed into the next pre-match window.
+    match_update_score_info();
     match_refresh_spawn_markers();
 }
 

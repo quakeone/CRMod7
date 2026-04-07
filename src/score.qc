@@ -9,6 +9,7 @@
 //
 float () match_count_players;
 void () match_end;
+void () match_update_score_info;
 
 //
 //  I N I T
@@ -30,6 +31,10 @@ void () score_init_world =
 {
 	CLANRING_STRING_TIED = "            Tied at ";
 	clanring_score_count = 0;
+	// Worldspawn infokeys are fresh on each map; reset our trackers so we
+	// don't try to clear keys that don't exist on the new world entity.
+	match_last_ts1_color = -1;
+	match_last_ts2_color = -1;
 };
 
 //
@@ -150,6 +155,13 @@ void (entity pteam, float fragval) score_frag =
 		clanring_sentinel.think = score_check_sudden_death;
 		clanring_sentinel.nextthink = time + 1;
 	}
+
+	// Refresh worldspawn teamscoreN:<color> infokeys on every score change so
+	// external readers (sidebars, scrapers) don't lag the live score by up to
+	// the 5-minute match_bprint_score tick.  Gated on MATCH_STARTED so that
+	// pre-match warmup kills don't broadcast a stale/uninitialized score.
+	if (clanring_state & CLANRING_MATCH_STARTED)
+		match_update_score_info();
 };
 /*
 //
