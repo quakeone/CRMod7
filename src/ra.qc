@@ -31,6 +31,12 @@ void() ra_apply_worldspawn_gravity =
 	cvar_set("sv_gravity", ftos(gravity));
 };
 
+void() ra_not_ready =
+{
+	sprint(self, "Rocket Arena is not ready yet. If this persists, restart the map.\n");
+	self.impulse = 0;
+};
+
 void () rocket_arena_init_world =
 {
 	boss 				= spawn ();
@@ -278,6 +284,12 @@ void() ra_join_queue =
 	local string tmp;
 	local float whichteam;
 
+	if (boss == world)
+	{
+		ra_not_ready();
+		return;
+	}
+
 	if ((boss.state == CA_MATCH_CLEANUP) || (boss.state == CA_MATCH_OVER))
 	{
 		sprint (self, "Try again in 5 seconds...\n");
@@ -451,6 +463,12 @@ void () ra_leave_queue =
 
 void () ra_select_team =
 {
+	if (boss == world)
+	{
+		ra_not_ready();
+		return;
+	}
+
 	if (boss.busy == TRUE)
 	{
 		sprint(self, "Try again in a few seconds...\n");

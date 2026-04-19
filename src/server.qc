@@ -574,6 +574,21 @@ void () server_set_infokey_modes =
     arena_update_round_infokeys();
 };
 
+void (float force) server_sync_pause_infokey =
+{
+    local string current;
+    local float paused;
+    local string desired;
+
+    paused = ((clanring_state & CLANRING_MATCH_PAUSED) ? TRUE : FALSE);
+    desired = (paused ? "on" : "off");
+    current = infokey(world, "matchpaused");
+    if (!force && current == desired)
+        return;
+
+    forceinfokey(world, "matchpaused", desired);
+};
+
 /**/
 void () W_Precache;
 
@@ -941,6 +956,7 @@ void () clanring_init_world =
     forceinfokey(world, "mod", clanring_version_info);
     forceinfokey(world, "modname", clanring_modname_info);
     server_set_infokey_modes();
+    server_sync_pause_infokey(TRUE);
 };
 
 //
@@ -3507,6 +3523,8 @@ void () clanring_periodic_checks =
 void () clanring_start_frame =
 {
     local float command;
+
+    server_sync_pause_infokey(FALSE);
 
     if ( (clanring_playmode & CLANRING_MATCH_MODE) )
         quaketag_start_frame();

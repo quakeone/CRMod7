@@ -959,6 +959,11 @@ void() json_emit_match_document =
                     json_kv_number("lava_deaths",   p.clanring_badstats2_x);
                     json_kv_number("axe_deaths",    p.clanring_badstats2_y);
                     json_kv_number("fall_deaths",   p.clanring_badstats2_z);
+                    if (stats_badstats_has_walkover_categories())
+                    {
+                        json_kv_number("spawn_walkovers", p.clanring_badstats_spawnwalk);
+                        json_kv_number("tele_exit_walkovers", p.clanring_badstats_telewalk);
+                    }
 
                     json_kv_number("def_teammate", p.stats_defense_teammate);
                     json_kv_number("def_backpack", p.stats_defense_backpack);

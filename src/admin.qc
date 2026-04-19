@@ -745,6 +745,7 @@ void() admin_make_spawn_point =
 	self.owner.angles = self.angles;
 	self.owner.origin = self.origin;
 	dm_num_spawns = (dm_num_spawns + 1);
+	badstats_invalidate_walkover_cache();
 	sprint(self, "Spawn point created\n");
 	admin_show_spot_info ();
 };

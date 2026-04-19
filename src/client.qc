@@ -1059,6 +1059,10 @@ void() PutClientInServer =
          
     self.origin = self.oldorigin = spot.origin; //R00k: update oldorigin so we dont respawn where we died.
     setorigin(self, spot.origin);	    //R00k: change our origin and relink our edict.
+    self.clanring_badstats_spawnwalk_on = TRUE;
+    self.clanring_badstats_spawnwalk_ignore_until = time + 1;
+    self.clanring_badstats_telewalk_on = TRUE;
+    self.clanring_badstats_telewalk_ignore_until = time + 1;
 
     if ((clanring_state & CLANRING_MATCH_STARTED) && clanring_match_start_time && (clanring_match_inactivity_check != world) && self.match_start_monitor_active && !(mode_is_arena()))
     {
@@ -1545,6 +1549,118 @@ void() CheckWaterJump =
             // return; ELOHIM_MOD - unnecessary
         }
     }
+};
+
+float(entity spot) badstats_player_overlaps_spawn =
+{
+    if ((spot.absmin_x == spot.absmax_x)
+        && (spot.absmin_y == spot.absmax_y)
+        && (spot.absmin_z == spot.absmax_z))
+    {
+        if ((self.absmin_x > (spot.origin_x + 16)) || (self.absmin_y > (spot.origin_y + 16)) || (self.absmin_z > (spot.origin_z + 24)))
+            return FALSE;
+        if ((self.absmax_x < (spot.origin_x - 16)) || (self.absmax_y < (spot.origin_y - 16)) || (self.absmax_z < (spot.origin_z - 24)))
+            return FALSE;
+        return TRUE;
+    }
+
+    if ((self.absmin_x > spot.absmax_x) || (self.absmin_y > spot.absmax_y) || (self.absmin_z > spot.absmax_z))
+        return FALSE;
+    if ((self.absmax_x < spot.absmin_x) || (self.absmax_y < spot.absmin_y) || (self.absmax_z < spot.absmin_z))
+        return FALSE;
+    return TRUE;
+};
+
+float(entity head) badstats_player_touching_spawn_cache =
+{
+    local entity spot;
+
+    spot = head;
+    while (spot != world)
+    {
+        if (badstats_player_overlaps_spawn(spot))
+            return TRUE;
+        spot = spot.clanring_walkover_cache_next;
+    }
+
+    return FALSE;
+};
+
+float(entity head) badstats_player_touching_tele_cache =
+{
+    local entity spot;
+
+    spot = head;
+    while (spot != world)
+    {
+        if (badstats_player_overlaps_spawn(spot))
+            return TRUE;
+        spot = spot.clanring_walkover_cache_next;
+    }
+
+    return FALSE;
+};
+
+float() badstats_player_touching_spawn =
+{
+    return badstats_player_touching_spawn_cache(badstats_walkover_spawn_head);
+};
+
+float() badstats_player_touching_tele_exit =
+{
+    return badstats_player_touching_tele_cache(badstats_walkover_tele_head);
+};
+
+void() badstats_track_spawn_walkovers =
+{
+    local float on_spawn, on_tele;
+
+    if ((self.style & CLANRING_OBSERVER) || self.deadflag || (self.health <= 0))
+    {
+        self.clanring_badstats_spawnwalk_on = FALSE;
+        self.clanring_badstats_telewalk_on = FALSE;
+        return;
+    }
+
+    if (!stats_badstats_has_walkover_categories() || (clanring_state & CLANRING_MATCH_OVER))
+    {
+        self.clanring_badstats_spawnwalk_on = FALSE;
+        self.clanring_badstats_telewalk_on = FALSE;
+        return;
+    }
+
+    badstats_ensure_walkover_cache();
+    on_spawn = badstats_player_touching_spawn();
+    on_tele = badstats_player_touching_tele_exit();
+
+    if (!(clanring_state & CLANRING_MATCH_STARTED)
+        || (time < self.clanring_badstats_spawnwalk_ignore_until)
+        || (time < self.teleport_time))
+    {
+        self.clanring_badstats_spawnwalk_on = on_spawn;
+    }
+    else if (on_spawn && !self.clanring_badstats_spawnwalk_on)
+    {
+        self.clanring_badstats_spawnwalk = self.clanring_badstats_spawnwalk + 1;
+        self.clanring_badstats_spawnwalk_ignore_until = utils_max(self.clanring_badstats_spawnwalk_ignore_until, time + 0.5);
+    }
+    self.clanring_badstats_spawnwalk_on = on_spawn;
+
+    if (!(clanring_state & CLANRING_MATCH_STARTED)
+        || (time < self.clanring_badstats_telewalk_ignore_until)
+        || (time < self.teleport_time))
+    {
+        self.clanring_badstats_telewalk_on = on_tele;
+        return;
+    }
+
+    if (on_tele && !self.clanring_badstats_telewalk_on)
+    {
+        self.clanring_badstats_telewalk = self.clanring_badstats_telewalk + 1;
+        self.clanring_badstats_telewalk_ignore_until = utils_max(self.clanring_badstats_telewalk_ignore_until, time + 0.5);
+    }
+
+    self.clanring_badstats_telewalk_on = on_tele;
 };
 
 /*
@@ -2117,6 +2233,8 @@ void() PlayerPostThink =
         observer_post_think ();
         return;
     }
+
+    badstats_track_spawn_walkovers();
 
     if (prematch_rules())
     {

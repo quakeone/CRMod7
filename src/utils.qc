@@ -45,6 +45,65 @@ void (string s, ...) bprint7 = #23;
 
 void() clanring_clear_player_runes;
 
+float() stats_badstats_has_walkover_categories =
+{
+    local float teamsize;
+
+    if (!(clanring_playmode & CLANRING_MATCH_MODE))
+        return FALSE;
+    if (mode_is_arena())
+        return FALSE;
+    if (clanring_playmode & CLANRING_HH_MODE)
+        return FALSE;
+    if (!teamplay)
+        return FALSE;
+
+    teamsize = stats_matchtype;
+    if (clanring_maxsize > teamsize)
+        teamsize = clanring_maxsize;
+    return (teamsize > 1);
+};
+
+float(string classname) badstats_class_affects_walkover_cache =
+{
+    if (classname == "info_player_deathmatch") return TRUE;
+    if (classname == "info_teleport_destination") return TRUE;
+    return FALSE;
+};
+
+void() badstats_invalidate_walkover_cache =
+{
+    badstats_walkover_spawn_head = world;
+    badstats_walkover_tele_head = world;
+    badstats_walkover_cache_ready = FALSE;
+};
+
+void() badstats_cache_link_spawn =
+{
+    self.clanring_walkover_cache_next = badstats_walkover_spawn_head;
+    badstats_walkover_spawn_head = self;
+};
+
+void() badstats_cache_link_tele =
+{
+    self.clanring_walkover_cache_next = badstats_walkover_tele_head;
+    badstats_walkover_tele_head = self;
+};
+
+void() badstats_rebuild_walkover_cache =
+{
+    badstats_invalidate_walkover_cache();
+    utils_do_item(badstats_cache_link_spawn, "info_player_deathmatch");
+    utils_do_item(badstats_cache_link_tele, "info_teleport_destination");
+    badstats_walkover_cache_ready = TRUE;
+};
+
+void() badstats_ensure_walkover_cache =
+{
+    if (!badstats_walkover_cache_ready)
+        badstats_rebuild_walkover_cache();
+};
+
 void() clanring_refresh_pak0_only =
 {
     registercvar("sv_pak0_only", "0");
@@ -3754,11 +3813,14 @@ void(entity ev) webhook_stats_info =
                                    stats_has_nontrivial_activity(p));
 
                 if ((p.style & CLANRING_OBSERVER) && !obs_participant) { b_obs += 1; }
-                else if ((p.next_team == world) && !obs_participant)   { b_noteam += 1; }
+                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world) && !obs_participant)   { b_noteam += 1; }
                 else
                 {
                     if (!opened) {
-                        APPEND_SAFE("\n**Bad stats (paks self% team% lava axe fall)**\n\n");
+                        if (stats_badstats_has_walkover_categories())
+                            APPEND_SAFE("\n**Bad stats (paks self% team% lava axe fall spawn tele)**\n\n");
+                        else
+                            APPEND_SAFE("\n**Bad stats (paks self% team% lava axe fall)**\n\n");
                         APPEND_SAFE("```\n");
                         opened = 1;
                     }
@@ -3779,16 +3841,37 @@ void(entity ev) webhook_stats_info =
                     zname = strzone(nm);
 
                     // one-shot formatted line
-                    line = sprintf(
-                        "%s  %2g | %3g%% %3g%% | %2g %2g %2g\n",
-                        strpad(name_col_w, zname),
-                        p.clanring_badstats_x,       // paks
-                        self_pct,                    // self %
-                        team_pct,                    // team %
-                        p.clanring_badstats2_x,      // lava
-                        p.clanring_badstats2_y,      // axe
-                        p.clanring_badstats2_z       // fall
-                    );
+                    if (stats_badstats_has_walkover_categories())
+                    {
+                        local string bad_tail;
+                        bad_tail = sprintf("%2g %2g %2g %2g %2g",
+                                           p.clanring_badstats2_x,
+                                           p.clanring_badstats2_y,
+                                           p.clanring_badstats2_z,
+                                           p.clanring_badstats_spawnwalk,
+                                           p.clanring_badstats_telewalk);
+                        line = sprintf(
+                            "%s  %2g | %3g%% %3g%% | %s\n",
+                            strpad(name_col_w, zname),
+                            p.clanring_badstats_x,          // paks
+                            self_pct,                       // self %
+                            team_pct,                       // team %
+                            bad_tail
+                        );
+                    }
+                    else
+                    {
+                        line = sprintf(
+                            "%s  %2g | %3g%% %3g%% | %2g %2g %2g\n",
+                            strpad(name_col_w, zname),
+                            p.clanring_badstats_x,       // paks
+                            self_pct,                    // self %
+                            team_pct,                    // team %
+                            p.clanring_badstats2_x,      // lava
+                            p.clanring_badstats2_y,      // axe
+                            p.clanring_badstats2_z       // fall
+                        );
+                    }
 
                     APPEND_SAFE(line);
                     strunzone(zname);

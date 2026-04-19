@@ -35,6 +35,8 @@ void() match_timer_think2;
 void() match_list_ghosts;
 void() match_enter_ghost_code;
 void() match_start_unpause_countdown;
+void() match_notready;
+void() match_start_timer;
 void() match_unpause;
 void(entity ghostent) match_restore_ghost;
 float() match_is_imbalanced;
@@ -605,29 +607,42 @@ void() match_update_score_info =
 {
     local string score;
     local float new_color1 = -1, new_color2 = -1;
+    local entity score1 = clanring_sentinel, score2 = clanring_sentinel, pteam;
 
-    // If the team list has been torn down (e.g. just after match_delete_teams),
-    // first/second_place may still point at freed entities; resync them so we
-    // take the "no teams" cleanup branch instead of dereferencing garbage.
-    if (clanring_sentinel.next_team == world)
+    // Derive the published slots from the live team list instead of relying on
+    // first/second_place. Those globals are maintained primarily for score and
+    // winner logic, but infokey publishing is also used during pre-match
+    // transitions (ready/notready, rpickup, new-game cleanup) where the team
+    // list may have changed without those globals being refreshed yet.
+    pteam = clanring_sentinel.next_team;
+    while (pteam)
     {
-        clanring_first_place = clanring_sentinel;
-        clanring_second_place = clanring_sentinel;
+        if (!teamplay || (pteam.count > 0))
+        {
+            if (pteam.frags > score1.frags)
+            {
+                score2 = score1;
+                score1 = pteam;
+            }
+            else if (pteam.frags > score2.frags)
+                score2 = pteam;
+        }
+        pteam = pteam.next_team;
     }
 
-    if (clanring_first_place != clanring_sentinel)
+    if (score1 != clanring_sentinel)
     {
-        new_color1 = clanring_first_place.height;
-        score = ftos(clanring_first_place.frags);
+        new_color1 = score1.height;
+        score = ftos(score1.frags);
 
         if (match_last_ts1_color != new_color1)
             match_clear_teamscore_key("teamscore1", match_last_ts1_color);
         forceinfokey(world, sprintf("teamscore1:%s", strings_get_colour(new_color1)), score);
 
-        if (clanring_second_place != clanring_sentinel)
+        if (score2 != clanring_sentinel)
         {
-            new_color2 = clanring_second_place.height;
-            score = ftos(clanring_second_place.frags);
+            new_color2 = score2.height;
+            score = ftos(score2.frags);
 
             if (match_last_ts2_color != new_color2)
                 match_clear_teamscore_key("teamscore2", match_last_ts2_color);
@@ -1468,6 +1483,7 @@ void() match_add_spawn =
 {
     self.mdl = "clanring_start_point";
     self.classname = "info_player_deathmatch";
+    badstats_invalidate_walkover_cache();
 };
 
 //
@@ -1479,7 +1495,10 @@ void() match_add_spawn =
 void() match_remove_start =
 {
     if (self.mdl == "clanring_start_point")
+    {
         self.classname = self.mdl;
+        badstats_invalidate_walkover_cache();
+    }
 };
 
 //
@@ -1999,6 +2018,8 @@ void() match_delete_teams =
     clanring_numteams = 0;
     clanring_sentinel.next_team = world;
     clanring_sentinel.next_player = world;
+    clanring_first_place = clanring_sentinel;
+    clanring_second_place = clanring_sentinel;
 };
 
 //
@@ -2109,6 +2130,8 @@ float () match_put_player_in_team =
                          self.skin = 3;
                 }
             }
+            if (!(clanring_state & (CLANRING_MATCH_STARTED | CLANRING_MATCH_OVER)))
+                match_update_score_info();
             return TRUE;
         }
         pteam = pteam.next_team;
@@ -2178,6 +2201,9 @@ float () match_put_player_in_team =
      if (clanring_numteams == 1)
         announce("Only one team present");
 
+    if (!(clanring_state & (CLANRING_MATCH_STARTED | CLANRING_MATCH_OVER)))
+        match_update_score_info();
+
     return TRUE;
 };
 
@@ -2208,6 +2234,62 @@ float () match_all_ready =
         player = find(player, classname, "player");
     }
     return TRUE;
+};
+
+//
+//  U N R E A D Y   A F K   S T A R T   B L O C K E R S
+//
+//  If a ready player is AFK and preventing automatic countdown start,
+//  unready them so they must explicitly ready again when they return.
+//
+float () match_unready_afk_start_blockers =
+{
+    local entity player;
+    local entity oldself;
+    local float found_blocker;
+
+    found_blocker = FALSE;
+    player = find(world, classname, "player");
+    while (player)
+    {
+        if (!(player.style & CLANRING_OBSERVER))
+        if ((player.next_team != world)
+            && (player.style & CLANRING_READY)
+            && (player.style & CLANRING_AFK_CLIENT))
+        {
+            bprint(sprintf("\n%s is currently AFK!\n\nMatch Start delayed...\n", player.netname));
+            oldself = self;
+            self = player;
+            match_notready();
+            self = oldself;
+            found_blocker = TRUE;
+
+            // Restart the scan because match_notready mutates the team/player lists.
+            player = find(world, classname, "player");
+            continue;
+        }
+
+        player = find(player, classname, "player");
+    }
+
+    return found_blocker;
+};
+
+//
+//  T R Y   S T A R T   C O U N T D O W N
+//
+//  Handle AFK blockers first, then start the timer once everyone else is ready.
+//
+void() match_try_start_countdown =
+{
+    if ((clanring_numteams < 2) || (clanring_state & CLANRING_TIMER_STARTED))
+        return;
+
+    if (match_unready_afk_start_blockers())
+        return;
+
+    if (match_all_ready())
+        match_start_timer();
 };
 
 //
@@ -2423,6 +2505,12 @@ void(entity ghostent) match_restore_ghost =
     self.mangle = ghostent.mangle;
     self.statstate = ghostent.statstate;
     self.clanring_badstats = ghostent.clanring_badstats;
+    self.clanring_badstats_spawnwalk = ghostent.clanring_badstats_spawnwalk;
+    self.clanring_badstats_spawnwalk_on = FALSE;
+    self.clanring_badstats_spawnwalk_ignore_until = time + 1;
+    self.clanring_badstats_telewalk = ghostent.clanring_badstats_telewalk;
+    self.clanring_badstats_telewalk_on = FALSE;
+    self.clanring_badstats_telewalk_ignore_until = time + 1;
     self.clanring_qdwep	= ghostent.clanring_qdwep;
     self.clanring_qdkill = ghostent.clanring_qdkill;
     self.clanring_ptwep = ghostent.clanring_ptwep;
@@ -2668,10 +2756,11 @@ void() match_ready =
     }
     
     // check to see if we need to start the timer
-    if (clanring_numteams > 1 && !(clanring_state & CLANRING_TIMER_STARTED) && match_all_ready())
-    {
-        match_start_timer ();
-    }
+    match_try_start_countdown();
+
+    if (!(self.style & CLANRING_READY))
+        return;
+
     // Give the player a ghost
     match_make_ghost ();
 
@@ -2783,6 +2872,9 @@ void(entity player) match_remove_player =
     if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
         && !(clanring_state & CLANRING_MATCH_STARTED))
         match_refresh_spawn_markers();
+
+    if (!(clanring_state & (CLANRING_MATCH_STARTED | CLANRING_MATCH_OVER)))
+        match_update_score_info();
 };
 
 // ---------------------------------------------
@@ -3426,7 +3518,8 @@ void() match_rpickup =
     bprint(" possibilities\n");
     
 
-    match_update_score_info();
+    if (!(clanring_state & CLANRING_MATCH_OVER))
+        match_update_score_info();
 
     rs_used_in_cycle = rs_used_in_cycle + 1;
 };
@@ -4256,11 +4349,7 @@ void(entity player) match_disconnect_notify =
         {
             if (!(clanring_state & CLANRING_TIMER_STARTED))
             {
-                if (clanring_numteams > 1)
-                {
-                    if (match_all_ready())
-                        match_start_timer();
-                }
+                match_try_start_countdown();
             }
         }
         return;
@@ -4305,6 +4394,8 @@ void(entity player) match_disconnect_notify =
                  self.owner.statstate 	= self.statstate;
                            
                 self.owner.clanring_badstats = self.clanring_badstats;
+                self.owner.clanring_badstats_spawnwalk = self.clanring_badstats_spawnwalk;
+                self.owner.clanring_badstats_telewalk = self.clanring_badstats_telewalk;
                 
                 self.owner.fpickups		= self.fpickups;
                 self.owner.fcaptures	= self.fcaptures;

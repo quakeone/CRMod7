@@ -164,6 +164,7 @@ void() worldspawn =
     team1_lastspawn = world;
     team2_lastspawn = world;
     ra_lastspawn = world;
+    badstats_invalidate_walkover_cache();
 
 //	InternalInit();
 //	InitSearchHunk();
@@ -361,7 +362,7 @@ void() worldspawn =
 	    clanring_precache_compat_sound("enforcer/sight3.wav", "");//Item tossing "You There!"
 	    clanring_precache_compat_sound("ra/laugh.wav", ""); // Powerup Denied sound.
 	    precache_sound ("misc/null.wav");
-        if (!clanring_sv_pak0_only)
+        if (!clanring_sv_pak0_only && ((cvar("samelevel")) & CLANRING_HH_MODE))
         {
 	        precache_sound ("hhsounds/altamb.wav");
 	        precache_sound ("hhsounds/altar1.wav");

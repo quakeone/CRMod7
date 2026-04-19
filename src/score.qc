@@ -10,6 +10,22 @@
 float () match_count_players;
 void () match_end;
 void () match_update_score_info;
+string (float num) strings_get_colour;
+
+void(string slot) score_clear_persisted_colored_teamscores =
+{
+	local float color;
+	local string key;
+
+	color = 0;
+	while (color < 14)
+	{
+		key = sprintf("%s:%s", slot, strings_get_colour(color));
+		if (infokey(world, key) != "")
+			forceinfokey(world, key, "");
+		color = color + 1;
+	}
+};
 
 //
 //  I N I T
@@ -31,10 +47,14 @@ void () score_init_world =
 {
 	CLANRING_STRING_TIED = "            Tied at ";
 	clanring_score_count = 0;
-	// Worldspawn infokeys are fresh on each map; reset our trackers so we
-	// don't try to clear keys that don't exist on the new world entity.
-	match_last_ts1_color = -1;
-	match_last_ts2_color = -1;
+	// On samelevel/new-game restarts, worldspawn can retain the previous
+	// teamscoreN:<color> keys. Clear any carried-over colored slots now, but
+	// preserve whether a :none placeholder is already live so match start can
+	// blank it before publishing the active team colors.
+	score_clear_persisted_colored_teamscores("teamscore1");
+	score_clear_persisted_colored_teamscores("teamscore2");
+	match_last_ts1_color = (infokey(world, "teamscore1:none") != "") ? -2 : -1;
+	match_last_ts2_color = (infokey(world, "teamscore2:none") != "") ? -2 : -1;
 };
 
 //

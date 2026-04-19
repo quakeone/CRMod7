@@ -596,13 +596,24 @@ void() console_show_badstats =
 	 entity player;
 	 float tot_enemy;
 	 float tot_done;
+	 float show_walkovers;
+
+	show_walkovers = stats_badstats_has_walkover_categories();
 
 	cprint("\"------------\"\n");
 	cprint("\" Bad Stats \"\n");
 	cprint("\"------------\"\n");
 
-	cprint("\" paks | self | team | lava | axed | fall |      name\"\n");
-	cprint("\"------+------+------+------+------+------+----------------\"\n");
+	if (show_walkovers)
+	{
+		cprint("\" paks | self | team | lava | axed | fall | spwn | tele |      name\"\n");
+		cprint("\"------+------+------+------+------+------+------+------+----------------\"\n");
+	}
+	else
+	{
+		cprint("\" paks | self | team | lava | axed | fall |      name\"\n");
+		cprint("\"------+------+------+------+------+------+----------------\"\n");
+	}
 	player = clanring_sentinel.next_player;
 	while (player)
 	{
@@ -620,6 +631,13 @@ void() console_show_badstats =
 		utils_cprint_int3(player.clanring_badstats2_y);  // axe deaths
 		cprint(" | ");
 		utils_cprint_int3(player.clanring_badstats2_z);  // fall deaths
+		if (show_walkovers)
+		{
+			cprint(" | ");
+			utils_cprint_int3(player.clanring_badstats_spawnwalk);
+			cprint(" | ");
+			utils_cprint_int3(player.clanring_badstats_telewalk);
+		}
 		cprint(" | ");
 		cprint2(player.netname, "\"\n");
 		player = player.next_player;
@@ -1325,6 +1343,8 @@ void(string name, float angleflags) console_make_entity =
         newent.angles_y = 0;
     if (!(angleflags & CONSOLE_ENT_ROLL))
         newent.angles_z = 0;
+    if (badstats_class_affects_walkover_cache(name))
+        badstats_invalidate_walkover_cache();
 
     temp = vtos(newent.origin);
     cprint4(name, " created at ", temp, ", ");
@@ -1363,10 +1383,12 @@ void(string name) console_kill_entity =
 			v = e.origin - location;
 			if (vlen(v) < 20)
 			{
-				                cprint5("removed ", name, " at ", temp, ", ");
+                cprint5("removed ", name, " at ", temp, ", ");
                 temp = vtos(e.angles);
                 cprint2(temp, "\n");
 				remove(e);
+                if (badstats_class_affects_walkover_cache(name))
+                    badstats_invalidate_walkover_cache();
 				return;
 			}
 		}

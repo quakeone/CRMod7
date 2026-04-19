@@ -143,6 +143,12 @@ string(float want_match_record) stats_format_captime_record =
 void() stats_reset_player =
 {
 	self.mangle = self.dest = self.dest2 = self.dest1 = self.clanring_badstats = self.clanring_badstats2 = '0 0 0';
+	self.clanring_badstats_spawnwalk = 0;
+	self.clanring_badstats_spawnwalk_on = FALSE;
+	self.clanring_badstats_spawnwalk_ignore_until = 0;
+	self.clanring_badstats_telewalk = 0;
+	self.clanring_badstats_telewalk_on = FALSE;
+	self.clanring_badstats_telewalk_ignore_until = 0;
 	self.clanring_qdkill = self.clanring_qdwep = self.clanring_ptkill = self.clanring_ptwep = '0 0 0';
 	self.stats_gl_frac = 0;
 	self.stats_gl_tot = 0;
@@ -233,13 +239,24 @@ void() stats_show_badstats =
 {
 	local entity player;
 	local float tot_enemy, tot_done;
+	local float show_walkovers;
+
+	show_walkovers = stats_badstats_has_walkover_categories();
 
 	sprint(self, "\n");
 	sprint(self, "\bbad stuff\n");
 	sprint(self, "\n");
 
-	sprint(self, " paks \xFC self \xFC team \xFC lava \xFC axe  \xFC fall \xFC      name\n");
-	sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
+	if (show_walkovers)
+	{
+		sprint(self, " paks \xFC self \xFC team \xFC lava \xFC axe  \xFC fall \xFC spwn \xFC tele \xFC      name\n");
+		sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
+	}
+	else
+	{
+		sprint(self, " paks \xFC self \xFC team \xFC lava \xFC axe  \xFC fall \xFC      name\n");
+		sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
+	}
 	player = clanring_sentinel.next_player;
 	while (player)
 	{
@@ -259,7 +276,16 @@ void() stats_show_badstats =
 			utils_print_int3(player.clanring_badstats2_y);
 			sprint(self, "\x91\xFC \x90");
 			utils_print_int3(player.clanring_badstats2_z);
-			sprint(self, "\x91\xFC ");
+			if (show_walkovers)
+			{
+				sprint(self, "\x91\xFC \x90");
+				utils_print_int3(player.clanring_badstats_spawnwalk);
+				sprint(self, "\x91\xFC \x90");
+				utils_print_int3(player.clanring_badstats_telewalk);
+				sprint(self, "\x91\xFC ");
+			}
+			else
+				sprint(self, "\x91\xFC ");
 		}
 		else
 		{
@@ -275,7 +301,16 @@ void() stats_show_badstats =
 			utils_print_int3(player.clanring_badstats2_y);
 			sprint(self, " \xFC  ");
 			utils_print_int3(player.clanring_badstats2_z);
-			sprint(self, " \xFC ");
+			if (show_walkovers)
+			{
+				sprint(self, " \xFC  ");
+				utils_print_int3(player.clanring_badstats_spawnwalk);
+				sprint(self, " \xFC  ");
+				utils_print_int3(player.clanring_badstats_telewalk);
+				sprint(self, " \xFC ");
+			}
+			else
+				sprint(self, " \xFC ");
 		}
 		sprint2(self, player.netname, "\n");
 		player = player.next_player;

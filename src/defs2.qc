@@ -291,6 +291,13 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .vector clanring_ptkill;            // vector to keep track of pent kill stats		// CRMOD - stats
 .vector clanring_badstats;          // keep track of RL paks and damage done to team
 .vector clanring_badstats2;         // keep track of lava, axe, falling deaths
+.float  clanring_badstats_spawnwalk; // times player entered a spawn point volume
+.float  clanring_badstats_spawnwalk_on; // debounce state: currently overlapping a spawn point
+.float  clanring_badstats_spawnwalk_ignore_until; // suppress counting immediately after spawn/restore and briefly after a count
+.float  clanring_badstats_telewalk; // times player entered a teleporter exit volume
+.float  clanring_badstats_telewalk_on; // debounce state: currently overlapping a teleporter exit
+.float  clanring_badstats_telewalk_ignore_until; // suppress counting immediately after spawn/restore and briefly after a count
+.entity clanring_walkover_cache_next; // linked-list pointer for cached spawn/tele walkover entities
 .float join_time;					// time when player joined the server
 .vector clanring_backpacks;			// track rl|lg|gl lost/taken backpacks
 .vector deathorigin;
@@ -613,6 +620,9 @@ float	clanring_afk_timeout;
 
 float stats_timelimit;
 float stats_matchtype;
+entity badstats_walkover_spawn_head;
+entity badstats_walkover_tele_head;
+float badstats_walkover_cache_ready;
 
 .float  csqc_enabled;
 
