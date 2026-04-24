@@ -377,6 +377,9 @@ void(vector org, entity death_owner) spawn_tdeath =
 {
 	local entity death;
 
+	if (ffa_start_lock_active())
+		return;
+
 	death = spawn();
 	death.classname = "teledeath";
 	death.movetype = MOVETYPE_NONE;

@@ -471,6 +471,9 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 	
 	if (clanring_state & CLANRING_MATCH_PAUSED) return;
 
+	if (ffa_start_lock_active() && targ.classname == "player")
+		return;
+
 	// Prewar: no PvP when either party is in leave-me-alone.
 	// Exceptions: telefrags still kill; self-damage allowed.
 	if (!match_in_progress())

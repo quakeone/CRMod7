@@ -29,14 +29,11 @@ void(float ghost) G1v1_UpdateQuadAlpha;
 
 void() SUB_regen =
 {
+	ffa_item_clear_respawn_ghost(self);
 	self.model = self.mdl;		// restore original model
 	self.solid = SOLID_TRIGGER;	// allow it to be touched again
 
-	// Set correct alpha for 1v1 ghosting
-	if (self.items == IT_QUAD && g1v1_in_effect && g1v1_quad_ghosted)
-		self.alpha = 0.5;
-	else
-		self.alpha = 1.0;
+	ffa_item_update_alpha(self);
 
 	sound (self, CHAN_VOICE, "items/itembk2.wav", 1, ATTN_NORM);	// play respawn sound
 	if (!(deathmatch || (self.spawnflags & ITEM_RESPAWNDM)))
@@ -127,6 +124,8 @@ void() PlaceItem =
 			votables_disable_item();
 	}
     // END_MOD
+
+	ffa_item_update_alpha(self);
 };
 
 float() CheckValidTouch;
@@ -222,7 +221,7 @@ void(entity item, string itemname, float timeleft) SendObserverItemTimer
 }
 
 // ------------------------------------------------------------
-// Quad Control -> Observer/QTV announcements (majority / 60%+)
+// Quad Control announcements (majority / 60%+)
 // ------------------------------------------------------------
 
 // Count Quad spawners in the current level (cached)
@@ -315,6 +314,54 @@ void(string msg, entity subject) QuadControl_AnnounceObservers =
     }
 };
 
+float() QuadControl_ShouldAnnounceFFA =
+{
+    if (cvar("teamplay") > 0)
+        return FALSE;
+
+    if (clanring_playmode & CLANRING_HH_MODE)
+        return TRUE;
+
+    if (!(clanring_playmode & CLANRING_NORMAL_MODE))
+        return FALSE;
+
+    if (clanring_playmode & (CLANRING_MATCH_MODE
+                           | CLANRING_PRACTICE_MODE
+                           | CLANRING_CAPTURE_THE_FLAG
+                           | CLANRING_WIPEOUT_MODE
+                           | CLANRING_DMM4_MODE
+                           | CLANRING_AIRSHOT_MODE
+                           | CLANRING_CA_MODE
+                           | CLANRING_RA_MODE))
+        return FALSE;
+
+    return TRUE;
+};
+
+// Announce to active FFA players without duplicating observer/QTV messages.
+void(string msg, entity subject) QuadControl_AnnounceFFA =
+{
+    if (!QuadControl_ShouldAnnounceFFA())
+        return;
+
+    local entity p;
+    p = find(world, classname, "player");
+    while (p)
+    {
+        if ((p.style & CLANRING_CONNECTED) && !(p.style & CLANRING_OBSERVER))
+        {
+            if (!((clanring_playmode & CLANRING_HH_MODE) && p.hh_is_head))
+            {
+                sprint(p, subject.netname);
+                sprint(p, " ");
+                sprint(p, msg);
+                sprint(p, "\n");
+            }
+        }
+        p = find(p, classname, "player");
+    }
+};
+
 // Called on each Quad pickup to maybe announce milestones.
 void(entity picker) QuadControl_MaybeAnnounce =
 {
@@ -334,6 +381,7 @@ void(entity picker) QuadControl_MaybeAnnounce =
                                    strings_ftos_gold(taken),
                                    strings_ftos_gold(possible));
         QuadControl_AnnounceObservers(msg, picker);
+        QuadControl_AnnounceFFA(msg, picker);
         picker.quad_majority_announced = 1;
     }
 
@@ -516,7 +564,6 @@ void() health_touch =
 		//sprint(other, " health\n");
 		sound (other, CHAN_ITEM, self.noise, 1, ATTN_NORM);
 		stuffcmd(other, "bf\n");
-		self.model = string_null;
 		self.solid = SOLID_NOT;
 		self.owner = other;
 
@@ -550,6 +597,8 @@ void() health_touch =
 			}
 			other.stats_item_health += 1;
 		}
+
+		ffa_item_hide_or_ghost(self);
 	}
 	activator = other;
 	SUB_UseTargets();				// fire all targets / killtargets
@@ -573,6 +622,7 @@ void() item_megahealth_rot =
 				{
 					self.owner.nextthink = time + 20;
 					self.owner.think = SUB_regen;
+					ffa_item_hide_or_ghost(self.owner);
 					SendObserverItemTimer(self, "mega", 20); // woods
 				}
 				remove(self);
@@ -588,6 +638,7 @@ void() item_megahealth_rot =
 	{
 		self.owner.nextthink = time + 20;
 		self.owner.think = SUB_regen;
+		ffa_item_hide_or_ghost(self.owner);
 		SendObserverItemTimer(self, "mega", 20); // woods
 	}
 
@@ -749,12 +800,12 @@ void() armor_touch =
 		other.armorvalue 	= value;
 		other.items 		= other.items - (other.items & (IT_ARMOR1 | IT_ARMOR2 | IT_ARMOR3)) + bit;
 		self.solid 			= SOLID_NOT;
-		self.model 			= string_null;
 
 		if (deathmatch != 2 && deathmatch != 4 && deathmatch != 5)
 			self.nextthink = time + 20;
 
 		self.think= SUB_regen;
+		ffa_item_hide_or_ghost(self);
 // armor touch sound
 		sound (other, CHAN_ITEM, "items/armor1.wav", 1, ATTN_NORM);
 		stuffcmd(other, "bf\n");
@@ -1046,7 +1097,6 @@ void() weapon_touch =
 
 		if (!leave)
 		{
-			self.model = string_null;
 			self.solid = SOLID_NOT;
 
 			if (deathmatch == 1)
@@ -1059,6 +1109,7 @@ void() weapon_touch =
 			}
 
 			self.think = SUB_regen;
+			ffa_item_hide_or_ghost(self);
 		}
 	}
 
@@ -1247,7 +1298,6 @@ void() ammo_touch =
 
 		self = stemp;
 
-		self.model = string_null;
 		self.solid = SOLID_NOT;
 
 		if (deathmatch == 3)
@@ -1260,6 +1310,7 @@ void() ammo_touch =
 		}
 
 		self.think = SUB_regen;
+		ffa_item_hide_or_ghost(self);
 
 	}	// 1998-08-15 Do not take unnecessary items but fire all targets by Maddes
 
@@ -1709,6 +1760,9 @@ void () powerup_denied =
 //=====================================================
 void () powerup_pickup =
 {
+	if (!(items_are_ready()))
+		return;
+
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return;
 
@@ -1810,6 +1864,7 @@ void() powerup_drop =
 			//drop.alpha = (timeleft[i] - time)/16;	// R00k: fade the model based on time remaining
             drop.nextthink = timeleft[i];
 			drop.think = SUB_Remove;
+			ffa_item_update_alpha(drop);
         }
     }
 };
@@ -1869,9 +1924,8 @@ void() powerup_touch =
 	if (self.items == IT_SUIT)
 	{
 		sound (other, CHAN_VOICE, self.noise, 1, ATTN_NORM);
-		self.solid = SOLID_NOT;
 		other.items = other.items | self.items;
-		self.model = string_null;
+		ffa_item_hide_or_ghost(self);
 		self.stats_item_biosuit += 1;
 //		other.effects = other.effects | EF_GREEN;
 		other.rad_time = 1;
@@ -1888,9 +1942,8 @@ void() powerup_touch =
 		else
 			sound (other, CHAN_VOICE, self.noise, 1, ATTN_NONE);
 
-		self.solid = SOLID_NOT;
 		other.items = other.items | self.items;
-		self.model = string_null;
+		ffa_item_hide_or_ghost(self);
 
 		other.invincible_time = 1;
 		other.invincible_finished = time + 30;
@@ -1907,9 +1960,8 @@ void() powerup_touch =
 	if (self.items == IT_INVISIBILITY)
 	{
 		sound (other, CHAN_VOICE, self.noise, 1, ATTN_NORM);
-		self.solid = SOLID_NOT;
 		other.items = other.items | self.items;
-		self.model = string_null;
+		ffa_item_hide_or_ghost(self);
 		other.invisible_time = 1;
 		other.invisible_finished = time + 30;
 
@@ -1934,9 +1986,8 @@ void() powerup_touch =
 		else
 			sound (other, CHAN_ITEM, self.noise, 1, ATTN_NONE);//R00k: most dm maps only have one quad, so announce it globally
 
-		self.solid = SOLID_NOT;
 		other.items = other.items | self.items;
-		self.model = string_null;
+		ffa_item_hide_or_ghost(self);
 
 		other.super_time = 1;
 		other.super_damage_finished = time + 30;
@@ -2060,11 +2111,7 @@ void() item_artifact_super_damage =
 	// END_MOD
 	StartItem ();
 
-	// If 1v1 ghosting is active at spawn time, show as half-opaque
-	if (g1v1_in_effect && g1v1_quad_ghosted)
-		self.alpha = 0.5;
-	else
-		self.alpha = 1.0;
+	ffa_item_update_alpha(self);
 };
 
 /*
@@ -2079,6 +2126,9 @@ void() BackpackTouch =
 	local string s;
 	local float best, new, acount, bswitch, headtake;
 	local entity stemp;
+
+	if (!(items_are_ready()))
+		return;
 
 	if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
 		return;
@@ -2729,6 +2779,9 @@ void() Team_Ammo_Touch=
 {
 	local entity etemp;
 	local float  donttake;	// 1998-08-15 Do not take unnecessary items but fire all targets by Maddes
+
+	if (!(items_are_ready()))
+		return;
 
 	if (((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED)))
 	{

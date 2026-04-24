@@ -2187,7 +2187,7 @@ void (float tm, float tf) pqc_team_frags =
 };
 
 void(float m, float s)pqc_match_time =
-{    
+{
 	local entity oldself;
 
     oldself = self;
@@ -2235,8 +2235,63 @@ void(float m, float s)pqc_match_time =
     self = oldself;
 };
 
+void(float total_seconds) pqc_ffa_time_remaining =
+{
+	local entity oldself;
+	local float m;
+	local float s;
+
+	if (total_seconds < 0)
+		total_seconds = 0;
+
+	total_seconds = rint(total_seconds);
+	m = floor(total_seconds / 60);
+	s = total_seconds - (m * 60);
+
+	oldself = self;
+	self = find(world, classname, "player");
+	while (self)
+	{
+		if (self.style & CLANRING_CONNECTED)
+		{
+			msg_entity = self;
+
+			if (self.csqc_enabled == 1)
+			{
+				WriteByte(MSG_MULTICAST, SVC_CGAMEPACKET);
+				WriteByte(MSG_MULTICAST, PQC_MATCH_TIME);
+				WriteByte(MSG_MULTICAST, m);
+				WriteByte(MSG_MULTICAST, s);
+				multicast('0 0 0', MULTICAST_ONE_R);
+			}
+			else
+			{
+				if ((self.client == "ezQuake") || (self.client == "FTE"))
+				{
+					WriteByte(MSG_MULTICAST, SVC_UPDATESTAT);
+					WriteByte(MSG_MULTICAST, 18);// STAT_MATCHSTARTTIME
+					WriteLong(MSG_MULTICAST, (time + total_seconds) * 1000);
+					multicast('0 0 0', MULTICAST_ONE_R);
+				}
+				else
+				{
+					WriteByte(MSG_MULTICAST, SVC_STUFFCMD);
+					WriteByte(MSG_MULTICAST, MOD_PROQUAKE);
+					WriteByte(MSG_MULTICAST, PQC_MATCH_TIME);
+					WriteBytePQ(MSG_MULTICAST, m);
+					WriteBytePQ(MSG_MULTICAST, s);
+					WriteString(MSG_MULTICAST, string_null);
+					multicast('0 0 0', MULTICAST_ONE_R);
+				}
+			}
+		}
+		self = find(self, classname, "player");
+	}
+	self = oldself;
+};
+
 void ()pqc_match_reset =
-{	
+{
 	local entity oldself;
 
 	// Keep HUD teamscores visible after match end; defer clearing until players ready up
@@ -2319,8 +2374,403 @@ float () ammo_is_infinite =
 	return FALSE;
 };
 
+float () ffa_start_lock_delay =
+{
+	local float delay;
+
+	delay = cvar("cr_ffa_start_delay");
+	if (delay < 0)
+		return 0;
+	return delay;
+};
+
+float () ffa_start_lock_mode =
+{
+	if (clanring_playmode & CLANRING_MATCH_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_PRACTICE_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_DMM4_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_AIRSHOT_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_CA_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_RA_MODE)
+		return FALSE;
+
+	if (!(clanring_playmode & CLANRING_NORMAL_MODE) && !(clanring_playmode & CLANRING_HH_MODE))
+		return FALSE;
+
+	if (clanring_ffa_start_lock_config_ready && cvar("teamplay") > 0)
+	{
+		if (!((clanring_playmode & CLANRING_NORMAL_MODE) && (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)))
+			return FALSE;
+	}
+
+	return TRUE;
+};
+
+void () ffa_start_lock_refresh =
+{
+	local float delay;
+
+	clanring_ffa_start_lock_until = 0;
+	delay = ffa_start_lock_delay();
+	if (delay <= 0)
+		return;
+	if (!ffa_start_lock_mode())
+		return;
+	clanring_ffa_start_lock_until = clanring_ffa_start_lock_start_time + delay;
+	if (clanring_ffa_start_lock_until <= time)
+		clanring_ffa_start_lock_until = 0;
+};
+
+float () ffa_start_lock_active =
+{
+	ffa_start_lock_refresh();
+	if (clanring_ffa_start_lock_until <= time)
+		return FALSE;
+	return TRUE;
+};
+
+float () ffa_join_brightfield_mode =
+{
+	if (mode_is_arena())
+		return FALSE;
+	if (clanring_playmode & CLANRING_MATCH_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_PRACTICE_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_DMM4_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_AIRSHOT_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_CA_MODE)
+		return FALSE;
+	if (clanring_playmode & CLANRING_RA_MODE)
+		return FALSE;
+
+	if (cvar("teamplay") > 0)
+	{
+		if (!((clanring_playmode & CLANRING_NORMAL_MODE) && (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)))
+			return FALSE;
+	}
+
+	if (clanring_playmode & CLANRING_HH_MODE)
+		return TRUE;
+	if (clanring_playmode & CLANRING_NORMAL_MODE)
+		return TRUE;
+	return FALSE;
+};
+
+void () ffa_join_brightfield_clear =
+{
+	if (self.ffa_join_brightfield_until <= 0)
+		return;
+
+	self.effects = self.effects - (self.effects & EF_BRIGHTFIELD);
+	self.ffa_join_brightfield_until = 0;
+};
+
+void () ffa_join_brightfield_start =
+{
+	if (!self.ffa_join_brightfield_pending)
+		return;
+	if (!ffa_join_brightfield_mode())
+		return;
+	if ((self.style & CLANRING_OBSERVER) || self.deadflag || self.health <= 0)
+		return;
+
+	self.ffa_join_brightfield_pending = FALSE;
+	self.ffa_join_brightfield_until = time + 3;
+	self.effects = self.effects | EF_BRIGHTFIELD;
+};
+
+void () ffa_join_brightfield_update =
+{
+	if (self.ffa_join_brightfield_until <= 0)
+		return;
+	if (!ffa_join_brightfield_mode() || (self.style & CLANRING_OBSERVER) || self.deadflag || self.health <= 0)
+	{
+		ffa_join_brightfield_clear();
+		return;
+	}
+	if (time >= self.ffa_join_brightfield_until)
+	{
+		ffa_join_brightfield_clear();
+		return;
+	}
+
+	self.effects = self.effects | EF_BRIGHTFIELD;
+};
+
+float () ffa_item_alpha_mode =
+{
+	if (cvar("teamplay") > 0)
+		return FALSE;
+
+	if (clanring_playmode & CLANRING_HH_MODE)
+		return TRUE;
+
+	if (!(clanring_playmode & CLANRING_NORMAL_MODE))
+		return FALSE;
+	if (clanring_playmode & (CLANRING_MATCH_MODE
+	                       | CLANRING_PRACTICE_MODE
+	                       | CLANRING_CAPTURE_THE_FLAG
+	                       | CLANRING_WIPEOUT_MODE
+	                       | CLANRING_DMM4_MODE
+	                       | CLANRING_AIRSHOT_MODE
+	                       | CLANRING_CA_MODE
+	                       | CLANRING_RA_MODE))
+		return FALSE;
+	return TRUE;
+};
+
+float () ffa_item_alpha_value =
+{
+	local float alpha;
+
+	alpha = cvar("cr_ffa_item_alpha");
+	if (alpha <= 0)
+		return 1;
+	if (alpha >= 1)
+		return 1;
+	if (alpha < 0.1)
+		return 0.1;
+	return alpha;
+};
+
+float () ffa_item_alpha_enabled =
+{
+	local float alpha;
+
+	if (!ffa_item_alpha_mode())
+		return FALSE;
+	alpha = cvar("cr_ffa_item_alpha");
+	return ((alpha > 0) && (alpha < 1));
+};
+
+float () ffa_item_alpha_time =
+{
+	local float t;
+
+	t = cvar("cr_ffa_item_alpha_time");
+	if (t < 0)
+		return 0;
+	return t;
+};
+
+float (entity item) ffa_item_alpha_applies =
+{
+	if ((item.classname == "weapon_supershotgun")
+	 || (item.classname == "weapon_nailgun")
+	 || (item.classname == "weapon_supernailgun")
+	 || (item.classname == "weapon_grenadelauncher")
+	 || (item.classname == "weapon_rocketlauncher")
+	 || (item.classname == "weapon_lightning"))
+		return TRUE;
+
+	if ((item.classname == "item_armor1")
+	 || (item.classname == "item_armor2")
+	 || (item.classname == "item_armorInv"))
+		return TRUE;
+
+	if ((item.classname == "item_health")
+	 || (item.classname == "item_health_vial"))
+		return TRUE;
+
+	if ((item.classname == "item_shells")
+	 || (item.classname == "item_spikes")
+	 || (item.classname == "item_rockets")
+	 || (item.classname == "item_cells"))
+		return TRUE;
+
+	if ((item.classname == "item_artifact_super_damage")
+	 || (item.classname == "item_artifact_invulnerability")
+	 || (item.classname == "item_artifact_invisibility")
+	 || (item.classname == "item_artifact_envirosuit"))
+		return TRUE;
+
+	return FALSE;
+};
+
+float (entity item) ffa_item_alpha =
+{
+	if ((item.classname == "item_artifact_super_damage") && g1v1_in_effect && g1v1_quad_ghosted)
+	{
+		if (ffa_item_alpha_enabled())
+			return 1;
+		return 0.5;
+	}
+	return 1;
+};
+
+void (entity item) ffa_item_update_alpha =
+{
+	item.alpha = ffa_item_alpha(item);
+
+	if (item.classname != "item_artifact_super_damage")
+		return;
+
+	if (g1v1_in_effect && g1v1_quad_ghosted && ffa_item_alpha_enabled())
+	{
+		item.effects = item.effects | EF_FULLBRIGHT;
+		item.colormod = '7 0.5 0.5';
+	}
+	else
+	{
+		item.effects = item.effects - (item.effects & EF_FULLBRIGHT);
+		item.colormod = '0 0 0';
+	}
+};
+
+void () ffa_item_spawn_respawn_ghost;
+void () ffa_item_remove_respawn_ghost;
+
+void (entity item) ffa_item_clear_respawn_ghost =
+{
+	if (item.ffa_item_ghost_ent == world)
+		return;
+	if (!wasfreed(item.ffa_item_ghost_ent))
+		remove(item.ffa_item_ghost_ent);
+	item.ffa_item_ghost_ent = world;
+};
+
+entity (entity item, float expire_time) ffa_item_spawn_ghost_clone =
+{
+	local entity ghost;
+
+	if (item.mdl == "")
+		return world;
+	if (expire_time <= time)
+		return world;
+
+	ghost = spawn();
+	ghost.classname = "item_ffa_ghost";
+	ghost.owner = item;
+	ghost.solid = SOLID_NOT;
+	ghost.movetype = MOVETYPE_NONE;
+	ghost.angles = item.angles;
+	ghost.frame = item.frame;
+	ghost.skin = item.skin;
+	ghost.effects = item.effects;
+	ghost.colormod = item.colormod;
+	setmodel(ghost, item.mdl);
+	setorigin(ghost, item.origin);
+	ghost.alpha = ffa_item_alpha_value();
+	ghost.think = ffa_item_remove_respawn_ghost;
+	ghost.nextthink = expire_time;
+
+	item.ffa_item_ghost_ent = ghost;
+	return ghost;
+};
+
+void () ffa_item_remove_respawn_ghost =
+{
+	local entity item;
+
+	item = self.owner;
+	if ((item != world) && !wasfreed(item) && (item.ffa_item_ghost_ent == self))
+		item.ffa_item_ghost_ent = world;
+
+	remove(self);
+};
+
+void () ffa_item_spawn_respawn_ghost =
+{
+	local entity item;
+
+	item = self.owner;
+	if ((item == world) || wasfreed(item))
+	{
+		remove(self);
+		return;
+	}
+
+	if (item.ffa_item_ghost_ent == self)
+		item.ffa_item_ghost_ent = world;
+
+	if (!ffa_item_alpha_enabled() || !ffa_item_alpha_applies(item) || item.nextthink <= time)
+	{
+		remove(self);
+		return;
+	}
+
+	if (item.model != string_null)
+	{
+		remove(self);
+		return;
+	}
+
+	ffa_item_spawn_ghost_clone(item, item.nextthink);
+	remove(self);
+};
+
+void (entity item, float ghost_start_time) ffa_item_schedule_ghost_timer =
+{
+	local entity timer;
+
+	ffa_item_clear_respawn_ghost(item);
+
+	timer = spawn();
+	timer.classname = "item_ffa_ghost_timer";
+	timer.owner = item;
+	timer.solid = SOLID_NOT;
+	timer.movetype = MOVETYPE_NONE;
+	timer.model = string_null;
+	timer.think = ffa_item_spawn_respawn_ghost;
+	timer.nextthink = ghost_start_time;
+	item.ffa_item_ghost_ent = timer;
+};
+
+void (entity item) ffa_item_hide_or_ghost =
+{
+	local float ghost_time;
+	local float respawn_time;
+
+	item.solid = SOLID_NOT;
+	ffa_item_clear_respawn_ghost(item);
+
+	if (item.classname == "item_artifact_super_damage")
+	{
+		item.effects = item.effects - (item.effects & EF_FULLBRIGHT);
+		item.colormod = '0 0 0';
+	}
+
+	if (ffa_item_alpha_enabled() && ffa_item_alpha_applies(item) && item.nextthink > time)
+	{
+		ghost_time = ffa_item_alpha_time();
+		respawn_time = item.nextthink;
+
+		if ((ghost_time <= 0) || (respawn_time <= time + ghost_time))
+		{
+			item.model = string_null;
+			item.alpha = 1;
+			ffa_item_spawn_ghost_clone(item, respawn_time);
+			return;
+		}
+
+		item.model = string_null;
+		item.alpha = 1;
+		ffa_item_schedule_ghost_timer(item, respawn_time - ghost_time);
+		return;
+	}
+
+	item.model = string_null;
+	item.alpha = 1;
+};
+
 float () items_are_ready =
 {
+	if (ffa_start_lock_active())
+	{
+		return FALSE;
+	}
 	if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED))
 		return FALSE;
 	if ((mode_is_arena()) && ((boss == world) || ((boss != world) && (boss.timetofight == FALSE))))

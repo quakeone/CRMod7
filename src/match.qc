@@ -3631,11 +3631,11 @@ while (player)
 //
 void () match_pause_item =
 {
-    if (self.nextthink == -1)
-        return;
-    self.nextthink = self.nextthink + 1000000;
-    self.clanring_old_velocity = self.velocity;
-    self.velocity = '0 0 0';
+	if (self.nextthink == -1)
+		return;
+	self.nextthink = self.nextthink + 1000000;
+	self.clanring_old_velocity = self.velocity;
+	self.velocity = '0 0 0';
 
     if (self.classname == "grenade")
         self.movetype = MOVETYPE_FLY;
@@ -3707,10 +3707,12 @@ void() match_pause =
     if (!(clanring_state & CLANRING_MATCH_STARTED) || (clanring_state & CLANRING_MATCH_PAUSED))
         return;
 
-    clanring_state = clanring_state | CLANRING_MATCH_PAUSED;
-    clanring_match_pause_time = time;
-    utils_do_items(match_pause_item);
-    utils_do_item(match_pause_item, "item_backpack");
+	clanring_state = clanring_state | CLANRING_MATCH_PAUSED;
+	clanring_match_pause_time = time;
+	utils_do_items(match_pause_item);
+	utils_do_item(match_pause_item, "item_ffa_ghost_timer");
+	utils_do_item(match_pause_item, "item_ffa_ghost");
+	utils_do_item(match_pause_item, "item_backpack");
     //R00k added -start
     utils_do_flags(match_pause_item);
     utils_do_hook(match_pause_item);
@@ -3801,8 +3803,8 @@ void() match_unpause_item =
     if (self.nextthink == -1)
         return;
 
-    self.nextthink = self.nextthink - 1000000 + clanring_match_pause_time;
-    self.velocity = self.clanring_old_velocity;
+	self.nextthink = self.nextthink - 1000000 + clanring_match_pause_time;
+	self.velocity = self.clanring_old_velocity;
     if (self.classname == "grenade")
         self.movetype = MOVETYPE_BOUNCE;
     if ((self.classname == "item_flag_team1")||(self.classname == "item_flag_team2"))
@@ -3869,10 +3871,12 @@ void() match_abort_pause_timeout =
 
     clanring_state = (clanring_state - (clanring_state & CLANRING_MATCH_PAUSED));
     clanring_state = (clanring_state - (clanring_state & CLANRING_AUTO_PAUSED));
-    clanring_match_pause_time = time - clanring_match_pause_time;
+	clanring_match_pause_time = time - clanring_match_pause_time;
 
-    utils_do_items(match_unpause_item);
-    utils_do_item(match_unpause_item, "item_backpack");
+	utils_do_items(match_unpause_item);
+	utils_do_item(match_unpause_item, "item_ffa_ghost_timer");
+	utils_do_item(match_unpause_item, "item_ffa_ghost");
+	utils_do_item(match_unpause_item, "item_backpack");
     utils_do_flags (match_unpause_item);
     utils_do_hook (match_unpause_item);
     utils_do_item(match_unpause_item, "item_rune");
@@ -3914,10 +3918,12 @@ void() match_unpause =
     clanring_match_pause_time = time - clanring_match_pause_time;
     if (clanring_match_start_time)
         clanring_match_start_time = clanring_match_start_time + clanring_match_pause_time;
-    if (clanring_match_inactivity_check != world)
-        clanring_match_inactivity_check.nextthink = clanring_match_inactivity_check.nextthink - 1000000 + clanring_match_pause_time;
-    utils_do_items(match_unpause_item);
-    utils_do_item(match_unpause_item, "item_backpack");
+	if (clanring_match_inactivity_check != world)
+		clanring_match_inactivity_check.nextthink = clanring_match_inactivity_check.nextthink - 1000000 + clanring_match_pause_time;
+	utils_do_items(match_unpause_item);
+	utils_do_item(match_unpause_item, "item_ffa_ghost_timer");
+	utils_do_item(match_unpause_item, "item_ffa_ghost");
+	utils_do_item(match_unpause_item, "item_backpack");
 
     //R00k added -start
     utils_do_flags (match_unpause_item);

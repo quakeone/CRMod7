@@ -352,8 +352,7 @@ void(float ghost) G1v1_UpdateQuadAlpha =
     e = find(world, classname, "item_artifact_super_damage");
     while (e)
     {
-        // 0.5 when ghosted, 1.0 otherwise
-        e.alpha = ghost ? 0.5 : 1.0;
+        ffa_item_update_alpha(e);
         e = find(e, classname, "item_artifact_super_damage");
     }
 };
@@ -455,8 +454,9 @@ void() AutoGhostQuad_Refresh =
 void (entity client) clear_afk_status =
 {
     client.afk_time = time; // Reset AFK time regardless of current status
-    
-if (client.style & CLANRING_AFK_CLIENT && (client.style & CLANRING_CONNECTED))
+    client.afk_sync_grace_until = 0;
+
+    if (client.style & CLANRING_AFK_CLIENT && (client.style & CLANRING_CONNECTED))
     {
         local entity oldself = self;
         self = client;
@@ -481,12 +481,13 @@ void () restore_afk_status =
         remove(self);
         return;
     }
-    
+
     local entity oldself = self;
     self = player;
-    
+
     // Restore AFK status
     self.style = self.style | CLANRING_AFK_CLIENT;
+    self.afk_sync_grace_until = time + CLANRING_AFK_RESYNC_GRACE;
     afk_name();
     forceinfokey(self, "afk", "yes");
     chat_status = infokey(self, "chat");
@@ -678,6 +679,9 @@ void () clanring_init_world =
     banent = spawn();
 
     registercvar("cr_startmode", "0");
+    registercvar("cr_ffa_start_delay", "3");
+    registercvar("cr_ffa_item_alpha", "0.5");
+    registercvar("cr_ffa_item_alpha_time", "5");
     clanring_playmode = cvar("samelevel");
     startup_playmode = cvar("cr_startmode");
     current_startup_bits = clanring_startup_mode_bits(clanring_playmode);
@@ -812,6 +816,11 @@ void () clanring_init_world =
     teamplay = cvar("teamplay");
     clanring_set_teamplay(-1);
     timelimit = (cvar("timelimit") * 60);
+
+    clanring_ffa_start_lock_config_ready = FALSE;
+    clanring_ffa_start_lock_start_time = time;
+    clanring_ffa_start_lock_timer_last = 0;
+    ffa_start_lock_refresh();
 
     //R00k: this is CRCTF not 3waveCTF anymore. I prefer a smooth hook with better physics.
     //Zoid originally had hook speeds in version 1.0 at 1000 x 1000, then changed in 2.0 to 800x1000!
@@ -1794,6 +1803,8 @@ void () clanring_client_disconnect =
     self.super_damage_finished 	= 0;
     self.radsuit_finished 		= 0;
     self.effects 				= 0;
+    self.ffa_join_brightfield_pending = FALSE;
+    self.ffa_join_brightfield_until = 0;
     self.killed 				= 0;
     self.clanring_chase_score 	= CLANRING_NEGINF;// CRMOD make sure they don't have some high rating that can't be beat by the other players
     strunzone(self.oldname);
@@ -1982,6 +1993,7 @@ void () clanring_put_client_in_server =
                 temp = "";
             }
         }
+        ffa_join_brightfield_start();
         player_stand1();
         spawn_tdeath(self.origin, self);
         makevectors(self.angles);
@@ -3639,6 +3651,12 @@ void () clanring_start_frame =
                 if (timelimit && !(clanring_playmode & CLANRING_MATCH_MODE) && (mode_is_arena() == FALSE))
                 {
                     float tl = rint(timelimit - time);
+
+                    if (tl < 0)
+                        tl = 0;
+
+                    if (!(ffa_start_lock_active()))
+                        pqc_ffa_time_remaining(tl);
 
                     switch (tl)
                     {

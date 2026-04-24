@@ -1709,6 +1709,49 @@ void() votables_vote_exit =
 	}
 };
 
+string() votables_nextlevel_vote_label =
+{
+	string nextmap_title = "";
+
+	if (nextmap == "")
+		return "next level";
+
+	nextmap_title = VoteMenu_get_map_by_name(nextmap);
+	if ((nextmap_title == "") || (nextmap_title == "error") || (nextmap_title == "Error"))
+		return sprintf("next level: %s", redify(nextmap));
+
+	return sprintf("next level: %s (%s)", redify(nextmap), nextmap_title);
+};
+
+void() votables_advance_nextmap =
+{
+	if (nextmap != "")
+		strunzone(nextmap);
+	nextmap = "";
+
+	if (clanring_lastcount > 0)
+	{
+		if (clanring_level < 1)
+			clanring_level = 1;
+
+		if (levels[clanring_level] != "")
+		{
+			tokenize(levels[clanring_level]);
+			nextmap = strzone(argv(0));
+			VoteMenu_Init();
+			clanring_level++;
+
+			if (clanring_level > clanring_lastcount)
+				clanring_level = 1;
+
+			utils_set_cvar("scratch1", clanring_level);
+			return;
+		}
+	}
+
+	clanring_nextlevel_config();
+};
+
 //Vote to exit to next map in levels.cfg
 void() votables_request_vote_exit =
 {
@@ -1724,15 +1767,29 @@ void() votables_request_vote_exit =
 		return;
 	}
 
+	if (clanring_request != world)
+	{
+		if ((clanring_request.owner == self) && (clanring_request.classname == "nextmap"))
+		{
+			votables_advance_nextmap();
+			Request_Poll_Cleanup();
+		}
+	}
+
 	if (self.style & CLANRING_ADMINISTRATOR)
 		votables_vote_exit();
 	else
 	{
-		string newstate = "";
-		sprint(self,"\byou have voted to exit to the next level.\n\botherwise, use WARP to specify map.\n");
-		
-		newstate = " exit to ";
-		if (vote_init(newstate, "next level.", votables_vote_exit))
+		if (nextmap == "")
+			clanring_nextlevel_config();
+
+		string nextlevel_label = votables_nextlevel_vote_label();
+		string nextlevel_caption = sprintf("%s.", nextlevel_label);
+		string newstate = "exit to ";
+
+		sprint(self,"\byou have voted to exit to the ", nextlevel_label, ".\n\botherwise, use WARP to specify map.\n");
+
+		if (vote_init(newstate, nextlevel_caption, votables_vote_exit, "nextmap"))
 			vote_yes();
 	}
 };
@@ -2244,6 +2301,7 @@ void (float gibs) votables_request_set_gibs =
 void () votables_disable_item =
 {
 	self.effects = self.effects - (self.effects & self.effects);
+	ffa_item_clear_respawn_ghost(self);
 	self.model = string_null;
 	self.solid = SOLID_NOT;
 	self.nextthink = 9999999; // must be really big for quaketv
@@ -2267,7 +2325,7 @@ void () votables_set_quad =
             g1v1_quad_ghosted = FALSE;
             utils_do_item(SUB_regen, "item_artifact_super_damage"); // ensure present
             bprint("Quad enabled\n");
-            G1v1_UpdateQuadAlpha(FALSE); // -> 1.0
+            G1v1_UpdateQuadAlpha(FALSE); // -> configured FFA/default alpha
         }
         else
         {
@@ -2275,7 +2333,7 @@ void () votables_set_quad =
             clanring_playmode = clanring_playmode | CLANRING_NO_QUAD;
             g1v1_quad_ghosted = TRUE;
             bprint("Quad disabled for 1 on 1\n");
-            G1v1_UpdateQuadAlpha(TRUE);  // -> 0.5
+            G1v1_UpdateQuadAlpha(TRUE);  // -> red/full alpha when cr_ffa_item_alpha is enabled
         }
         utils_set_cvar("samelevel", clanring_playmode);
         return;

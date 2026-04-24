@@ -493,7 +493,7 @@ void() TeamCaptureFlagTouch =
 		
 	if (other.solid == SOLID_TRIGGER)
 	{
-		if (self.cnt == FLAG_DROPPED) 
+		if (self.cnt == FLAG_DROPPED)
 		{
 			if (other.touch == hurt_touch)		// if flag lands on a trigger_hurt return it to base...
 			{
@@ -502,8 +502,11 @@ void() TeamCaptureFlagTouch =
 					self.super_time = time - 30;	// just reset the respawn time and let						    		
 				}					// the think routine control the return...
 			}		
-		}		
+		}
 	}
+
+	if (ffa_start_lock_active())
+		return;
 
 	if (clanring_state & CLANRING_NULL_FLAG)
 		return;
@@ -1330,6 +1333,9 @@ void() RuneTouch =
 	{
 		return;
 	}
+
+	if (ffa_start_lock_active())
+		return;
 
 	if (other.classname != "player") return;
 

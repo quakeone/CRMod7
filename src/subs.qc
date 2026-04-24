@@ -19,7 +19,12 @@
 
 void() SUB_Null = {};
 
-void() SUB_Remove = {remove(self);};
+void() SUB_Remove =
+{
+	if (self.ffa_item_ghost_ent != world)
+		ffa_item_clear_respawn_ghost(self);
+	remove(self);
+};
 
 void() SUB_Freeze = {self.velocity = '0 0 0';}; // ELOHIM_MOD
 /*
@@ -428,6 +433,8 @@ added noclip check because Quake's default still-touch-everything noclip is awfu
 */
 float() CheckValidTouch =
 {
+	if (ffa_start_lock_active())
+		return FALSE;
 	if (clanring_state & CLANRING_MATCH_PAUSED)
 		return FALSE;
 	if (other.classname != "player")

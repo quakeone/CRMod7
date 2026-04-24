@@ -248,6 +248,9 @@ void() DecodeLevelParms =
     self.oflags 				= parm12;  // CRMOD observer flags
     self.clanring_hack_count 	= parm13;
     self.afk_time 				= (time - parm14);
+    self.afk_sync_grace_until  = 0;
+    if (self.style & CLANRING_AFK_CLIENT)
+        self.afk_sync_grace_until = time + CLANRING_AFK_RESYNC_GRACE;
     self.statstate 				= parm15;
 
     self.player_flag = (self.player_flag - (self.player_flag & ITEM_RUNE_MASK));
@@ -634,11 +637,14 @@ void() ClientKill =
     if (gameover)
         return;
 
-    if (self.style & CLANRING_OBSERVER)
-        return;
+	if (self.style & CLANRING_OBSERVER)
+		return;
 
-    if (clanring_state & CLANRING_MATCH_PAUSED)
-    {
+	if (ffa_start_lock_active())
+		return;
+
+	if (clanring_state & CLANRING_MATCH_PAUSED)
+	{
         sprint(self,"The match is paused; you cannot self-gib.");
         return;
     }
@@ -787,8 +793,10 @@ entity () SelectSpawnPoint =
 {
     local entity spot;
     local entity thing;
+    local entity best_spot;
     local float	pcount;
     local float	loop_count;
+    local float	best_count;
 
     spot = find(world, classname, "info_player_deathmatch");
     if (spot == world)
@@ -859,6 +867,37 @@ entity () SelectSpawnPoint =
         pcount = 0;
     }
 
+    if (ffa_start_lock_active())
+    {
+        best_spot = world;
+        best_count = 999999;
+        spot = find(world, classname, "info_player_deathmatch");
+
+        while (spot)
+        {
+            pcount = 0;
+            thing = findradius(spot.origin, 128);
+            while (thing)
+            {
+                if (((thing.classname == "player") && (thing.style & CLANRING_CONNECTED)) && (!(thing.style & CLANRING_OBSERVER)) && (thing.health))
+                    pcount = pcount + 1;
+
+                thing = thing.chain;
+            }
+
+            if ((best_spot == world) || (pcount < best_count))
+            {
+                best_spot = spot;
+                best_count = pcount;
+            }
+
+            spot = find(spot, classname, "info_player_deathmatch");
+        }
+
+        if (best_spot != world)
+            return best_spot;
+    }
+
     if (serverflags)
     {
         spot = find(world, classname, "info_player_start2");
@@ -871,6 +910,109 @@ entity () SelectSpawnPoint =
         error ("PutClientInServer: no info_player_start on level");
     }
     return spot;
+};
+
+vector(float slot, float radius) ffa_start_lock_spawn_offset =
+{
+    if (slot == 0) return '1 0 0' * radius;
+    if (slot == 1) return '-1 0 0' * radius;
+    if (slot == 2) return '0 1 0' * radius;
+    if (slot == 3) return '0 -1 0' * radius;
+    if (slot == 4) return '1 1 0' * radius;
+    if (slot == 5) return '-1 1 0' * radius;
+    if (slot == 6) return '1 -1 0' * radius;
+    return '-1 -1 0' * radius;
+};
+
+float(vector org) ffa_start_lock_spawn_near_player =
+{
+    local entity thing;
+
+    thing = findradius(org, 40);
+    while (thing)
+    {
+        if ((thing != self) && ((thing.classname == "player") && (thing.style & CLANRING_CONNECTED)) && (!(thing.style & CLANRING_OBSERVER)) && (thing.health))
+            return TRUE;
+
+        thing = thing.chain;
+    }
+
+    return FALSE;
+};
+
+float(vector org) ffa_start_lock_spawn_position_clear =
+{
+    local vector drop;
+
+    if (ffa_start_lock_spawn_near_player(org))
+        return FALSE;
+
+    tracebox(org, VEC_HULL_MIN, VEC_HULL_MAX, org, MOVE_NORMAL, self);
+    if (trace_startsolid || trace_allsolid || (trace_fraction < 1))
+        return FALSE;
+
+    drop = org - '0 0 48';
+    tracebox(org, VEC_HULL_MIN, VEC_HULL_MAX, drop, MOVE_NORMAL, self);
+    if (trace_startsolid || trace_allsolid || (trace_fraction == 1))
+        return FALSE;
+
+    if ((org_z - trace_endpos_z) > 28)
+        return FALSE;
+
+    return TRUE;
+};
+
+void(entity spot) ffa_start_lock_spread_spawn =
+{
+    local vector base;
+    local vector candidate;
+    local float ring;
+    local float radius;
+    local float slot;
+    local float try_slot;
+    local float start_slot;
+
+    if (!ffa_start_lock_active())
+        return;
+
+    if (spot == world)
+        return;
+
+    base = spot.origin;
+    if (ffa_start_lock_spawn_position_clear(base))
+        return;
+
+    start_slot = floor(random() * 8);
+    ring = 0;
+
+    while (ring < 3)
+    {
+        radius = 48;
+        if (ring == 1)
+            radius = 72;
+        else if (ring == 2)
+            radius = 96;
+
+        slot = 0;
+        while (slot < 8)
+        {
+            try_slot = start_slot + slot;
+            if (try_slot >= 8)
+                try_slot = try_slot - 8;
+
+            candidate = base + ffa_start_lock_spawn_offset(try_slot, radius);
+            if (ffa_start_lock_spawn_position_clear(candidate))
+            {
+                setorigin(self, candidate);
+                self.oldorigin = self.origin;
+                return;
+            }
+
+            slot = slot + 1;
+        }
+
+        ring = ring + 1;
+    }
 };
 
 /*
@@ -1026,6 +1168,9 @@ void() PutClientInServer =
     self.watertype 				= CONTENT_EMPTY;
     self.waterlevel 			= 0;
     self.velocity 				= '0 0 0';
+    self.ffa_start_locked       = FALSE;
+    self.ffa_start_lock_nextprint = 0;
+    self.ffa_start_lock_lastsound = 0;
     self.last_demomark_time     = 0;
     self.killstreak				= 0;
     self.combo_frags 			= 0;
@@ -1095,6 +1240,7 @@ void() PutClientInServer =
     modelindex_player = self.modelindex;
 
     setsize (self, VEC_HULL_MIN, VEC_HULL_MAX);
+    ffa_start_lock_spread_spawn(spot);
 
     self.view_ofs = '0 0 22';
 
@@ -1663,6 +1809,84 @@ void() badstats_track_spawn_walkovers =
     self.clanring_badstats_telewalk_on = on_tele;
 };
 
+float() ffa_start_lock_player_think =
+{
+    local float remain;
+
+    if (!ffa_start_lock_active())
+    {
+        if (clanring_ffa_start_lock_timer_last)
+        {
+            clanring_ffa_start_lock_timer_last = 0;
+            if (!timelimit)
+                pqc_match_time(0, 0);
+        }
+
+        if (self.ffa_start_locked)
+        {
+            self.ffa_start_locked = FALSE;
+            self.ffa_start_lock_nextprint = 0;
+            self.ffa_start_lock_lastsound = 0;
+
+            if (!(self.style & CLANRING_OBSERVER) && !self.deadflag && self.health > 0)
+            {
+                if (self.finaldest_y)
+                    self.movetype = self.finaldest_y;
+                else
+                    self.movetype = MOVETYPE_WALK;
+
+                self.velocity = '0 0 0';
+                self.movement = '0 0 0';
+                centerprint(self, "\n");
+            }
+        }
+        return FALSE;
+    }
+
+    if ((self.style & CLANRING_OBSERVER) || self.deadflag || self.health <= 0)
+        return FALSE;
+
+    if (!self.ffa_start_locked)
+    {
+        self.ffa_start_locked = TRUE;
+    }
+
+    self.style = (self.style | CLANRING_NO_POST_THINK);
+    self.style = self.style - (self.style & CLANRING_OK_TO_SHOOT);
+    self.movetype = MOVETYPE_NONE;
+    self.velocity = '0 0 0';
+    self.movement = '0 0 0';
+    self.button0 = self.button1 = self.button2 = 0;
+    self.impulse = 0;
+    self.delayed_impulse = 0;
+    self.air_finished = time + 12;
+    self.finaldest_x = time;
+
+    if (time >= self.ffa_start_lock_nextprint)
+    {
+        remain = ceil(clanring_ffa_start_lock_until - time);
+        if (remain < 1)
+            remain = 1;
+
+        if (clanring_ffa_start_lock_timer_last != remain)
+        {
+            pqc_match_time(0, remain);
+            clanring_ffa_start_lock_timer_last = remain;
+        }
+
+        if ((remain <= 3) && (self.ffa_start_lock_lastsound != remain))
+        {
+            stuffcmd(self, "play buttons/switch04.wav\n");
+            self.ffa_start_lock_lastsound = remain;
+        }
+
+        centerprint(self, "\n\n\nGame starts in ", strings_ftos_gold(remain));
+        self.ffa_start_lock_nextprint = time + 0.5;
+    }
+
+    return TRUE;
+};
+
 /*
 ================
 PlayerPreThink
@@ -1715,6 +1939,11 @@ void() PlayerPreThink =
     }
 
     votables_map_vote_prompt_display();
+
+    ffa_join_brightfield_update();
+
+    if (ffa_start_lock_player_think())
+        return;
 
     if (self.style & CLANRING_SETTING_OPTIONS)
     {
@@ -2485,6 +2714,12 @@ void() ClientConnect =
     {
         dropclient(self);
         return;
+    }
+
+    if (parm10 & CLANRING_NEW_CLIENT)
+    {
+        self.ffa_join_brightfield_pending = TRUE;
+        self.ffa_join_brightfield_until = 0;
     }
 
     clanring_client_connect ();
@@ -3414,6 +3649,8 @@ void () check_client_status =
 
     if (chat_status == "2" || chat_status == "3") // AFK (3 = AFK + chatting)
     {
+        self.afk_sync_grace_until = 0;
+
         if (!(self.style & CLANRING_AFK_CLIENT))
             client_afk_on();
 
@@ -3422,14 +3659,31 @@ void () check_client_status =
     }
     else if (chat_status == "1") // Typing
     {
+        self.afk_sync_grace_until = 0;
+
         if (self.style & CLANRING_AFK_CLIENT)
             client_afk_off();
-            
+
         if (!(self.style & CLANRING_TYPING_CLIENT))
             client_typing_on();
     }
-    else if (chat_status == "0" || chat_status == "") // Active
+    else if (chat_status == "0") // Active
     {
+        self.afk_sync_grace_until = 0;
+
+        if (self.style & CLANRING_AFK_CLIENT)
+            client_afk_off();
+
+        if (self.style & CLANRING_TYPING_CLIENT)
+            client_typing_off();
+    }
+    else if (chat_status == "")
+    {
+        // QSS-M may briefly resend an empty chat status during level changes.
+        // Preserve AFK carry-over until that userinfo finishes resyncing.
+        if ((self.style & CLANRING_AFK_CLIENT) && (self.afk_sync_grace_until > time))
+            return;
+
         if (self.style & CLANRING_AFK_CLIENT)
             client_afk_off();
 

@@ -1361,6 +1361,9 @@ void(entity player) hh_head_takeover =
 
 void() hh_haunt_touch =
 {
+	if (ffa_start_lock_active())
+		return;
+
 	if (other.classname != "player")
 		return;
 
@@ -1977,6 +1980,9 @@ void() hh_head_touch =
 	if (!(clanring_playmode & CLANRING_HH_MODE))
 		return;
 
+	if (ffa_start_lock_active())
+		return;
+
 	if (other.classname != "player")
 		return;
 
@@ -2026,6 +2032,9 @@ void() hh_altar_touch =
 	local float altar_slot;
 
 	if (!(clanring_playmode & CLANRING_HH_MODE))
+		return;
+
+	if (ffa_start_lock_active())
 		return;
 
 	if (other.classname != "player")

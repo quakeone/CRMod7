@@ -196,6 +196,10 @@ float   clanring_levelcount;        // used to scan through list in levels.cfg
 float   clanring_lastcount;         // used to detect end-of-file in levels.cfg
 float   clanring_force_ring;        // 1 = force ring on, -1 = force ring off, 0 = no force (auto)
 float   clanring_force_timelimit;   // 1 = force timelimit from cfg, 0 = auto
+float   clanring_ffa_start_lock_config_ready; // clanring.cfg has finalized teamplay-sensitive start-lock mode checks
+float   clanring_ffa_start_lock_start_time; // server time when the current level's FFA lock began
+float   clanring_ffa_start_lock_until; // server time when the FFA post-changelevel lock releases
+float   clanring_ffa_start_lock_timer_last; // last start-lock second sent to the ProQuake timer clock
 float   hh_maxheads = 0;            // 0 = no carry cap; positive values enforce a cap
 float   hh_altar_scoring;           // allows client_frag only during HH altar scoring
 float   hh_collect_taken;           // temp pickup count for HH helper transfers
@@ -317,6 +321,12 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .entity next_team;			        // used to point to next team
 .entity next_camera;		        // used to point to next camera
 .vector clanring_old_velocity;      // used for pausing/unpausing
+.float  ffa_start_locked;           // player is currently held by the FFA post-changelevel lock
+.float  ffa_start_lock_nextprint;   // throttle per-client FFA lock countdown centerprints
+.float  ffa_start_lock_lastsound;   // last FFA start-lock second that played the countdown beep
+.float  ffa_join_brightfield_pending; // fresh connect has not yet entered an FFA game
+.float  ffa_join_brightfield_until; // EF_BRIGHTFIELD is owned by the fresh-join FFA timer until this time
+.entity ffa_item_ghost_ent;         // hidden timer or visual clone for FFA item alpha ghosting
 .float  clanring_hack_count;	    // used to count admin hacking attempts
 .float  quadDisabledMsgShown;     // 0=not shown yet this map, 1=shown (for 1v1 quad disabled message)
 
@@ -540,7 +550,9 @@ float 	PQC_PING_TIMES	=	7;
 
 float	clanring_afk_check;
 float	clanring_afk_timeout;
+float   CLANRING_AFK_RESYNC_GRACE = 30; // seconds to preserve carried AFK state while client chat infokeys resync
 .float 	afk_time;
+.float  afk_sync_grace_until; // preserve carried AFK state until client chat infokeys resync after map/mode changes
 .float 	vote;    //client flag that holds their vote
 .float  ammo_heads;
 .entity hh_head_list;

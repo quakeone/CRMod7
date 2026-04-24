@@ -594,6 +594,9 @@ void(string command, string value) config_command =
 				clanring_set_fraglimit(console_fraglimit);
 				utils_set_cvar("pausable", console_pausable);//why again? we just set this
 				utils_set_cvar("noexit", console_noexit);
+				clanring_ffa_start_lock_config_ready = TRUE;
+				clanring_ffa_start_lock_start_time = time;
+				ffa_start_lock_refresh();
 			}
 			break;
 		}
@@ -892,8 +895,8 @@ void(string mode) clanring_count_maps =
                 if (found_in_warp_list(argv(0))) //The map must be installed in the warp.cfg so that we can grab the title string.
 				{
 					mapCount++;
-                    string maparg = strpad(16, argv(0));
-                    string titlearg = strpad(21,(VoteMenu_get_map_by_name(argv(0))));
+                    string maparg = strpad(16, substring(argv(0), 0, 16));
+                    string titlearg = strpad(21, substring(VoteMenu_get_map_by_name(argv(0)), 0, 21));
                     titlearg = (redify(titlearg));
                     levels[mapCount] = strzone(sprintf("%s %s", maparg, (titlearg)));
                 }
@@ -1405,9 +1408,12 @@ void() clanring_main_config =
 	registercvar("cr_lockdown_labels", "");
 		registercvar("cr_lockdown_auto_release_on_match_start", "0");
 		registercvar("cr_dm_randomize_start", "1");
-		registercvar("cr_ra_randomize_start", "1");
-		registercvar("cr_hh_randomize_start", "0");
-		registercvar("sv_pak0_only", "0");
+			registercvar("cr_ra_randomize_start", "1");
+			registercvar("cr_hh_randomize_start", "0");
+			registercvar("cr_ffa_start_delay", "3");
+			registercvar("cr_ffa_item_alpha", "0.5");
+			registercvar("cr_ffa_item_alpha_time", "5");
+			registercvar("sv_pak0_only", "0");
 		exec_clanring_cfg("configs/clanring.cfg");
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.
