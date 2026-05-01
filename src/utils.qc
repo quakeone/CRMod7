@@ -3750,10 +3750,12 @@ void(entity ev) webhook_stats_info =
     APPEND_SAFE("\n");
     // Enhanced header: "20 min 3v3 match on kaboom" or "15 of 20 min 3v3 match on kaboom"
     // For non-match modes (normal/FFA), shows "10 min game on kaboom"
+    // Overtime: total time across regulation + OT periods, with "(N OT)" suffix.
     {
         local string match_desc;
         local float elapsed_mins, remaining_secs, tl;
-        local string time_str;
+        local float reg_tl, ot_len, ot_n, current_period_tl, completed_mins, total_tl;
+        local string time_str, ot_suffix;
         local string time_str_z, map_str_z;
         local float is_match_mode;
         local string game_type;
@@ -3766,22 +3768,40 @@ void(entity ev) webhook_stats_info =
         if (tl <= 0) tl = cvar("timelimit");
         if (tl <= 0) tl = 20; // default fallback
 
+        // Resolve regulation length and OT contribution.  When the match has
+        // entered OT, clanring_timelimit has been overwritten with the OT
+        // length, so we need clanring_match_initial_timelimit to know what
+        // regulation actually was.
+        ot_n = clanring_overtime_count;
+        if (ot_n < 0) ot_n = 0;
+        reg_tl = clanring_match_initial_timelimit;
+        if (reg_tl <= 0) reg_tl = tl;
+        ot_len = (ot_n > 0) ? tl : 0;
+        current_period_tl = (ot_n > 0) ? ot_len : reg_tl;
+        completed_mins = (ot_n > 0) ? (reg_tl + (ot_n - 1) * ot_len) : 0;
+        total_tl = reg_tl + ot_n * ot_len;
+
+        ot_suffix = "";
+        if (ot_n == 1) ot_suffix = " (1 OT)";
+        else if (ot_n > 1) ot_suffix = sprintf(" (%g OT)", ot_n);
+
         // Calculate elapsed time
-        if (is_match_mode && clanring_match_timer != world && tl > 0)
+        if (is_match_mode && clanring_match_timer != world && current_period_tl > 0)
         {
-            // Match mode: use match timer to calculate elapsed time
+            // Match mode: use match timer to calculate elapsed time within
+            // the current period, then add any completed periods.
             remaining_secs = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
             if (remaining_secs < 0) remaining_secs = 0;
-            elapsed_mins = floor((tl * 60 - remaining_secs) / 60);
+            elapsed_mins = completed_mins + floor((current_period_tl * 60 - remaining_secs) / 60);
             if (elapsed_mins < 1) elapsed_mins = 1;  // Show at least 1 minute
-            
+
             // Show "X of Y min" if match ended early.
-            // Round up if less than 60 seconds remain (match essentially complete)
-            if (remaining_secs > 0 && remaining_secs < 60) elapsed_mins = tl;
-            if (remaining_secs >= 60 && elapsed_mins < tl)
-                time_str = sprintf("%g of %g min", elapsed_mins, tl);
+            // Round up if less than 60 seconds remain (current period essentially complete)
+            if (remaining_secs > 0 && remaining_secs < 60) elapsed_mins = total_tl;
+            if (remaining_secs >= 60 && elapsed_mins < total_tl)
+                time_str = sprintf("%g of %g min%s", elapsed_mins, total_tl, ot_suffix);
             else
-                time_str = sprintf("%g min", tl);
+                time_str = sprintf("%g min%s", total_tl, ot_suffix);
         }
         else if (!is_match_mode)
         {
@@ -3791,7 +3811,7 @@ void(entity ev) webhook_stats_info =
             time_str = sprintf("%g min", elapsed_mins);
         }
         else
-            time_str = sprintf("%g min", tl);
+            time_str = sprintf("%g min%s", total_tl, ot_suffix);
 
         // Zone strings to avoid tempstring aliasing.
         time_str_z = strzone(time_str);

@@ -366,6 +366,8 @@ void() match_init_world =
     clanring_match_aborted = FALSE;
     clanring_match_inactivity_check = world;
     clanring_match_start_time = 0;
+    clanring_match_initial_timelimit = 0;
+    clanring_overtime_count = 0;
     clanring_sentinel.next_team = world;
     clanring_sentinel.movetarget = world;
     clanring_sentinel.frags = CLANRING_NEGINF;
@@ -1243,6 +1245,7 @@ void() match_end =
         // Regular match end (timer ran out)
         if ((clanring_first_place.frags == clanring_second_place.frags) && clanring_overtime)
         {
+            clanring_overtime_count = clanring_overtime_count + 1;
             clanring_timelimit = clanring_overtime;//R00k OT bug fix
             timelimit = (clanring_timelimit * 60);//fixme??
             // go into overtime
@@ -1821,6 +1824,8 @@ void() match_begin =
     forceinfokey(world, "matchtime", ftos(clanring_timelimit));//R00k: requested by Woods.
     stats_matchtype = clanring_maxsize;	//3/6/2017 6:14AM added for stats header output, this will be incorrect if the game is unlocked.(fixme)
     stats_timelimit = clanring_timelimit;
+    clanring_match_initial_timelimit = clanring_timelimit;
+    clanring_overtime_count = 0;
 
     self.think = match_timer_think2;
     self.nextthink = time + 1;

@@ -359,7 +359,6 @@ void() IntermissionThink =
         tokenize(vote_map_choices[self.impulse]);
 
         string myVoteMapName = strzone(argv(0));
-        string myVoteMapTitle = strzone(redify(argv(1)));
 
         // Helper: compute how many more votes are needed for a simple majority right now
         // (matches the majority check later: > (players * 0.5))
@@ -385,12 +384,12 @@ void() IntermissionThink =
             {
                 local float need1 = votes_needed_for_slot(self.warp_map);
                 if (need1 > 0)
-                    bprint(sprintf("%s \bREMOVED\b their vote for %s %s (%s more needed to pass)\n",
-                                   self.netname, myVoteMapName, myVoteMapTitle,
+                    bprint(sprintf("%s \bREMOVED\b their vote for %s (%s more needed to pass)\n",
+                                   self.netname, myVoteMapName,
                                    strings_ftos_gold(need1)));
                 else
-                    bprint(sprintf("%s \bREMOVED\b their vote for %s %s (Vote passed)\n",
-                                   self.netname, myVoteMapName, myVoteMapTitle));
+                    bprint(sprintf("%s \bREMOVED\b their vote for %s (Vote passed)\n",
+                                   self.netname, myVoteMapName));
             }
             self.warp_map = 0;
             self.impulse = 0;
@@ -404,22 +403,20 @@ void() IntermissionThink =
             // Print the REMOVED line for the PREVIOUSLY voted map (self.warp_map), not the new one
             tokenize(vote_map_choices[self.warp_map]);
             string prevVoteMapName  = strzone(argv(0));
-            string prevVoteMapTitle = strzone(redify(argv(1)));
             map_choices[self.warp_map] -= 1;
             {
                 local float need2 = votes_needed_for_slot(self.warp_map);
                 if (need2 > 0)
-                    bprint(sprintf("%s \bREMOVED\b their vote for %s %s (%s more needed to pass)\n",
-                                   self.netname, prevVoteMapName, prevVoteMapTitle,
+                    bprint(sprintf("%s \bREMOVED\b their vote for %s (%s more needed to pass)\n",
+                                   self.netname, prevVoteMapName,
                                    strings_ftos_gold(need2)));
                 else
-                    bprint(sprintf("%s \bREMOVED\b their vote for %s %s (Vote passed)\n",
-                                   self.netname, prevVoteMapName, prevVoteMapTitle));
+                    bprint(sprintf("%s \bREMOVED\b their vote for %s (Vote passed)\n",
+                                   self.netname, prevVoteMapName));
             }
             self.warp_map = 0;
             centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[1], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);
             strunzone(prevVoteMapName);
-            strunzone(prevVoteMapTitle);
         }
 
         self.warp_map = self.impulse;
@@ -428,16 +425,15 @@ void() IntermissionThink =
         {
             local float need3 = votes_needed_for_slot(self.warp_map);
             if (need3 > 0)
-                bprint(sprintf("%s voted for %s %s (%s more needed to pass)\n",
-                               self.netname, myVoteMapName, myVoteMapTitle,
+                bprint(sprintf("%s voted for %s (%s more needed to pass)\n",
+                               self.netname, myVoteMapName,
                                strings_ftos_gold(need3)));
             else
-                bprint(sprintf("%s voted for %s %s - Vote passed\n",
-                               self.netname, myVoteMapName, myVoteMapTitle));
+                bprint(sprintf("%s voted for %s - Vote passed\n",
+                               self.netname, myVoteMapName));
         }
 
         strunzone(myVoteMapName);
-        strunzone(myVoteMapTitle);
 
 //		if (clanring_gameconfig & CLANRING_VOTE_MAJORITY_PASS)
         {

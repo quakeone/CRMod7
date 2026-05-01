@@ -187,6 +187,8 @@ float   clanring_state;             // server state (volatile flags)
 float   clanring_timelimit;         // timelimit for matches (default 20 minutes)
 float   default_timelimit;          // reset timelimit between matches in case of overtime or interrupted match abort
 float   clanring_overtime;          // length of auto-overtime; 0 if none
+float   clanring_match_initial_timelimit; // regulation timelimit captured at match start, preserved across OT
+float   clanring_overtime_count;    // number of overtime periods entered in the current match
 float   clanring_nextcheck;         // used for periodic checks
 float   clanring_nextcheck2;	    // used for frequent periodic checks
 entity  clanring_request;           // used to control voting
