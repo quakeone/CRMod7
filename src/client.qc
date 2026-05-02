@@ -3135,24 +3135,38 @@ void(entity targ, entity attacker) ClientObituary =
                     }
 
                     deathstring2 = ", with just his bare hands.\n";
+                    rnum = attacker.weapon;
 
-                    if (attacker.weapon == IT_ROCKET_LAUNCHER)
+                    if (targ.deathtype == "rocket")
+                        rnum = IT_ROCKET_LAUNCHER;
+                    if (targ.deathtype == "grenade")
+                        rnum = IT_GRENADE_LAUNCHER;
+                    if (targ.deathtype == "supernail")
+                        rnum = IT_SUPER_NAILGUN;
+                    if (targ.deathtype == "nail")
+                        rnum = IT_NAILGUN;
+                    if (targ.deathtype == "hook")
+                        rnum = IT_HOOK;
+                    if (targ.deathtype == "discharge")
+                        rnum = IT_LIGHTNING;
+
+                    if (rnum == IT_ROCKET_LAUNCHER)
                         deathstring2 = ", with a Rocket Launcher.";
-                    if (attacker.weapon == IT_LIGHTNING)
+                    if (rnum == IT_LIGHTNING)
                         deathstring2 = ", with a Lightning Gun.";
-                    if ((attacker.weapon == IT_GRENADE_LAUNCHER))
+                    if ((rnum == IT_GRENADE_LAUNCHER))
                         deathstring2 = ", with a Grenade Launcher.";
-                    if ((attacker.weapon == IT_SUPER_NAILGUN))
+                    if ((rnum == IT_SUPER_NAILGUN))
                         deathstring2 = ", with a Super Nailgun.";
-                    if ((attacker.weapon == IT_SUPER_SHOTGUN))
+                    if ((rnum == IT_SUPER_SHOTGUN))
                         deathstring2 = ", with a Super Shotgun.";
-                    if ((attacker.weapon == IT_NAILGUN))
+                    if ((rnum == IT_NAILGUN))
                         deathstring2 = ", with a Nailgun.";
-                    if ((attacker.weapon == IT_SHOTGUN))
+                    if ((rnum == IT_SHOTGUN))
                         deathstring2 = ", with a Shotgun.";
-                    if ((attacker.weapon == IT_AXE))
+                    if ((rnum == IT_AXE))
                         deathstring2 = ", with an Axe.";
-                    if ((attacker.weapon == IT_HOOK))
+                    if ((rnum == IT_HOOK))
                         deathstring2 = ", with a Hook.";
 
                     announce4(attacker.netname, deathstring, targ.netname, deathstring2);
