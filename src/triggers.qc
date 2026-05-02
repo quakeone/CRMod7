@@ -352,12 +352,25 @@ void() tdeath_touch =
         entity killer = other_is_later ? other       : self.owner;
 
         /* Pentagram check - if the intended victim is invulnerable,
-           swap roles so the invulnerable player survives. */
-        if (victim.invincible_finished > time)
+           deflect the telefrag onto the attacker.  If both players have
+           pentagram, the telefrag still kills the original victim. */
+        if (victim.invincible_finished >= time)
         {
-            entity tmp = victim;
-            victim = killer;
-            killer = tmp;
+            self.owner = killer;
+
+            if (killer.invincible_finished >= time)
+            {
+                self.classname = "teledeath3";
+                victim.invincible_finished = 0;
+                T_Damage (victim, self, self, 50000);
+            }
+            else
+            {
+                self.classname = "teledeath2";
+                T_Damage (killer, self, self, 50000);
+            }
+
+            return;
 		}
 		
         self.owner = killer;              /* <-- make obituary show right name */

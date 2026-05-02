@@ -708,7 +708,7 @@ void() GibPlayer =
 		sound (self, CHAN_VOICE, "player/teledth1.wav", 1, ATTN_NORM);
 		return;
 	}
-	if (damage_attacker.classname == "teledeath2")
+	if (damage_attacker.classname == "teledeath2" || damage_attacker.classname == "teledeath3")
 	{
 		sound (self, CHAN_VOICE, "player/teledth1.wav", 1, ATTN_NORM);
 		return;

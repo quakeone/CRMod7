@@ -2997,7 +2997,7 @@ void(entity targ, entity attacker) ClientObituary =
         }
         if (attacker.classname == "teledeath2")
         {
-            announce3("Pentegram power deflects ", targ.netname, "'s telefrag");
+            announce3("Pentagram power deflects ", targ.netname, "'s telefrag");
             targ.mangle_z = targ.mangle_z + 1;
             client_frag (targ, -1);
             return;
