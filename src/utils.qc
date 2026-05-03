@@ -4263,7 +4263,7 @@ void(entity ev) webhook_stats_info =
         // close if opened
         if (opened_quad) APPEND_SAFE("```\n");
 
-        // ---- Bad stats (paks self% team% lava axe fall) ----
+        // ---- Bad stats (paks self% team% bore lava axe fall) ----
         {
             local float opened; opened = 0;
             local float b_seen, b_inc, b_obs, b_noteam, b_limit;
@@ -4288,9 +4288,9 @@ void(entity ev) webhook_stats_info =
                 {
                     if (!opened) {
                         if (stats_badstats_has_walkover_categories())
-                            APPEND_SAFE("\n**Bad stats (paks self% team% lava axe fall spawn tele)**\n\n");
+                            APPEND_SAFE("\n**Bad stats (paks self% team% bore lava axe fall spawn tele)**\n\n");
                         else
-                            APPEND_SAFE("\n**Bad stats (paks self% team% lava axe fall)**\n\n");
+                            APPEND_SAFE("\n**Bad stats (paks self% team% bore lava axe fall)**\n\n");
                         APPEND_SAFE("```\n");
                         opened = 1;
                     }
@@ -4314,7 +4314,8 @@ void(entity ev) webhook_stats_info =
                     if (stats_badstats_has_walkover_categories())
                     {
                         local string bad_tail;
-                        bad_tail = sprintf("%2g %2g %2g %2g %2g",
+                        bad_tail = sprintf("%2g %2g %2g %2g %2g %2g",
+                                           p.clanring_badstats_bores,
                                            p.clanring_badstats2_x,
                                            p.clanring_badstats2_y,
                                            p.clanring_badstats2_z,
@@ -4331,15 +4332,19 @@ void(entity ev) webhook_stats_info =
                     }
                     else
                     {
+                        local string bad_tail2;
+                        bad_tail2 = sprintf("%2g %2g %2g %2g",
+                                            p.clanring_badstats_bores,
+                                            p.clanring_badstats2_x,
+                                            p.clanring_badstats2_y,
+                                            p.clanring_badstats2_z);
                         line = sprintf(
-                            "%s  %2g | %3g%% %3g%% | %2g %2g %2g\n",
+                            "%s  %2g | %3g%% %3g%% | %s\n",
                             strpad(name_col_w, zname),
                             p.clanring_badstats_x,       // paks
                             self_pct,                    // self %
                             team_pct,                    // team %
-                            p.clanring_badstats2_x,      // lava
-                            p.clanring_badstats2_y,      // axe
-                            p.clanring_badstats2_z       // fall
+                            bad_tail2                    // bore, lava, axe, fall
                         );
                     }
 

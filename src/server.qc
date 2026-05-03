@@ -52,6 +52,7 @@
 // .crmod_badstats_x - number of RL paks lost
 // .crmod_badstats_y - total damage done to self
 // .crmod_badstats_z - total damage done to teammates
+// .crmod_badstats_bores - self kills with own rockets/grenades
 //
 // Observer mode:
 //
@@ -93,6 +94,9 @@
 // .mangle
 // .crmod_qdwep
 // .crmod_qdkill
+// .crmod_badstats
+// .crmod_badstats2
+// .crmod_badstats_bores
 // .style
 // Copied on pause (if not dead):
 // .frame

@@ -3052,6 +3052,9 @@ void(entity targ, entity attacker) ClientObituary =
                 client_frag (attacker, -1);
                 attacker.just_suicided = 0;
 
+                if (targ.deathtype == "grenade" || targ.deathtype == "rocket")
+                    attacker.clanring_badstats_bores = attacker.clanring_badstats_bores + 1;
+
                 if (targ.deathtype == "grenade")
                 {
                     if (targ.health < -20)

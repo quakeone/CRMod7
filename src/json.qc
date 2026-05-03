@@ -956,6 +956,7 @@ void() json_emit_match_document =
                     json_kv_number("rl_paks_given", p.clanring_badstats_x);
                     json_kv_number("self_dmg_pct",  self_pct);
                     json_kv_number("team_dmg_pct",  team_pct);
+                    json_kv_number("bore_deaths",   p.clanring_badstats_bores);
                     json_kv_number("lava_deaths",   p.clanring_badstats2_x);
                     json_kv_number("axe_deaths",    p.clanring_badstats2_y);
                     json_kv_number("fall_deaths",   p.clanring_badstats2_z);

@@ -297,6 +297,7 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .vector clanring_ptkill;            // vector to keep track of pent kill stats		// CRMOD - stats
 .vector clanring_badstats;          // keep track of RL paks and damage done to team
 .vector clanring_badstats2;         // keep track of lava, axe, falling deaths
+.float  clanring_badstats_bores;    // self kills with own rockets/grenades
 .float  clanring_badstats_spawnwalk; // times player entered a spawn point volume
 .float  clanring_badstats_spawnwalk_on; // debounce state: currently overlapping a spawn point
 .float  clanring_badstats_spawnwalk_ignore_until; // suppress counting immediately after spawn/restore and briefly after a count

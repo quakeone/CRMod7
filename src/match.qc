@@ -2510,6 +2510,8 @@ void(entity ghostent) match_restore_ghost =
     self.mangle = ghostent.mangle;
     self.statstate = ghostent.statstate;
     self.clanring_badstats = ghostent.clanring_badstats;
+    self.clanring_badstats2 = ghostent.clanring_badstats2;
+    self.clanring_badstats_bores = ghostent.clanring_badstats_bores;
     self.clanring_badstats_spawnwalk = ghostent.clanring_badstats_spawnwalk;
     self.clanring_badstats_spawnwalk_on = FALSE;
     self.clanring_badstats_spawnwalk_ignore_until = time + 1;
@@ -4405,6 +4407,8 @@ void(entity player) match_disconnect_notify =
                  self.owner.statstate 	= self.statstate;
                            
                 self.owner.clanring_badstats = self.clanring_badstats;
+                self.owner.clanring_badstats2 = self.clanring_badstats2;
+                self.owner.clanring_badstats_bores = self.clanring_badstats_bores;
                 self.owner.clanring_badstats_spawnwalk = self.clanring_badstats_spawnwalk;
                 self.owner.clanring_badstats_telewalk = self.clanring_badstats_telewalk;
                 

@@ -606,13 +606,13 @@ void() console_show_badstats =
 
 	if (show_walkovers)
 	{
-		cprint("\" paks | self | team | lava | axed | fall | spwn | tele |      name\"\n");
-		cprint("\"------+------+------+------+------+------+------+------+----------------\"\n");
+		cprint("\" paks | self | team | bore | lava | axed | fall | spwn | tele |      name\"\n");
+		cprint("\"------+------+------+------+------+------+------+------+------+----------------\"\n");
 	}
 	else
 	{
-		cprint("\" paks | self | team | lava | axed | fall |      name\"\n");
-		cprint("\"------+------+------+------+------+------+----------------\"\n");
+		cprint("\" paks | self | team | bore | lava | axed | fall |      name\"\n");
+		cprint("\"------+------+------+------+------+------+------+----------------\"\n");
 	}
 	player = clanring_sentinel.next_player;
 	while (player)
@@ -625,6 +625,8 @@ void() console_show_badstats =
 		console_print_percent4(player.clanring_badstats_y, tot_done);
 		cprint(" | ");
 		console_print_percent4(player.clanring_badstats_z, tot_done);
+		cprint(" | ");
+		utils_cprint_int3(player.clanring_badstats_bores);
 		cprint(" | ");
 		utils_cprint_int3(player.clanring_badstats2_x);  // lava deaths
 		cprint(" | ");
