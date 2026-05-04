@@ -252,6 +252,8 @@ string (float num) strings_get_teamname =
 		"Aqua team",	"Yellow team",
 		"Blue team"
 	};
+	if (num < 1 || num > 13)
+		return "Unknown team";
 	return tab[num-1];
 };
 
@@ -273,6 +275,8 @@ string (float num) strings_get_teamname_bronze =
 		"\bAqua team      ",	"\bYellow team    ",
 		"\bBlue team      "
 	};
+	if (num < 1 || num > 13)
+		return "\bUnknown team   ";
 	return tab[num-1];
 };
 
@@ -295,6 +299,8 @@ string (float num) strings_get_teamname2 =
 		"Aqua      ",	"Yellow    ",
 		"Blue      "
 	};
+	if (num < 1 || num > 13)
+		return "Unknown   ";
 	return tab[num-1];
 };
 //
@@ -314,6 +320,8 @@ string (float num) strings_get_teamname3 =
 		"Aqua    ",	"Yellow  ",
 		"Blue    "
 	};
+	if (num < 1 || num > 13)
+		return "Unknown ";
 	return tab[num-1];
 };
 //
@@ -333,6 +341,8 @@ string (float num) strings_get_teamname4 =
 		"Aqu",	"Yel",
 		"Blu"
 	};
+	if (num < 1 || num > 13)
+		return "???";
 	return tab[num-1];
 };
 string (float num) strings_get_teamname4_red =
@@ -347,6 +357,8 @@ string (float num) strings_get_teamname4_red =
 		"\bAqu\b",	"\bYel\b",
 		"\bBlu\b"
 	};
+	if (num < 1 || num > 13)
+		return "\b???\b";
 	return tab[num-1];
 };
 //
@@ -374,6 +386,8 @@ string (float num) strings_get_colour =
 		"blue"
 	};
 
+	if (num < 0 || num > 13)
+		return "unknown";
 	return tab[num];
 };
 
