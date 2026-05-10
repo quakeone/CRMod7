@@ -190,6 +190,10 @@ void(entity item, string itemname, float timeleft) SendObserverItemTimer
     if (mode_is_arena())
         return;
 
+    // Weaponstay/static weapons do not need respawn overlays.
+    if ((deathmatch == 3) && ((itemname == "rl") || (itemname == "lg")))
+        return;
+
     // Loop through all clients with player classname
     entity player;
     player = find(world, classname, "player");
