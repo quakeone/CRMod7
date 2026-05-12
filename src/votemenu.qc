@@ -54,7 +54,9 @@ void () VoteMenu_Init =
 {
     string nextmap_textline[6];
     float usedIndices[6];
-    float nextlevel, index = 1, canUse = FALSE;
+    float nextlevel, index = 1, canUse = FALSE, show_console_info;
+
+    show_console_info = utils_show_nextmap_console_info();
 
     nextlevel = (clanring_level < 1 ? 1 : clanring_level);
 
@@ -89,12 +91,15 @@ void () VoteMenu_Init =
         if (levels[index] != "")
         {
             usedIndices[j] = index;
-            nextmap_textline[j] = levels[index]; dprint(nextmap_textline[j], "\n");
+            nextmap_textline[j] = levels[index];
+            if (show_console_info)
+                dprint(nextmap_textline[j], "\n");
             vote_map_choices[j] = strzone(nextmap_textline[j]);
         }
         else
         {
-            dprint(sprintf("Skipping invalid level at index %g\n", index));
+            if (show_console_info)
+                dprint(sprintf("Skipping invalid level at index %g\n", index));
         }
         canUse = FALSE;
     }

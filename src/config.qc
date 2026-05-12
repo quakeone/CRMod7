@@ -989,9 +989,7 @@ void() clanring_nextlevel_config =
     }
     else
     {
-        if ((clanring_playmode & CLANRING_NORMAL_MODE)
-            && !(clanring_playmode & CLANRING_MATCH_MODE)
-            && !(clanring_playmode & CLANRING_PRACTICE_MODE))
+        if (utils_show_nextmap_console_info())
             print(sprintf("NextMap is %s.\n", nextmap));
 		VoteMenu_Init();
         clanring_level++;

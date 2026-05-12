@@ -78,6 +78,29 @@ void() badstats_invalidate_walkover_cache =
     badstats_walkover_cache_ready = FALSE;
 };
 
+float() utils_show_nextmap_console_info =
+{
+    if (clanring_playmode & CLANRING_HH_MODE)
+        return TRUE;
+
+    if (clanring_playmode & CLANRING_RA_MODE)
+        return TRUE;
+
+    if (!(clanring_playmode & CLANRING_NORMAL_MODE))
+        return FALSE;
+
+    if (clanring_playmode & (CLANRING_CAPTURE_THE_FLAG
+                           | CLANRING_MATCH_MODE
+                           | CLANRING_PRACTICE_MODE
+                           | CLANRING_CA_MODE
+                           | CLANRING_WIPEOUT_MODE
+                           | CLANRING_DMM4_MODE
+                           | CLANRING_AIRSHOT_MODE))
+        return FALSE;
+
+    return TRUE;
+};
+
 void() badstats_cache_link_spawn =
 {
     self.clanring_walkover_cache_next = badstats_walkover_spawn_head;
