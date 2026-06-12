@@ -94,6 +94,11 @@ void(string command, string value) config_command =
                 utils_do_players(match_clear_leavemealone);
             break;
         }
+        case "cr_suggest_countdown_hint":
+        {
+            cvar_set("cr_suggest_countdown_hint", value);
+            break;
+        }
 		case "setadmin":
 		{
 			array_password[0] = stof(value);
@@ -1399,6 +1404,7 @@ void() clanring_main_config =
 	print("Loading ClanRing Configuration File: \"configs/clanring.cfg\"\n");
 	// Ensure custom cvars exist before parsing config so cvar_set works on them
 		registercvar("cr_allow_leavemealone", "1");
+		registercvar("cr_suggest_countdown_hint", "1");
 		registercvar("cr_hh_weaponstay_pref", "-1");
 		registercvar("cr_pubctf_runes_override", "-1");
 		registercvar("cr_lockdown_until", "0");

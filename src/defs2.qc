@@ -766,6 +766,7 @@ float last_return_time;
 .float next_color;
 
 .float last_lastscores_time;  // Per-client anti-spam for "lastscores" (3s throttle)
+.float next_suggest_time;     // Per-client anti-spam for broadcast pickup suggestions
 .float team2;
 .float wins;
 .float losses;

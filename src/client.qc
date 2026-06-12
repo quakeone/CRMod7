@@ -2920,7 +2920,10 @@ void(entity client, float fragval) client_frag =
             else if ((togo >= 1) && (togo <= window))
             {
                 if (togo == 1)
+                {
+                    sound(world, CHAN_AUTO, "plats/train2.wav", 1, ATTN_NONE);
                     bprint2(client.netname, " is on \bgame point\b!\n");
+                }
                 else
                     bprint4(client.netname, " has ",
                             strings_ftos_gold(client.frags),
@@ -3950,6 +3953,10 @@ void(string cmd) SV_ParseClientCommand =
                     }
                 }
             }
+            return;
+
+        case "suggest":
+            Suggest_f(args);
             return;
 
         case "fraglimit":

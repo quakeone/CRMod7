@@ -136,6 +136,7 @@ void() votables_send_aliases =
 	stuffcmd(self, "alias obits impulse 211\n");
 	// timelimit aliases
 	stuffcmd(self, "alias timeset cmd timeset\n");
+	stuffcmd(self, "alias suggest \"cmd suggest\"\n");
 	stuffcmd(self, "alias otset impulse 216\n");
 	// Quad, Pent, Ring aliases
 	stuffcmd(self, "alias setquad impulse 221\n");
@@ -727,6 +728,7 @@ void() votables_set_gametype_mode_map =
 	if (!leavemealone_mode_allows())
 		utils_do_players(match_clear_leavemealone);
 
+	utils_sync_external_ents_dir();
 	changelevel (newmapname);
 };
 

@@ -37,6 +37,7 @@ void() match_enter_ghost_code;
 void() match_start_unpause_countdown;
 void() match_notready;
 void() match_start_timer;
+void() Suggest_MaybePrintCountdownHint;
 void() match_unpause;
 void(entity ghostent) match_restore_ghost;
 float() match_is_imbalanced;
@@ -2315,6 +2316,7 @@ void() match_start_timer =
     clanring_match_timer.nextthink = time + 1;
 
     clanring_state = clanring_state | CLANRING_TIMER_STARTED;
+    Suggest_MaybePrintCountdownHint();
     match_show_timelimit();
 
     // Let's GO!!!

@@ -2081,6 +2081,7 @@ void () clanring_help_misc =
     sprint(self, " rules      - view server rules\n");
     sprint(self, " ticrate    - view sys_ticrate\n");
     sprint(self, " shownick   - teammate identifier\n");
+    sprint(self, " suggest    - suggest balanced pickup teams\n");
     sprint(self, " autoweapon - toggle smartweapon\n");
     sprint(self, " autopause  - toggle auto pausing\n");
     sprint(self, " last       - show recently disconnected players\n");
@@ -2235,6 +2236,7 @@ void () misc_commands =
         sprint(self, " \blastscores\b\n");
         sprint(self, " \bmotd\b\n");
         sprint(self, " \brules\b\n");
+        sprint(self, " \bsuggest\b\n");
         sprint(self, " \bcmd unignore\b\n");
         sprint(self, "\n");
 };

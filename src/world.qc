@@ -206,6 +206,7 @@ void() worldspawn =
     precache_sound ("player/h2odeath.wav");		// drowning death
 
     precache_sound ("misc/talk.wav");			// talk
+    precache_sound ("plats/train2.wav");		// FFA game point
     precache_sound ("player/teledth1.wav");		// telefrag
     precache_sound ("misc/r_tele1.wav");		// teleport sounds
     precache_sound ("misc/r_tele2.wav");
@@ -439,7 +440,6 @@ void() worldspawn =
 void() StartFrame =
 {
     local entity serverinactive;
-    local float altents_enabled;
     //this restarts the server after 6 hour if no one is on the server
     //it keeps the server running smooth
 
@@ -466,24 +466,9 @@ void() StartFrame =
     
     if (framecount == 1)	
     {
-        altents_enabled = (cvar("gamecfg")) & CLANRING_ALTERNATIVE_ENTS;
-
-        if (altents_enabled)
-        {
-            if ((cvar("samelevel")) & CLANRING_CAPTURE_THE_FLAG)
-                cvar_set("external_ents_dir", "ctf_alt");
-            else
-                cvar_set("external_ents_dir", "dm_alt");	
-
+        utils_sync_external_ents_dir();
+        if ((cvar("gamecfg")) & CLANRING_ALTERNATIVE_ENTS)
             bprint("Alternative entity set enabled\n");
-        }
-        else
-        {
-            if ((cvar("samelevel")) & CLANRING_CAPTURE_THE_FLAG)
-                cvar_set("external_ents_dir", "ctf");
-            else
-                cvar_set("external_ents_dir", "");	
-        }
     }
 
     clanring_start_frame();

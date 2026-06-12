@@ -1691,6 +1691,14 @@ void() stats_show_per =
 //
 //  Dump statistics if player has autostats enabled.
 //
+float() stats_should_post_webhook =
+{
+	if (clanring_playmode & CLANRING_MATCH_MODE)
+		return (clanring_state & CLANRING_MATCH_OVER);
+
+	return (gameover || intermission_running);
+};
+
 void() stats_autodump =
 {
 		sprint(self, "\n");
@@ -1817,12 +1825,12 @@ void() stats_autodump =
         if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
             msg = strcat(msg, sprintf("%s set a new match capture record!\n", clanring_new_record_player));
 
-        // Defer the post: PREP = webhook_stats_info, CONTENT = msg.
-        // Throttle so multiple stats_autodump passes don't duplicate posts.
-        if (!(clanring_timelimit > 0 && match_aborted_too_early()))
-        {
-            if (time >= stats_webhook_next_allowed_time)
-            {
+	        // Defer the post: PREP = webhook_stats_info, CONTENT = msg.
+	        // Throttle so multiple stats_autodump passes don't duplicate posts.
+	        if (stats_should_post_webhook() && !(clanring_timelimit > 0 && match_aborted_too_early()))
+	        {
+	            if (time >= stats_webhook_next_allowed_time)
+	            {
                 stats_webhook_next_allowed_time = time + 90.0;
                 webhook_post_deferred(webhook_stats_info, msg);
             }

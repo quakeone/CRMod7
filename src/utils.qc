@@ -43,6 +43,28 @@ void (string s, ...) bprint5 = #23;
 void (string s, ...) bprint6 = #23; 
 void (string s, ...) bprint7 = #23; 
 
+void() utils_sync_external_ents_dir =
+{
+    local float altents_enabled;
+
+    altents_enabled = (cvar("gamecfg")) & CLANRING_ALTERNATIVE_ENTS;
+
+    if (altents_enabled)
+    {
+        if ((cvar("samelevel")) & CLANRING_CAPTURE_THE_FLAG)
+            cvar_set("external_ents_dir", "ctf_alt");
+        else
+            cvar_set("external_ents_dir", "dm_alt");
+    }
+    else
+    {
+        if ((cvar("samelevel")) & CLANRING_CAPTURE_THE_FLAG)
+            cvar_set("external_ents_dir", "ctf");
+        else
+            cvar_set("external_ents_dir", "");
+    }
+};
+
 void() clanring_clear_player_runes;
 
 float() stats_badstats_has_walkover_categories =

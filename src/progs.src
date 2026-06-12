@@ -47,6 +47,7 @@ console.qc
 config.qc
 googlesheets.qc
 options.qc
+suggest.qc
 subs.qc
 combat.qc
 ident.qc
