@@ -2093,6 +2093,95 @@ float(string maparg) found_in_warp_list =
 	return mapfound;
 };
 
+float(string section) levels_cfg_is_section =
+{
+	return ((section == "-ctf-") || (section == "-ca-") || (section == "-dm-") || (section == "-ra-") || (section == "-hh-"));
+};
+
+string(float gametype) levels_cfg_section_for_gametype =
+{
+	if (gametype == 1)
+		return "-ctf-";
+	else if (gametype == 2 || gametype == 6)
+		return "-ca-";
+	else if (gametype == 3 || gametype == 4 || gametype == 5 || gametype == 7)
+		return "-ra-";
+	else if (gametype == 8)
+		return "-hh-";
+	else if (gametype == -2)
+	{
+		if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+			return "-ctf-";
+		return "-dm-";
+	}
+	else if (gametype < 0)
+	{
+		if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+			return "-ctf-";
+		else if (clanring_playmode & CLANRING_CA_MODE)
+			return "-ca-";
+		else if ((clanring_playmode & CLANRING_RA_MODE) || (clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_AIRSHOT_MODE))
+			return "-ra-";
+		else if (clanring_playmode & CLANRING_HH_MODE)
+			return "-hh-";
+	}
+
+	return "-dm-";
+};
+
+float(string section) levels_cfg_random_map_from_section =
+{
+	local filestream f;
+	local string line;
+	local float argc, found_section, mapcount, mapnum, selected_mapnum;
+
+	f = fopen("configs/levels.cfg", FILE_READ);
+	if (f < 0)
+		return FALSE;
+
+	while ((line = fgets(f)))
+	{
+		argc = tokenize(line);
+		if (!argc) continue;
+		if (argv(0) == "//" || argv(0) == "#") continue;
+
+		if (!found_section)
+		{
+			if (argv(0) == section)
+				found_section = TRUE;
+			continue;
+		}
+
+		if (levels_cfg_is_section(argv(0)))
+			break;
+
+		mapnum = found_in_warp_list(argv(0));
+		if (mapnum)
+		{
+			mapcount = mapcount + 1;
+			if ((random() * mapcount) < 1)
+				selected_mapnum = mapnum;
+		}
+	}
+
+	fclose(f);
+	return selected_mapnum;
+};
+
+float(float gametype) levels_cfg_random_map_for_gametype =
+{
+	local string section;
+	local float mapnum;
+
+	section = levels_cfg_section_for_gametype(gametype);
+	mapnum = levels_cfg_random_map_from_section(section);
+
+	if (!mapnum && section == "-hh-")
+		mapnum = levels_cfg_random_map_from_section("-dm-");
+
+	return mapnum;
+};
+
 // used to determine mode from client command
 float(string modearg) get_mode_from_string =
 {
@@ -2429,6 +2518,26 @@ float () ffa_start_lock_delay =
 	return delay;
 };
 
+//
+//  Count clients currently in the game (not observers). Used to skip the
+//  FFA start-lock when there is nobody to wait for.
+//
+float () ffa_start_lock_playercount =
+{
+	local entity p;
+	local float n;
+
+	n = 0;
+	p = find(world, classname, "player");
+	while (p)
+	{
+		if (!(p.style & CLANRING_OBSERVER))
+			n = n + 1;
+		p = find(p, classname, "player");
+	}
+	return n;
+};
+
 float () ffa_start_lock_mode =
 {
 	if (clanring_playmode & CLANRING_MATCH_MODE)
@@ -2447,6 +2556,10 @@ float () ffa_start_lock_mode =
 		return FALSE;
 
 	if (!(clanring_playmode & CLANRING_NORMAL_MODE) && !(clanring_playmode & CLANRING_HH_MODE))
+		return FALSE;
+
+	// Nobody to wait for: skip the start-lock with a lone player.
+	if (ffa_start_lock_playercount() < 2)
 		return FALSE;
 
 	if (clanring_ffa_start_lock_config_ready && cvar("teamplay") > 0)
