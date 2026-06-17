@@ -470,11 +470,32 @@ void() execute_changelevel =
     string matchsound_path = "";
     float prnd = -1;
 //	local float bcount;
+    float vote_time = 20;
+
+    // In FFA with a lone player there's nobody else to vote, so halve the
+    // end-of-map vote menu wait (10s instead of 20s).
+    if (!teamplay)
+    {
+        local entity pl;
+        local float numplayers;
+
+        numplayers = 0;
+        pl = find(world, classname, "player");
+        while (pl != world)
+        {
+            if (!(pl.style & CLANRING_OBSERVER))
+                numplayers = numplayers + 1;
+            pl = find(pl, classname, "player");
+        }
+
+        if (numplayers <= 1)
+            vote_time = 10;
+    }
 
     intermission_running = 1;	// enforce a wait time before allowing changelevel
-    intermission_exittime = time + 20;
+    intermission_exittime = time + vote_time;
     forceinfokey (world, "intermission","on");	//Notify everyone since we aren't send out the SVC_INTERMISSION anymore.
-    pqc_match_time (0, 20);
+    pqc_match_time (0, vote_time);
     lightstyle(0, "f");// R00k: -added- dim light on intermission
 /*
     WriteByte(MSG_ALL, SVC_CDTRACK);
