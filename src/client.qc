@@ -3900,6 +3900,25 @@ void (string wanted_map) captimes_show_map_sprint =
     sprint(self, source_title, sprintf("\bTime Trial Leaders\b for %s:\n", wanted_map), trial_lines, "\n\bMatch Times\b:\n", match_lines, "\n");
 };
 
+float sv_parseclientcommand_maparg_random;
+
+float(float gametype, string maparg) SV_ParseClientCommand_MapArg =
+{
+	sv_parseclientcommand_maparg_random = (lowrcase(maparg) == "random");
+	if (sv_parseclientcommand_maparg_random)
+		return levels_cfg_random_map_for_gametype(gametype);
+
+	return found_in_warp_list(maparg);
+};
+
+void(string maparg) SV_ParseClientCommand_MapNotFound =
+{
+	if (sv_parseclientcommand_maparg_random)
+		sprint(self, "No maps are available in levels.cfg for this mode.\n");
+	else
+		sprint2(self, maparg, " is not a recognized map.\n");
+};
+
 void(string cmd) SV_ParseClientCommand =
 {
     local float args, modecmd, mapnumber=0;
@@ -4279,22 +4298,27 @@ void(string cmd) SV_ParseClientCommand =
                     return;
                 }
 
-                mapnumber = found_in_warp_list(arg2);
+                mapnumber = SV_ParseClientCommand_MapArg(0, arg2);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(0, modecmd, mapnumber);
                 else
-                    sprint2(self, arg2, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg2);
                 return;
             }
             else if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(0, arg1);
                 if (mapnumber)
                 {
                     votables_request_set_gametype_mode_map(0, -1, mapnumber);
                 }
                 else
                 {
+                    if (sv_parseclientcommand_maparg_random)
+                    {
+                        SV_ParseClientCommand_MapNotFound(arg1);
+                        return;
+                    }
                     modecmd = get_mode_from_string(arg1);
                     if (modecmd < 0)
                     {
@@ -4310,14 +4334,14 @@ void(string cmd) SV_ParseClientCommand =
         case "ffa":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(0, arg1);
                 if (mapnumber)
                 {
                     votables_request_set_gametype_mode_map(0, 0, mapnumber);
                 }
                 else
                 {
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 }
                 return;
             }
@@ -4333,22 +4357,27 @@ void(string cmd) SV_ParseClientCommand =
                     return;
                 }
 
-                mapnumber = found_in_warp_list(arg2);
+                mapnumber = SV_ParseClientCommand_MapArg(1, arg2);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(1, modecmd, mapnumber);
                 else
-                    sprint2(self, arg2, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg2);
                 return;
             }
             else if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(1, arg1);
                 if (mapnumber)
                 {
                     votables_request_set_gametype_mode_map(1, -1, mapnumber);
                 }
                 else
                 {
+                    if (sv_parseclientcommand_maparg_random)
+                    {
+                        SV_ParseClientCommand_MapNotFound(arg1);
+                        return;
+                    }
                     modecmd = get_mode_from_string(arg1);
                     if (modecmd < 0)
                     {
@@ -4364,11 +4393,11 @@ void(string cmd) SV_ParseClientCommand =
         case "normal":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(-2, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(-1, 0, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(-1, 0, 0);
@@ -4376,11 +4405,11 @@ void(string cmd) SV_ParseClientCommand =
         case "practice":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(-2, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(-1, 1, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(-1, 1, 0);
@@ -4388,11 +4417,11 @@ void(string cmd) SV_ParseClientCommand =
         case "match":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(-2, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(-1, 2, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(-1, 2, 0);
@@ -4400,11 +4429,11 @@ void(string cmd) SV_ParseClientCommand =
         case "dmm4":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(4, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(4, -1, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(4, -1, 0);
@@ -4412,11 +4441,11 @@ void(string cmd) SV_ParseClientCommand =
         case "airshot":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(5, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(5, -1, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(5, -1, 0);
@@ -4424,11 +4453,11 @@ void(string cmd) SV_ParseClientCommand =
         case "wipeout":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(6, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(6, -1, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(6, -1, 0);
@@ -4436,11 +4465,11 @@ void(string cmd) SV_ParseClientCommand =
         case "ctfdmm4":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(7, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(7, -1, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(7, -1, 0);
@@ -4450,11 +4479,11 @@ void(string cmd) SV_ParseClientCommand =
             {
                 if (arg2 != "")
                 {
-                    mapnumber = found_in_warp_list(arg2);
+                    mapnumber = SV_ParseClientCommand_MapArg(8, arg2);
                     if (mapnumber)
                         votables_request_set_hh_variant(0, mapnumber);
                     else
-                        sprint2(self, arg2, " is not a recognized map.\n");
+                        SV_ParseClientCommand_MapNotFound(arg2);
                     return;
                 }
                 votables_request_set_hh_variant(0, 0);
@@ -4464,11 +4493,11 @@ void(string cmd) SV_ParseClientCommand =
             {
                 if (arg2 != "")
                 {
-                    mapnumber = found_in_warp_list(arg2);
+                    mapnumber = SV_ParseClientCommand_MapArg(8, arg2);
                     if (mapnumber)
                         votables_request_set_hh_variant(1, mapnumber);
                     else
-                        sprint2(self, arg2, " is not a recognized map.\n");
+                        SV_ParseClientCommand_MapNotFound(arg2);
                     return;
                 }
                 votables_request_set_hh_variant(1, 0);
@@ -4476,11 +4505,16 @@ void(string cmd) SV_ParseClientCommand =
             }
             else if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(8, arg1);
                 if (mapnumber)
                     votables_request_set_hh(mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized HH mode or map.\n");
+                {
+                    if (sv_parseclientcommand_maparg_random)
+                        SV_ParseClientCommand_MapNotFound(arg1);
+                    else
+                        sprint2(self, arg1, " is not a recognized HH mode or map.\n");
+                }
                 return;
             }
             votables_request_set_hh(0);
@@ -4488,11 +4522,11 @@ void(string cmd) SV_ParseClientCommand =
         case "ca":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(2, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(2, -1, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(2, -1, 0);
@@ -4500,11 +4534,11 @@ void(string cmd) SV_ParseClientCommand =
         case "ra":
             if (arg1 != "")
             {
-                mapnumber = found_in_warp_list(arg1);
+                mapnumber = SV_ParseClientCommand_MapArg(3, arg1);
                 if (mapnumber)
                     votables_request_set_gametype_mode_map(3, -1, mapnumber);
                 else
-                    sprint2(self, arg1, " is not a recognized map.\n");
+                    SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
             votables_request_set_gametype_mode_map(3, -1, 0);
@@ -4765,12 +4799,17 @@ void(string cmd) SV_ParseClientCommand =
         default:
             if (arg0 != "")
             {
-                mapnumber = found_in_warp_list(arg0);
+                mapnumber = SV_ParseClientCommand_MapArg(-1, arg0);
                 if (mapnumber)
                 {
                     if (votables_maybe_prompt_map_vote_mode_change(mapnumber))
                         return;
                     votables_request_set_gametype_mode_map(-1, -1, mapnumber);
+                    return;
+                }
+                if (sv_parseclientcommand_maparg_random)
+                {
+                    SV_ParseClientCommand_MapNotFound(arg0);
                     return;
                 }
             }
