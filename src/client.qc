@@ -1184,6 +1184,7 @@ void() PutClientInServer =
     self.effects 				= 0;
     self.regen_time   			= 0;
     self.invincible_time 		= 0;
+    self.f_trigger_block_time	= 0;	// clear f_/q_ print notice debounce for reused edicts
     self.watertype 				= CONTENT_EMPTY;
     self.waterlevel 			= 0;
     self.velocity 				= '0 0 0';
@@ -3902,6 +3903,40 @@ void (string wanted_map) captimes_show_map_sprint =
 
 float sv_parseclientcommand_maparg_random;
 
+// TRUE if the chat token is one of the QSS-M f_/q_ print triggers, whose
+// auto-responses spam everyone with engine/version/system/model info.
+float(string s) clanring_is_fq_print_trigger =
+{
+    s = lowrcase(s);
+    return (s == "f_version" || s == "q_version" ||
+            s == "f_modified" ||
+            s == "f_system"  || s == "q_sysinfo" ||
+            s == "f_config"  || s == "f_random");
+};
+
+// TRUE while a match is actively running (block f_/q_ prints during it).
+float() clanring_match_blocks_fq_prints =
+{
+    if (mode_is_arena())
+        return (boss != world) && (boss.state == CA_MATCH_PLAYING);
+
+    return (clanring_playmode & CLANRING_MATCH_MODE)
+        && (clanring_state & CLANRING_MATCH_STARTED)
+        && !(clanring_state & CLANRING_MATCH_OVER);
+};
+
+// Notify the invoker (debounced) that f_/q_ prints are off during a match.
+// A single invocation can arrive as both "say f_version" and a raw "q_version"
+// stringcmd, so suppress duplicate notices within a short window.
+void() clanring_fq_print_blocked_notify =
+{
+    if (time > self.f_trigger_block_time)
+    {
+        sprint(self, "f_/q_ print checks are disabled during matches.\n");
+        self.f_trigger_block_time = time + 2;
+    }
+};
+
 float(float gametype, string maparg) SV_ParseClientCommand_MapArg =
 {
 	sv_parseclientcommand_maparg_random = (lowrcase(maparg) == "random");
@@ -3937,6 +3972,26 @@ void(string cmd) SV_ParseClientCommand =
         arg1 = argv(1);
     if (args > 2)
         arg2 = argv(2);
+
+    // Block QSS-M f_/q_ print triggers during an active match. They arrive as a
+    // broadcast "say f_version" (and/or a raw "q_version" stringcmd); letting them
+    // through floods in-match players with everyone's auto-responses. QSS-M only
+    // auto-responds to exact one-token chat, so the say trigger requires exactly
+    // two tokens to avoid overblocking real chat.
+    if (clanring_match_blocks_fq_prints())
+    {
+        if ((arg0 == "say" || arg0 == "say_team")
+            && args == 2 && clanring_is_fq_print_trigger(arg1))
+        {
+            clanring_fq_print_blocked_notify();
+            return;
+        }
+        if (clanring_is_fq_print_trigger(arg0))
+        {
+            clanring_fq_print_blocked_notify();
+            return;
+        }
+    }
 
     switch (arg0)
     {

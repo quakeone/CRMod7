@@ -231,6 +231,7 @@ float   clanring_match_start_time;  // timestamp of when early-match inactivity 
 float   CLANRING_MATCH_PLAYER_RESPAWN_DELAY = 1; // ready players respawn 1 second after match begin/end
 float   CLANRING_MATCH_START_MOVEMENT_THRESHOLD = 16; // minimum distance required to count as movement
 .float last_demomark_time;
+.float f_trigger_block_time;  // debounce for "disabled during match" notice on f_/q_ version triggers
 // --- Quad control observer announcements ---
 float QUAD_RESPAWN_TIME = 60;     // seconds between quad respawns (standard QW)
 float g_quad_spawner_count;       // number of Quad spawners on the map (cached)
