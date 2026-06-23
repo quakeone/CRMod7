@@ -682,7 +682,7 @@ float map_choices[6];
 
 string default_nextmap;
 
-float MAX_CUSTOM_MATCH_SOUNDS = 20;	//Upped
+float MAX_CUSTOM_MATCH_SOUNDS = 40;	//Upped
 float clanring_matchsounds_loaded;
 float clanring_matchsounds_precached;
 float clanring_matchsound_count;

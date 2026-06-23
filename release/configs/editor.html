@@ -1086,7 +1086,7 @@ function serializeLevels(data) {
 }
 
 function serializeMatchsounds(entries) {
-  let out = '// matchsounds.cfg\n// GameOver music during the nextmap vote menu (~20 seconds). Max 20 slots.\n';
+  let out = '// matchsounds.cfg\n// GameOver music during the nextmap vote menu (~20 seconds). Max 40 slots.\n';
   for (const e of entries) out += e + '\n';
   return out;
 }
@@ -1661,7 +1661,7 @@ function renderMatchsoundsPage() {
   let html = `
     <div class="page-header">
       <h1>matchsounds.cfg</h1>
-      <p class="desc">Game-over music — a random track is picked from this list during the nextmap vote screen. Max 20 slots.</p>
+      <p class="desc">Game-over music — a random track is picked from this list during the nextmap vote screen. Max 40 slots.</p>
       <div class="page-actions">
         <button class="btn btn-primary" onclick="exportMatchsounds()">Export</button>
       </div>
@@ -1680,7 +1680,7 @@ function renderMatchsoundsPage() {
     <input type="text" id="addms" placeholder="matchsounds/track.wav" onkeydown="if(event.key==='Enter')addMatchsound()">
     <button class="btn btn-sm btn-secondary" onclick="addMatchsound()">Add</button>
   </div>`;
-  html += `<div class="list-count">${entries.length} / 20 slots</div>`;
+  html += `<div class="list-count">${entries.length} / 40 slots</div>`;
   html += `</div>`;
 
   return html;
@@ -2170,7 +2170,7 @@ function removeLevelMap(mode, idx) {
 function addMatchsound() {
   const input = document.getElementById('addms');
   const val = input.value.trim();
-  if (!val || State.matchsounds.length >= 20) return;
+  if (!val || State.matchsounds.length >= 40) return;
   State.matchsounds.push(val);
   input.value = '';
   markDirty('matchsounds');
