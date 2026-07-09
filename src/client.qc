@@ -800,6 +800,215 @@ float (vector sp) SpotNearBadOrigin =
     return FALSE;
 };
 
+entity(entity start) DMFFANextQuadSpawner =
+{
+    local entity quad;
+
+    quad = find(start, classname, "item_artifact_super_damage");
+    while (quad != world)
+    {
+        if (quad.touch == powerup_touch)
+            return quad;
+
+        quad = find(quad, classname, "item_artifact_super_damage");
+    }
+
+    return world;
+};
+
+float() DMFFAAvoidQuadSpawnActive =
+{
+    if (!(clanring_playmode & CLANRING_NORMAL_MODE))
+        return FALSE;
+
+    if (clanring_playmode & (CLANRING_CAPTURE_THE_FLAG | CLANRING_MATCH_MODE | CLANRING_PRACTICE_MODE | CLANRING_HH_MODE | CLANRING_WIPEOUT_MODE | CLANRING_AIRSHOT_MODE | CLANRING_DMM4_MODE | CLANRING_CA_MODE | CLANRING_RA_MODE))
+        return FALSE;
+
+    if (cvar("teamplay") > 0)
+        return FALSE;
+
+    if (clanring_playmode & CLANRING_NO_QUAD)
+        return FALSE;
+
+    if (dm_num_spawns <= 1)
+        return FALSE;
+
+    return (DMFFANextQuadSpawner(world) != world);
+};
+
+float(entity spot, entity quad) DMFFAQuadClosestSpawn =
+{
+    local entity check;
+    local float best_dist;
+    local float dist;
+    local float spot_dist;
+
+    best_dist = 99999999;
+    check = find(world, classname, "info_player_deathmatch");
+
+    while (check != world)
+    {
+        dist = vlen(check.origin - quad.origin);
+        if (dist < best_dist)
+            best_dist = dist;
+
+        check = find(check, classname, "info_player_deathmatch");
+    }
+
+    spot_dist = vlen(spot.origin - quad.origin);
+    return (spot_dist <= best_dist + 1);
+};
+
+float(entity spot) DMFFAQuadDistance =
+{
+    local entity quad;
+    local float dist;
+    local float best_dist;
+
+    best_dist = 99999999;
+    quad = DMFFANextQuadSpawner(world);
+
+    while (quad != world)
+    {
+        dist = vlen(spot.origin - quad.origin);
+        if (dist < best_dist)
+            best_dist = dist;
+
+        quad = DMFFANextQuadSpawner(quad);
+    }
+
+    return best_dist;
+};
+
+float(entity spot) DMFFASpawnClosestToAnyQuad =
+{
+    local entity quad;
+
+    quad = DMFFANextQuadSpawner(world);
+    while (quad != world)
+    {
+        if (DMFFAQuadClosestSpawn(spot, quad))
+            return TRUE;
+
+        quad = DMFFANextQuadSpawner(quad);
+    }
+
+    return FALSE;
+};
+
+float() DMFFAActivePlayerCount =
+{
+    local entity player;
+    local float count;
+    local float self_counted;
+
+    player = find(world, classname, "player");
+    while (player != world)
+    {
+        if ((player.style & CLANRING_CONNECTED) && !(player.style & CLANRING_OBSERVER))
+        {
+            count = count + 1;
+            if (player == self)
+                self_counted = TRUE;
+        }
+
+        player = find(player, classname, "player");
+    }
+
+    if (!self_counted && !(self.style & CLANRING_OBSERVER))
+        count = count + 1;
+
+    return count;
+};
+
+float() DMFFAHasNonQuadClosestSpawn =
+{
+    local entity check;
+
+    check = find(world, classname, "info_player_deathmatch");
+    while (check != world)
+    {
+        if (!DMFFASpawnClosestToAnyQuad(check))
+            return TRUE;
+
+        check = find(check, classname, "info_player_deathmatch");
+    }
+
+    return FALSE;
+};
+
+float(entity spot, float avoid_quad_spawns) DMFFASpawnAvoidedByQuad =
+{
+    if (!avoid_quad_spawns)
+        return FALSE;
+
+    return DMFFASpawnClosestToAnyQuad(spot);
+};
+
+float(float quad_spawn_avoid_enabled) DMFFAWeightedQuadSpawnActive =
+{
+    if (!quad_spawn_avoid_enabled)
+        return FALSE;
+
+    return (DMFFAActivePlayerCount() <= 3);
+};
+
+float(entity spot) DMFFASpawnHasNearbyPlayer =
+{
+    local entity thing;
+
+    thing = findradius(spot.origin, 128);
+    while (thing != world)
+    {
+        if (((thing.classname == "player") && (thing.style & CLANRING_CONNECTED)) && (!(thing.style & CLANRING_OBSERVER)) && (thing.health))
+            return TRUE;
+
+        thing = thing.chain;
+    }
+
+    return FALSE;
+};
+
+float(entity spot) DMFFASpawnQuadWeight =
+{
+    local float weight;
+
+    weight = DMFFAQuadDistance(spot);
+    if (weight < 1)
+        weight = 1;
+
+    return weight;
+};
+
+entity(float quad_spawn_avoid_enabled, float avoid_quad_spawns) DMFFASelectWeightedQuadSpawn =
+{
+    local entity spot;
+    local entity selected;
+    local float total_weight;
+    local float weight;
+
+    if (!DMFFAWeightedQuadSpawnActive(quad_spawn_avoid_enabled))
+        return world;
+
+    spot = find(world, classname, "info_player_deathmatch");
+    while (spot != world)
+    {
+        if (!SpotNearBadOrigin(spot.origin)
+            && !DMFFASpawnAvoidedByQuad(spot, avoid_quad_spawns)
+            && !DMFFASpawnHasNearbyPlayer(spot))
+        {
+            weight = DMFFASpawnQuadWeight(spot);
+            total_weight = total_weight + weight;
+            if ((selected == world) || (random() * total_weight < weight))
+                selected = spot;
+        }
+
+        spot = find(spot, classname, "info_player_deathmatch");
+    }
+
+    return selected;
+};
+
 /*
 ============
 SelectSpawnPoint
@@ -815,6 +1024,8 @@ entity () SelectSpawnPoint =
     local float	pcount;
     local float	loop_count;
     local float	best_count;
+    local float quad_spawn_avoid_enabled;
+    local float avoid_quad_spawns;
 
     spot = find(world, classname, "info_player_deathmatch");
     if (spot == world)
@@ -830,14 +1041,32 @@ entity () SelectSpawnPoint =
         return spot;
     }
 
+    quad_spawn_avoid_enabled = DMFFAAvoidQuadSpawnActive();
+    if (quad_spawn_avoid_enabled)
+        avoid_quad_spawns = DMFFAHasNonQuadClosestSpawn();
+
     if (clanring_gameconfig & CLANRING_SEQUENTIAL_SPAWNS)
     {
+        loop_count = dm_num_spawns;
         spot = find(lastspawn, classname, "info_player_deathmatch");
         if (spot == world)
             spot = find(spot, classname, "info_player_deathmatch");
+
+        while ((loop_count > 0) && DMFFASpawnAvoidedByQuad(spot, avoid_quad_spawns))
+        {
+            spot = find(spot, classname, "info_player_deathmatch");
+            if (spot == world)
+                spot = find(spot, classname, "info_player_deathmatch");
+            loop_count = loop_count - 1;
+        }
+
         lastspawn = spot;
         return spot;
     }
+
+    spot = DMFFASelectWeightedQuadSpawn(quad_spawn_avoid_enabled, avoid_quad_spawns);
+    if (spot != world)
+        return spot;
 
     loop_count = 64;//crash test
 
@@ -859,7 +1088,9 @@ entity () SelectSpawnPoint =
         spot = find(spot, classname, "info_player_deathmatch");
         loop_count -= 1; //testing...
 
-        if ((spot == world)||(SpotNearBadOrigin(spot.origin)))//check if this is where we last spawned or just died
+        if (spot == world)
+            pcount = 1;
+        else if (SpotNearBadOrigin(spot.origin) || DMFFASpawnAvoidedByQuad(spot, avoid_quad_spawns))//check if this is where we last spawned or just died
             pcount = 1;
         else
         {	// SPAWNFRAG_PROTECTION: dont pick a spawnpoint that will telefrag any player -- BEGIN
@@ -905,8 +1136,11 @@ entity () SelectSpawnPoint =
 
             if ((best_spot == world) || (pcount < best_count))
             {
-                best_spot = spot;
-                best_count = pcount;
+                if (!DMFFASpawnAvoidedByQuad(spot, avoid_quad_spawns))
+                {
+                    best_spot = spot;
+                    best_count = pcount;
+                }
             }
 
             spot = find(spot, classname, "info_player_deathmatch");
