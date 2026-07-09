@@ -313,18 +313,10 @@ float() CountActivePlayersDM =
     p = find(world, classname, "player");
     while (p)
     {
-        // Count only connected, non-observer players as "active"
+        // Count connected, non-observer participants. Death/HH head state must
+        // not make the 1v1 quad rule flap during an active game.
         if ((p.style & CLANRING_CONNECTED) && !(p.style & CLANRING_OBSERVER))
-        {
-            // HH head victims are out of play and should not affect HH FFA 1v1 quad logic.
-            if ((clanring_playmode & CLANRING_HH_MODE) && p.hh_is_head)
-            {
-                p = find(p, classname, "player");
-                continue;
-            }
-
             n = n + 1;
-        }
         p = find(p, classname, "player");
     }
     return n;

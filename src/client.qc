@@ -1516,13 +1516,6 @@ void() PlayerDeathThink =
         if (!(clanring_playmode & CLANRING_WIPEOUT_MODE) || ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0)))
             return;
     }
-    if ((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head)
-    {
-        // HH head victims stay dead until HH flow resolves them
-        // (carried to altar, haunt timeout, reclaim, or head expiry).
-        return;
-    }
-
     // wait for all buttons released
     if (self.deadflag == DEAD_DEAD)
     {
@@ -1534,8 +1527,18 @@ void() PlayerDeathThink =
     }
 
     // wait for any button down
-    if (!self.button2 && !self.button1 && !self.button0)
-        return;
+    if ((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head)
+    {
+        // Preserve jump for HH altar haunting; fire/use leaves the head behind
+        // and puts the player back in the match, matching original HH flow.
+        if (!self.button1 && !self.button0)
+            return;
+    }
+    else
+    {
+        if (!self.button2 && !self.button1 && !self.button0)
+            return;
+    }
     clear_afk_status(self);								//R00k:
     self.button0 = self.button1 = self.button2 = 0;
     respawn();
