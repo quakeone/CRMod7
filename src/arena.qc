@@ -22,7 +22,9 @@ void () clan_arena_init_world;
 void () airshot_init_world;
 void () dmm4_init_world;
 void () rocket_arena_init_world;
-float (float rounddeaths) wipeout_get_respawn;
+float (entity player, float offset) wipeout_get_respawn;
+float (entity team) wipeout_team_has_pending_respawn;
+void (entity team) wipeout_update_team_nextspawn;
 void () dmm4_report_winner;
 void () wipeout_init_teams;
 //void () wipeout_try_spawn_quad;
@@ -116,8 +118,23 @@ void () arena_client_disconnect =
 
 	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (self.next_team != world))
 	{
-		self.next_team.teamalive -= 1;
-		self.next_team.teamtotal -= 1;
+		// Only active/dead round participants were counted by
+		// wipeout_init_teams. Dead players already left teamalive at death;
+		// queued late-joiners were never included in either counter.
+		if (self.ca_player_flag == PF_PLAYING)
+		{
+			if (self.next_team.teamalive > 0)
+				self.next_team.teamalive -= 1;
+			if (self.next_team.teamtotal > 0)
+				self.next_team.teamtotal -= 1;
+		}
+		else if (self.ca_player_flag == PF_DEAD)
+		{
+			if (self.next_team.teamtotal > 0)
+				self.next_team.teamtotal -= 1;
+		}
+		self.respawntime = 0;
+		wipeout_update_team_nextspawn(self.next_team);
 	}
 
 	RemoveFromTeam();//R00k
@@ -760,6 +777,10 @@ void () respawn_teams =
 				player.frags = 0;
 				player.respawntime = 0;
 				player.rounddeaths = 0;
+				player.wipeout_round_kills = 0;
+				player.wipeout_regen_time = 0;
+				player.wipeout_spawn_time = 0;
+				player.wipeout_escape_time = 0;
 			}
 
 			if (cp < boss.start_players)
@@ -837,7 +858,15 @@ void () im_dead_now_what =
 		if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (self.next_team != world))
 		{
 			self.next_team.teamalive -= 1;
-			if (self.next_team.teamalive < 1)
+			self.rounddeaths = (self.rounddeaths + 1);
+			self.respawntime = 0;
+
+			// KTX Wipeout allows four respawns per round. A suicide forfeits
+			// the remaining life instead of returning the player to limbo.
+			if ((self.rounddeaths <= 4) && !(self.just_suicided > 0))
+				self.respawntime = time + wipeout_get_respawn(self, 0);
+
+			if ((self.next_team.teamalive < 1) && !wipeout_team_has_pending_respawn(self.next_team))
 			{
 				bprint3 ("The ", self.next_team.netname, " has been \bwiped out\b\n");
 				prnd = floor(random() * 6) + 1;
@@ -859,6 +888,7 @@ void () im_dead_now_what =
 						e.respawntime = 0;
 					e = e.chain_gang;
 				}
+				self.next_team.nextspawn = 0;
 			}
 			else
 			{
@@ -867,13 +897,10 @@ void () im_dead_now_what =
 						clanring_play_compat_sound(world, CHAN_AUTO, "crx/lastone.wav", "", 1, ATTN_NONE);
 				}
 
-				//set player's respawn and update team nextspawn for huds
-				self.rounddeaths = (self.rounddeaths + 1);
-				self.respawntime = (time + wipeout_get_respawn(self.rounddeaths));
-				if ((self.next_team.nextspawn == 0) || (self.next_team.nextspawn > self.respawntime))
-				{
-					self.next_team.nextspawn = self.respawntime;
-				}
+				// Set the team's next spawn for the HUD. Zero means this player
+				// has exhausted their lives (or used kill).
+				if (self.respawntime > 0)
+					wipeout_update_team_nextspawn(self.next_team);
 			}
 		}
 	}
@@ -1082,6 +1109,10 @@ void(float whichteam) Join_Team =
 	self.frags 		= 0;
 	self.respawntime = 0;
 	self.rounddeaths = 0;
+	self.wipeout_round_kills = 0;
+	self.wipeout_regen_time = 0;
+	self.wipeout_spawn_time = 0;
+	self.wipeout_escape_time = 0;
 
 	add_player_to_stat_list(pteam,self);
 	add_player_to_chain(pteam,self);
@@ -1487,6 +1518,11 @@ void () arena_fight_and_shoot =
 	self.combo_frags = 0;
 	self.combo_time = 0;
 	self.arena_packs = 0;
+	if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+	{
+		self.wipeout_spawn_time = time;
+		self.laststattime = time + 2;
+	}
 
 	centerprint(self, "\bFIGHT!");
 
@@ -1758,6 +1794,10 @@ void() arena_refresh_player =
 	self.killed	 = FALSE;
 	self.respawntime = 0;
 	self.rounddeaths = 0;
+	self.wipeout_round_kills = 0;
+	self.wipeout_regen_time = 0;
+	self.wipeout_spawn_time = 0;
+	self.wipeout_escape_time = 0;
 
 	// if (clanring_playmode & CLANRING_WIPEOUT_MODE)
 	// {

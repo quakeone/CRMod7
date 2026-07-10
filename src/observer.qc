@@ -1885,6 +1885,15 @@ void () observer_update_display =
 
 	self.delay = time + 0.5;
 
+	// KTX Wipeout mirrors the tracked player's contextual centerprint. Keep
+	// that display authoritative instead of replacing it with the generic
+	// observer weapon/health panel while chase tracking is enabled.
+	if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+	{
+		WipeoutModePlayerUpdate();
+		return;
+	}
+
 	if (self.style & CLANRING_HEADS_UP)
     {		
 		local float sig = 29;
@@ -2238,29 +2247,24 @@ void () observer_pre_think =
 
 	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (self.next_team != world) && (boss.state == CA_MATCH_PLAYING) && (boss.wait == 0))
 	{
-		if (self.next_team.teamalive < 1)
-		{
-			self.respawntime = 0;
-		}
-		else if (self.respawntime > 0) //needed?
+		if (self.respawntime > 0)
 		{
 			if (time >= self.respawntime)
 			{
 				observer_end ();
+				self.wipeout_spawn_time = time;
+				self.spawn_protect_finished = time + 1;
+				self.laststattime = time + 2;
+				centerprint(self, "\bFIGHT!");
 				bprint2(self.netname, " has respawned\n");
+				wipeout_mark_team_escape(self.next_team, self);
 				self.next_team.teamalive += 1;
-				if (self.next_team.teamalive >= self.next_team.teamtotal)
-				{
-					self.next_team.nextspawn = 0;
-				}
+				wipeout_update_team_nextspawn(self.next_team);
 				return;
 			}
 			else
 			{
-				if ((self.next_team.nextspawn == 0) || (self.next_team.nextspawn > self.respawntime))
-				{
-					self.next_team.nextspawn = self.respawntime;
-				}
+				wipeout_update_team_nextspawn(self.next_team);
 			}
 		}
 	}

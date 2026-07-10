@@ -1,21 +1,177 @@
 void() powerup_touch;
 
-float (float numdeaths) wipeout_get_respawn =
+float (entity spot) wipeout_get_spawn_radius =
 {
-	switch (numdeaths)
+	// KTX defaults Wipeout occupancy checks to 84 units and widens a few
+	// abusable dm3 spawns. Origin matching mirrors KTX's map-specific table.
+	if (mapname != "dm3")
+		return 84;
+
+	if (vlen(spot.origin - '-880 -232 -16') < 1)
+		return 128;
+	if (vlen(spot.origin - '1520 432 -88') < 1)
+		return 300;
+	if (vlen(spot.origin - '-632 -680 -16') < 1)
+		return 128;
+	if (vlen(spot.origin - '512 768 216') < 1)
+		return 128;
+
+	return 84;
+};
+
+// Match current KTX Wipeout pacing: respawn delay scales with team size,
+// is capped to a four-life schedule, and a solo player's first return is free.
+float (entity player, float offset) wipeout_get_respawn =
+{
+	local float deaths, multiple, teamsize;
+
+	deaths = player.rounddeaths + offset;
+	teamsize = player.next_team.teamtotal;
+	if (teamsize < 1)
+		teamsize = 1;
+
+	if ((teamsize == 1) && (deaths == 1))
+		return 0;
+	if (deaths <= 0)
+		return 0;
+
+	if (deaths > 4)
+		return 999;
+
+	multiple = teamsize + 1;
+	if (multiple < 3)
+		multiple = 3;
+	else if (multiple > 6)
+		multiple = 6;
+
+	if (deaths == 1)
+		return multiple;
+
+	return (deaths - 1) * (multiple * 2);
+};
+
+float (entity team) wipeout_team_has_pending_respawn =
+{
+	local entity player;
+
+	player = team.chain_gang;
+	while (player != world)
 	{
-		case 1:
-			return 5;
-		case 2:
-			return 20;
-		case 3:
-			return 40;
-		case 4:
-			return 60;
-		default:
-			return 80;
+		if ((player.style & CLANRING_CONNECTED) && (player.respawntime > 0))
+			return TRUE;
+		player = player.chain_gang;
 	}
-}
+
+	return FALSE;
+};
+
+void (entity team) wipeout_update_team_nextspawn =
+{
+	local entity player;
+	local float earliest;
+
+	if (team == world)
+		return;
+
+	earliest = 0;
+	player = team.chain_gang;
+	while (player != world)
+	{
+		if ((player.style & CLANRING_CONNECTED) && (player.respawntime > time) &&
+			((earliest == 0) || (player.respawntime < earliest)))
+		{
+			earliest = player.respawntime;
+		}
+		player = player.chain_gang;
+	}
+
+	team.nextspawn = earliest;
+};
+
+void (entity team, entity respawned) wipeout_mark_team_escape =
+{
+	local entity player;
+
+	// Only the sole living teammate can have just escaped a wipe.
+	if ((team == world) || (team.teamalive != 1))
+		return;
+
+	player = team.chain_gang;
+	while (player != world)
+	{
+		if ((player != respawned) && (player.style & CLANRING_CONNECTED) &&
+			!(player.style & CLANRING_OBSERVER) && (player.health > 0))
+		{
+			player.wipeout_escape_time = time;
+		}
+		player = player.chain_gang;
+	}
+};
+
+void (entity victim, entity attacker) wipeout_reward_escape =
+{
+	local entity player;
+	local float escaped_by;
+
+	if ((victim == world) || (victim.classname != "player") ||
+		(victim.wipeout_escape_time <= 0))
+		return;
+
+	escaped_by = time - victim.wipeout_escape_time;
+	victim.wipeout_escape_time = 0;
+	if ((escaped_by <= 0) || (escaped_by >= 0.3))
+		return;
+
+	victim.rounddeaths -= 1;
+
+	player = victim.next_team.chain_gang;
+	while (player != world)
+	{
+		if (player.style & CLANRING_CONNECTED)
+			clanring_stuffcmd_compat_play(player, "ca/hero.wav", "misc/medkey.wav");
+		player = player.chain_gang;
+	}
+
+	if ((attacker != world) && (attacker.next_team != world) &&
+		(attacker.next_team != victim.next_team))
+	{
+		player = attacker.next_team.chain_gang;
+		while (player != world)
+		{
+			if (player.style & CLANRING_CONNECTED)
+				clanring_stuffcmd_compat_play(player, "boss2/idle.wav", "misc/medkey.wav");
+			player = player.chain_gang;
+		}
+	}
+
+	bprint4(victim.netname, " survives by ", ftos(floor(escaped_by * 1000)), " milliseconds!\n");
+};
+
+void (entity player) wipeout_check_solo_regen =
+{
+	local float required_time;
+
+	if ((player == world) || IS_CA_OBSERVER(player) ||
+		(player.next_team == world) || (player.next_team.teamtotal != 1) ||
+		(player.wipeout_regen_time <= 0))
+		return;
+
+	required_time = player.wipeout_round_kills * 5;
+	if ((time - player.wipeout_regen_time) <= required_time)
+		return;
+
+	stuffcmd(player, "play misc/secret.wav\n");
+	player.items = player.items - (player.items & (IT_ARMOR1 | IT_ARMOR2 | IT_ARMOR3));
+	player.items = player.items | IT_ARMOR3;
+	player.armorvalue = 200;
+	player.armortype = 0.8;
+	player.health = 100;
+	player.ammo_nails = 200;
+	player.ammo_shells = 100;
+	player.ammo_rockets = 50;
+	player.ammo_cells = 150;
+	player.wipeout_regen_time = 0;
+};
 
 entity (float wnum) check_weapon_spot =
 {

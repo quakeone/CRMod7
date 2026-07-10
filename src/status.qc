@@ -468,9 +468,134 @@ string (entity e) wipeout_get_teamstatus =
 };
 
 float (entity e) IS_CA_OBSERVER;
+void (entity player) wipeout_check_solo_regen;
+
+float () wipeout_centerprint_is_owned =
+{
+	// These states render modal centerprint content and must remain the sole
+	// owner until they close. The map-vote prompt has no style bit, so its
+	// per-client pending field is included explicitly.
+	if (self.style & (CLANRING_SETTING_OPTIONS | CLANRING_MOTD |
+		CLANRING_KICK_CONFIRM | CLANRING_CONFIRM_LEAVE | CLANRING_SCOREBOARD))
+		return TRUE;
+
+	// Player .use callbacks represent numeric-entry menus/prompts (warp,
+	// voting, admin codes, limits, and similar modal interactions).
+	if ((self.use != SUB_Null) || self.pending_map_vote_mapnum)
+		return TRUE;
+
+	if (gameover || intermission_running || (clanring_state & CLANRING_MATCH_PAUSED))
+		return TRUE;
+
+	return FALSE;
+};
+
+float (entity team) wipeout_team_respawn_seconds =
+{
+	if ((team == world) || (team.nextspawn <= time))
+		return 999;
+
+	return ceil(team.nextspawn - time);
+};
+
+float (entity player) wipeout_enemy_alive_count =
+{
+	local entity team;
+	local float alive;
+
+	team = boss.next_team;
+	while (team != world)
+	{
+		if (team.team2 != player.team2)
+			alive += team.teamalive;
+		team = team.next_team;
+	}
+
+	return alive;
+};
+
+float (entity player) wipeout_enemy_respawn_seconds =
+{
+	local entity team;
+	local float earliest;
+
+	earliest = 999;
+	team = boss.next_team;
+	while (team != world)
+	{
+		if ((team.team2 != player.team2) && (team.nextspawn > time) &&
+			((earliest == 999) || (team.nextspawn < earliest)))
+		{
+			earliest = team.nextspawn;
+		}
+		team = team.next_team;
+	}
+
+	if (earliest == 999)
+		return 999;
+	return ceil(earliest - time);
+};
+
+string (entity player) wipeout_context_string =
+{
+	local float ownrespawn, enemyrespawn, enemiesalive;
+
+	if (player == world)
+		return "";
+
+	// A dead player who is not tracking anyone gets their personal countdown.
+	if (IS_CA_OBSERVER(player))
+	{
+		if (player.respawntime > time)
+			return sprintf("\n\n%s\nseconds to respawn\n\n", strings_ftos_gold(ceil(player.respawntime - time)));
+		return "";
+	}
+
+	// KTX waits briefly after a spawn before showing last-alive information.
+	if ((time - player.wipeout_spawn_time) <= 2)
+		return "";
+
+	if ((player.next_team.teamtotal == 1) && (player.wipeout_regen_time > 0))
+	{
+		ownrespawn = (player.wipeout_round_kills * 5) - (time - player.wipeout_regen_time) + 1;
+		if (ownrespawn < 1)
+			ownrespawn = 1;
+		return sprintf("\n\nregenerating health: %s\n\n", ftos(floor(ownrespawn)));
+	}
+
+	ownrespawn = wipeout_team_respawn_seconds(player.next_team);
+	enemyrespawn = wipeout_enemy_respawn_seconds(player);
+	enemiesalive = wipeout_enemy_alive_count(player);
+
+	if ((player.next_team.teamalive == 1) && (enemiesalive == 1))
+	{
+		if (ownrespawn == 999)
+			return "\n\n\b1 on 1\b\n\n";
+		return sprintf("\n\n\b1 on 1\b\n%s\n\n", strings_ftos_gold(ownrespawn));
+	}
+
+	if (player.next_team.teamalive == 1)
+	{
+		if (ownrespawn == 999)
+			return "\n\n\bstay alive!\b\n\n";
+		return sprintf("\n\n\bstay alive!\b\n%s\n\n", strings_ftos_gold(ownrespawn));
+	}
+
+	if (enemiesalive == 1)
+	{
+		if (enemyrespawn == 999)
+			return "\n\none enemy left\n\n";
+		return sprintf("\n\none enemy left\n%s\n\n", ftos(enemyrespawn));
+	}
+
+	return "";
+};
+
 void () WipeoutModePlayerUpdate =
 {
 	local entity e;
+	local entity hudplayer;
+	local string context="";
 	local string s1="";
 	local string s2="";
 	local string s3="";
@@ -479,8 +604,17 @@ void () WipeoutModePlayerUpdate =
 	if (!(clanring_playmode & CLANRING_WIPEOUT_MODE))
 		return;
 
-	if (IS_CA_OBSERVER(self))
+	// Regeneration is gameplay state and must continue even while another
+	// centerprint owner (menu, prompt, or MOTD) has the screen.
+	wipeout_check_solo_regen(self);
+
+	if (wipeout_centerprint_is_owned())
+	{
+		// Force an immediate HUD refresh on the first frame after the modal
+		// owner closes, without clearing or repainting its centerprint here.
+		self.laststattime = 0;
 		return;
+	}
 
 	if (boss.state != CA_MATCH_PLAYING)
 		return;
@@ -495,13 +629,17 @@ void () WipeoutModePlayerUpdate =
 		return;
 	}
 
-	if (self.style & CLANRING_MOTD)//r00k v3.21
-		return;
-
-	if (clanring_state & CLANRING_MATCH_PAUSED)
-		return;
-
 	self.laststattime = (time + .5);
+
+	// Dead players normally see their own respawn timer. While actively
+	// tracking a live player, mirror that player's KTX-style context instead.
+	hudplayer = self;
+	if (IS_CA_OBSERVER(self) && (self.movetarget != world) &&
+		(self.movetarget.classname == "player") && !IS_CA_OBSERVER(self.movetarget))
+	{
+		hudplayer = self.movetarget;
+	}
+	context = wipeout_context_string(hudplayer);
 
 	e = boss.next_team;
 
@@ -525,5 +663,5 @@ void () WipeoutModePlayerUpdate =
 		}
 	}
 
-	centerprint5 (self, "team alive                                         \n", s1, s2, s3, s4);
+	centerprint (self, context, "team alive                                         \n", s1, s2, s3, s4);
 };

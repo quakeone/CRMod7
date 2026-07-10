@@ -158,7 +158,7 @@ void () arena_main_loop =
 				e = boss.next_team;
 				while (e != world)
 				{
-					if (e.teamalive > 0)
+					if ((e.teamalive > 0) || wipeout_team_has_pending_respawn(e))
 					{
 						team_alive += 1;
 

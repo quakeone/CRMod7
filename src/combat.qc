@@ -431,13 +431,24 @@ void(entity targ, entity attacker) Killed =
 		}
 		if (clanring_playmode & CLANRING_WIPEOUT_MODE)
 		{
+			wipeout_reward_escape(targ, attacker);
+
+			if ((attacker != targ) && (attacker.classname == "player") &&
+				(attacker.next_team != world) && (attacker.next_team != targ.next_team))
+			{
+				attacker.wipeout_round_kills += 1;
+				if ((attacker.next_team.teamtotal == 1) && (attacker.wipeout_regen_time == 0))
+					attacker.wipeout_regen_time = time;
+			}
+
 			if ((targ != world) && (targ.classname == "player") && (targ.next_team != world))
 			{
 				//TODO: too many messages? or show [rounddeaths] in obituary?
 				if (targ.next_team.teamalive > 1)
 				{
-					rtime = wipeout_get_respawn(targ.rounddeaths);
-					bprint4(targ.netname, " will respawn in ", ftos(rtime), " seconds\n");
+					rtime = wipeout_get_respawn(targ, 1);
+					if (rtime < 999)
+						bprint4(targ.netname, " will respawn in ", ftos(rtime), " seconds\n");
 				}
 			}
 		}
@@ -504,6 +515,39 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 		if (boss.timetofight == FALSE)
 		{
 			return;
+		}
+
+		// Fresh Wipeout respawns cannot take or deal damage for one second.
+		// Preserve self-rocket/grenade movement while suppressing its damage,
+		// matching KTX's no-pain window without touching armor or statistics.
+		if ((clanring_playmode & CLANRING_WIPEOUT_MODE) &&
+			(((targ.classname == "player") && (targ.spawn_protect_finished > time)) ||
+			 ((attacker.classname == "player") && (attacker.spawn_protect_finished > time))))
+		{
+			if ((targ == attacker) && (inflictor != world) && (targ.movetype == MOVETYPE_WALK) &&
+				(targ.deathtype != "hook"))
+			{
+				dir = targ.origin - (inflictor.absmin + inflictor.absmax) * 0.5;
+				dir = normalize(dir);
+				targ.velocity = targ.velocity + dir * damage * 8;
+			}
+			else if ((targ != attacker) && (targ.spawn_protect_finished > time) &&
+				(targ.invincible_sound < time))
+			{
+				sound(targ, CHAN_ITEM, "items/protect3.wav", 0.75, ATTN_NORM);
+				targ.invincible_sound = time + 2;
+			}
+			return;
+		}
+
+		// Match KTX solo-Wipeout regeneration: taking enemy damage more
+		// than one second after the timer starts cancels the recovery.
+		if ((clanring_playmode & CLANRING_WIPEOUT_MODE) &&
+			(targ.classname == "player") && (attacker != targ) &&
+			(targ.wipeout_regen_time > 0) && ((time - targ.wipeout_regen_time) > 1))
+		{
+			targ.wipeout_regen_time = 0;
+			clanring_stuffcmd_compat_play(targ, "boss2/idle.wav", "misc/medkey.wav");
 		}
 	}
 
@@ -798,7 +842,8 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 	}
 
 	// ELOHIM_MOD - print info for practice mode; check for pre-match
-	if ((clanring_playmode & CLANRING_PRACTICE_MODE) || (clanring_playmode & CLANRING_CA_MODE))
+	if ((clanring_playmode & CLANRING_PRACTICE_MODE) ||
+		((clanring_playmode & CLANRING_CA_MODE) && !(clanring_playmode & CLANRING_WIPEOUT_MODE)))
 	{
 		if (targ.classname == "player" && attacker.classname == "player" && targ != attacker)
 		{

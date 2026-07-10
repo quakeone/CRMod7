@@ -44,9 +44,9 @@ float() lockdown_check_connect;
 void(string arg1, string arg2, float argc) lockdown_command;
 void () clanring_show_rules;
 void () clanring_load_matchsounds;
+float (entity spot) wipeout_get_spawn_radius;
 
 // Entity field declarations
-.float just_suicided; // set briefly when a death is a self-kill/suicide
 
 /*
 =============================================================================
@@ -643,8 +643,10 @@ void() ClientKill =
 
     if (mode_is_arena())
     {
-        // Allow kill for RA participants to escape getting stuck; keep disabled for other arena modes
-        if (!(clanring_playmode & CLANRING_RA_MODE))
+        // KTX permits kill during active Wipeout, but it consumes the life and
+        // does not put the player back into the respawn queue. RA retains its
+        // existing escape hatch; the other arena modes still reject kill.
+        if (!(clanring_playmode & (CLANRING_RA_MODE | CLANRING_WIPEOUT_MODE)))
             return;
 
         // Disallow kill during countdown (before round is actually playing or while wait > 0)
@@ -693,6 +695,18 @@ void() ClientKill =
     self.modelindex = modelindex_player;
 
     set_suicide_frame();
+
+    if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+    {
+        self.health = 0;
+        self.takedamage = DAMAGE_NO;
+        self.ca_player_flag = PF_DEAD;
+        self.just_suicided = time;
+        im_dead_now_what();
+        self.just_suicided = 0;
+        self.think = respawn;
+        self.nextthink = time + 0.1;
+    }
 
     // In Rocket Arena, treat kill as a round death without auto-respawn
     if ((mode_is_arena()) && (clanring_playmode & CLANRING_RA_MODE))
@@ -1096,13 +1110,30 @@ entity () SelectSpawnPoint =
         {	// SPAWNFRAG_PROTECTION: dont pick a spawnpoint that will telefrag any player -- BEGIN
             //if (clanring_gameconfig & CLANRING_SPAWNFRAG_PROTECTION)//TODO only protect spawns at match start.
             {
-                thing = findradius (spot.origin, 128);
+                if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+					thing = findradius(spot.origin, wipeout_get_spawn_radius(spot));
+				else
+					thing = findradius(spot.origin, 128);
                 while (thing)
                 {
                     if (((thing.classname == "player") && (thing.style & CLANRING_CONNECTED)) && (!(thing.style & CLANRING_OBSERVER)) && (thing.health))//r00k: added .health
                     {
-                        pcount = 1;
-                        thing = world;
+						if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+						{
+							traceline(spot.origin, thing.origin, TRUE, self);
+							if (trace_fraction == 1)
+							{
+								pcount = 1;
+								thing = world;
+							}
+							else
+								thing = thing.chain;
+						}
+						else
+						{
+							pcount = 1;
+							thing = world;
+						}
                     }
                     else
                     {

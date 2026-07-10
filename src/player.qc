@@ -587,7 +587,9 @@ void() PlayerDead =
             else if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait == 0))
             {
                 self.movetarget = world;
-                self.nextthink = time + 2;
+				// Enter Wipeout limbo promptly so the full KTX respawn timer and
+				// dead-player HUD are visible instead of consuming two seconds here.
+				self.nextthink = time + 0.1;
             }
             else
             {
