@@ -830,6 +830,31 @@ entity(entity start) DMFFANextQuadSpawner =
     return world;
 };
 
+float() DMFFAActivePlayerCount =
+{
+    local entity player;
+    local float count;
+    local float self_counted;
+
+    player = find(world, classname, "player");
+    while (player != world)
+    {
+        if ((player.style & CLANRING_CONNECTED) && !(player.style & CLANRING_OBSERVER))
+        {
+            count = count + 1;
+            if (player == self)
+                self_counted = TRUE;
+        }
+
+        player = find(player, classname, "player");
+    }
+
+    if (!self_counted && !(self.style & CLANRING_OBSERVER))
+        count = count + 1;
+
+    return count;
+};
+
 float() DMFFAAvoidQuadSpawnActive =
 {
     if (!(clanring_playmode & CLANRING_NORMAL_MODE))
@@ -842,6 +867,10 @@ float() DMFFAAvoidQuadSpawnActive =
         return FALSE;
 
     if (clanring_playmode & CLANRING_NO_QUAD)
+        return FALSE;
+
+    // Quad is automatically disabled in FFA with only one or two players.
+    if (DMFFAActivePlayerCount() <= 2)
         return FALSE;
 
     if (dm_num_spawns <= 1)
@@ -908,31 +937,6 @@ float(entity spot) DMFFASpawnClosestToAnyQuad =
     }
 
     return FALSE;
-};
-
-float() DMFFAActivePlayerCount =
-{
-    local entity player;
-    local float count;
-    local float self_counted;
-
-    player = find(world, classname, "player");
-    while (player != world)
-    {
-        if ((player.style & CLANRING_CONNECTED) && !(player.style & CLANRING_OBSERVER))
-        {
-            count = count + 1;
-            if (player == self)
-                self_counted = TRUE;
-        }
-
-        player = find(player, classname, "player");
-    }
-
-    if (!self_counted && !(self.style & CLANRING_OBSERVER))
-        count = count + 1;
-
-    return count;
 };
 
 float() DMFFAHasNonQuadClosestSpawn =
