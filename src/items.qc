@@ -2131,6 +2131,14 @@ void() BackpackTouch =
 	local float best, new, acount, bswitch, headtake;
 	local entity stemp;
 
+	// Remove packs that land in lethal void triggers. Keep ordinary hurt
+	// triggers playable, matching the dropped-flag damage threshold.
+	if ((other.touch == hurt_touch) && (other.dmg > 10))
+	{
+		hh_backpack_expire();
+		return;
+	}
+
 	if (!(items_are_ready()))
 		return;
 
