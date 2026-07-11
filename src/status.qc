@@ -591,6 +591,54 @@ string (entity player) wipeout_context_string =
 	return "";
 };
 
+float (entity player) wipeout_hud_countdown =
+{
+	local float seconds;
+	local float enemiesalive;
+
+	if (player == world)
+		return 0;
+
+	if (IS_CA_OBSERVER(player))
+	{
+		if (player.respawntime > time)
+			return ceil(player.respawntime - time);
+		return 0;
+	}
+
+	if ((time - player.wipeout_spawn_time) <= 2)
+		return 0;
+
+	if ((player.next_team.teamtotal == 1) && (player.wipeout_regen_time > 0))
+	{
+		seconds = (player.wipeout_round_kills * 5) - (time - player.wipeout_regen_time) + 1;
+		if (seconds < 1)
+			seconds = 1;
+		return floor(seconds);
+	}
+
+	seconds = wipeout_team_respawn_seconds(player.next_team);
+	enemiesalive = wipeout_enemy_alive_count(player);
+
+	// These are the contextual countdowns printed above the team table.
+	if ((player.next_team.teamalive == 1) && (seconds != 999))
+		return seconds;
+	if (enemiesalive == 1)
+	{
+		seconds = wipeout_enemy_respawn_seconds(player);
+		if (seconds != 999)
+			return seconds;
+	}
+
+	// The team table still shows the player's team respawn countdown during
+	// ordinary play, so mirror that when no special context owns the clock.
+	seconds = wipeout_team_respawn_seconds(player.next_team);
+	if (seconds != 999)
+		return seconds;
+
+	return 0;
+};
+
 void () WipeoutModePlayerUpdate =
 {
 	local entity e;
@@ -640,6 +688,7 @@ void () WipeoutModePlayerUpdate =
 		hudplayer = self.movetarget;
 	}
 	context = wipeout_context_string(hudplayer);
+	pqc_player_time_remaining(self, wipeout_hud_countdown(hudplayer));
 
 	e = boss.next_team;
 

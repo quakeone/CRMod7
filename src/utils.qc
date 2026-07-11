@@ -2424,6 +2424,52 @@ void(float total_seconds) pqc_ffa_time_remaining =
 	self = oldself;
 };
 
+// Send a countdown to one player's ProQuake timer.  Arena/Wipeout timers are
+// contextual, so broadcasting the value (as match timers do) would give other
+// players and spectators the wrong countdown.
+void(entity player, float total_seconds) pqc_player_time_remaining =
+{
+	local float m;
+	local float s;
+
+	if ((player == world) || !(player.style & CLANRING_CONNECTED))
+		return;
+
+	if (total_seconds < 0)
+		total_seconds = 0;
+
+	total_seconds = ceil(total_seconds);
+	m = floor(total_seconds / 60);
+	s = total_seconds - (m * 60);
+	msg_entity = player;
+
+	if (player.csqc_enabled == 1)
+	{
+		WriteByte(MSG_MULTICAST, SVC_CGAMEPACKET);
+		WriteByte(MSG_MULTICAST, PQC_MATCH_TIME);
+		WriteByte(MSG_MULTICAST, m);
+		WriteByte(MSG_MULTICAST, s);
+		multicast('0 0 0', MULTICAST_ONE_R);
+	}
+	else if ((player.client == "ezQuake") || (player.client == "FTE"))
+	{
+		WriteByte(MSG_MULTICAST, SVC_UPDATESTAT);
+		WriteByte(MSG_MULTICAST, 18);// STAT_MATCHSTARTTIME
+		WriteLong(MSG_MULTICAST, (time + total_seconds) * 1000);
+		multicast('0 0 0', MULTICAST_ONE_R);
+	}
+	else
+	{
+		WriteByte(MSG_MULTICAST, SVC_STUFFCMD);
+		WriteByte(MSG_MULTICAST, MOD_PROQUAKE);
+		WriteByte(MSG_MULTICAST, PQC_MATCH_TIME);
+		WriteBytePQ(MSG_MULTICAST, m);
+		WriteBytePQ(MSG_MULTICAST, s);
+		WriteString(MSG_MULTICAST, string_null);
+		multicast('0 0 0', MULTICAST_ONE_R);
+	}
+};
+
 void ()pqc_match_reset =
 {
 	local entity oldself;
