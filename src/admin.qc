@@ -39,8 +39,6 @@ entity kick_target;         // Player to kick
 void() admin_send_aliases =
 {
 //	stuffcmd(self, "alias qsmack impulse 37\n");		//R00k removed
-	stuffcmd(self, "alias bans impulse 197\n");
-	stuffcmd(self, "alias unban impulse 198\n");
 	stuffcmd(self, "alias help-admin impulse 200\n");
 	stuffcmd(self, "alias autoss impulse 204\n");
 	stuffcmd(self, "alias crban impulse 205\n");
@@ -831,24 +829,25 @@ void() admin_make_camera =
 //
 void() admin_help =
 {
-	sprint(self, "Admin only commands:\n");
-	sprint(self, " autoss       - automatic screenshots\n");
-	sprint(self, " maxteams     - set max number of teams\n");
-	sprint(self, " kick!        - kick a player\n");
-	sprint(self, " crban        - ban a player\n");
-	sprint(self, " modevote     - enable/disable mode votes\n");
-	sprint(self, " options      - on-screen options menu\n");
-	sprint(self, " dmset        - change deathmatch mode\n");
-	sprint(self, " faststart    - toggle fast match start\n");
-	sprint(self, " abortmatch   - abort current match\n");
-	sprint(self, " ghostlist    - view list of ghosts\n");
-	sprint(self, " spot         - show location/angles\n");
-	sprint(self, " nextspawn    - go to next spawn point\n");
-	sprint(self, " makespawn    - add spawn point\n");
-	sprint(self, " nextcam      - go to next camera\n");
-	sprint(self, " makecam      - add camera\n");
-	sprint(self, " lockdown     - private lock [1-30|-1..-30|status|off|list|add/remove <ip>]\n");
-	sprint(self, " safepractice - no spam/discharging\n");
+	sprint(self, "\n");
+	sprint(self, " \bhelp-admin\b\n");
+	sprint(self, "\n");
+	sprint(self, " \babortmatch\b    abort the current match\n");
+	sprint(self, " \bautoss\b        take automatic screenshots\n");
+	sprint(self, " \bcrban\b         ban a player\n");
+	sprint(self, " \bdmset\b         change the deathmatch mode\n");
+	sprint(self, " \bips\b           list player IP addresses\n");
+	sprint(self, " \bkick!\b         kick a player\n");
+	sprint(self, " \blockdown\b      control private server access\n");
+	sprint(self, " \bmakecam\b       add a fixed camera\n");
+	sprint(self, " \bmakespawn\b     add a spawn point\n");
+	sprint(self, " \bmaxteams\b      set the maximum number of teams\n");
+	sprint(self, " \bmodevote\b      toggle mode voting\n");
+	sprint(self, " \bnextcam\b       go to the next camera\n");
+	sprint(self, " \bnextspawn\b     go to the next spawn point\n");
+	sprint(self, " \boptions\b       open the on-screen options menu\n");
+	sprint(self, " \bsafepractice\b  disable spam and discharging\n");
+	sprint(self, "\n");
 };
 
 //

@@ -1589,20 +1589,26 @@ void () observer_set_camera_position =
 //
 void () observer_help =
 {
-        sprint(self, "Observer commands:\n");
-        sprint(self, " help-walk       - \bhelp for walk mode\n");
-        sprint(self, " help-fly        - \bhelp for fly mode\n");
-        sprint(self, " help-chase      - \bhelp for chase/demo mode\n");
-        sprint(self, " help-camera     - \bhelp for camera mode\n");
-        sprint(self, " ready           - \bexit observer mode\n");
-        sprint(self, " walk/flyme      > \bchoose mode\n");
-        sprint(self, " chase/eyecam    > \bchoose mode \n");
-        sprint(self, " autochase       - \bautomatic chasecam mode\n");
-        sprint(self, " camera          - \bcamera mode\n");
-        sprint(self, " autocam         - \bautomatic camera mode\n");
-        sprint(self, " headsup         - \btoggle heads up display\n");
-        sprint(self, " tourney         - \btoggle tournament chase\n");
-        sprint(self, " commentary      - \btoggle commentary\n");
+        sprint(self, "\n");
+        sprint(self, " \bhelp-observer\b\n");
+        sprint(self, "\n");
+        sprint(self, " \bhelp-walk\b    walking observer controls\n");
+        sprint(self, " \bhelp-fly\b     free-flying observer controls\n");
+        sprint(self, " \bhelp-chase\b   chase-camera controls\n");
+        sprint(self, " \bhelp-camera\b  fixed-camera controls\n");
+        sprint(self, " \bready\b        exit observer mode\n");
+        sprint(self, " \bwalk\b         enter walking observer mode\n");
+        sprint(self, " \bflyme\b        enter free-flying observer mode\n");
+        sprint(self, " \bchase\b        follow a player in third person\n");
+        sprint(self, " \beyecam\b       watch through a selected player's eyes\n");
+        sprint(self, " \bautochase\b    automatically switch chase targets\n");
+        sprint(self, " \bautopov\b      automatically switch player views\n");
+        sprint(self, " \bcamera\b       use fixed map cameras\n");
+        sprint(self, " \bautocam\b      automatically switch fixed cameras\n");
+        sprint(self, " \bheadsup\b      toggle the heads-up display\n");
+        sprint(self, " \btourney\b      toggle tournament chase mode\n");
+        sprint(self, " \bcommentary\b   toggle commentary mode\n");
+        sprint(self, "\n");
 };
 
 //
@@ -1610,10 +1616,13 @@ void () observer_help =
 //
 void () observer_walk_help =
 {
-        sprint(self, "Walk mode controls:\n");
-        sprint(self, " jump            - \bjump\n");
-        sprint(self, " attack          - \bfly (through walls)\n");
-        sprint(self, "help-observer    - \bobserver mode help\n");
+        sprint(self, "\n");
+        sprint(self, " \bhelp-walk\b\n");
+        sprint(self, "\n");
+        sprint(self, " \bjump\b           jump\n");
+        sprint(self, " \battack\b         switch to fly mode\n");
+        sprint(self, " \bhelp-observer\b  observer mode commands\n");
+        sprint(self, "\n");
 };
 
 //
@@ -1621,10 +1630,13 @@ void () observer_walk_help =
 //
 void () observer_fly_help =
 {
-        sprint(self, "Fly mode controls:\n");
-        sprint(self, " jump            - \bmove up\n");
-        sprint(self, " attack          - \bfly through walls\n");
-        sprint(self, "help-observer    - \bobserver mode help\n");
+        sprint(self, "\n");
+        sprint(self, " \bhelp-fly\b\n");
+        sprint(self, "\n");
+        sprint(self, " \bjump\b           move up\n");
+        sprint(self, " \battack\b         fly through walls\n");
+        sprint(self, " \bhelp-observer\b  observer mode commands\n");
+        sprint(self, "\n");
 };
 
 //
@@ -1632,16 +1644,16 @@ void () observer_fly_help =
 //
 void () observer_chase_help =
 {
-        sprint(self, "Chase/eyecam mode controls:\n");
-        sprint(self, " attack          - \bfreelook\n");
-        sprint(self, " jump            - \bselect next player\n");
-        sprint(self, " attack+jump     - \bprevious player\n");
-        sprint(self, " smooth          - \btoggle camera smoothing\n");
-        sprint(self, " autochase       - \bautomatic chase mode\n");
-        sprint(self, "                   \b(chase mode only)\n");
-        sprint(self, " tourney         - \btoggle tourneycam\n");
-        sprint(self, "                   \b(chase mode only)\n");
-        sprint(self, "help-observer    - \bobserver mode help\n");
+        sprint(self, "\n");
+        sprint(self, " \bhelp-chase\b\n");
+        sprint(self, "\n");
+        sprint(self, " \battack\b         freelook\n");
+        sprint(self, " \bjump\b           select the next player\n");
+        sprint(self, " \battack+jump\b    select the previous player\n");
+        sprint(self, " \bautochase\b      toggle automatic chase mode\n");
+        sprint(self, " \btourney\b        toggle tournament chase mode\n");
+        sprint(self, " \bhelp-observer\b  observer mode commands\n");
+        sprint(self, "\n");
 };
 
 // CRMOD
@@ -1649,13 +1661,15 @@ void () observer_chase_help =
 //    by Paul Baker
 void () observer_camera_help =
 {
-        sprint(self, "Camera mode controls:\n");
-        sprint(self, " attack          - \bfreelook\n");
-        sprint(self, " jump            - \bselect next camera\n");
-        sprint(self, " attack+jump     - \bprevious camera\n");
-        sprint(self, " smooth          - \btoggle camera smoothing\n");
-        sprint(self, " autocam         - \bautomatic camera mode\n");
-        sprint(self, "help-observer    - \bobserver mode help\n");
+        sprint(self, "\n");
+        sprint(self, " \bhelp-camera\b\n");
+        sprint(self, "\n");
+        sprint(self, " \battack\b         freelook\n");
+        sprint(self, " \bjump\b           select the next camera\n");
+        sprint(self, " \battack+jump\b    select the previous camera\n");
+        sprint(self, " \bautocam\b        toggle automatic camera mode\n");
+        sprint(self, " \bhelp-observer\b  observer mode commands\n");
+        sprint(self, "\n");
 };
 
 //

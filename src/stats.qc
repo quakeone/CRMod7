@@ -1844,78 +1844,75 @@ void() stats_autodump =
 void () stats_help =
 {
 	sprint(self, "\n");
-	sprint(self, "\bweapon efficiency\b\n");
+	sprint(self, " \bhelp-stats\b\n");
 	sprint(self, "\n");
-	sprint(self, "bul - bullet efficiency\n");
-	sprint(self, "nls - nail efficiency\n");
-	sprint(self, "rox - rocket efficiency\n");
-	sprint(self, "lg  - lightning gun efficiency\n");
-
+	sprint(self, " weapon efficiency\n");
 	sprint(self, "\n");
-
+	sprint(self, " \bbul\b  bullet efficiency\n");
+	sprint(self, " \bnls\b  nail efficiency\n");
+	sprint(self, " \brox\b  rocket efficiency\n");
+	sprint(self, " \blg\b   lightning gun efficiency\n");
 	sprint(self, "\n");
-	sprint(self, "\bkills\b\n");
+	sprint(self, " kills\n");
 	sprint(self, "\n");
-	sprint(self, "opp - number of opponents killed\n");
-	sprint(self, "slf - number of times killed self\n");
-	sprint(self, "tm  - teammates killed\n");
-	sprint(self, "kld - times killed by enemy\n");
-	sprint(self, "dtk - damage taken\n");
-	sprint(self, "dgv - damage given\n");
-	
-
+	sprint(self, " \bopp\b  opponents killed\n");
+	sprint(self, " \bslf\b  times killed self\n");
+	sprint(self, " \btm\b   teammates killed\n");
+	sprint(self, " \bkld\b  times killed by an enemy\n");
+	sprint(self, " \bdtk\b  damage taken\n");
+	sprint(self, " \bdgv\b  damage given\n");
 	sprint(self, "\n");
-
+	sprint(self, " quad damage\n");
 	sprint(self, "\n");
-	sprint(self, "\bquad damage\b\n");
+	sprint(self, " \bquads\b  quads picked up\n");
+	sprint(self, " \beff\b    quad weapon efficiency\n");
+	sprint(self, " \bopp\b    opponents killed\n");
+	sprint(self, " \bslf\b    times killed self\n");
+	sprint(self, " \btm\b     teammates killed\n");
 	sprint(self, "\n");
-	sprint(self, "quads - quads picked up\n");
-	sprint(self, "eff   - quad weapon efficiency\n");
-	sprint(self, "opp   - opponents killed\n");
-	sprint(self, "slf   - killed self\n");
-	sprint(self, "tm    - teammates killed\n");
-
+	sprint(self, " pent protection\n");
 	sprint(self, "\n");
-
+	sprint(self, " \bpents\b  pentagrams picked up\n");
+	sprint(self, " \beff\b    pentagram protection efficiency\n");
+	sprint(self, " \bopp\b    opponents killed\n");
+	sprint(self, " \btm\b     teammates killed\n");
 	sprint(self, "\n");
-	sprint(self, "\bbad stuff\n");
+	sprint(self, " bad stuff\n");
 	sprint(self, "\n");
-	sprint(self, "paks - number of RL paks given away\n");
-	sprint(self, "self - percent damage done to self\n");
-	sprint(self, "team - percent damage done to team\n");
-	
+	sprint(self, " \bpaks\b  rocket-launcher packs given away\n");
+	sprint(self, " \bself\b  percent damage done to self\n");
+	sprint(self, " \bteam\b  percent damage done to teammates\n");
+	sprint(self, " \bbore\b  self-kills with rockets or grenades\n");
+	sprint(self, " \blava\b  lava deaths\n");
+	sprint(self, " \baxe\b   axe deaths\n");
+	sprint(self, " \bfall\b  falling deaths\n");
+	sprint(self, " \bspwn\b  spawn-point walkovers\n");
+	sprint(self, " \btele\b  teleporter-exit walkovers\n");
 	sprint(self, "\n");
-
+	sprint(self, " head hunters\n");
 	sprint(self, "\n");
-	sprint(self, "\bHeadhunters\b\n");
+	sprint(self, " \bpick\b  heads picked up\n");
+	sprint(self, " \brec\b   team heads reclaimed\n");
+	sprint(self, " \bscr\b   heads scored at the altar\n");
+	sprint(self, " \bval\b   total altar score value\n");
+	sprint(self, " \bpeak\b  best carried head value\n");
+	sprint(self, " \bdrop\b  heads dropped on death\n");
+	sprint(self, " \bhunt\b  haunting runs started\n");
+	sprint(self, " \bbite\b  successful haunt bites\n");
+	sprint(self, " \bkil\b   kills while haunting\n");
+	sprint(self, " \btime\b  total haunting time\n");
 	sprint(self, "\n");
-	sprint(self, "pick - heads picked up\n");
-	sprint(self, "rec  - team heads reclaimed\n");
-	sprint(self, "scr  - heads scored at the altar\n");
-	sprint(self, "val  - total altar score value\n");
-	sprint(self, "peak - best carried head value\n");
-	sprint(self, "drop - heads dropped on death\n");
-	sprint(self, "hunt - haunting runs started\n");
-	sprint(self, "bite - successful haunt bites\n");
-	sprint(self, "kil  - kills while haunting\n");
-	sprint(self, "time - total haunting time\n");
-
+	sprint(self, " ctf related\n");
 	sprint(self, "\n");
-
+	sprint(self, " \bflag\b  pickups\n");
+	sprint(self, " \bcap\b   captures\n");
+	sprint(self, " \bdef\b   defenses\n");
+	sprint(self, " \brtn\b   returns\n");
+	sprint(self, " \bfcd\b   carrier defenses\n");
+	sprint(self, " \bfca\b   carrier assists\n");
+	sprint(self, " \bfck\b   flag carriers killed\n");
+	sprint(self, " \btime\b  best capture time\n");
 	sprint(self, "\n");
-	sprint(self, "\bctf related\b\n");
-	sprint(self, "\n");
-	sprint(self, "flag - pickups\n");
-	sprint(self, "cap  - captures\n");
-	sprint(self, "def  - defenses\n");
-	sprint(self, "rtn  - returns\n");
-	sprint(self, "fcd  - carrier defenses\n");
-	sprint(self, "fca  - carrier assists\n");
-	sprint(self, "fck  - flag carriers killed\n");
-	sprint(self, "time - best capture time\n");
-
-	sprint(self, "\n");
-
 };
 
 //

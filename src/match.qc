@@ -3555,22 +3555,25 @@ void() match_request_rpickup =
 //
 void() match_help =
 {
-    sprint(self, "Match commands (for match mode only):\n");
-    sprint(self, " ready       - \bcommit to a team\n");
-    sprint(self, " notready    - \buncommit yourself\n");
-    sprint(self, " otset       - \bchange overtime\n");
-    sprint(self, " timeset     - \bchange timelimit\n");
-    sprint(self, " ready?      - \bfindout who is not ready\n");
-    sprint(self, " unlock      - \ballow new players to join\n");
-    sprint(self, " lock        - \bre-cap the team size\n");
-    sprint(self, " timerstop   - \bpause the match\n");
-    sprint(self, " timerstart  - \bstart/restart the timer\n");
-    sprint(self, " ghostcode   - \bview your ghost code\n");
-    sprint(self, " ghostlist   - \blist ghost codes of your teammates\n");
-    sprint(self, " ghost       - \brestore yourself from ghost\n");
-    sprint(self, " score       - \bshow time left and score\n");
-    sprint(self, " +teamscores - \bbind this to a key\n");
-    sprint(self, " rockets     - \bshows who has an RL\n");
+    sprint(self, "\n");
+    sprint(self, " \bhelp-match\b\n");
+    sprint(self, "\n");
+    sprint(self, " \bready\b        commit to a team\n");
+    sprint(self, " \bnotready\b     withdraw your ready status\n");
+    sprint(self, " \botset\b        change the overtime period\n");
+    sprint(self, " \btimeset\b      set the match time in minutes\n");
+    sprint(self, " \bready?\b       show players who are not ready\n");
+    sprint(self, " \brpickup\b      randomly reshuffle the teams\n");
+    sprint(self, " \bunlock\b       allow new players to join\n");
+    sprint(self, " \block\b         re-cap the team size\n");
+    sprint(self, " \btimerstop\b    pause the match timer\n");
+    sprint(self, " \btimerstart\b   start or resume the match timer\n");
+    sprint(self, " \bghostcode\b    show your ghost code\n");
+    sprint(self, " \bghostlist\b    list teammate ghost codes\n");
+    sprint(self, " \bghost\b        restore yourself from a ghost\n");
+    sprint(self, " \bscore\b        show score and time remaining\n");
+    sprint(self, " \brockets\b      show players carrying a rocket launcher\n");
+    sprint(self, "\n");
 };
 
 //

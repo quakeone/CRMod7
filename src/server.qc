@@ -284,7 +284,6 @@ void () watch_commands;
 void () stat_commands;
 void () misc_commands;
 void () modhelp_commands;
-void () shortcuts_commands;
 void () arena_init_world;
 void () rocket_arena_init_world;
 void () arena_main_loop;
@@ -1280,8 +1279,6 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias stat impulse 184\n");
     stuffcmd(self, "alias misc impulse 185\n");
     stuffcmd(self, "alias modhelp impulse 186\n");
-    stuffcmd(self, "alias shortcuts impulse 187\n");
-    stuffcmd(self, "alias itemstats cmd itemstats\n");
     stuffcmd(self, "alias dstats cmd dstats\n");
     stuffcmd(self, "alias wtstats cmd wtstats\n");
     stuffcmd(self, "alias itstats cmd itstats\n");
@@ -2015,16 +2012,20 @@ void () clanring_put_client_in_server =
 //
 void () clanring_help =
 {
-    sprint2(self, clanring_version, "\n");
-    sprint(self, "Help commands (type in console):\n");
-    sprint(self, " vinfo         - server version info\n");
-    sprint(self, " help-misc     - misc commands\n");
-    sprint(self, " help-observer - observer commands\n");
-    sprint(self, " help-match    - match mode help\n");
-    sprint(self, " help-stats    - statistics help\n");
+    sprint(self, "\n");
+    sprint(self, " \bhelp-server\b\n");
+    sprint(self, "\n");
+    sprint2(self, " ", clanring_version);
+    sprint(self, "\n");
+    sprint(self, " \bcommands\b       list command groups\n");
+    sprint(self, " \bvinfo\b          show server version information\n");
+    sprint(self, " \bhelp-misc\b      miscellaneous commands\n");
+    sprint(self, " \bhelp-observer\b  observer mode commands\n");
+    sprint(self, " \bhelp-match\b     match mode commands\n");
+    sprint(self, " \bhelp-stats\b     statistics help\n");
     if (self.style & CLANRING_ADMINISTRATOR)
-        sprint(self, " help-admin    - admin commands\n");
-    sprint(self, " commands - list commands/impulses\n");
+        sprint(self, " \bhelp-admin\b     administrator commands\n");
+    sprint(self, "\n");
 };
 
 //
@@ -2048,43 +2049,51 @@ void () clanring_help_change =
 //
 void () clanring_help_misc =
 {
-    sprint(self, " admin      - enter admin code\n");
-    sprint(self, " admins     - list server admins\n");
-    sprint(self, " setquad    - enable/disable quad\n");
-    sprint(self, " setpent    - enable/disable pent\n");
-    sprint(self, " setring    - enable/disable ring\n");
-    sprint(self, " setrunes   - enable/disable runes\n");
-    sprint(self, " sethook    - enable/disable grappling hook\n");
+    sprint(self, "\n");
+    sprint(self, " \bhelp-misc\b\n");
+    sprint(self, "\n");
+    sprint(self, " \badmin\b         enter an admin code\n");
+    sprint(self, " \badmins\b        list server administrators\n");
+    sprint(self, " \bsetquad\b       toggle quad spawning\n");
+    sprint(self, " \bsetpent\b       toggle pentagram spawning\n");
+    sprint(self, " \bsetring\b       toggle ring spawning\n");
+    sprint(self, " \bsetrunes\b      toggle rune spawning\n");
+    sprint(self, " \bsethook\b       toggle the grappling hook\n");
 
     if (clanring_playmode & CLANRING_MODE_VOTE)
     {
-        sprint(self, " normal     - request FFA play\n");
-        sprint(self, " practice   - request practice mode\n");
-        sprint(self, " match      - request match mode\n");
+        sprint(self, " \bnormal\b        request public play mode\n");
+        sprint(self, " \bpractice\b      request practice mode\n");
+        sprint(self, " \bmatch\b         request match mode\n");
     }
 
-    sprint(self, " nogibs     - disable gibs\n");
-    sprint(self, " lowgibs    - set gibs to 'low'\n");
-    sprint(self, " highgibs   - set gibs to 'high'\n");
-    sprint(self, " motd       - show message of the day\n");
-    sprint(self, " commands   - list commands/impulses\n");
-    sprint(self, " observer   - toggle observer mode\n");
-    sprint(self, " warp       - choose a map for vote to load\n");
-    sprint(self, " rules      - view server rules\n");
-    sprint(self, " ticrate    - view sys_ticrate\n");
-    sprint(self, " shownick   - teammate identifier\n");
-    sprint(self, " suggest    - suggest balanced pickup teams\n");
-    sprint(self, " autoweapon - toggle smartweapon\n");
-    sprint(self, " autopause  - toggle auto pausing\n");
-    sprint(self, " last       - show recently disconnected players\n");
-    sprint(self, " lastscores - show scores from the previous match\n");
+    sprint(self, " \bnogibs\b        disable gibs\n");
+    sprint(self, " \blowgibs\b       use fewer gibs\n");
+    sprint(self, " \bhighgibs\b      use more gibs\n");
+    sprint(self, " \bmotd\b          show the message of the day\n");
+    sprint(self, " \bcommands\b      list command groups\n");
+    sprint(self, " \bobserver\b      toggle observer mode\n");
+    sprint(self, " \bwarp\b          vote to change map\n");
+    sprint(self, " \brules\b         show server rules\n");
+    sprint(self, " \bticrate\b       show the server tick rate\n");
+    sprint(self, " \bshownick\b      identify the teammate in view\n");
+    sprint(self, " \bsuggest\b       suggest ranked pickup teams\n");
+    sprint(self, " \bautoweapon\b    toggle smart weapon selection\n");
+    sprint(self, " \bautopause\b     toggle automatic match pausing\n");
+    sprint(self, " \bleavemealone\b  toggle prewar leave-me-alone mode\n");
+    if (self.client != "QSS-M")
+        sprint(self, " \bmarkdemo\b      mark the current point in a demo\n");
+    sprint(self, " \bpowerupdrop\b   toggle powerup dropping\n");
+    sprint(self, " \blast\b          list recently disconnected players\n");
+    sprint(self, " \blastscores\b    show scores from the previous match\n");
     if (clanring_playmode & CLANRING_HH_MODE)
     {
-        sprint(self, " hook       - grappling hook\n");
-        sprint(self, " passhead   - toss one carried head (impulse 9)\n");
-        sprint(self, " hhcall     - play the Head Hunters call-out\n");
-        sprint(self, " hhhelp     - show Head Hunters help\n");
+        sprint(self, " \bhook\b          use the grappling hook\n");
+        sprint(self, " \bpasshead\b      toss one carried head\n");
+        sprint(self, " \bhhcall\b        play the teammate call-out\n");
+        sprint(self, " \bhhhelp\b        show Head Hunters help\n");
     }
+    sprint(self, "\n");
 };
 
 void () clanring_info =
@@ -2101,17 +2110,38 @@ void () clanring_commands =
 {
     // regular user commands
     sprint(self, "\n");
-    sprint(self, " \byes [\by\b]\b    vote yes\n");
-    sprint(self, " \bno [\bn\b]\b     vote no\n");
-    sprint(self, " \bwarp\b       initiate vote to change level\n");
+    sprint(self, " \bcommands\b\n");
+    sprint(self, " ----------------------------------------\n");
+    sprint(self, "\n");
+    sprint(self, " voting and maps\n");
+    sprint(self, "\n");
+    sprint(self, " \byes\b        vote yes\n");
+    sprint(self, " \bno\b         vote no\n");
+    sprint(self, " \bwarp\b       vote to change map\n");
+    sprint(self, "\n");
+    sprint(self, " command groups\n");
+    sprint(self, "\n");
     sprint(self, " \bmodes\b      mode switch commands\n");
     sprint(self, " \bgameplay\b   match/game variable commands\n");
     sprint(self, " \bwatch\b      observer commands\n");
-    sprint(self, " \bstats\b      match statistics\n");
-    sprint(self, " \bshortcuts\b  command shortcuts\n");
+    sprint(self, " \bstat\b       statistics command menu\n");
     sprint(self, " \bmisc\b       miscellaneous commands\n");
-    sprint(self, " \bmodhelp\b    detailed commands usage\n");
-    sprint(self, " \badmin\b      enter admin code\n");
+    sprint(self, " \bmodhelp\b    detailed command help\n");
+    sprint(self, "\n");
+    sprint(self, " server information\n");
+    sprint(self, "\n");
+    sprint(self, " \brules\b      view server rules\n");
+    sprint(self, " \bmotd\b       message of the day\n");
+    sprint(self, " \badmins\b     list administrators\n");
+    sprint(self, "\n");
+    sprint(self, " player commands\n");
+    sprint(self, "\n");
+    sprint(self, " \bobserver\b   toggle observer mode\n");
+    sprint(self, " \bstats\b      show current match statistics\n");
+    sprint(self, "\n");
+    sprint(self, " administration\n");
+    sprint(self, "\n");
+    sprint(self, " \badmin\b      enter an admin code\n");
     sprint(self, "\n");
 
 
@@ -2120,15 +2150,22 @@ void () clanring_commands =
     {
         sprint(self, " admin commands\n");
         sprint(self, "\n");
-        sprint(self, " \babortmatch\b   \bkick!\b\n");
-        sprint(self, " \bautoss\b       \bmodvote\b\n");
-        sprint(self, " \bban!\b         \bmakespawn\b\n");
-        sprint(self, " \bdmset\b        \bmaxteams\b\n");
-        sprint(self, " \bfaststart\b    \bnextspawn\b\n");
-        sprint(self, " \bghostlist\b    \bnextcam\b\n");
-        sprint(self, " \bhelp-admin\b   \boptions\b\n");
-        sprint(self, " \bips\b          \blockdown\b\n");
-        sprint(self, " \bsafepractice\b\n");
+        sprint(self, " \babortmatch\b    abort the current match\n");
+        sprint(self, " \bautoss\b        take automatic screenshots\n");
+        sprint(self, " \bcrban\b         ban a player\n");
+        sprint(self, " \bdmset\b         change the deathmatch mode\n");
+        sprint(self, " \bhelp-admin\b    show detailed admin help\n");
+        sprint(self, " \bips\b           list player IP addresses\n");
+        sprint(self, " \bkick!\b         kick a player\n");
+        sprint(self, " \blockdown\b      control private server access\n");
+        sprint(self, " \bmakecam\b       add a fixed camera\n");
+        sprint(self, " \bmakespawn\b     add a spawn point\n");
+        sprint(self, " \bmaxteams\b      set the maximum number of teams\n");
+        sprint(self, " \bmodevote\b      toggle mode voting\n");
+        sprint(self, " \bnextcam\b       go to the next camera\n");
+        sprint(self, " \bnextspawn\b     go to the next spawn point\n");
+        sprint(self, " \boptions\b       open the on-screen options menu\n");
+        sprint(self, " \bsafepractice\b  disable spam and discharging\n");
         sprint(self, "\n");
     }
     //clanring_help_change ();
@@ -2141,17 +2178,23 @@ void () clanring_commands =
 void () modes_commands =
 {
         sprint(self, "\n");
-        sprint(self, " \bairshot\b\n");
-        sprint(self, " \bca\b\n");
-        sprint(self, " \bctf\b\n");
-        sprint(self, " \bdm\b\n");
-        sprint(self, " \bdmm4\b\n");
-        sprint(self, " \bhh\b\n");
-        sprint(self, " \bmatch\b\n");
-        sprint(self, " \bnormal\b\n");
-        sprint(self, " \bpractice\b\n");
-        sprint(self, " \bra\b\n");
-        sprint(self, " \bwipeout\b\n");
+        sprint(self, " alternate modes\n");
+        sprint(self, "\n");
+        sprint(self, " \bdm\b        deathmatch mode\n");
+        sprint(self, " \bctf\b       capture the flag\n");
+        sprint(self, " \bdmm4\b      deathmatch mode 4\n");
+        sprint(self, " \bctfdmm4\b   capture the flag with DMM4 weapons\n");
+        sprint(self, " \bca\b        clan arena\n");
+        sprint(self, " \bra\b        rocket arena\n");
+        sprint(self, " \bwipeout\b   team elimination with respawns\n");
+        sprint(self, " \bairshot\b   mid-air rocket combat\n");
+        sprint(self, " \bhh\b        Head Hunters\n");
+        sprint(self, "\n");
+        sprint(self, " dm/ctf modes\n");
+        sprint(self, "\n");
+        sprint(self, " \bnormal\b    public play mode\n");
+        sprint(self, " \bpractice\b  unrestricted practice mode\n");
+        sprint(self, " \bmatch\b     competitive match mode\n");
         sprint(self, "\n");
 };
 
@@ -2160,105 +2203,111 @@ void () gameplay_commands =
         if (clanring_playmode & CLANRING_HH_MODE)
         {
             sprint(self, "\n");
-            sprint(self, " \bhook\b                   grappling hook\n");
-            sprint(self, " \bpasshead\b [\btosshead\b]\b   toss one carried head (impulse 9)\n");
-            sprint(self, " \bhhhelp\b                 show Head Hunters help\n");
-            sprint(self, " \bdropweapon\b [\bthrowweapon\b]\b teamplay-only throw weapon\n");
-            sprint(self, " \bdropammo\b [\bthrowammo\b]\b  teamplay-only throw ammo pack\n");
-            sprint(self, " \bhhcall\b [\bcallmate\b]\b     play the Head Hunters call-out\n");
+            sprint(self, " \bhook\b        use the grappling hook\n");
+            sprint(self, " \bpasshead\b    toss one carried head\n");
+            sprint(self, " \bhhhelp\b      show Head Hunters help\n");
+            sprint(self, " \bdropweapon\b  drop a weapon for a teammate\n");
+            sprint(self, " \bdropammo\b    drop an ammo pack for a teammate\n");
+            sprint(self, " \bhhcall\b      play the teammate call-out\n");
             sprint(self, "\n");
             return;
         }
 
         sprint(self, "\n");
-        sprint(self, " \bdroprune [\bdr\b]\b   \bsetquad\b\n");
-        sprint(self, " \bflagstatus\b      \bsetring\b\n");
-        sprint(self, " \bghost\b           \btimerstart [\bst\b]\b\n");
-        sprint(self, " \bghostcode\b       \btimerstop [\bpa\b]\b\n");
-        sprint(self, " \block\b            \btimeset [minutes]\b\n");
-        sprint(self, " \botset\b           \btimeset10 [\bt10\b]\b\n");
-        sprint(self, " \bready [\br\b]\b       \btimeset20 [\bt20\b]\b\n");
-        sprint(self, " \bready? [\b?\b]\b      \bunlock\b\n");
-        sprint(self, " \bsethook\b         \bweaponstay\b\n");
-        sprint(self, " \bsetpent\b\n");
+        sprint(self, " \bdroprune\b     drop your carried rune\n");
+        sprint(self, " \bflagstatus\b   show the team flag status\n");
+        sprint(self, " \bforce\b        vote to force-start an arena match\n");
+        sprint(self, " \bghost\b        restore yourself from a ghost\n");
+        sprint(self, " \bghostcode\b    show your ghost code\n");
+        sprint(self, " \bghostlist\b    list teammate ghost codes\n");
+        sprint(self, " \block\b         re-cap the team size\n");
+        sprint(self, " \bnotready\b     withdraw your ready status\n");
+        sprint(self, " \botset\b        change the overtime period\n");
+        sprint(self, " \bpowerupdrop\b  toggle powerup dropping\n");
+        sprint(self, " \bready\b        commit to a team\n");
+        sprint(self, " \bready?\b       show players who are not ready\n");
+        sprint(self, " \brpickup\b      randomly reshuffle the teams\n");
+        sprint(self, " \bsethook\b      toggle the grappling hook\n");
+        sprint(self, " \bsetpent\b      toggle pentagram spawning\n");
+        sprint(self, " \bsetquad\b      toggle quad spawning\n");
+        sprint(self, " \bsetring\b      toggle ring spawning\n");
+        sprint(self, " \bsetrunes\b     toggle rune spawning\n");
+        sprint(self, " \btimerstart\b   start or resume the match timer\n");
+        sprint(self, " \btimerstop\b    pause the match timer\n");
+        sprint(self, " \btimeset\b      set the match time in minutes\n");
+        sprint(self, " \bunlock\b       allow new players to join\n");
+        sprint(self, " \bweaponstay\b   toggle weapon stay\n");
         sprint(self, "\n");
 };
 
 void () watch_commands =
 {
         sprint(self, "\n");
-        sprint(self, " \bautocam\b\n");
-        sprint(self, " \bautochase\b\n");
-        sprint(self, " \bchase\b\n");
-        sprint(self, " \bautopov\b\n");
-        sprint(self, " \beyecam [e]\b\n");
-        sprint(self, " \bflyme\b\n");
+        sprint(self, " \bautocam\b    automatically switch fixed cameras\n");
+        sprint(self, " \bautochase\b  automatically switch chase targets\n");
+        sprint(self, " \bcamera\b     use fixed map cameras\n");
+        sprint(self, " \bchase\b      follow a player in third person\n");
+        sprint(self, " \bautopov\b    automatically switch player views\n");
+        sprint(self, " \beyecam\b     watch through a selected player's eyes\n");
+        sprint(self, " \bflyme\b      enter free-flying observer mode\n");
+        sprint(self, " \bwalk\b       enter walking observer mode\n");
         sprint(self, "\n");
 };
 
 void () stat_commands =
 {
         sprint(self, "\n");
-        sprint(self, " \bbadstats\b\n");
-        sprint(self, " \befficiency\b\n");
-        sprint(self, " \bflagstats\b\n");
-        sprint(self, " \bkillstats\b\n");
-        sprint(self, " \bquadstats\b\n");
-        sprint(self, " \bstats\b\n");
-        sprint(self, " \bteamstats\b\n");
+        sprint(self, " \bautostats\b   toggle automatic end-of-match statistics\n");
+        sprint(self, " \bbadstats\b    show self, team, and environment deaths\n");
+        sprint(self, " \befficiency\b  show player frag efficiency\n");
+        sprint(self, " \bflagstats\b   show capture-the-flag statistics\n");
+        sprint(self, " \bkillstats\b   show detailed kill statistics\n");
+        sprint(self, " \bpentstats\b   show pentagram statistics\n");
+        sprint(self, " \bquadstats\b   show quad-damage statistics\n");
+        sprint(self, " \bstats\b       show current match statistics\n");
+        sprint(self, " \bteamstats\b   show team totals\n");
+        sprint(self, " \bdstats\b      show defense statistics\n");
+        sprint(self, " \bwtstats\b     show weapon pickup statistics\n");
+        sprint(self, " \bitstats\b     show item pickup statistics\n");
         sprint(self, "\n");
 };
 
 void () misc_commands =
 {
         sprint(self, "\n");
-        sprint(self, " \bcaptimes\b\n");
-        sprint(self, " \bdropammo\b\n");
-        sprint(self, " \bdropweapon\b\n");
-        if (clanring_playmode & CLANRING_HH_MODE)
-        {
-            sprint(self, " \bhook\b\n");
-            sprint(self, " \bpasshead\b\n");
-            sprint(self, " \bhhcall\b\n");
-            sprint(self, " \bhhhelp\b\n");
-        }
-        sprint(self, " \bhighscores\b\n");
-        sprint(self, " \bcmd ignore\b\n");
-        sprint(self, " \blast\b\n");
-        sprint(self, " \blastscores\b\n");
-        sprint(self, " \bmotd\b\n");
-        sprint(self, " \brules\b\n");
-        sprint(self, " \bsuggest\b\n");
-        sprint(self, " \bcmd unignore\b\n");
+        sprint(self, " \bafk\b           toggle AFK status\n");
+        sprint(self, " \bcaptimes\b      show capture-time records for a map\n");
+        sprint(self, " \bdropammo\b      drop an ammo pack in teamplay\n");
+        sprint(self, " \bdropweapon\b    drop a weapon in teamplay\n");
+        sprint(self, " \bhighscores\b    show map record times\n");
+        sprint(self, " \bcmd ignore\b    ignore a player's messages\n");
+        sprint(self, " \blast\b          list recently disconnected players\n");
+        sprint(self, " \blastscores\b    show scores from the previous match\n");
+        sprint(self, " \bmotd\b          show the message of the day\n");
+        sprint(self, " \bnextmap\b       vote to advance to the next map\n");
+        sprint(self, " \brules\b         show server rules\n");
+        sprint(self, " \bshownick\b      identify the teammate in view\n");
+        sprint(self, " \bleavemealone\b  toggle prewar leave-me-alone mode\n");
+        if (self.client != "QSS-M")
+            sprint(self, " \bmarkdemo\b      mark the current point in a demo\n");
+        sprint(self, " \bsuggest\b       suggest ranked pickup teams\n");
+        sprint(self, " \bcmd unignore\b  stop ignoring a player\n");
         sprint(self, "\n");
 };
 
 void () modhelp_commands =
 {
         sprint(self, "\n");
-        sprint(self, " \bhelp-camera\b\n");
-        sprint(self, " \bhelp-chase\b\n");
-        sprint(self, " \bhelp-fly\b\n");
-        sprint(self, " \bhelp-match\b\n");
-        sprint(self, " \bhelp-misc\b\n");
-        sprint(self, " \bhelp-observer\b\n");
-        sprint(self, " \bhelp-server\b\n");
-        sprint(self, " \bhelp-stats\b\n");
-        sprint(self, " \bhelp-walk\b\n");
-        sprint(self, " \bvinfo\b\n");
-        sprint(self, "\n");
-};
-
-void () shortcuts_commands =
-{
-        sprint(self, "\n");
-        sprint(self, " \bmapx\b  warp to    \brd\b   red\n");
-        sprint(self, " \b?\b     ready?     \btimeset 10\n");
-        sprint(self, " \bbl\b    blue       \btimeset 20\n");
-        sprint(self, " \be\b     eyecam     \bst\b   timerstart\n");
-        sprint(self, " \bn\b     no         \bpa\b   timerstop\n");
-        sprint(self, " \bnr\b    notready   \byl\b   yellow\n");
-        sprint(self, " \br\b     ready      \by\b    yes\n");
+        sprint(self, " \bhelp-camera\b    fixed-camera controls\n");
+        sprint(self, " \bhelp-chase\b     chase-camera controls\n");
+        sprint(self, " \bhelp-fly\b       free-flying observer controls\n");
+        sprint(self, " \bhelp-match\b     match mode commands\n");
+        sprint(self, " \bhelp-misc\b      miscellaneous commands\n");
+        sprint(self, " \bhelp-observer\b  observer mode commands\n");
+        sprint(self, " \bhelp-server\b    general server help\n");
+        sprint(self, " \bhelp-stats\b     statistics help\n");
+        sprint(self, " \bhelp-walk\b      walking observer controls\n");
+        sprint(self, " \bvinfo\b          server version information\n");
         sprint(self, "\n");
 };
 
@@ -2914,8 +2963,6 @@ void () clanring_impulse =
         misc_commands ();
     else if (self.impulse == 186)
         modhelp_commands ();
-    else if (self.impulse == 187)
-        shortcuts_commands ();
     else if (self.impulse == 188)
         utils_show_last_disconnects ();
     else if (self.impulse >= 115 && self.impulse <= 116)
