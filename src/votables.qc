@@ -302,20 +302,20 @@ void () votables_change_level =
 		serverflags = 0;
 		utils_update_server_time();  // Update persistent time
 		utils_save_disconnect_log();  // Save to file before map change
-		changelevel("start");
+		clanring_changelevel("start");
 	}
 	else if (request_mapname == "start1")
 	{
 		serverflags = 15;
 		utils_update_server_time();  // Update persistent time
 		utils_save_disconnect_log();  // Save to file before map change
-		changelevel("start");
+		clanring_changelevel("start");
 	}
 	else
 	{
 		utils_update_server_time();  // Update persistent time
 		utils_save_disconnect_log();  // Save to file before map change
-		changelevel (request_mapname);
+		clanring_changelevel(request_mapname);
 	}	
 };
 
@@ -722,14 +722,14 @@ void() votables_set_gametype_mode_map =
 	observer_clear_players_infokeys();
 
 	if (newmapname == "")
-		newmapname = mapname;
+		newmapname = clanring_current_mapname();
 
 	// If we changed into a mode that doesn't permit leave-me-alone, clear it now
 	if (!leavemealone_mode_allows())
 		utils_do_players(match_clear_leavemealone);
 
 	utils_sync_external_ents_dir();
-	changelevel (newmapname);
+	clanring_changelevel(newmapname);
 };
 
 //
@@ -1626,7 +1626,7 @@ void() votables_set_altents =
     utils_set_cvar("gamecfg", clanring_gameconfig);
 	utils_update_server_time();  // Update persistent time
 	utils_save_disconnect_log();  // Save to file before map change
-	changelevel(mapname);
+	clanring_changelevel(clanring_current_mapname());
 };
 
 //

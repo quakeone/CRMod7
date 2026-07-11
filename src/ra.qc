@@ -1,5 +1,242 @@
 void (float value) clanring_set_fraglimit;
 
+/*
+Virtual Rocket Arena submaps
+----------------------------
+configs/ra_submaps.cfg maps a public virtual name to a physical BSP and a
+spawn-group tag:
+
+    virtual_name  bsp_name  spawn_group
+
+Spawn entities inside the BSP (or its external .ent) opt into a room with:
+
+    "cr_ra_submap" "spawn_group"
+
+The selected virtual name and group are carried over the physical changelevel
+in cvars because ordinary Quake changelevel only accepts a real BSP name.
+*/
+
+void() ra_clear_submap_config =
+{
+	local float i;
+
+	for (i = 0; i < ra_submap_count; i = i + 1)
+	{
+		if (ra_submaps[i].name != "")
+			strunzone(ra_submaps[i].name);
+		if (ra_submaps[i].bsp != "")
+			strunzone(ra_submaps[i].bsp);
+		if (ra_submaps[i].spawn_group != "")
+			strunzone(ra_submaps[i].spawn_group);
+
+		ra_submaps[i].name = "";
+		ra_submaps[i].bsp = "";
+		ra_submaps[i].spawn_group = "";
+	}
+
+	ra_submap_count = 0;
+};
+
+float(string virtual_name) ra_find_submap =
+{
+	local float i;
+
+	if (!virtual_name || virtual_name == "")
+		return -1;
+
+	for (i = 0; i < ra_submap_count; i = i + 1)
+	{
+		if (ra_submaps[i].name == virtual_name)
+			return i;
+	}
+
+	return -1;
+};
+
+void() ra_load_submap_config =
+{
+	local filestream f;
+	local string line;
+	local float argc;
+	local float duplicate;
+
+	ra_clear_submap_config();
+	f = fopen("configs/ra_submaps.cfg", FILE_READ);
+	if (f < 0)
+		return;
+
+	print("Loading ClanRing Configuration File: \"configs/ra_submaps.cfg\"\n");
+	while ((line = fgets(f)))
+	{
+		argc = tokenize(line);
+		if (!argc)
+			continue;
+		if (argv(0) == "//" || argv(0) == "#")
+			continue;
+		if (argc < 3)
+		{
+			print(sprintf("[RA submaps] Ignoring incomplete entry: %s\n", line));
+			continue;
+		}
+		if (ra_submap_count >= RA_SUBMAP_LIMIT)
+		{
+			print(sprintf("[RA submaps] Limit of %s entries reached\n", ftos(RA_SUBMAP_LIMIT)));
+			break;
+		}
+
+		duplicate = ra_find_submap(argv(0));
+		if (duplicate >= 0)
+		{
+			print(sprintf("[RA submaps] Duplicate virtual map ignored: %s\n", argv(0)));
+			continue;
+		}
+
+		ra_submaps[ra_submap_count].name = strzone(argv(0));
+		ra_submaps[ra_submap_count].bsp = strzone(argv(1));
+		ra_submaps[ra_submap_count].spawn_group = strzone(argv(2));
+		ra_submap_count = ra_submap_count + 1;
+	}
+
+	fclose(f);
+	print(sprintf("[RA submaps] Loaded %s virtual maps\n", ftos(ra_submap_count)));
+};
+
+void() ra_clear_active_submap =
+{
+	if (ra_active_submap_name != "")
+		strunzone(ra_active_submap_name);
+	if (ra_active_submap_bsp != "")
+		strunzone(ra_active_submap_bsp);
+	if (ra_active_spawn_group != "")
+		strunzone(ra_active_spawn_group);
+
+	ra_active_submap_name = "";
+	ra_active_submap_bsp = "";
+	ra_active_spawn_group = "";
+};
+
+void() ra_clear_submap_cvars =
+{
+	cvar_set("cr_ra_virtual_map", "");
+	cvar_set("cr_ra_virtual_bsp", "");
+	cvar_set("cr_ra_virtual_spawn_group", "");
+};
+
+void() ra_submap_init_world =
+{
+	local string virtual_name;
+	local string virtual_bsp;
+	local string spawn_group;
+
+	registercvar("cr_ra_virtual_map", "");
+	registercvar("cr_ra_virtual_bsp", "");
+	registercvar("cr_ra_virtual_spawn_group", "");
+	ra_clear_active_submap();
+
+	virtual_name = cvar_string("cr_ra_virtual_map");
+	virtual_bsp = cvar_string("cr_ra_virtual_bsp");
+	spawn_group = cvar_string("cr_ra_virtual_spawn_group");
+
+	if (!(clanring_playmode & CLANRING_RA_MODE)
+		|| virtual_name == "" || virtual_bsp != mapname || spawn_group == "")
+	{
+		ra_clear_submap_cvars();
+		forceinfokey(world, "ra_submap", "");
+		forceinfokey(world, "ra_bsp", "");
+		return;
+	}
+
+	ra_active_submap_name = strzone(virtual_name);
+	ra_active_submap_bsp = strzone(virtual_bsp);
+	ra_active_spawn_group = strzone(spawn_group);
+	forceinfokey(world, "ra_submap", ra_active_submap_name);
+	forceinfokey(world, "ra_bsp", ra_active_submap_bsp);
+	print(sprintf("[RA submaps] Active map %s uses %s.bsp spawn group %s\n",
+		ra_active_submap_name, ra_active_submap_bsp, ra_active_spawn_group));
+};
+
+string() clanring_current_mapname =
+{
+	if (ra_active_submap_name != "")
+		return ra_active_submap_name;
+
+	return mapname;
+};
+
+void(string requested_map) clanring_changelevel =
+{
+	local float submap;
+	local string physical_map;
+
+	submap = ra_find_submap(requested_map);
+	if (submap >= 0)
+		physical_map = ra_submaps[submap].bsp;
+	else
+		physical_map = requested_map;
+
+	if ((submap >= 0) && (clanring_playmode & CLANRING_RA_MODE))
+	{
+		cvar_set("cr_ra_virtual_map", ra_submaps[submap].name);
+		cvar_set("cr_ra_virtual_bsp", ra_submaps[submap].bsp);
+		cvar_set("cr_ra_virtual_spawn_group", ra_submaps[submap].spawn_group);
+	}
+	else
+	{
+		ra_clear_submap_cvars();
+	}
+
+	changelevel(physical_map);
+};
+
+float(entity spot) ra_spawn_matches_submap =
+{
+	if (ra_active_spawn_group == "")
+		return TRUE;
+
+	return (spot.cr_ra_submap == ra_active_spawn_group);
+};
+
+void() ra_validate_submap_spawns =
+{
+	local entity spot;
+	local float count;
+
+	if (ra_active_spawn_group == "")
+	{
+		remove(self);
+		return;
+	}
+
+	spot = find(world, classname, "info_teleport_destination");
+	while (spot != world)
+	{
+		if (ra_spawn_matches_submap(spot))
+			count = count + 1;
+		spot = find(spot, classname, "info_teleport_destination");
+	}
+
+	spot = find(world, classname, "info_player_deathmatch");
+	while (spot != world)
+	{
+		if (ra_spawn_matches_submap(spot))
+			count = count + 1;
+		spot = find(spot, classname, "info_player_deathmatch");
+	}
+
+	if (!count)
+	{
+		bprint(sprintf("\bRA submap error:\b %s has no spawns tagged cr_ra_submap=%s\n",
+			ra_active_submap_name, ra_active_spawn_group));
+	}
+	else
+	{
+		print(sprintf("[RA submaps] %s has %s eligible spawns\n",
+			ra_active_submap_name, ftos(count)));
+	}
+
+	remove(self);
+};
+
 /* RA worldspawn override key:
 "cr_ra_gravity" "150"
 
@@ -173,7 +410,11 @@ string() ra_get_next_map =
 };
 
 float() ra_map =
-{		
+
+{
+	if (ra_active_submap_name != "")
+		return TRUE;
+
 	if (mapname == "23ar-a")	return TRUE;
 	if (mapname == "2pyramid")  return TRUE;
 	if (mapname == "2towers")  	return TRUE;
@@ -227,6 +468,34 @@ float() ra_map =
 //
 //Sequential spawns, with telefrag scan.
 //
+entity(entity start, string spawn_classname) ra_find_submap_spawn =
+{
+	local entity spot;
+
+	spot = find(start, classname, spawn_classname);
+	while (spot != world)
+	{
+		if (ra_spawn_matches_submap(spot))
+			return spot;
+		spot = find(spot, classname, spawn_classname);
+	}
+
+	return world;
+};
+
+entity(string spawn_classname) ra_next_submap_spawn =
+{
+	local entity spot;
+
+	if ((ra_lastspawn != world) && (ra_lastspawn.classname == spawn_classname))
+		spot = ra_find_submap_spawn(ra_lastspawn, spawn_classname);
+
+	if (spot == world)
+		spot = ra_find_submap_spawn(world, spawn_classname);
+
+	return spot;
+};
+
 entity() SelectRASpawnPoint =
 {
 	local entity spot;
@@ -238,26 +507,44 @@ entity() SelectRASpawnPoint =
 	
 	//pcount = random() * (tele_num_spawns - 0.001);
 	//pcount = floor(pcount);
-	spot = find(world, classname, "info_teleport_destination");
-
-	if (spot == world)
+	// Preserve the original RA selection exactly for ordinary, non-virtual maps.
+	if (ra_active_spawn_group == "")
 	{
-		spot = find(world, classname, "info_player_deathmatch");
+		spot = find(world, classname, "info_teleport_destination");
+		if (spot == world)
+		{
+			spot = find(world, classname, "info_player_deathmatch");
+			if (spot == ra_lastspawn)
+				spot = find(spot, classname, "info_player_deathmatch");
+			return spot;
+		}
+
 		if (spot == ra_lastspawn)
 		{
-			spot = find(spot, classname, "info_player_deathmatch");
+			spot = find(spot, classname, "info_teleport_destination");
+			if (spot == world)
+			{
+				spot = find(world, classname, "info_teleport_destination");
+				spot.origin = spot.origin + '64 64 64';
+			}
 		}
+
+		if (spot != world)
+		{
+			self.solid = SOLID_NOT;
+			makevectors(self.v_angle);
+			self.velocity = v_forward * 320;
+		}
+
+		ra_lastspawn = spot;
 		return spot;
 	}
 
-	if (spot == ra_lastspawn)
+	spot = ra_next_submap_spawn("info_teleport_destination");
+
+	if (spot == world)
 	{
-		spot = find(spot, classname, "info_teleport_destination");
-		if (spot == world)
-		{
-			spot = find(world, classname, "info_teleport_destination");
-			spot.origin = spot.origin + '64 64 64';
-		}
+		spot = ra_next_submap_spawn("info_player_deathmatch");
 	}
 
 	//Check for telefrag

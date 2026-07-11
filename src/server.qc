@@ -688,6 +688,7 @@ void () clanring_init_world =
         clanring_playmode = clanring_playmode | desired_startup_bits;
         utils_set_cvar("samelevel", clanring_playmode);
     }
+    ra_submap_init_world();
     clanring_refresh_pak0_only();
     clanring_gameconfig = cvar("gamecfg");	//R00k TODO: migrate settings
     clanring_apply_pak0_only_mode();
@@ -947,6 +948,7 @@ void () clanring_init_world =
     // schedule the config files for a bit later so that they don't
     // get loaded twice on startup
     utils_make_scheduled_event(clanring_exec_configs, 1);
+    utils_make_scheduled_event(ra_validate_submap_spawns, 0.1);
     if (clanring_playmode & CLANRING_HH_MODE)
         utils_make_scheduled_event(hh_startup, 0.2);
     // spawn runes if enabled, wait for the cfg to be read.
@@ -3787,7 +3789,7 @@ void () clanring_start_frame =
 
                 utils_update_server_time();  // Update persistent time
                 utils_save_disconnect_log();  // Save to file before map change
-                changelevel(nextmap);
+                clanring_changelevel(nextmap);
                 strunzone(nextmap); // zoned mem carries over, over changelevels, so we need to free it now.
                 nextmap = "";
             }

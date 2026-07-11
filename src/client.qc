@@ -317,11 +317,11 @@ void() GotoNextMap =
 
         if (nextmap == "")
         {
-            nextmap = mapname;
+            nextmap = clanring_current_mapname();
             bprint("\nMap not found. Reloading Current Map...Please Wait.\n");
         }
     }
-    changelevel (nextmap);
+    clanring_changelevel(nextmap);
 };
 
 /*

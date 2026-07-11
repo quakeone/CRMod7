@@ -860,7 +860,7 @@ void() json_emit_match_document =
       json_key("match"); json_begin_object();
         json_kv_string("date",       date);
         json_kv_string("hostname",   hname);
-        json_kv_string("map",        mapname);
+        json_kv_string("map",        clanring_current_mapname());
         json_kv_string("gamemode",   sgtype);
         json_kv_number("match size", clanring_maxteams);
         json_kv_number("team size",  stats_matchtype);
@@ -1036,7 +1036,7 @@ void(string entry) json_append_lastscores =
     float si;
 
     // ---------- Collect metadata ----------
-    string mapn = mapname; if (!mapn || mapn == "") mapn = "unknown";
+    string mapn = clanring_current_mapname(); if (!mapn || mapn == "") mapn = "unknown";
 
     string mode = infokey(world, "mode");
     if (!mode || mode == "")

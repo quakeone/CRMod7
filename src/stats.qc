@@ -1732,7 +1732,7 @@ void() stats_autodump =
 
 		sprint(self, "match statistics\n");
 		sprint(self, "\n");
-		sprint(self, "map      \b:\b ", mapname, "\n");
+		sprint(self, "map      \b:\b ", clanring_current_mapname(), "\n");
 		sprint(self, "date     \b:\b ", date, "\n");
 		sprint(self, "server   \b:\b ", hname, "\n");
 		sprint(self, "mode     \b:\b ", mode_label, "\n");
@@ -1820,7 +1820,7 @@ void() stats_autodump =
 
         // Compact, Discord-friendly header; you can add more lines here anytime.
         msg = sprintf("**Match statistics**\n%s\n%s\nMap: %s\nTeamplay: %s\nMode: %s\n",
-                      date, hname, mapname, tplay, mode_label);
+                      date, hname, clanring_current_mapname(), tplay, mode_label);
 
         if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
             msg = strcat(msg, sprintf("%s set a new match capture record!\n", clanring_new_record_player));

@@ -680,6 +680,30 @@ typedef struct
 
 servermap_t warpmap[WARP_CATEGORY_SIZE * WARP_MAPLIST_SIZE];
 
+// A virtual Rocket Arena map selects one spawn group inside another map's BSP.
+typedef struct
+{
+	string name;        // votable/rotatable virtual map name
+	string bsp;         // physical map filename without .bsp
+	string spawn_group; // value used by spawn entities' cr_ra_submap key
+} ra_submap_t;
+
+#define RA_SUBMAP_LIMIT 128
+ra_submap_t ra_submaps[RA_SUBMAP_LIMIT];
+float ra_submap_count;
+string ra_active_submap_name;
+string ra_active_submap_bsp;
+string ra_active_spawn_group;
+
+void() ra_load_submap_config;
+void() ra_submap_init_world;
+void() ra_validate_submap_spawns;
+void(string requested_map) clanring_changelevel;
+string() clanring_current_mapname;
+float(entity spot) ra_spawn_matches_submap;
+
+.string cr_ra_submap; // optional RA spawn-group tag from a BSP or external .ent
+
 string warpmenutop[WARP_CATEGORY_SIZE]; // Customizable map categories for the warp menu contents.
 string vote_map_choices[6];
 

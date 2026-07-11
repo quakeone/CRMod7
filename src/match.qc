@@ -1338,7 +1338,7 @@ void() match_end =
             tshort_m = sprintf("%s.%s", tsec_m, tms_m);
             server_host_m = cvar_string("hostname");
             msg_m = sprintf("New Match #1 Record | %s, %s, %s, %s, %s",
-                            mapname,
+                            clanring_current_mapname(),
                             playerrecord2[0].player,
                             tshort_m,
                             team_s_m,

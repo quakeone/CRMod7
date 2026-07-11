@@ -962,7 +962,7 @@ void() console_autodump =
 		Timelimit: 20
 		*/
 		
-		cprint3("\"Map: ",mapname,"\"\n");
+		cprint3("\"Map: ",clanring_current_mapname(),"\"\n");
 
 		temp = ftos(stats_matchtype);
 		cprint5("\"Type: ", temp, "v", temp,"\"\n");

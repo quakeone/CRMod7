@@ -989,7 +989,7 @@ void() clanring_nextlevel_config =
 
 	if (nextmap == "")
     {
-        nextmap = strzone(mapname); // Reload the current map.
+        nextmap = strzone(clanring_current_mapname()); // Reload the current logical map.
         bprint("Nextmap not found, reloading ", nextmap, ".\n");
     }
     else
@@ -1082,6 +1082,7 @@ void(string cfg) exec_clanring_cfg =
 
 void() clanring_warp_config =
 {
+	ra_load_submap_config();
 	print("Loading ClanRing Configuration File: \"configs/warp_main_menu.cfg\"\n");
 	exec_warp_main_menu();
 	print("Loading ClanRing Configuration File: \"configs/warp.cfg\"\n");
@@ -1361,18 +1362,38 @@ void () write_airshot_streak_stats =
 //TODO: maybe combine these .ent .cam files together into per $mapname.cfg files with subsections for entity, camera, server settings for speed and ease?
 void() clanring_ent_config =
 {
-	//Entity Files
-	print("Loading Entities Configuration File: entities/", mapname, ".ent\"\n");
-//	print("\"It is OPTIONAL - there is nothing wrong if it can't be found.\"\n");
-	exec_clanring_cfg((strcat("entities/", mapname, ".ent")));
+	local string logical_map;
+	local string path;
+	local filestream f;
+
+	logical_map = clanring_current_mapname();
+	path = strcat("entities/", logical_map, ".ent");
+	f = fopen(path, FILE_READ);
+	if ((f < 0) && (logical_map != mapname))
+		path = strcat("entities/", mapname, ".ent");
+	else if (f >= 0)
+		fclose(f);
+
+	print(sprintf("Loading Entities Configuration File: \"%s\"\n", path));
+	exec_clanring_cfg(path);
 };
 
 void() clanring_cam_config =
 {
-	//Camera Files
-	print("Loading Camera Configuration File: \"camera/", mapname, ".cam\"\n");
-//	print("\"It is OPTIONAL - there is nothing wrong if it can't be found.\"\n");
-	exec_clanring_cfg((strcat("cameras/", mapname, ".cam")));
+	local string logical_map;
+	local string path;
+	local filestream f;
+
+	logical_map = clanring_current_mapname();
+	path = strcat("cameras/", logical_map, ".cam");
+	f = fopen(path, FILE_READ);
+	if ((f < 0) && (logical_map != mapname))
+		path = strcat("cameras/", mapname, ".cam");
+	else if (f >= 0)
+		fclose(f);
+
+	print(sprintf("Loading Camera Configuration File: \"%s\"\n", path));
+	exec_clanring_cfg(path);
 };
 
 void() clanring_map_config =
@@ -1380,9 +1401,10 @@ void() clanring_map_config =
 	//Map specific settings
 	// Reset per-map timelimit force before applying map cfg
 	clanring_force_timelimit = 0;
-	// Try configs/maps/ first, fall back to configs/
-	string maps_path = strcat("configs/maps/", mapname, ".cfg");
-	string flat_path = strcat("configs/", mapname, ".cfg");
+	// Try the logical submap name first, then fall back to the physical BSP.
+	string logical_map = clanring_current_mapname();
+	string maps_path = strcat("configs/maps/", logical_map, ".cfg");
+	string flat_path = strcat("configs/", logical_map, ".cfg");
 	filestream f = fopen(maps_path, FILE_READ);
 	if (f >= 0)
 	{
@@ -1392,8 +1414,35 @@ void() clanring_map_config =
 	}
 	else
 	{
-		print(sprintf("Loading Map Configuration File: \"%s\"\n", flat_path));
-		exec_clanring_cfg(flat_path);
+		f = fopen(flat_path, FILE_READ);
+		if (f >= 0)
+		{
+			fclose(f);
+			print(sprintf("Loading Map Configuration File: \"%s\"\n", flat_path));
+			exec_clanring_cfg(flat_path);
+		}
+		else if (logical_map != mapname)
+		{
+			maps_path = strcat("configs/maps/", mapname, ".cfg");
+			flat_path = strcat("configs/", mapname, ".cfg");
+			f = fopen(maps_path, FILE_READ);
+			if (f >= 0)
+			{
+				fclose(f);
+				print(sprintf("Loading Map Configuration File: \"%s\"\n", maps_path));
+				exec_clanring_cfg(maps_path);
+			}
+			else
+			{
+				print(sprintf("Loading Map Configuration File: \"%s\"\n", flat_path));
+				exec_clanring_cfg(flat_path);
+			}
+		}
+		else
+		{
+			print(sprintf("Loading Map Configuration File: \"%s\"\n", flat_path));
+			exec_clanring_cfg(flat_path);
+		}
 	}
 	// Trace current key cvars after map cfg
 	bprint("after map cfg: deathmatch ", ftos(cvar("deathmatch")), ", timelimit ", ftos(cvar("timelimit")), ", forceTL ", ftos(clanring_force_timelimit), "\n");
@@ -1538,7 +1587,7 @@ void() clanring_exec_configs =
 			clanring_set_teamplay(2);
 		}
 		clanring_levelcount = -1;
-		nextmap = strzone(mapname);//just restart samelevel
+		nextmap = strzone(clanring_current_mapname());//just restart same logical map
 	}
 
 	//R00k: ticrate defaults for different modes :|

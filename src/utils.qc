@@ -4019,7 +4019,7 @@ void(entity ev) webhook_stats_info =
 
         // Zone strings to avoid tempstring aliasing.
         time_str_z = strzone(time_str);
-        map_str_z = strzone(utils_dequake_for_discord(mapname));
+        map_str_z = strzone(utils_dequake_for_discord(clanring_current_mapname()));
         
         if (clanring_maxsize > 0 && teamplay)
             match_desc = sprintf("%s %gv%g %s on %s", time_str_z, clanring_maxsize, clanring_maxsize, game_type, map_str_z);
