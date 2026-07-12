@@ -1082,7 +1082,6 @@ void(string cfg) exec_clanring_cfg =
 
 void() clanring_warp_config =
 {
-	ra_load_submap_config();
 	print("Loading ClanRing Configuration File: \"configs/warp_main_menu.cfg\"\n");
 	exec_warp_main_menu();
 	print("Loading ClanRing Configuration File: \"configs/warp.cfg\"\n");

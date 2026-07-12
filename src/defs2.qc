@@ -685,15 +685,29 @@ typedef struct
 {
 	string name;        // votable/rotatable virtual map name
 	string bsp;         // physical map filename without .bsp
-	string spawn_group; // value used by spawn entities' cr_ra_submap key
 } ra_submap_t;
 
+// A configured spawn belongs to one ra_submaps[] entry. Multiple records let
+// an arena provide distinct starts without requiring an external .ent file.
+typedef struct
+{
+	float submap_index;
+	// Keep coordinates scalar: vector members in arrays of structs only retain
+	// their X component on some legacy QuakeC VM/compiler combinations.
+	float coord0;
+	float coord1;
+	float coord2;
+	float yaw;
+} ra_submap_spawn_t;
+
 #define RA_SUBMAP_LIMIT 128
+#define RA_SUBMAP_SPAWN_LIMIT 512
 ra_submap_t ra_submaps[RA_SUBMAP_LIMIT];
+ra_submap_spawn_t ra_submap_spawns[RA_SUBMAP_SPAWN_LIMIT];
 float ra_submap_count;
+float ra_submap_spawn_count;
 string ra_active_submap_name;
 string ra_active_submap_bsp;
-string ra_active_spawn_group;
 
 void() ra_load_submap_config;
 void() ra_submap_init_world;
@@ -703,6 +717,14 @@ string() clanring_current_mapname;
 float(entity spot) ra_spawn_matches_submap;
 
 .string cr_ra_submap; // optional RA spawn-group tag from a BSP or external .ent
+
+// Alkaline map compatibility. func_wall gives liquidbrush volumes native water
+// contents when the engine supports them; the other keys retain map metadata.
+.string liquidbrush;
+.float liquidtype;
+.vector liquidcolor;
+.float liquiddensity;
+.float softangle; // parse-only spotlight metadata used by some Alkaline maps
 
 string warpmenutop[WARP_CATEGORY_SIZE]; // Customizable map categories for the warp menu contents.
 string vote_map_choices[6];

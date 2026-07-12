@@ -1262,6 +1262,7 @@ void(entity spot) ffa_start_lock_spread_spawn =
     if (!ffa_start_lock_active())
         return;
 
+    // Retain the standard fallback if a virtual arena has no eligible start.
     if (spot == world)
         return;
 
@@ -1395,7 +1396,13 @@ void() PutClientInServer =
         }
     }
 
-    if (mode_is_arena())
+    // A virtual map's configured starts are authoritative even while a mode
+    // change is still taking effect. Do this before the ordinary arena test.
+    if (ra_active_submap_name != "")
+    {
+        spot = SelectRASpawnPoint();
+    }
+    else if (mode_is_arena())
     {
         if ((ra_map()) && ((self.ca_player_flag == PF_READY) || (self.ca_player_flag == PF_PLAYING)))
         {

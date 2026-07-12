@@ -742,14 +742,44 @@ void() func_wall_use =
 	self.frame = 1 - self.frame;
 };
 
-/*QUAKED func_wall (0 .5 .8) ?
-This is just a solid wall if not inhibitted
+/*QUAKED func_wall (0 .5 .8) ? NONSOLID
+This is a solid wall unless spawnflag 2 or Alkaline's liquidbrush key is set.
 */
 void() func_wall =
 {
 	self.angles = '0 0 0';
-	self.movetype = MOVETYPE_PUSH;	// so it doesn't get pushed by anything
-	self.solid = SOLID_BSP;
+
+	// ALKALINE_COMPAT: Alkaline uses func_wall spawnflag 2 for non-solid visual
+	// brushes and liquidbrush "1" for entity-based liquid volumes. QSS/FTE can
+	// give a SOLID_BSP brush native water contents through its negative skin;
+	// unsupported engines retain a passable visual volume. Based on Alkaline's
+	// liquidbrush convention; source reference courtesy of Fabio Lima:
+	// https://github.com/fabiolimamp/alkaline
+	if (self.liquidbrush == "1")
+	{
+		if (checkextension("FTE_ENT_SKIN_CONTENTS"))
+		{
+			self.movetype = MOVETYPE_PUSH;
+			self.solid = SOLID_BSP;
+			self.skin = CONTENT_WATER;
+		}
+		else
+		{
+			self.movetype = MOVETYPE_NONE;
+			self.solid = SOLID_NOT;
+		}
+	}
+	else if (self.spawnflags & 2)
+	{
+		self.movetype = MOVETYPE_NONE;
+		self.solid = SOLID_NOT;
+	}
+	else
+	{
+		self.movetype = MOVETYPE_PUSH;	// so it doesn't get pushed by anything
+		self.solid = SOLID_BSP;
+	}
+
 	self.use = func_wall_use;
 	setmodel (self, self.model);
 };

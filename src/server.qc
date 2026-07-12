@@ -688,6 +688,9 @@ void () clanring_init_world =
         clanring_playmode = clanring_playmode | desired_startup_bits;
         utils_set_cvar("samelevel", clanring_playmode);
     }
+    // RA spawn definitions must be loaded before clients receive their first
+    // placement; the normal delayed config pass is too late for map entry.
+    ra_load_submap_config();
     ra_submap_init_world();
     clanring_refresh_pak0_only();
     clanring_gameconfig = cvar("gamecfg");	//R00k TODO: migrate settings

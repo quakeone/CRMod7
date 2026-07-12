@@ -3,17 +3,19 @@ void (float value) clanring_set_fraglimit;
 /*
 Virtual Rocket Arena submaps
 ----------------------------
-configs/ra_submaps.cfg maps a public virtual name to a physical BSP and a
-spawn-group tag:
+configs/ra_submaps.cfg maps a public virtual name to a physical BSP and owns
+the spawn coordinates used by that virtual arena:
 
-    virtual_name  bsp_name  spawn_group
+    map    virtual_name  bsp_name
+    spawn  virtual_name  x  y  z  yaw
 
-Spawn entities inside the BSP (or its external .ent) opt into a room with:
+Multiple spawn records may belong to one map. The virtual name is also the
+spawn-group tag, so external entities can still supplement configured spawns:
 
-    "cr_ra_submap" "spawn_group"
+    "cr_ra_submap" "virtual_name"
 
-The selected virtual name and group are carried over the physical changelevel
-in cvars because ordinary Quake changelevel only accepts a real BSP name.
+The selected virtual name is carried over the physical changelevel in a cvar
+because ordinary Quake changelevel only accepts a real BSP name.
 */
 
 void() ra_clear_submap_config =
@@ -26,15 +28,13 @@ void() ra_clear_submap_config =
 			strunzone(ra_submaps[i].name);
 		if (ra_submaps[i].bsp != "")
 			strunzone(ra_submaps[i].bsp);
-		if (ra_submaps[i].spawn_group != "")
-			strunzone(ra_submaps[i].spawn_group);
 
 		ra_submaps[i].name = "";
 		ra_submaps[i].bsp = "";
-		ra_submaps[i].spawn_group = "";
 	}
 
 	ra_submap_count = 0;
+	ra_submap_spawn_count = 0;
 };
 
 float(string virtual_name) ra_find_submap =
@@ -57,8 +57,10 @@ void() ra_load_submap_config =
 {
 	local filestream f;
 	local string line;
+	local string command;
 	local float argc;
 	local float duplicate;
+	local float submap;
 
 	ra_clear_submap_config();
 	f = fopen("configs/ra_submaps.cfg", FILE_READ);
@@ -73,32 +75,70 @@ void() ra_load_submap_config =
 			continue;
 		if (argv(0) == "//" || argv(0) == "#")
 			continue;
-		if (argc < 3)
-		{
-			print(sprintf("[RA submaps] Ignoring incomplete entry: %s\n", line));
-			continue;
-		}
-		if (ra_submap_count >= RA_SUBMAP_LIMIT)
-		{
-			print(sprintf("[RA submaps] Limit of %s entries reached\n", ftos(RA_SUBMAP_LIMIT)));
-			break;
-		}
 
-		duplicate = ra_find_submap(argv(0));
-		if (duplicate >= 0)
+		command = argv(0);
+		if (command == "map")
 		{
-			print(sprintf("[RA submaps] Duplicate virtual map ignored: %s\n", argv(0)));
-			continue;
-		}
+			if (argc != 3)
+			{
+				print(sprintf("[RA submaps] Expected: map virtual_name bsp_name: %s\n", line));
+				continue;
+			}
+			if (ra_submap_count >= RA_SUBMAP_LIMIT)
+			{
+				print(sprintf("[RA submaps] Map limit of %s reached\n", ftos(RA_SUBMAP_LIMIT)));
+				continue;
+			}
 
-		ra_submaps[ra_submap_count].name = strzone(argv(0));
-		ra_submaps[ra_submap_count].bsp = strzone(argv(1));
-		ra_submaps[ra_submap_count].spawn_group = strzone(argv(2));
-		ra_submap_count = ra_submap_count + 1;
+			duplicate = ra_find_submap(argv(1));
+			if (duplicate >= 0)
+			{
+				print(sprintf("[RA submaps] Duplicate virtual map ignored: %s\n", argv(1)));
+				continue;
+			}
+
+			ra_submaps[ra_submap_count].name = strzone(argv(1));
+			ra_submaps[ra_submap_count].bsp = strzone(argv(2));
+			ra_submap_count = ra_submap_count + 1;
+		}
+		else if (command == "spawn")
+		{
+			if (argc != 6)
+			{
+				print(sprintf("[RA submaps] Expected: spawn virtual_name x y z yaw: %s\n", line));
+				continue;
+			}
+
+			submap = ra_find_submap(argv(1));
+			if (submap < 0)
+			{
+				print(sprintf("[RA submaps] Spawn references unknown virtual map: %s\n", argv(1)));
+				continue;
+			}
+			if (ra_submap_spawn_count >= RA_SUBMAP_SPAWN_LIMIT)
+			{
+				print(sprintf("[RA submaps] Spawn limit of %s reached\n", ftos(RA_SUBMAP_SPAWN_LIMIT)));
+				continue;
+			}
+
+			ra_submap_spawns[ra_submap_spawn_count].submap_index = submap;
+			// Store scalar components independently. Some engines/compiler targets
+			// only copy X when assigning a vector member inside a struct array.
+			ra_submap_spawns[ra_submap_spawn_count].coord0 = stof(argv(2));
+			ra_submap_spawns[ra_submap_spawn_count].coord1 = stof(argv(3));
+			ra_submap_spawns[ra_submap_spawn_count].coord2 = stof(argv(4));
+			ra_submap_spawns[ra_submap_spawn_count].yaw = stof(argv(5));
+			ra_submap_spawn_count = ra_submap_spawn_count + 1;
+		}
+		else
+		{
+			print(sprintf("[RA submaps] Unknown directive: %s\n", line));
+		}
 	}
 
 	fclose(f);
-	print(sprintf("[RA submaps] Loaded %s virtual maps\n", ftos(ra_submap_count)));
+	print(sprintf("[RA submaps] Loaded %s virtual maps with %s configured spawns\n",
+		ftos(ra_submap_count), ftos(ra_submap_spawn_count)));
 };
 
 void() ra_clear_active_submap =
@@ -107,38 +147,75 @@ void() ra_clear_active_submap =
 		strunzone(ra_active_submap_name);
 	if (ra_active_submap_bsp != "")
 		strunzone(ra_active_submap_bsp);
-	if (ra_active_spawn_group != "")
-		strunzone(ra_active_spawn_group);
 
 	ra_active_submap_name = "";
 	ra_active_submap_bsp = "";
-	ra_active_spawn_group = "";
 };
 
 void() ra_clear_submap_cvars =
 {
 	cvar_set("cr_ra_virtual_map", "");
 	cvar_set("cr_ra_virtual_bsp", "");
-	cvar_set("cr_ra_virtual_spawn_group", "");
+};
+
+void() ra_create_configured_spawns =
+{
+	local float submap;
+	local float i;
+	local float count;
+	local entity spot;
+	local vector configured_origin;
+
+	if (ra_active_submap_name == "")
+		return;
+
+	submap = ra_find_submap(ra_active_submap_name);
+	if (submap < 0)
+	{
+		print(sprintf("[RA submaps] Active virtual map is missing from config: %s\n",
+			ra_active_submap_name));
+		return;
+	}
+
+	for (i = 0; i < ra_submap_spawn_count; i = i + 1)
+	{
+		if (ra_submap_spawns[i].submap_index != submap)
+			continue;
+
+		spot = spawn();
+		spot.classname = "info_player_deathmatch";
+		spot.cr_ra_submap = ra_active_submap_name;
+		spot.angles = '0 1 0' * ra_submap_spawns[i].yaw;
+		// Match console_get_origin(), the established working vector-construction
+		// pattern in console.qc: assign local components, then pass the vector.
+		configured_origin_x = ra_submap_spawns[i].coord0;
+		configured_origin_y = ra_submap_spawns[i].coord1;
+		configured_origin_z = ra_submap_spawns[i].coord2;
+		setorigin(spot, configured_origin);
+		dm_num_spawns = dm_num_spawns + 1;
+		count = count + 1;
+	}
+
+	print(sprintf("[RA submaps] Created %s configured spawns for %s\n",
+		ftos(count), ra_active_submap_name));
 };
 
 void() ra_submap_init_world =
 {
 	local string virtual_name;
 	local string virtual_bsp;
-	local string spawn_group;
 
 	registercvar("cr_ra_virtual_map", "");
 	registercvar("cr_ra_virtual_bsp", "");
-	registercvar("cr_ra_virtual_spawn_group", "");
 	ra_clear_active_submap();
 
 	virtual_name = cvar_string("cr_ra_virtual_map");
 	virtual_bsp = cvar_string("cr_ra_virtual_bsp");
-	spawn_group = cvar_string("cr_ra_virtual_spawn_group");
 
-	if (!(clanring_playmode & CLANRING_RA_MODE)
-		|| virtual_name == "" || virtual_bsp != mapname || spawn_group == "")
+	// A configured virtual alias owns its physical map placement regardless of
+	// the mode active on the source map. This prevents its identity and spawns
+	// from being discarded during a simultaneous mode/map change.
+	if (virtual_name == "" || virtual_bsp != mapname)
 	{
 		ra_clear_submap_cvars();
 		forceinfokey(world, "ra_submap", "");
@@ -148,11 +225,11 @@ void() ra_submap_init_world =
 
 	ra_active_submap_name = strzone(virtual_name);
 	ra_active_submap_bsp = strzone(virtual_bsp);
-	ra_active_spawn_group = strzone(spawn_group);
 	forceinfokey(world, "ra_submap", ra_active_submap_name);
 	forceinfokey(world, "ra_bsp", ra_active_submap_bsp);
-	print(sprintf("[RA submaps] Active map %s uses %s.bsp spawn group %s\n",
-		ra_active_submap_name, ra_active_submap_bsp, ra_active_spawn_group));
+	print(sprintf("[RA submaps] Active map %s uses %s.bsp\n",
+		ra_active_submap_name, ra_active_submap_bsp));
+	ra_create_configured_spawns();
 };
 
 string() clanring_current_mapname =
@@ -174,11 +251,12 @@ void(string requested_map) clanring_changelevel =
 	else
 		physical_map = requested_map;
 
-	if ((submap >= 0) && (clanring_playmode & CLANRING_RA_MODE))
+	if (submap >= 0)
 	{
+		// The caller owns the game mode; this layer only maps the public alias
+		// to its physical BSP and carries the selected submap across changelevel.
 		cvar_set("cr_ra_virtual_map", ra_submaps[submap].name);
 		cvar_set("cr_ra_virtual_bsp", ra_submaps[submap].bsp);
-		cvar_set("cr_ra_virtual_spawn_group", ra_submaps[submap].spawn_group);
 	}
 	else
 	{
@@ -190,10 +268,70 @@ void(string requested_map) clanring_changelevel =
 
 float(entity spot) ra_spawn_matches_submap =
 {
-	if (ra_active_spawn_group == "")
+	if (ra_active_submap_name == "")
 		return TRUE;
 
-	return (spot.cr_ra_submap == ra_active_spawn_group);
+	return (spot.cr_ra_submap == ra_active_submap_name);
+};
+
+float(vector org) ra_spawn_hull_clear =
+{
+	tracebox(org, VEC_HULL_MIN, VEC_HULL_MAX, org, MOVE_NORMAL, self);
+	return !(trace_startsolid || trace_allsolid || (trace_fraction < 1));
+};
+
+vector(vector org) ra_resolve_spawn_origin =
+{
+	local vector candidate;
+	local float z;
+	local float radius;
+	local float x;
+	local float y;
+
+	if (ra_spawn_hull_clear(org))
+		return org;
+
+	// First try lifting vertically; mapper/player origins that are slightly
+	// embedded in a floor are the common case.
+	for (z = 8; z <= 128; z = z + 8)
+	{
+		candidate = org + ('0 0 1' * z);
+		if (ra_spawn_hull_clear(candidate))
+		{
+			print(sprintf("[RA submaps] Adjusted blocked spawn %s to %s\n",
+				vtos(org), vtos(candidate)));
+			return candidate;
+		}
+	}
+
+	// If a wall or brush volume occupies the original point, search nearby in
+	// expanding square rings while staying close to the configured arena.
+	for (radius = 16; radius <= 128; radius = radius + 16)
+	{
+		for (x = 0 - radius; x <= radius; x = x + 16)
+		{
+			for (y = 0 - radius; y <= radius; y = y + 16)
+			{
+				if ((fabs(x) != radius) && (fabs(y) != radius))
+					continue;
+
+				for (z = 0; z <= 128; z = z + 16)
+				{
+					candidate = org + [x, y, z];
+					if (ra_spawn_hull_clear(candidate))
+					{
+						print(sprintf("[RA submaps] Adjusted blocked spawn %s to %s\n",
+							vtos(org), vtos(candidate)));
+						return candidate;
+					}
+				}
+			}
+		}
+	}
+
+	bprint(sprintf("\bRA submap error:\b no clear player hull near configured spawn %s\n",
+		vtos(org)));
+	return org;
 };
 
 void() ra_validate_submap_spawns =
@@ -201,7 +339,7 @@ void() ra_validate_submap_spawns =
 	local entity spot;
 	local float count;
 
-	if (ra_active_spawn_group == "")
+	if (ra_active_submap_name == "")
 	{
 		remove(self);
 		return;
@@ -226,12 +364,15 @@ void() ra_validate_submap_spawns =
 	if (!count)
 	{
 		bprint(sprintf("\bRA submap error:\b %s has no spawns tagged cr_ra_submap=%s\n",
-			ra_active_submap_name, ra_active_spawn_group));
+			ra_active_submap_name, ra_active_submap_name));
 	}
 	else
 	{
 		print(sprintf("[RA submaps] %s has %s eligible spawns\n",
 			ra_active_submap_name, ftos(count)));
+		if (count < 2)
+			bprint(sprintf("\bRA submap warning:\b %s needs at least two distinct spawns\n",
+				ra_active_submap_name));
 	}
 
 	remove(self);
@@ -499,6 +640,7 @@ entity(string spawn_classname) ra_next_submap_spawn =
 entity() SelectRASpawnPoint =
 {
 	local entity spot;
+	local vector safe_origin;
 	//local entity thing;
 	//local float	pcount;
 	//local float	n;
@@ -508,7 +650,7 @@ entity() SelectRASpawnPoint =
 	//pcount = random() * (tele_num_spawns - 0.001);
 	//pcount = floor(pcount);
 	// Preserve the original RA selection exactly for ordinary, non-virtual maps.
-	if (ra_active_spawn_group == "")
+	if (ra_active_submap_name == "")
 	{
 		spot = find(world, classname, "info_teleport_destination");
 		if (spot == world)
@@ -550,6 +692,13 @@ entity() SelectRASpawnPoint =
 	//Check for telefrag
 	if (spot != world)
 	{
+		safe_origin = ra_resolve_spawn_origin(spot.origin);
+		if (safe_origin != spot.origin)
+		{
+			spot.origin = safe_origin;
+			setorigin(spot, safe_origin);
+		}
+
 		self.solid = SOLID_NOT;//this will unstick players at spawn
 		makevectors(self.v_angle);
 		self.velocity = v_forward * (320);//R00k:Nudge them forward
