@@ -148,6 +148,7 @@ void() votables_send_aliases =
 	stuffcmd(self, "alias highgibs impulse 227\n");
 	// playmode aliases
 	stuffcmd(self, "alias normal cmd normal\n");
+	stuffcmd(self, "alias ffa cmd ffa\n");
 	stuffcmd(self, "alias practice cmd practice\n");
 	stuffcmd(self, "alias match cmd match\n");
 	stuffcmd(self, "alias dm cmd dm\n");

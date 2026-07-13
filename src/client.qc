@@ -4625,7 +4625,12 @@ void(string cmd) SV_ParseClientCommand =
         case "dm":
             if (arg2 != "")
             {
-                modecmd = get_mode_from_string(arg1);
+                // FFA is the DM-specific name for normal mode. Keep CTF using
+                // "normal" by handling the alias here instead of globally.
+                if (arg1 == "ffa")
+                    modecmd = 0;
+                else
+                    modecmd = get_mode_from_string(arg1);
                 if (modecmd < 0)
                 {
                     sprint2(self, arg1, " is not a recognized mode.\n");
@@ -4653,7 +4658,10 @@ void(string cmd) SV_ParseClientCommand =
                         SV_ParseClientCommand_MapNotFound(arg1);
                         return;
                     }
-                    modecmd = get_mode_from_string(arg1);
+                    if (arg1 == "ffa")
+                        modecmd = 0;
+                    else
+                        modecmd = get_mode_from_string(arg1);
                     if (modecmd < 0)
                     {
                         sprint2(self, arg1, " is not a recognized map or mode.\n");
@@ -4666,12 +4674,22 @@ void(string cmd) SV_ParseClientCommand =
             votables_request_set_gametype_mode_map(0, -1, 0);
             return;
         case "ffa":
+            if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+            {
+                sprint(self, "FFA is a Deathmatch mode. Use normal for CTF.\n");
+                return;
+            }
+            if (clanring_playmode & (CLANRING_CA_MODE | CLANRING_RA_MODE | CLANRING_DMM4_MODE | CLANRING_AIRSHOT_MODE | CLANRING_WIPEOUT_MODE | CLANRING_HH_MODE))
+            {
+                sprint(self, "FFA is only available in Deathmatch mode.\n");
+                return;
+            }
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(0, arg1);
                 if (mapnumber)
                 {
-                    votables_request_set_gametype_mode_map(0, 0, mapnumber);
+                    votables_request_set_gametype_mode_map(-1, 0, mapnumber);
                 }
                 else
                 {
@@ -4679,7 +4697,7 @@ void(string cmd) SV_ParseClientCommand =
                 }
                 return;
             }
-            votables_request_set_gametype_mode_map(0, 0, 0);
+            votables_request_set_gametype_mode_map(-1, 0, 0);
             return;
         case "ctf":
             if (arg2 != "")
