@@ -2113,6 +2113,17 @@ void() badstats_track_spawn_walkovers =
     self.clanring_badstats_telewalk_on = on_tele;
 };
 
+float(float impulse) ffa_start_lock_allows_impulse =
+{
+    // Let an active player leave the game during the start countdown. These
+    // are the observer-mode impulses accepted by observer_impulse().
+    if ((impulse >= 140 && impulse <= 143) || impulse == 149
+        || (impulse >= 153 && impulse <= 155))
+        return TRUE;
+
+    return FALSE;
+};
+
 float() ffa_start_lock_player_think =
 {
     local float remain;
@@ -2149,6 +2160,20 @@ float() ffa_start_lock_player_think =
 
     if ((self.style & CLANRING_OBSERVER) || self.deadflag || self.health <= 0)
         return FALSE;
+
+    if (ffa_start_lock_allows_impulse(self.impulse))
+    {
+        clear_afk_status(self);
+        clanring_impulse();
+
+        if (self.style & CLANRING_OBSERVER)
+        {
+            self.ffa_start_locked = FALSE;
+            self.ffa_start_lock_nextprint = 0;
+            self.ffa_start_lock_lastsound = 0;
+            return FALSE;
+        }
+    }
 
     if (!self.ffa_start_locked)
     {
