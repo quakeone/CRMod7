@@ -1734,14 +1734,14 @@ void() votables_advance_nextmap =
 
 	if (clanring_lastcount > 0)
 	{
-		if (clanring_level < 1)
+		if (clanring_level < 1 || clanring_level > clanring_lastcount)
 			clanring_level = 1;
 
 		if (levels[clanring_level] != "")
 		{
-			tokenize(levels[clanring_level]);
+			clanring_level = VoteMenu_Init();
+			tokenize(vote_map_choices[1]);
 			nextmap = strzone(argv(0));
-			VoteMenu_Init();
 			clanring_level++;
 
 			if (clanring_level > clanring_lastcount)

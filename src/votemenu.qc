@@ -24,25 +24,47 @@ string VoteMenu_get_map_by_name(string maparg) =
 	return "error";
 };
 
+string(string maparg) VoteMenu_FormatMapChoice =
+{
+    string title;
+
+    if (maparg == "")
+        return "";
+
+    title = VoteMenu_get_map_by_name(maparg);
+    if (title == "" || title == "error" || title == "Error")
+        return maparg;
+
+    return sprintf("%s %s",
+        strpad(16, substring(maparg, 0, 16)),
+        redify(strpad(21, substring(title, 0, 21))));
+};
+
+float(string choice) VoteMenu_IsCurrentMap =
+{
+    if (!choice || choice == "")
+        return FALSE;
+
+    tokenize(choice);
+    return !strcasecmp(argv(0), clanring_current_mapname());
+};
+
 void() VoteMenu_Cleanup =
 {
-	strunzone(vote_map_choices[1]);
-	strunzone(vote_map_choices[2]);
-	strunzone(vote_map_choices[3]);
-	strunzone(vote_map_choices[4]);
-	strunzone(vote_map_choices[5]);
+	for (float i = 1; i <= 5; i++)
+	{
+		if (vote_map_choices[i] != "")
+			strunzone(vote_map_choices[i]);
+		vote_map_choices[i] = "";
 
-	strunzone(VOTE_MENU_TEXTLINE[1]);
-	strunzone(VOTE_MENU_TEXTLINE[2]);
-	strunzone(VOTE_MENU_TEXTLINE[3]);
-	strunzone(VOTE_MENU_TEXTLINE[4]);
-	strunzone(VOTE_MENU_TEXTLINE[5]);
+		if (VOTE_MENU_TEXTLINE[i] != "")
+			strunzone(VOTE_MENU_TEXTLINE[i]);
+		VOTE_MENU_TEXTLINE[i] = "";
 
-	strunzone(VOTE_MENU_TEXTLINE[7]);
-	strunzone(VOTE_MENU_TEXTLINE[8]);
-	strunzone(VOTE_MENU_TEXTLINE[9]);
-	strunzone(VOTE_MENU_TEXTLINE[10]);
-	strunzone(VOTE_MENU_TEXTLINE[11]);
+		if (VOTE_MENU_TEXTLINE[i + 6] != "")
+			strunzone(VOTE_MENU_TEXTLINE[i + 6]);
+		VOTE_MENU_TEXTLINE[i + 6] = "";
+	}
 }
 
 //
@@ -50,33 +72,58 @@ void() VoteMenu_Cleanup =
 //
 //	Initialize all the wacky strings to construct the menu
 //
-void () VoteMenu_Init =
+float () VoteMenu_Init =
 {
     string nextmap_textline[6];
     float usedIndices[6];
     float nextlevel, index = 1, canUse = FALSE, show_console_info;
 
+    // Reinitialization can happen when a player repeatedly advances an active
+    // nextmap vote. Release the previous menu before replacing its strings.
+    VoteMenu_Cleanup();
+
     show_console_info = utils_show_nextmap_console_info();
 
-    nextlevel = (clanring_level < 1 ? 1 : clanring_level);
+    nextlevel = clanring_level;
+    if (nextlevel < 1 || nextlevel > clanring_lastcount)
+        nextlevel = 1;
+
+    // The rotation index can still point at the map that just ended (for
+    // example after a manual map vote). Find the next distinct map instead.
+    index = nextlevel;
+    for (float offset = 0; offset < clanring_lastcount; offset++)
+    {
+        if (levels[index] != "" && !VoteMenu_IsCurrentMap(levels[index]))
+        {
+            nextlevel = index;
+            break;
+        }
+
+        index++;
+        if (index > clanring_lastcount)
+            index = 1;
+    }
 
     if (levels[nextlevel] == "")
-        levels[nextlevel] = default_nextmap;
-
-    nextmap_textline[1] = levels[nextlevel];
+        nextmap_textline[1] = VoteMenu_FormatMapChoice(default_nextmap);
+    else
+        nextmap_textline[1] = levels[nextlevel];
     vote_map_choices[1] = strzone(nextmap_textline[1]);
     usedIndices[1] = nextlevel;
 
     for (float j = 2; j < 6; j++)
     {
-        while (canUse == FALSE)
+        index = floor(random() * clanring_lastcount) + 1;
+
+        // Walk forward from a random starting point. This guarantees that we
+        // terminate and that the current map is not offered when alternatives
+        // exist, even with a short custom rotation.
+        for (float attempts = 0; attempts < clanring_lastcount; attempts++)
         {
-            index = ceil(random() * clanring_lastcount);
-
-            if (index < 1)
-                index = 1; // just in case...
-
             canUse = TRUE;
+
+            if (levels[index] == "" || VoteMenu_IsCurrentMap(levels[index]))
+                canUse = FALSE;
 
             for (float i = 1; i < j; i++)
             {
@@ -86,9 +133,16 @@ void () VoteMenu_Init =
                     break;
                 }
             }
+
+            if (canUse)
+                break;
+
+            index++;
+            if (index > clanring_lastcount)
+                index = 1;
         }
 
-        if (levels[index] != "")
+        if (canUse && levels[index] != "")
         {
             usedIndices[j] = index;
             nextmap_textline[j] = levels[index];
@@ -99,7 +153,12 @@ void () VoteMenu_Init =
         else
         {
             if (show_console_info)
-                dprint(sprintf("Skipping invalid level at index %g\n", index));
+                dprint("Not enough distinct non-current maps to fill vote menu\n");
+
+            // Keep every menu slot usable without reintroducing the current
+            // map. Duplicate slot 1 only for unusually short rotations.
+            nextmap_textline[j] = nextmap_textline[1];
+            vote_map_choices[j] = strzone(nextmap_textline[j]);
         }
         canUse = FALSE;
     }
@@ -138,6 +197,8 @@ void () VoteMenu_Init =
 	VOTE_MENU_TEXTLINE[9]  = strzone(VOTE_MENU_TEXTLINE[9]);
 	VOTE_MENU_TEXTLINE[10] = strzone(VOTE_MENU_TEXTLINE[10]);
 	VOTE_MENU_TEXTLINE[11] = strzone(VOTE_MENU_TEXTLINE[11]);
+
+    return nextlevel;
 };
 
 .float centerTime;

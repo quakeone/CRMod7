@@ -852,7 +852,7 @@ void() exec_warp_cfg =
 //  clanring_levelcount	- This is used throughout to check that levels.cfg has been read...
 //  clanring_lastcount	- used to count how many maps are listed in levels.cfg so we know when to recycle.
 
-void(string mode) clanring_count_maps =
+float(string mode) clanring_count_maps =
 {
     string line = "";
     float mapCount = 0;
@@ -865,7 +865,7 @@ void(string mode) clanring_count_maps =
         nextmap = strzone(default_nextmap);
         clanring_levelcount = -1;
         print("**[ WARNING ]** 'levels.cfg' not found.\n");
-        return;
+        return FALSE;
     }
 
     print("Loading ClanRing Configuration File: \"configs/levels.cfg\"\n");
@@ -913,6 +913,8 @@ void(string mode) clanring_count_maps =
 
     clanring_lastcount = mapCount;
  //   print(sprintf("%s maps in rotation for mode: %s\n", ftos(mapCount), mode));
+
+    return TRUE;
 }
 
 void() clanring_nextlevel_config =
@@ -920,7 +922,10 @@ void() clanring_nextlevel_config =
     string line = "", mode = "";
     float i = 1;
 
+    if (nextmap != "")
+        strunzone(nextmap);
     nextmap = "";
+    VoteMenu_Cleanup();
 
     if (clanring_level < 1)
         clanring_level = 1;
@@ -937,15 +942,24 @@ void() clanring_nextlevel_config =
     else
         mode = "-dm-";
 
-	clanring_count_maps(mode);	//Set clanring_lastcount for this mode.
+	// clanring_count_maps installs the zoned fallback itself when the file is
+	// unavailable. Preserve it instead of continuing and overwriting it.
+	if (!clanring_count_maps(mode))
+        return;
 
 	// Older levels.cfg files may not have a dedicated HH section yet.
 	// Fall back to the DM rotation instead of looping the current map forever.
 	if ((clanring_playmode & CLANRING_HH_MODE) && (clanring_lastcount <= 0))
 	{
 		print("[Rotation] HH section missing, falling back to -dm-\n");
-		clanring_count_maps("-dm-");
+		if (!clanring_count_maps("-dm-"))
+			return;
 	}
+
+    // scratch1 can retain an index from a longer rotation after a mode
+    // switch. Normalize it before any levels[] access.
+    if (clanring_lastcount < 1 || clanring_level > clanring_lastcount)
+        clanring_level = 1;
 
 	// When switching into RA mode, start rotation at a random map once
 	if ((clanring_playmode & CLANRING_RA_MODE) && (clanring_level <= 1))
@@ -984,19 +998,22 @@ void() clanring_nextlevel_config =
                           ftos(clanring_level), ftos(clanring_lastcount)));
         }
     }
-    tokenize(levels[clanring_level]);
-   	nextmap = strzone(argv(0));
-
-	if (nextmap == "")
+    if (levels[clanring_level] == "")
     {
         nextmap = strzone(clanring_current_mapname()); // Reload the current logical map.
         bprint("Nextmap not found, reloading ", nextmap, ".\n");
     }
     else
     {
+        // VoteMenu_Init returns the corrected slot-1 rotation index. Build
+        // nextmap here, where its zoned ownership is explicit, then advance
+        // from the corrected index rather than the stale persisted one.
+        clanring_level = VoteMenu_Init();
+        tokenize(vote_map_choices[1]);
+        nextmap = strzone(argv(0));
+
         if (utils_show_nextmap_console_info())
             print(sprintf("NextMap is %s.\n", nextmap));
-		VoteMenu_Init();
         clanring_level++;
 
         if (clanring_level > clanring_lastcount)
@@ -1586,6 +1603,8 @@ void() clanring_exec_configs =
 			clanring_set_teamplay(2);
 		}
 		clanring_levelcount = -1;
+		if (nextmap != "")
+			strunzone(nextmap);
 		nextmap = strzone(clanring_current_mapname());//just restart same logical map
 	}
 

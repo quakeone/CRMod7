@@ -264,7 +264,7 @@ float auto_parm3;	//
 float auto_parm4;	// 
 
 // other global variables
-string nextmap;                     // moved here from Client.qc
+string nextmap;                     // Non-empty values are strzone-owned; free before clearing/replacing.
 float timelimit;                    // this used to be local in CheckRules in Client.qc        
 float fraglimit;                    // this used to be local in CheckRules in Client.qc        
 float intermission_running;         // moved here from Client.qc

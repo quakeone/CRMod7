@@ -317,7 +317,7 @@ void() GotoNextMap =
 
         if (nextmap == "")
         {
-            nextmap = clanring_current_mapname();
+            nextmap = strzone(clanring_current_mapname());
             bprint("\nMap not found. Reloading Current Map...Please Wait.\n");
         }
     }
@@ -588,7 +588,7 @@ void() changelevel_touch =
     announce2(other.netname, " exited the level");
     if (nextmap == "")
     {
-        nextmap = self.map;
+        nextmap = strzone(self.map);
     }
     SUB_UseTargets ();
     self.touch = SUB_Null;

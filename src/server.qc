@@ -3779,14 +3779,56 @@ void () clanring_start_frame =
 
                 // Validate against your warp list
                 if (!(found_in_warp_list(argv(0))))
-                    nextmap = default_nextmap;
+                    nextmap = strzone(default_nextmap);
                 else
                     nextmap = strzone(argv(0));
 
                 // Final safety + optional file existence guard
                 if (!nextmap || nextmap == "")
-                    nextmap = default_nextmap;
-    
+                    nextmap = strzone(default_nextmap);
+
+                // Never replay the map that just ended. The menu generator
+                // already excludes it, but keep this final guard for stale or
+                // malformed vote data and for the no-vote fallback path.
+                if (VoteMenu_IsCurrentMap(nextmap))
+                {
+                    for (float j = 1; j <= 5; j++)
+                    {
+                        if (!vote_map_choices[j] || vote_map_choices[j] == ""
+                            || VoteMenu_IsCurrentMap(vote_map_choices[j]))
+                            continue;
+
+                        tokenize(vote_map_choices[j]);
+                        if (!found_in_warp_list(argv(0)))
+                            continue;
+
+                        strunzone(nextmap);
+                        nextmap = strzone(argv(0));
+                        break;
+                    }
+
+                    // A stale menu should not defeat the protection. Search
+                    // the active rotation directly if none of its five cached
+                    // choices supplied an alternative.
+                    if (VoteMenu_IsCurrentMap(nextmap))
+                    {
+                        for (float k = 1; k <= clanring_lastcount; k++)
+                        {
+                            if (!levels[k] || levels[k] == ""
+                                || VoteMenu_IsCurrentMap(levels[k]))
+                                continue;
+
+                            tokenize(levels[k]);
+                            if (!found_in_warp_list(argv(0)))
+                                continue;
+
+                            strunzone(nextmap);
+                            nextmap = strzone(argv(0));
+                            break;
+                        }
+                    }
+                }
+
                 VoteMenu_Cleanup();
                 // V O T E M E N U   C H E C K   M A J O R I T Y -- end
 
