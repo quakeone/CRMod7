@@ -338,6 +338,8 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .entity ffa_item_ghost_ent;         // hidden timer or visual clone for FFA item alpha ghosting
 .float  clanring_hack_count;	    // used to count admin hacking attempts
 .float  quadDisabledMsgShown;     // 0=not shown yet this map, 1=shown (for 1v1 quad disabled message)
+.float  ctf_practice_flag_msg_count; // inactive flag notices shown during this connection
+.float  ctf_practice_flag_last_touch; // debounce continuous contact with an inactive flag
 
 // Saved position support (prewar practice)
 .vector saved_pos_origin;

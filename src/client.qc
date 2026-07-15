@@ -119,6 +119,7 @@ void() SetPracticeParms =
 void() SetNewParms =
 {
     parm1 = parm2 = parm3 =	parm4 =	parm5 = parm6 =	parm7 = parm8 = parm9 =	0;//Clear out everything.
+    parm16 = 0;	// New connection: allow the CTF practice notice three times.
 
      if (clanring_playmode & CLANRING_PRACTICE_MODE)
     {
@@ -232,6 +233,7 @@ void() SetNewParms2 =
     parm13 = self.clanring_hack_count;
     parm14 = (time - self.afk_time);	//AFK carries over
     parm15 = self.statstate;
+    parm16 = self.ctf_practice_flag_msg_count;
 };
 
 void() DecodeLevelParms =
@@ -252,6 +254,8 @@ void() DecodeLevelParms =
     if (self.style & CLANRING_AFK_CLIENT)
         self.afk_sync_grace_until = time + CLANRING_AFK_RESYNC_GRACE;
     self.statstate 				= parm15;
+    self.ctf_practice_flag_msg_count = parm16;
+    self.ctf_practice_flag_last_touch = -1;
 
     self.player_flag = (self.player_flag - (self.player_flag & ITEM_RUNE_MASK));
 

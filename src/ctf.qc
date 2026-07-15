@@ -522,7 +522,14 @@ void() TeamCaptureFlagTouch =
 
 	if (clanring_playmode & CLANRING_PRACTICE_MODE)
 	{
-		centerprint (other, "Flags are \binactive\b in practice mode.\n");
+		if ((other.ctf_practice_flag_msg_count < 3)
+			&& ((other.ctf_practice_flag_last_touch < 0)
+				|| (time - other.ctf_practice_flag_last_touch > 0.5)))
+		{
+			centerprint (other, "Flags are \binactive\b in practice mode.\n");
+			other.ctf_practice_flag_msg_count += 1;
+		}
+		other.ctf_practice_flag_last_touch = time;
 		return;
 	}
 
