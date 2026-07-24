@@ -296,6 +296,21 @@ entity 	clanring_best_camera;			// set after each camera's think
 entity 	clanring_current_camera;
 float 	clanring_camera_delay;
 
+// autotrack formula selection (cr_autotrack)
+//   0 = CRMod: health/armor/activity/proximity weighted score (classic)
+//   1 = KTX:   item tier + frags, with ktpro event driven switching
+float	CLANRING_AUTOTRACK_CRMOD	= 0;
+float	CLANRING_AUTOTRACK_KTX		= 1;
+float	clanring_autotrack_mode;		// which scoring formula all auto modes use
+float	clanring_autotrack_event;		// an event asked for an immediate re-evaluation
+entity	clanring_autotrack_hint;		// who that event wants us to look at (may be world)
+float	clanring_autotrack_rl_taken;	// first rocket launcher of the match has been picked up
+float	clanring_autotrack_predict_next;	// next time the quad/pent predict poll may run
+float	observer_lock_enforcing;			// re-entrancy guard for the arena cam lock redirect
+.float	autotrack_predict_at;			// on a powerup: the respawn we already predicted for
+.entity	autotrack_team_best;			// on a team: best pov among that team's live players
+.float	autotrack_team_score;			// on a team: that player's score, for the compare
+
 vector 	clanring_angle;					// used for both autoss and intermission
 
 // client variables

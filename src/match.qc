@@ -1841,6 +1841,9 @@ void() match_begin =
     clanring_sentinel.ammo_rockets = 0;
     clanring_sentinel.cnt = 0;
 
+    // the "first RL of the game" autotrack event belongs to the match, not the map
+    clanring_autotrack_rl_taken = FALSE;
+
     // reset quad, pent counts
     utils_do_item(match_reset_owner, "item_artifact_invulnerability");
     utils_do_item(match_reset_owner, "item_artifact_super_damage");

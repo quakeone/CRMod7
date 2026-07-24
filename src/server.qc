@@ -689,6 +689,7 @@ void () clanring_init_world =
     registercvar("cr_ffa_start_delay", "3");
     registercvar("cr_ffa_item_alpha", "0.5");
     registercvar("cr_ffa_item_alpha_time", "5");
+    registercvar("cr_autotrack", "0");
     clanring_playmode = cvar("samelevel");
     startup_playmode = cvar("cr_startmode");
     current_startup_bits = clanring_startup_mode_bits(clanring_playmode);
@@ -880,6 +881,12 @@ void () clanring_init_world =
     auto_parm4 					= 0;
     clanring_pent 				= world;
     clanring_quad 				= world;
+
+    clanring_autotrack_mode		= cvar("cr_autotrack");
+    clanring_autotrack_event	= FALSE;
+    clanring_autotrack_hint		= world;
+    clanring_autotrack_rl_taken	= FALSE;
+    clanring_autotrack_predict_next = 0;
 
     clanring_afk_check 			= 300; 	//R00k: 5 MINUTES default for AFK status.
     clanring_afk_timeout 		= 1800; //Time to kick after AFK (30 minutes).
@@ -3584,6 +3591,11 @@ void () clanring_start_frame =
 
     server_sync_pause_infokey(FALSE);
 
+    // ktx autotrack events must land on the frame they happen, not on the next
+    // once-a-second autocam pass.
+    if (clanring_autotrack_event)
+        auto_chase_think();
+
     if ( (clanring_playmode & CLANRING_MATCH_MODE) )
         quaketag_start_frame();
 
@@ -3631,6 +3643,7 @@ void () clanring_start_frame =
                 timelimit 	= cvar("timelimit") * 60;
                 fraglimit 	= cvar("fraglimit");
                 teamplay 	= cvar("teamplay");
+                clanring_autotrack_mode = cvar("cr_autotrack");
 
                 player = find(world, classname, "player");
                 while (player != world)

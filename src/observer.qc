@@ -21,6 +21,10 @@
 
 // function declarations
 entity (entity e) observer_find_target;
+entity (entity e) observer_find_team_target;	// CRMOD - arena cam lock
+float () observer_enforce_cam_lock;				// CRMOD - arena cam lock
+entity () observer_team_pov_pick;				// CRMOD - arena cam lock
+float () observer_locked_off_team;				// CRMOD - arena cam lock
 entity (entity e) observer_find_camera;			// CRMOD
 void () observer_set_camera_position;			// CRMOD
 void () observer_set_chase_position;
@@ -242,6 +246,9 @@ void () observer_check_demo_end =
 //
 void () observer_walk_start =
 {
+	if (observer_enforce_cam_lock())
+		return;	// still in the round: team pov only, no roaming
+
 	observer_check_demo_end();
 	observer_clear_flags();
 	self.oflags = self.oflags | OBSERVER_WALK;
@@ -276,6 +283,9 @@ void () observer_walk_start =
 //
 void () observer_fly_start =
 {
+	if (observer_enforce_cam_lock())
+		return;	// still in the round: team pov only, no roaming
+
 	observer_check_demo_end();
 	observer_clear_flags();
 	self.oflags = self.oflags | OBSERVER_FLY;
@@ -304,6 +314,116 @@ void () observer_fly_start =
 	}
 };
 
+//
+//  E N F O R C E  C A M  L O C K
+//
+//  Arena cam lock.  A player who is still in the current round may only see their
+//  own team, so every observer mode that shows anything else - free fly, walk, and
+//  the free cameras - has to bounce them back into eyecam on a team mate.  Fly and
+//  walk matter as much as the cameras do: roaming the map reveals exactly what the
+//  lock exists to hide.
+//
+//  Returns TRUE when it took the player over, so callers drop what they were about
+//  to do.  While the lock is on it always takes them over: if the team has nobody
+//  left to watch it freezes them at their corpse rather than letting the mode
+//  through.  FALSE means the lock doesn't apply and the caller carries on.
+//
+entity () observer_team_pov_pick =
+{
+	local entity mate;
+
+	// The team best is recomputed once a second, so it can name someone who has
+	// died or left since.  Validate before trusting it; the search below prefers a
+	// live team mate and settles for a dead one, which is still a safe view.
+	mate = auto_pov_target();				// best live team mate, if the team has one
+	if (!auto_trackable(mate))
+		mate = observer_find_team_target(self.movetarget);
+
+	if ((mate == world) || (mate.classname != "player"))
+		return world;
+
+	return mate;
+};
+
+//
+//  L O C K E D  O F F  T E A M
+//
+//  TRUE when the cam lock applies and what we are looking at isn't on our team.
+//  Anything can put a wrong target in .movetarget - the global fallbacks inside
+//  observer_chase_start and observer_demo_start, prev target's global cycle, a
+//  camera entity - so rather than chase every one of those, the per frame position
+//  code checks this and snaps back.
+//
+float () observer_locked_off_team =
+{
+	if (!auto_cam_locked())
+		return FALSE;
+
+	return (self.movetarget.next_team != self.next_team);
+};
+
+//
+//  F R E E Z E  I N  P L A C E
+//
+//  The cam lock applies but there is nobody on the team left to watch.  That is not
+//  the same as the round being over: a solo Wipeout player is sitting on a respawn
+//  timer, and letting them walk, noclip or ride a camera in the meantime hands them
+//  the whole map before they come back.  Pin them to where they died instead.
+//
+void () observer_freeze_in_place =
+{
+	// Detach the client's view FIRST, while the demo bit is still set - that flag is
+	// what observer_check_demo_end tests, and clearing it first would make this a
+	// no op.  Dropping the flag alone does nothing to the client: SVC_SETVIEWPORT
+	// has it rendering from the other player's eyes until we send it back to self,
+	// so an eyecam on an opponent would carry right on through the freeze - which is
+	// precisely the view this is here to take away.
+	observer_check_demo_end();
+
+	// Park them in camera mode with no camera.  It has to be one of CHASE, DEMO or
+	// CAMERA: the observer movement code treats "no mode bit" as fly, so clearing
+	// them all would run observer_fly_move every frame and hand back the noclip we
+	// are trying to take away.  CAMERA is the one whose movetype is NONE by design,
+	// and with no movetarget the per frame position code has nothing to do.
+	// Parenthesised the way the mask needs - observer_clear_flags gets this wrong
+	// and zeroes the lot, which would take the commentary flag with it.
+	self.oflags = self.oflags - (self.oflags & (OBSERVER_WALK | OBSERVER_FLY | OBSERVER_CHASE | OBSERVER_DEMO));
+	self.oflags = self.oflags | OBSERVER_CAMERA;
+
+	self.movetarget = world;			// not through a team mate, and not a camera
+	self.velocity = '0 0 0';
+	self.movetype = MOVETYPE_NONE;
+	self.finaldest_y = MOVETYPE_NONE;
+	self.flags = self.flags - (self.flags & FL_ONGROUND);
+
+	if (self.deathorigin != '0 0 0')
+		setorigin(self, self.deathorigin);
+};
+
+float () observer_enforce_cam_lock =
+{
+	local entity mate;
+
+	if (observer_lock_enforcing)
+		return FALSE;						// already redirecting, don't re-enter
+	if (!auto_cam_locked())
+		return FALSE;
+
+	mate = observer_team_pov_pick();
+	if (mate == world)
+	{
+		observer_freeze_in_place();
+		return TRUE;						// took them over; caller must not proceed
+	}
+
+	observer_lock_enforcing = TRUE;
+	self.movetarget = mate;
+	observer_demo_start();
+	observer_lock_enforcing = FALSE;
+
+	return TRUE;
+};
+
 // CRMOD
 // C A M E R A  S T A R T
 //   by Paul Baker
@@ -312,6 +432,18 @@ void () observer_fly_start =
 void () observer_camera_start =
 {
 	local entity camera;
+
+	// A camera is a free view of the whole map, so a player who is still in the
+	// round doesn't get one - not by hand, and not through autocam.  Blocking this
+	// at the entry point matters: observer_set_camera_position is called from the
+	// middle of this function, so redirecting from in there would leave the tail of
+	// camera start running and print "camera mode" at somebody now in eyecam.
+	if (auto_cam_locked())
+	{
+		sprint(self, "camera mode is locked to your team this round\n");
+		if (observer_enforce_cam_lock())
+			return;
+	}
 
 	if (!self.movetarget)
 	{
@@ -389,6 +521,9 @@ void () observer_camera_start =
 //
 void () observer_chase_start =
 {
+	if (observer_enforce_cam_lock())
+		return;		// still in the round: team pov only
+
 	if (!self.movetarget || self.movetarget.classname != "player")
 	{
 		// see if we can find a target to chase
@@ -913,6 +1048,9 @@ void() observer_next_camera =
 	local entity camera;
 	local vector angle;
 
+	if (observer_enforce_cam_lock())
+		return;		// still in the round: no free cameras
+
 	self.movetarget = camera = observer_find_camera(self.movetarget);
 	setorigin(self, camera.origin);
 	if (camera.movetarget != world)
@@ -934,6 +1072,9 @@ void() observer_prev_camera =
 {
 	local entity e, curr, camera;
 	local vector angle;
+
+	if (observer_enforce_cam_lock())
+		return;		// still in the round: no free cameras
 
 	curr = self.movetarget;
 	e = observer_find_camera(curr);
@@ -1006,28 +1147,62 @@ void () observer_find_best_target =
 //
 //  F I N D  T E A M T A R G E T
 //
-//  Returns the next teammate to watch
+//  Returns the next teammate to watch, cycling on from 'e'.
 //	Arena mode only.
-
+//
+//  This used to walk next_player from the current target and take the first live
+//  player it found.  That chain is the global player list - each team's members are
+//  only contiguous within it - so walking off the end of your own team's run landed
+//  on an opponent, and a dead team fell through to an explicit global fallback.
+//  Either way a player who was still in the round could watch the other team, which
+//  is exactly what the arena cam lock exists to prevent.  Now the team is filtered
+//  on properly, and a wiped team keeps you on a dead team mate rather than handing
+//  you an enemy pov.  The global fallback only survives for a spectator with no team.
+//
 entity (entity e) observer_find_team_target =
 {
-	local entity p;
+	local entity p, first, aftere, deadmate;
+	local float seen;
 
-	p = e.next_player;
+	first = aftere = deadmate = world;
+	seen = FALSE;
 
+	p = find(world, classname, "player");
 	while (p)
 	{
-        if ((p.deadflag == DEAD_NO) && (IS_CA_OBSERVER(p) == FALSE) && ((p.style & CLANRING_CONNECTED)))
-			return p;
-		p = p.next_player;
-	}
-	
-	if (p == world)
-	{
-		p = observer_find_target(world); // Find the winner of the match if opponent
+		if ((p != self) && (p.style & CLANRING_CONNECTED)
+			&& ((self.next_team == world) || (p.next_team == self.next_team)))
+		{
+			if ((p.deadflag == DEAD_NO) && (IS_CA_OBSERVER(p) == FALSE))
+			{
+				if (first == world)
+					first = p;
+				if (seen && (aftere == world))
+					aftere = p;
+			}
+			else if (deadmate == world)
+				deadmate = p;
+		}
+
+		if (p == e)
+			seen = TRUE;
+
+		p = find(p, classname, "player");
 	}
 
-	return p;
+	if (aftere != world)
+		return aftere;		// next live team mate after the current target
+	if (first != world)
+		return first;		// wrapped around to the first live team mate
+	if (deadmate != world)
+		return deadmate;	// team is wiped - stay on a team mate, not an opponent
+
+	if (self.next_team != world)
+		return world;		// on a team, but nobody is left on it.  An opponent is
+							// not an acceptable answer here - let the caller decide
+							// what to show a player who is still in the round.
+
+	return observer_find_target(world);	// no team at all, e.g. a pure spectator
 };
 
 //
@@ -1055,6 +1230,12 @@ void () observer_arena_next_target =
 
     if (newt == world)
     {
+        // Nobody left on the team to cycle to.  Dropping a player who is still in
+        // the round into fly mode would hand them the whole map, so leave them on
+        // whatever they are watching instead.
+        if (auto_cam_locked())
+            return;
+
         observer_fly_start ();
         return;
     }
@@ -1376,7 +1557,15 @@ void () observer_set_chase_position =
     local vector pos;
     local vector desired_angle;	// CRMOD
     local vector angle;
-    
+
+	// Cam lock backstop, same as the eyecam path: chase mode can be pointed at an
+	// opponent by observer_chase_start's global fallback or by prev target.
+	if (observer_locked_off_team())
+	{
+		if (observer_enforce_cam_lock())
+			return;		// moved to a team mate, or frozen; either way it handled us
+	}
+
     if (self.oflags & OBSERVER_AUTO)
 	{
 		// JP - added this because now this can be called from observer_set_camera_position
@@ -1384,9 +1573,12 @@ void () observer_set_chase_position =
 		{
 			if (time > self.clanring_cam_delay)
 			{
-				if (clanring_current_chase_target != world && self.movetarget != clanring_current_chase_target)
+				local entity autotarget;
+
+				autotarget = auto_pov_target();	// cam locked arena players get their own team's best
+				if (autotarget != world && self.movetarget != autotarget)
 				{
-					self.movetarget = clanring_current_chase_target;
+					self.movetarget = autotarget;
 					observer_chase_start();//R00k: reset in case we were in autopov
 					self.delay = 0;
 					return;
@@ -1465,6 +1657,14 @@ void () observer_set_chase_position =
 //
 void () observer_set_demo_position =
 {
+	// Cam lock backstop: whatever left us pointed at someone who isn't on our team,
+	// take it back before a single frame of them is drawn.
+	if (observer_locked_off_team())
+	{
+		if (observer_enforce_cam_lock())
+			return;		// moved to a team mate, or frozen; either way it handled us
+	}
+
 	if ((self.movetarget == world)||(self.movetarget.style & CLANRING_OBSERVER)||(!(self.movetarget.style & CLANRING_CONNECTED)))
 	 	return;
 
@@ -1474,9 +1674,12 @@ void () observer_set_demo_position =
 		{
 			if (time > self.clanring_cam_delay)
 			{
-				if (clanring_current_chase_target != world && self.movetarget != clanring_current_chase_target)
+				local entity autotarget;
+
+				autotarget = auto_pov_target();	// cam locked arena players get their own team's best
+				if (autotarget != world && self.movetarget != autotarget)
 				{
-					self.movetarget = clanring_current_chase_target;
+					self.movetarget = autotarget;
 				    msg_entity = self;
 				    WriteByte(MSG_ONE, SVC_SETVIEWPORT);
 				    WriteEntity(MSG_ONE, self.movetarget);
@@ -1508,6 +1711,15 @@ void () observer_set_camera_position =
 	local entity player;
 	
 	camera = self.movetarget;
+
+	// A camera is a free view of the whole map, so a player who is still in the
+	// round must not be on one at all - not through autocam, and not by entering
+	// camera mode by hand.  Put them back in eyecam on a team mate.  Blocking only
+	// the switch is not enough: it would leave an already selected camera running,
+	// and drop them into the else branch below, which re-aims the camera at the
+	// best scoring player it can see regardless of team.
+	if (observer_enforce_cam_lock())
+		return;
 
 	if (self.oflags & OBSERVER_AUTO)
 	{

@@ -810,7 +810,12 @@ void() PlayerDie =
 
 	self.style = self.style | CLANRING_NO_POST_THINK;
 	self.clanring_chase_score = CLANRING_NEGINF;
-	self.clanring_cam_delay = time + 1;
+	self.clanring_cam_delay = time + auto_death_hold();
+
+	// CRMOD - ktx autotrack event: the pov just died, line up the next one now so
+	// the switch happens the moment the death hold above expires.
+	if (self == clanring_current_chase_target)
+		auto_track_event(world);
 	self.weaponmodel = "";
 	self.view_ofs = '0 0 -8';
 	self.deadflag = DEAD_DYING;

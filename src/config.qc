@@ -1499,6 +1499,7 @@ void() clanring_main_config =
 			registercvar("cr_ffa_item_alpha_time", "5");
 			registercvar("sv_pak0_only", "0");
 			registercvar("cr_gsheets_validated_sig", "0");
+			registercvar("cr_autotrack", "0");	// 0 = CRMod autocam scoring, 1 = KTX autotrack
 		exec_clanring_cfg("configs/clanring.cfg");
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.

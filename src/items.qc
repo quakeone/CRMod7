@@ -1027,6 +1027,7 @@ void() weapon_touch =
 					{
 						other.stats_item_rl += 1;
 						itname = "rl";
+						auto_track_first_rl(other);	// CRMOD - ktx autotrack event, ground pickup only
 					}
 					else
 					{
@@ -2022,6 +2023,12 @@ void() powerup_touch =
 			}
 		}
 	}
+
+	// CRMOD - ktx autotrack event, fired for every powerup once it has been applied.
+	// No hint: the taker isn't necessarily the best pov (a quad pickup doesn't beat
+	// someone already running a pent), so let the rescore decide.
+	auto_track_event(world);
+
 	activator = other;
 	SUB_UseTargets();// fire all targets / killtargets
 };
