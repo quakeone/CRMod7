@@ -4668,7 +4668,7 @@ void(string cmd) SV_ParseClientCommand =
 
                 mapnumber = SV_ParseClientCommand_MapArg(0, arg2);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(0, modecmd, mapnumber);
+                    votables_command_set_gametype_mode_map(0, modecmd, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg2);
                 return;
@@ -4678,7 +4678,7 @@ void(string cmd) SV_ParseClientCommand =
                 mapnumber = SV_ParseClientCommand_MapArg(0, arg1);
                 if (mapnumber)
                 {
-                    votables_request_set_gametype_mode_map(0, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(0, -1, mapnumber);
                 }
                 else
                 {
@@ -4696,11 +4696,11 @@ void(string cmd) SV_ParseClientCommand =
                         sprint2(self, arg1, " is not a recognized map or mode.\n");
                         return;
                     }
-                    votables_request_set_gametype_mode_map(0, modecmd, 0);
+                    votables_command_set_gametype_mode_map(0, modecmd, 0);
                 }
                 return;
             }
-            votables_request_set_gametype_mode_map(0, -1, 0);
+            votables_command_set_gametype_mode_map(0, -1, 0);
             return;
         case "ffa":
             if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
@@ -4718,7 +4718,7 @@ void(string cmd) SV_ParseClientCommand =
                 mapnumber = SV_ParseClientCommand_MapArg(0, arg1);
                 if (mapnumber)
                 {
-                    votables_request_set_gametype_mode_map(-1, 0, mapnumber);
+                    votables_command_set_gametype_mode_map(-1, 0, mapnumber);
                 }
                 else
                 {
@@ -4726,7 +4726,7 @@ void(string cmd) SV_ParseClientCommand =
                 }
                 return;
             }
-            votables_request_set_gametype_mode_map(-1, 0, 0);
+            votables_command_set_gametype_mode_map(-1, 0, 0);
             return;
         case "ctf":
             if (arg2 != "")
@@ -4740,7 +4740,7 @@ void(string cmd) SV_ParseClientCommand =
 
                 mapnumber = SV_ParseClientCommand_MapArg(1, arg2);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(1, modecmd, mapnumber);
+                    votables_command_set_gametype_mode_map(1, modecmd, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg2);
                 return;
@@ -4750,7 +4750,7 @@ void(string cmd) SV_ParseClientCommand =
                 mapnumber = SV_ParseClientCommand_MapArg(1, arg1);
                 if (mapnumber)
                 {
-                    votables_request_set_gametype_mode_map(1, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(1, -1, mapnumber);
                 }
                 else
                 {
@@ -4765,95 +4765,95 @@ void(string cmd) SV_ParseClientCommand =
                         sprint2(self, arg1, " is not a recognized map or mode.\n");
                         return;
                     }
-                    votables_request_set_gametype_mode_map(1, modecmd, 0);
+                    votables_command_set_gametype_mode_map(1, modecmd, 0);
                 }
                 return;
             }
-            votables_request_set_gametype_mode_map(1, -1, 0);
+            votables_command_set_gametype_mode_map(1, -1, 0);
             return;
         case "normal":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(-2, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(-1, 0, mapnumber);
+                    votables_command_set_gametype_mode_map(-1, 0, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(-1, 0, 0);
+            votables_command_set_gametype_mode_map(-1, 0, 0);
             return;
         case "practice":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(-2, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(-1, 1, mapnumber);
+                    votables_command_set_gametype_mode_map(-1, 1, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(-1, 1, 0);
+            votables_command_set_gametype_mode_map(-1, 1, 0);
             return;
         case "match":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(-2, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(-1, 2, mapnumber);
+                    votables_command_set_gametype_mode_map(-1, 2, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(-1, 2, 0);
+            votables_command_set_gametype_mode_map(-1, 2, 0);
             return;
         case "dmm4":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(4, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(4, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(4, -1, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(4, -1, 0);
+            votables_command_set_gametype_mode_map(4, -1, 0);
             return;
         case "airshot":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(5, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(5, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(5, -1, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(5, -1, 0);
+            votables_command_set_gametype_mode_map(5, -1, 0);
             return;
         case "wipeout":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(6, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(6, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(6, -1, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(6, -1, 0);
+            votables_command_set_gametype_mode_map(6, -1, 0);
             return;
         case "ctfdmm4":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(7, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(7, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(7, -1, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(7, -1, 0);
+            votables_command_set_gametype_mode_map(7, -1, 0);
             return;
         case "hh":
             if ((arg1 == "normal") || (arg1 == "ffa"))
@@ -4862,12 +4862,12 @@ void(string cmd) SV_ParseClientCommand =
                 {
                     mapnumber = SV_ParseClientCommand_MapArg(8, arg2);
                     if (mapnumber)
-                        votables_request_set_hh_variant(0, mapnumber);
+                        votables_command_set_hh_variant(0, mapnumber);
                     else
                         SV_ParseClientCommand_MapNotFound(arg2);
                     return;
                 }
-                votables_request_set_hh_variant(0, 0);
+                votables_command_set_hh_variant(0, 0);
                 return;
             }
             else if (arg1 == "team")
@@ -4876,19 +4876,19 @@ void(string cmd) SV_ParseClientCommand =
                 {
                     mapnumber = SV_ParseClientCommand_MapArg(8, arg2);
                     if (mapnumber)
-                        votables_request_set_hh_variant(1, mapnumber);
+                        votables_command_set_hh_variant(1, mapnumber);
                     else
                         SV_ParseClientCommand_MapNotFound(arg2);
                     return;
                 }
-                votables_request_set_hh_variant(1, 0);
+                votables_command_set_hh_variant(1, 0);
                 return;
             }
             else if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(8, arg1);
                 if (mapnumber)
-                    votables_request_set_hh(mapnumber);
+                    votables_command_set_hh_variant(-1, mapnumber);
                 else
                 {
                     if (sv_parseclientcommand_maparg_random)
@@ -4898,31 +4898,31 @@ void(string cmd) SV_ParseClientCommand =
                 }
                 return;
             }
-            votables_request_set_hh(0);
+            votables_command_set_hh_variant(-1, 0);
             return;
         case "ca":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(2, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(2, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(2, -1, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(2, -1, 0);
+            votables_command_set_gametype_mode_map(2, -1, 0);
             return;
         case "ra":
             if (arg1 != "")
             {
                 mapnumber = SV_ParseClientCommand_MapArg(3, arg1);
                 if (mapnumber)
-                    votables_request_set_gametype_mode_map(3, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(3, -1, mapnumber);
                 else
                     SV_ParseClientCommand_MapNotFound(arg1);
                 return;
             }
-            votables_request_set_gametype_mode_map(3, -1, 0);
+            votables_command_set_gametype_mode_map(3, -1, 0);
             return;
 
         // Position tools (prewar only; DM/CTF match mode)
@@ -5183,9 +5183,7 @@ void(string cmd) SV_ParseClientCommand =
                 mapnumber = SV_ParseClientCommand_MapArg(-1, arg0);
                 if (mapnumber)
                 {
-                    if (votables_maybe_prompt_map_vote_mode_change(mapnumber))
-                        return;
-                    votables_request_set_gametype_mode_map(-1, -1, mapnumber);
+                    votables_command_set_gametype_mode_map(-1, -1, mapnumber);
                     return;
                 }
                 if (sv_parseclientcommand_maparg_random)

@@ -16,6 +16,7 @@ float request_mode;         // Used to request a new mode
 float request_gametype;		// Used to request a new game type
 float request_teamplay;      // Used for HH FFA/team variants
 float request_weaponstay;   // Used to request weaponstay
+float votables_command_request;
 // q14ever overlay: remember who initiated the enable so we can attach the prop to them.
 entity q14ever_last_requester;
 
@@ -26,6 +27,8 @@ void(float ghost) G1v1_UpdateQuadAlpha;
 void(entity player) motd_cancel_for_client;
 void() votables_map_vote_prompt_response;
 void(float newtype, float newmode, float newmap) votables_request_set_gametype_mode_map;
+void(float newtype, float newmode, float newmap) votables_command_set_gametype_mode_map;
+void(float newteamplay, float newmap) votables_command_set_hh_variant;
 void(float val) admin_dmset;
 void(float clear_screen) votables_map_vote_prompt_clear;
 void() votables_map_vote_prompt_display;
@@ -879,7 +882,8 @@ void(float newtype, float newmode, float newmap) votables_request_set_gametype_m
 		mode = strings_get_mode (newmode);
 	}
 
-	if (votables_maybe_prompt_current_map_gametype_change(newtype, newmode, newmap))
+	if (!votables_command_request &&
+		votables_maybe_prompt_current_map_gametype_change(newtype, newmode, newmap))
 		return;
 
 	if (newmap)
@@ -2550,6 +2554,24 @@ void() votables_set_runes =
 		if (is_pub_ctf)
 			cvar_set("cr_pubctf_runes_override", "1");
 	}
+};
+
+// Client commands already state the requested gametype/mode/map explicitly.
+// Do not interrupt those requests with the interactive map compatibility menu.
+void(float newtype, float newmode, float newmap) votables_command_set_gametype_mode_map =
+{
+	if (self.pending_map_vote_mapnum)
+		votables_map_vote_prompt_clear(TRUE);
+
+	votables_command_request = TRUE;
+	votables_request_set_gametype_mode_map(newtype, newmode, newmap);
+	votables_command_request = FALSE;
+};
+
+void(float newteamplay, float newmap) votables_command_set_hh_variant =
+{
+	request_teamplay = newteamplay;
+	votables_command_set_gametype_mode_map(8, -1, newmap);
 };
 
 void() votables_request_set_runes =
