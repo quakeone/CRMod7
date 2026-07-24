@@ -198,6 +198,8 @@ float   clanring_levelcount;        // used to scan through list in levels.cfg
 float   clanring_lastcount;         // used to detect end-of-file in levels.cfg
 float   clanring_force_ring;        // 1 = force ring on, -1 = force ring off, 0 = no force (auto)
 float   clanring_force_timelimit;   // 1 = force timelimit from cfg, 0 = auto
+float   clanring_config_batching;   // defer public config-derived updates until parsing settles
+float   clanring_matchtime_sync_pending; // matchtime changed while config publication was deferred
 float   clanring_ffa_start_lock_config_ready; // clanring.cfg has finalized teamplay-sensitive start-lock mode checks
 float   clanring_ffa_start_lock_start_time; // server time when the current level's FFA lock began
 float   clanring_ffa_start_lock_until; // server time when the FFA post-changelevel lock releases
@@ -564,6 +566,7 @@ float	clanring_afk_timeout;
 float   CLANRING_AFK_RESYNC_GRACE = 30; // seconds to preserve carried AFK state while client chat infokeys resync
 .float 	afk_time;
 .float  afk_sync_grace_until; // preserve carried AFK state until client chat infokeys resync after map/mode changes
+.float  observer_attack_released; // observer attack-mode toggle fires once per press, not repeatedly while held
 .float 	vote;    //client flag that holds their vote
 .float  ammo_heads;
 .entity hh_head_list;

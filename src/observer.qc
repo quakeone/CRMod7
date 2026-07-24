@@ -596,6 +596,10 @@ void () observer_start =
 	//local float go_auto;
 	local string tmp="";
 
+	// A held attack across connect/map transitions must not repeatedly cycle
+	// observer modes. Require a release before accepting the next toggle.
+	self.observer_attack_released = !self.button0;
+
 	// Add "left the game" message for normal DM and CTF modes
 	local float was_playing = !(self.style & CLANRING_OBSERVER);
 	if (was_playing && (self.style & CLANRING_CONNECTED) && !mode_is_arena() && !(clanring_playmode & CLANRING_MATCH_MODE))
@@ -2295,9 +2299,14 @@ void () observer_post_think =
 {
 	if (!gameover)
 	{
-		//R00k: cycle modes with +attack button
-		if ((self.button0) && (time > self.attack_finished))
+		// Cycle modes once per +attack press. The old time-only debounce fired
+		// every 0.8 seconds while attack remained held, spamming failed eyecam
+		// fallback messages whenever there was no playable chase target.
+		if (!self.button0)
+			self.observer_attack_released = TRUE;
+		else if (self.observer_attack_released && (time > self.attack_finished))
 		{						
+			self.observer_attack_released = FALSE;
 			self.oflags = self.oflags - (self.oflags & (OBSERVER_AUTO|OBSERVER_GO_AUTO|OBSERVER_QUAKETV));
 
 			if (self.oflags & OBSERVER_FLY)

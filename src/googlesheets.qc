@@ -25,6 +25,36 @@ entity gsheets_lookup_client;  // requester for lookup-map response
 string gsheets_lookup_map;     // requested lookup map
 string gsheets_lookup_trial_lines; // formatted trial output waiting for match request
 
+float(string value, float hash) gsheets_signature_add =
+{
+	float i;
+	float c;
+
+	for (i = 0; i < strlen(value); i = i + 1)
+	{
+		c = str2chr(value, i);
+		if (c < 0)
+			c = c + 256;
+		hash = mod((hash * 33) + c, 16777213);
+	}
+	return hash;
+};
+
+float() gsheets_config_signature =
+{
+	float hash;
+
+	if (!gsheets_configured())
+		return 0;
+
+	hash = gsheets_signature_add(clanring_googlesheetsurl, 5381);
+	hash = gsheets_signature_add("|", hash);
+	hash = gsheets_signature_add(clanring_googlesheetsapikey, hash);
+	if (hash == 0)
+		hash = 1;
+	return hash;
+};
+
 //
 // Sanitize a string for JSON (preserve Quake colors, strip control/JSON breakers)
 //
@@ -277,12 +307,22 @@ string(string action) gsheets_build_url =
 //
 void() gsheets_validate =
 {
+	float signature;
+
 	if (!gsheets_configured())
 	{
 		dprint("Google Sheets not configured - using local files\n");
 		return;
 	}
 	
+	signature = gsheets_config_signature();
+	if (signature && cvar("cr_gsheets_validated_sig") == signature)
+	{
+		clanring_googlesheets_valid = TRUE;
+		dprint("Google Sheets validation cached for this configuration\n");
+		return;
+	}
+
 	dprint("Validating Google Sheets connection...\n");
 	
 	string url = gsheets_build_url("validate");
@@ -825,11 +865,13 @@ void(float reqid, float status, string body) gsheets_callback =
 			if (status == 200 && strstrofs(body, "\"status\":\"ok\"", 0) >= 0)
 			{
 				clanring_googlesheets_valid = TRUE;
+				cvar_set("cr_gsheets_validated_sig", ftos(gsheets_config_signature()));
 				dprint("Google Sheets validation successful\n");
 			}
 			else
 			{
 				clanring_googlesheets_valid = FALSE;
+				cvar_set("cr_gsheets_validated_sig", "0");
 				dprint(sprintf("Google Sheets validation failed (status %g)\n", status));
 				if (body != "")
 					dprint(sprintf("Response: %s\n", body));

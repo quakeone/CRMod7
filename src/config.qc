@@ -1056,6 +1056,18 @@ float(string cmd) config_command_uses_full_tail =
     return FALSE;
 };
 
+float(string cmd) config_command_is_sensitive =
+{
+    cmd = strtolower(cmd);
+    if (strstrofs(cmd, "setadmin", 0) == 0) return TRUE;
+    if (cmd == "captimesdiscordurl") return TRUE;
+    if (cmd == "statsdiscordurl") return TRUE;
+    if (cmd == "matchposturl") return TRUE;
+    if (cmd == "googlesheetsurl") return TRUE;
+    if (cmd == "googlesheetsapikey") return TRUE;
+    return FALSE;
+};
+
 void(string cfg) exec_clanring_cfg =
 {
 	filestream f = fopen(cfg, FILE_READ);
@@ -1091,6 +1103,9 @@ void(string cfg) exec_clanring_cfg =
 			val = config_join_args(1, argc);
 		else
 			val = argv(1);
+		if (config_command_is_sensitive(cmd))
+			dprint(cmd, " <redacted>\n");
+		else
 		dprint(cmd," ",val,"\n");
 		config_command(cmd, val);				//Parse the line.
 	}
@@ -1230,7 +1245,7 @@ void (string filename, float desc = 0, float recordset = 0) read_player_stats =
 void () read_capture_stats =
 {
 	// Try Google Sheets first if configured (don't wait for async validation)
-	dprint(sprintf("gsheets_configured: url='%s' key='%s'\n", clanring_googlesheetsurl, clanring_googlesheetsapikey));
+	dprint(sprintf("gsheets_configured: %s\n", gsheets_configured() ? "yes" : "no"));
 	if (gsheets_configured())
 	{
 		gsheets_read_capture_stats();
@@ -1483,6 +1498,7 @@ void() clanring_main_config =
 			registercvar("cr_ffa_item_alpha", "0.5");
 			registercvar("cr_ffa_item_alpha_time", "5");
 			registercvar("sv_pak0_only", "0");
+			registercvar("cr_gsheets_validated_sig", "0");
 		exec_clanring_cfg("configs/clanring.cfg");
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.
@@ -1547,11 +1563,18 @@ void() clanring_exec_configs =
 		cvar_set("cr_allow_q14ever", "0");
 	}
 
+	clanring_config_batching = TRUE;
+	clanring_matchtime_sync_pending = FALSE;
 	clanring_main_config();
-	gsheets_validate(); // Validate Google Sheets connection if configured
+
+	gsheets_validate(); // Async dispatch only; does not block config execution.
+
 		clanring_warp_config();
+
 		clanring_map_config();
+
 		clanring_nextlevel_config();
+
 		clanring_refresh_pak0_only();
 		clanring_apply_pak0_only_mode();
 		if (clanring_sv_pak0_only)
@@ -1563,6 +1586,8 @@ void() clanring_exec_configs =
 			{
 				print(sprintf("sv_pak0_only changed to %s, restarting %s to rebuild precaches\n",
 					ftos(clanring_sv_pak0_only), mapname));
+				clanring_config_batching = FALSE;
+				clanring_matchtime_sync_pending = FALSE;
 				localcmd("restart\n");
 				remove(self);
 				return;
@@ -1619,6 +1644,10 @@ void() clanring_exec_configs =
 		dprint(sprintf("setting sys_ticrate to %1.3f\n", clanring_ctf_ticrate));
 		cvar_set("sys_ticrate", ftos(clanring_ctf_ticrate));
 	}
+
+	clanring_config_batching = FALSE;
+	if (clanring_matchtime_sync_pending)
+		server_sync_matchtime_infokey();
 
 	// Final trace: show deathmatch at end of config execution
 	bprint("config end: deathmatch ", ftos(cvar("deathmatch")), "\n");

@@ -585,6 +585,18 @@ void (float force) server_sync_pause_infokey =
     forceinfokey(world, "matchpaused", desired);
 };
 
+void () server_sync_matchtime_infokey =
+{
+    if (clanring_config_batching)
+    {
+        clanring_matchtime_sync_pending = TRUE;
+        return;
+    }
+
+    forceinfokey(world, "matchtime", ftos(clanring_timelimit));
+    clanring_matchtime_sync_pending = FALSE;
+};
+
 /**/
 void () W_Precache;
 
@@ -890,7 +902,7 @@ void () clanring_init_world =
             clanring_timelimit = 2;
         default_timelimit = clanring_timelimit;//R00k added
         match_show_timelimit();
-        forceinfokey(world, "matchtime", ftos(clanring_timelimit));//R00k: requested by Woods.
+        server_sync_matchtime_infokey();//R00k: requested by Woods.
     }
     else
         default_timelimit = clanring_timelimit = 20;

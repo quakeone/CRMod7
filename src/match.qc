@@ -1822,7 +1822,7 @@ void() match_begin =
     //announce4("Match is ", temp, "v", temp);
     temp = ftos(clanring_timelimit);
     announce2(temp, " minutes remaining");
-    forceinfokey(world, "matchtime", ftos(clanring_timelimit));//R00k: requested by Woods.
+    server_sync_matchtime_infokey();//R00k: requested by Woods.
     stats_matchtype = clanring_maxsize;	//3/6/2017 6:14AM added for stats header output, this will be incorrect if the game is unlocked.(fixme)
     stats_timelimit = clanring_timelimit;
     clanring_match_initial_timelimit = clanring_timelimit;
@@ -2750,7 +2750,7 @@ void() match_ready =
             if (clanring_timelimit != request_timelimit)
             {
                 clanring_timelimit = (clanring_maxsize > 2) ? 20 : 10;
-                forceinfokey(world, "matchtime", ftos(clanring_timelimit));
+                server_sync_matchtime_infokey();
                 match_show_timelimit();
             }
         }
