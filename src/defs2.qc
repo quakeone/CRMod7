@@ -764,6 +764,8 @@ string matchsound[MAX_CUSTOM_MATCH_SOUNDS];
 string matchsound_rematch[MAX_CUSTOM_MATCH_SOUNDS];
 string matchsound_blowout[MAX_CUSTOM_MATCH_SOUNDS];
 
+string clanring_last_matchsound;	//zoned copy of the last match sound played, never repeated back to back
+
 typedef struct
 {
 	string player;

@@ -1159,6 +1159,55 @@ void() match_check_autoss =
     clanring_match_timer.nextthink = time + 2;
 };
 
+//
+//  M A T C H S O U N D  P I C K
+//
+//  Pick a random sound from one of the matchsound lists (0 = normal,
+//  1 = rematch, 2 = blowout), skipping whatever was played last time.
+//  Starts at a random slot and walks forward so the previous sound is
+//  only reused when it is the sole usable entry in the list.
+//
+string(float soundtype, float count) match_pick_sound =
+{
+    local float i, slot;
+    local string entry;
+    local string fallback = "";
+
+    if (count < 1)
+        return "";
+    if (count > MAX_CUSTOM_MATCH_SOUNDS)    // never index past the array
+        count = MAX_CUSTOM_MATCH_SOUNDS;
+
+    slot = floor(random() * count);
+    if (slot >= count)      // random() can return 1.0
+        slot = count - 1;
+
+    for (i = 0; i < count; i = i + 1)
+    {
+        if (slot >= count)
+            slot = slot - count;
+
+        if (soundtype == 1)
+            entry = matchsound_rematch[slot];
+        else if (soundtype == 2)
+            entry = matchsound_blowout[slot];
+        else
+            entry = matchsound[slot];
+
+        slot = slot + 1;
+
+        if (entry != "")
+        {
+            if (fallback == "")
+                fallback = entry;
+            if (entry != clanring_last_matchsound)
+                return entry;
+        }
+    }
+
+    return fallback;        // nothing else available, repeat is unavoidable
+};
+
 void(float score_diff) match_postgame_sound =
 {
     local string chosen = "";
@@ -1172,48 +1221,42 @@ void(float score_diff) match_postgame_sound =
     if (!(clanring_matchsound_count))
         return;
 
+    // Progs globals reset on map change, so the last sound is mirrored into
+    // serverinfo and read back here to survive a level change between matches.
+    if (clanring_last_matchsound == "")
+    {
+        local string previous = infokey(world, "lastmsnd");
+        if (previous && previous != "")
+            clanring_last_matchsound = strzone(previous);
+    }
+
     prnd = random();
     if (prnd < .8)
     {
         if (((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (score_diff > 200)) ||
             (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (score_diff > 40)))	//Change these to percentile score1/(score1+score2)
         {
-            if (clanring_matchsound_blowout_count)
-            {
-                prnd = floor(random() * clanring_matchsound_blowout_count);
-                if (matchsound_blowout[prnd] != "")
-                {
-                    chosen = matchsound_blowout[prnd];
-                }
-            }
+            chosen = match_pick_sound(2, clanring_matchsound_blowout_count);
         }
         else if (((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (score_diff < 50)) ||
             (!(clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (score_diff < 10)))
         {
-            if (clanring_matchsound_rematch_count)
-            {
-                prnd = floor(random() * clanring_matchsound_rematch_count);
-                if (matchsound_rematch[prnd] != "")
-                {
-                    chosen = matchsound_rematch[prnd];
-                }
-            }
+            chosen = match_pick_sound(1, clanring_matchsound_rematch_count);
         }
         else
         {
-            if (clanring_matchsound_count)
-            {
-                prnd = floor(random() * clanring_matchsound_count);
-                if (matchsound[prnd] != "")
-                {
-                    chosen = matchsound[prnd];
-                }
-            }
+            chosen = match_pick_sound(0, clanring_matchsound_count);
         }
     }
 
     if (chosen != "")
     {
+        // Remember it so the next match picks something different.
+        if (clanring_last_matchsound != "")
+            strunzone(clanring_last_matchsound);
+        clanring_last_matchsound = strzone(chosen);
+        forceinfokey(world, "lastmsnd", chosen);
+
         if (clanring_matchsounds_precached)
         {
             clanring_play_compat_sound(world, CHAN_AUTO, chosen, "", 1, ATTN_NONE);
