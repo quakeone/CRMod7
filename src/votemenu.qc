@@ -205,6 +205,9 @@ float () VoteMenu_Init =
 
 void () VoteMenu_Print =
 {
+	local float displayed_vote;
+	local entity ballot_owner;
+
 	if (self.style & CLANRING_AFK_CLIENT)
 		return;
 
@@ -217,7 +220,15 @@ void () VoteMenu_Print =
 
 		centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[1], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);
 
-		switch (self.warp_map)
+		displayed_vote = self.map_vote_slot;
+		if (VoteIP_Mode() == VOTE_IP_MODE_ENFORCE && displayed_vote)
+		{
+			ballot_owner = VoteIP_FindBallotOwner(self, VOTE_BALLOT_MAP);
+			if (ballot_owner != self)
+				displayed_vote = 0;
+		}
+
+		switch (displayed_vote)
 		{
 			case 1:
 				centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[7], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);

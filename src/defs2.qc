@@ -330,7 +330,9 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .entity clanring_walkover_cache_next; // linked-list pointer for cached spawn/tele walkover entities
 .float join_time;					// time when player joined the server
 .float clanring_ghostless;             // admitted to a match without reconnect state
-float clanring_ghost_key;               // per-map key for the ghost address fingerprint
+// Shared by ghost binding and vote-IP identity hashing. Re-rolling it mid-map
+// would invalidate both saved ghost fingerprints and connected vote groups.
+float clanring_ghost_key;               // per-map key for address fingerprints
 float clanring_ghost_probe_fails;       // unverified restore failures inside the current window
 float clanring_ghost_probe_seen;        // time of the last unverified failure
 float clanring_ghost_probe_wait;        // server-wide floor delay on unverified restores
@@ -592,6 +594,12 @@ float   CLANRING_AFK_RESYNC_GRACE = 30; // seconds to preserve carried AFK state
 .float  afk_sync_grace_until; // preserve carried AFK state until client chat infokeys resync after map/mode changes
 .float  observer_attack_released; // observer attack-mode toggle fires once per press, not repeatedly while held
 .float 	vote;    //client flag that holds their vote
+.float  map_vote_slot; // dedicated intermission ballot (1..5); do not reuse warp_map
+.float  vote_ip_notice_until; // per-client duplicate-IP warning/log cooldown
+.float  vote_ip_hash;
+.float  vote_ip_hash2;
+.float  vote_ip_address_valid;
+.float  vote_ip_private;
 .float  ammo_heads;
 .entity hh_head_list;
 .entity hh_head_next;

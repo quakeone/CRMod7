@@ -2477,38 +2477,9 @@ void() match_clear_ghost_aliases =
 //
 //  G H O S T   A D D R E S S   B I N D I N G
 //
-//  A ghost code is a convenience, not a credential: it is two digits, it is
-//  printed to the whole team by ghostlist, and anyone may try codes.  The
-//  code therefore only selects which ghost to restore; the client address
-//  decides whether it may be restored.
-//
-//  The address is kept as two keyed 16 bit words rather than a zoned string,
-//  so the ghost stays a plain float entity with nothing to release on the
-//  several paths that remove it.  The key is redrawn every map, so a collision
-//  cannot be worked out in advance; each word also stays inside exact float
-//  range.  Even so, treat this as a filter on an address the attacker cannot
-//  choose, not as authentication.
-//
-//  Note this binds an address, not a person: clients sharing one address (a
-//  household, a NAT, a shared proxy) can restore each other's ghosts.  That is
-//  inherent to address binding and no fingerprint width changes it -- only a
-//  server-issued secret would, at the cost of a longer code to re-enter.
-//
-float(string ip, float mult) match_ip_hash =
-{
-    local float h, i, n;
-
-    n = strlen(ip);
-    if (!n)
-        return 0;                   // callers read 0/0 as "no address"
-
-    h = clanring_ghost_key;
-    for (i = 0; i < n; i = i + 1)
-        h = (h * mult + str2chr(ip, i)) % 65536;
-
-    return h;
-};
-
+//  A ghost code selects a ghost; the client address decides whether it may be
+//  restored. VoteIP_HashAddress supplies the shared keyed two-word fingerprint
+//  used here and by unique-IP voting. This binds an address, not a person.
 //
 //  May this client restore that ghost?
 //
@@ -2534,8 +2505,8 @@ float(entity ghost) match_ghost_address_ok =
         return (mode >= 2) ? 0 : 1;     // ghost carries no address
 
     ip = lockdown_normalize_ip(infokey(self, INFOKEY_P_IP));
-    a = match_ip_hash(ip, 31);
-    b = match_ip_hash(ip, 131);
+    a = VoteIP_HashAddress(ip, 31);
+    b = VoteIP_HashAddress(ip, 131);
     if (!a && !b)
         return (mode >= 2) ? 0 : 1;     // no address reported for this client
 
@@ -2616,8 +2587,8 @@ float () match_make_ghost =
     // 0/0, since that pair is reserved for "no address".
     bind_mode = cvar("cr_ghost_bind_ip");
     ip = lockdown_normalize_ip(infokey(self, INFOKEY_P_IP));
-    ip_hash1 = match_ip_hash(ip, 31);
-    ip_hash2 = match_ip_hash(ip, 131);
+    ip_hash1 = VoteIP_HashAddress(ip, 31);
+    ip_hash2 = VoteIP_HashAddress(ip, 131);
     if ((bind_mode >= 2) && ((!ip) || (!ip_hash1 && !ip_hash2)))
     {
         self.clanring_ghostless = TRUE;

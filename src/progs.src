@@ -11,6 +11,7 @@ array.qc
 userdefs.qc
 strings.qc
 utils.qc
+vote_ip.qc
 motd.qc
 auto.qc
 debug.qc

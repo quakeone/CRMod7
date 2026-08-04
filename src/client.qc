@@ -339,7 +339,20 @@ void ()VoteMenu_Print;
 
 void() IntermissionThink =
 {
-    VoteMenu_Print();
+	local float selected_slot, previous_slot, needed;
+	local string map_name, previous_map_name;
+
+	// The automatic DM3 screenshot sequence temporarily reuses the engine's
+	// intermission state. It is not an end-of-level ballot and must not display
+	// the map menu or consume voting impulses.
+	if (clanring_state & CLANRING_TAKING_AUTOSS)
+	{
+		// Keep AFK/typing state current during the short screenshot window.
+		check_client_status();
+		return;
+	}
+
+	VoteMenu_Print();
 
     // Keep typing/AFK status synced during intermission
     check_client_status();
@@ -347,121 +360,93 @@ void() IntermissionThink =
     if ((self.client != "QSS-M") && (self.button0 || self.button2)) // Jump or fire to wake up on clients without chat status sync
         client_afk_off();
 
-    if ((self.impulse > 0) && (self.impulse < 6))
-    {
-        // 2 second cooldown for removing or changing votes (after first vote cycle)
-        if (self.warp_map && self.next_vote_time > time)
-        {
-            self.impulse = 0;
-            return;
-        }
+	if ((self.impulse > 0) && (self.impulse < 6))
+	{
+		selected_slot = self.impulse;
 
-        stuffcmd(self, "play buttons/switch04.wav\n");
-        // Set cooldown after first cycle: when removing/changing OR re-voting after removal
-        if (self.warp_map || self.next_vote_time)
-            self.next_vote_time = time + 2;
-        tokenize(vote_map_choices[self.impulse]);
+		// Reject duplicate-IP ballots before success sounds, ordinary vote
+		// cooldown changes, public messages, or ballot mutation.
+		if (VoteIP_BallotRejected(self, VOTE_BALLOT_MAP))
+		{
+			self.impulse = 0;
+			return;
+		}
 
-        string myVoteMapName = strzone(argv(0));
+		// 2 second cooldown for removing or changing votes (after first vote cycle)
+		if (self.map_vote_slot && self.next_vote_time > time)
+		{
+			self.impulse = 0;
+			return;
+		}
 
-        // Helper: compute how many more votes are needed for a simple majority right now
-        // (matches the majority check later: > (players * 0.5))
-        float(float slot) votes_needed_for_slot =
-        {
-            local entity p = find(world, classname, "player");
-            local float c = 0;
-            while (p != world)
-            {
-                c += 1;
-                p = find(p, classname, "player");
-            }
-            local float majority = floor(c * 0.5) + 1;
-            local float need = majority - map_choices[slot];
-            if (need < 0) need = 0;
-            return need;
-        };
+		stuffcmd(self, "play buttons/switch04.wav\n");
+		// Set cooldown after first cycle: when removing/changing OR re-voting after removal
+		if (self.map_vote_slot || self.next_vote_time)
+			self.next_vote_time = time + VOTE_MAP_CHANGE_COOLDOWN;
+		tokenize(vote_map_choices[selected_slot]);
+		map_name = strzone(argv(0));
 
-        if ((self.warp_map) && ((self.warp_map) == self.impulse))
-        {
-            map_choices[self.warp_map] -= 1;
-            // After decrement, report status; if already passing, say so explicitly
-            {
-                local float need1 = votes_needed_for_slot(self.warp_map);
-                if (need1 > 0)
-                    bprint(sprintf("%s \bREMOVED\b their vote for %s (%s more needed to pass)\n",
-                                   self.netname, myVoteMapName,
-                                   strings_ftos_gold(need1)));
-                else
-                    bprint(sprintf("%s \bREMOVED\b their vote for %s (Vote passed)\n",
-                                   self.netname, myVoteMapName));
-            }
-            self.warp_map = 0;
-            self.impulse = 0;
-            self.centerTime = 0;	//Update now.
-            centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[1], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);
-            return;
-        }
+		if (self.map_vote_slot && self.map_vote_slot == selected_slot)
+		{
+			self.map_vote_slot = 0;
+			VoteMap_Recount();
+			needed = VoteMap_VotesNeeded(selected_slot);
+			if (needed > 0)
+				bprint(sprintf("%s \bREMOVED\b their vote for %s (%s more needed to pass)\n",
+					self.netname, map_name, strings_ftos_gold(needed)));
+			else
+				bprint(sprintf("%s \bREMOVED\b their vote for %s (Vote passed)\n",
+					self.netname, map_name));
 
-        if ((self.warp_map) && ((self.warp_map) != self.impulse))
-        {
-            // Print the REMOVED line for the PREVIOUSLY voted map (self.warp_map), not the new one
-            tokenize(vote_map_choices[self.warp_map]);
-            string prevVoteMapName  = strzone(argv(0));
-            map_choices[self.warp_map] -= 1;
-            {
-                local float need2 = votes_needed_for_slot(self.warp_map);
-                if (need2 > 0)
-                    bprint(sprintf("%s \bREMOVED\b their vote for %s (%s more needed to pass)\n",
-                                   self.netname, prevVoteMapName,
-                                   strings_ftos_gold(need2)));
-                else
-                    bprint(sprintf("%s \bREMOVED\b their vote for %s (Vote passed)\n",
-                                   self.netname, prevVoteMapName));
-            }
-            self.warp_map = 0;
-            centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[1], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);
-            strunzone(prevVoteMapName);
-        }
+			if (VoteMap_HasMajority())
+			{
+				sound(self, CHAN_AUTO, "misc/power.wav", 1, ATTN_NONE);
+				intermission_exittime = time;
+			}
 
-        self.warp_map = self.impulse;
-        map_choices[self.warp_map] += 1;
-        // Also show the updated status after incrementing; if threshold met, say "Vote passed"
-        {
-            local float need3 = votes_needed_for_slot(self.warp_map);
-            if (need3 > 0)
-                bprint(sprintf("%s voted for %s (%s more needed to pass)\n",
-                               self.netname, myVoteMapName,
-                               strings_ftos_gold(need3)));
-            else
-                bprint(sprintf("%s voted for %s - Vote passed\n",
-                               self.netname, myVoteMapName));
-        }
+			strunzone(map_name);
+			self.impulse = 0;
+			self.centerTime = 0;	//Update now.
+			centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[1], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);
+			return;
+		}
 
-        strunzone(myVoteMapName);
+		if (self.map_vote_slot && self.map_vote_slot != selected_slot)
+		{
+			previous_slot = self.map_vote_slot;
+			tokenize(vote_map_choices[previous_slot]);
+			previous_map_name = strzone(argv(0));
+			self.map_vote_slot = 0;
+			VoteMap_Recount();
+			needed = VoteMap_VotesNeeded(previous_slot);
+			if (needed > 0)
+				bprint(sprintf("%s \bREMOVED\b their vote for %s (%s more needed to pass)\n",
+					self.netname, previous_map_name, strings_ftos_gold(needed)));
+			else
+				bprint(sprintf("%s \bREMOVED\b their vote for %s (Vote passed)\n",
+					self.netname, previous_map_name));
 
-//		if (clanring_gameconfig & CLANRING_VOTE_MAJORITY_PASS)
-        {
-            entity p = find(world, classname, "player");
-            float c = 0;
+			centerprint(self, VOTE_MENU_TEXTLINE[0], VOTE_MENU_TEXTLINE[1], VOTE_MENU_TEXTLINE[2], VOTE_MENU_TEXTLINE[3], VOTE_MENU_TEXTLINE[4], VOTE_MENU_TEXTLINE[5], VOTE_MENU_TEXTLINE[6]);
+			strunzone(previous_map_name);
+		}
 
-            while (p != world)
-            {
-                c += 1;
-                p = find (p, classname, "player");
-            }
+		self.map_vote_slot = selected_slot;
+		VoteMap_Recount();
+		needed = VoteMap_VotesNeeded(selected_slot);
+		if (needed > 0)
+			bprint(sprintf("%s voted for %s (%s more needed to pass)\n",
+				self.netname, map_name, strings_ftos_gold(needed)));
+		else
+			bprint(sprintf("%s voted for %s - Vote passed\n",
+				self.netname, map_name));
 
-            for (float i = 1; i < 6; i++)
-            {
-                if (map_choices[i] >= map_choices[0])
-                    map_choices[0] = map_choices[i];
-            }
-            //Check if we have a majority already...
-            if (c && ((map_choices[0]) > (c * 0.5)))
-            {
-                sound (self, CHAN_AUTO, "misc/power.wav", 1, ATTN_NONE);
-                intermission_exittime = time;
-            }
-        }
+		strunzone(map_name);
+
+		if (VoteMap_HasMajority())
+		{
+			sound(self, CHAN_AUTO, "misc/power.wav", 1, ATTN_NONE);
+			intermission_exittime = time;
+		}
 
         self.centerTime = 0;	//Update now.
         self.impulse = 0;
@@ -472,9 +457,13 @@ void() execute_changelevel =
 {
     entity tmp;
     string matchsound_path = "";
-    float prnd = -1;
+	float prnd = -1;
 //	local float bcount;
-    float vote_time = 20;
+	float vote_time = 20;
+
+	// Begin every intermission with a fresh derived ballot. This also clears
+	// any state left by an earlier menu interaction on the same client edict.
+	VoteMap_ResetBallots();
 
     // In FFA with a lone player there's nobody else to vote, so halve the
     // end-of-map vote menu wait (10s instead of 20s).

@@ -53,82 +53,13 @@ void() Request_Poll_Cleanup =
 
 float(float ballot) Request_Poll_Votes_Needed =
 {
-	local entity bingo;
-	local float	vcount = 0, pcount = 0, votes_needed = 99;
-
-	bingo = find(world, classname, "player");
-
-	// What we are doing here is tallying up the votes pragmatically.
-	// The vote will pass if there is a majority for yes, or no, immediately.
-	// This way, we don't have to sit around for 45 seconds waiting for
-	// the request to timeout if there is already a majority vote.
-	// Although, it doesn't give players much time to change their vote...
-
-	if (ballot == 1)		// yes vote
+	if (ballot != 1 && ballot != 2)
 	{
-		while (bingo)
-		{
-			if ((bingo.style & CLANRING_CONNECTED) && clienttype(bingo) != CLIENTTYPE_BOT)
-			{
-				if (bingo.style & CLANRING_AFK_CLIENT)
-				{
-					if (bingo.vote)	//count players that are afk and already voted
-					{
-						pcount += 1;
-
-						if ((bingo.vote == ballot) || (bingo == clanring_request.owner))
-							vcount += 1;
-					}
-				}
-				else
-				{
-					pcount += 1;
-
-					if ((bingo.vote == ballot) || (bingo == clanring_request.owner))
-						vcount += 1;
-				}
-			}
-			bingo = find(bingo, classname, "player");
-		}
-		votes_needed = ceil((pcount * 0.51) - vcount);
+		bprint("Request_Poll_Votes_Needed: Invalid Ballot\n");
+		return 99;
 	}
-	else
-	{
-		if (ballot == 2)	// no vote
-		{
-			while (bingo)
-			{
-				if ((bingo.style & CLANRING_CONNECTED) && clienttype(bingo) != CLIENTTYPE_BOT)
-				{
-					if (bingo.style & CLANRING_AFK_CLIENT)
-					{
-						if (bingo.vote)	//count players that are afk and already voted
-						{
-							pcount += 1;
 
-							if (bingo.vote == ballot)
-								vcount += 1;
-						}
-					}
-					else
-					{
-						pcount += 1;
-
-						if (bingo.vote == ballot)
-							vcount += 1;
-					}
-				}
-				bingo = find(bingo, classname, "player");
-			}
-	 		votes_needed = ceil((pcount * 0.51) - vcount);
-	 	}
-	 	else
-	 		bprint("Request_Poll_Votes_Needed: Invalid Ballot\n");
-	 }
-	if (votes_needed < 1)
-		return 0;
-	else
-		return votes_needed;
+	return VoteIP_LiveVotesNeeded(ballot);
 };
 
 void(entity player, float cast) Request_Poll_Vote =
@@ -137,15 +68,16 @@ void(entity player, float cast) Request_Poll_Vote =
 
 	clear_afk_status(player);	//R00k
 
-    // Suppress per-player vote lines if the caller is no longer connected
-    local float player_is_connected;
-    player_is_connected = (player.style & CLANRING_CONNECTED) ? 1 : 0;
-
 	if (clanring_request == world)
 	{
 		sprint(player, "There is nothing to vote on.\n");
 		return;
 	}
+
+	// Enforce/monitor the shared IP ballot before mutating player.vote or
+	// emitting any public vote feedback.
+	if (VoteIP_BallotRejected(player, VOTE_BALLOT_LIVE))
+		return;
 
 	if (player.vote)
 	{
@@ -154,15 +86,13 @@ void(entity player, float cast) Request_Poll_Vote =
 			if (player == clanring_request.owner)							// This person, who changed their mind, also started the request, so just cancel it.
 			{
 				sound(world, CHAN_AUTO, "misc/menu2.wav", 1, ATTN_NONE);
-                if (player_is_connected)
-                    bprint(player.netname," cancelled their request.\n");
+	                bprint(player.netname," cancelled their request.\n");
 				Request_Poll_Cleanup();
 				return;
 			}
 			else
 			{
-                if (player_is_connected)
-                    bprint(player.netname, " flipped their vote.\n");
+	                bprint(player.netname, " flipped their vote.\n");
 			}
 		}
 		else
@@ -206,20 +136,6 @@ void(entity player, float cast) Request_Poll_Vote =
 	{
         votes_needed = Request_Poll_Votes_Needed(cast); // majority YES check (after this ballot)
 
-        // If this recount was triggered by a disconnect (not a live client),
-        // resolve without printing a per-player "voted" line.
-        if (!player_is_connected)
-        {
-            if (votes_needed == 0)
-            {
-                bprint("Vote passed to ", clanring_request.noise1, clanring_request.noise2, ".\n");
-                clanring_request.touch();
-	                clanring_play_compat_sound(world, CHAN_AUTO, "misc/runekey.wav", "misc/medkey.wav", 1, ATTN_NONE);
-                Request_Poll_Cleanup();
-                return;
-            }
-        }
-
 		if (votes_needed == 0)// majority YES
 		{
 			// The final (passing) YES ballot: single-line message per request.
@@ -260,15 +176,6 @@ void(entity player, float cast) Request_Poll_Vote =
 		{
             votes_needed = Request_Poll_Votes_Needed(cast);
 
-            // Silent resolve for disconnect-triggered recount (no per-player line)
-            if (!player_is_connected && (votes_needed == 0))
-            {
-                bprint("\n");
-                sound(world, CHAN_AUTO, "misc/menu2.wav", 1, ATTN_NONE);
-                bprint("The request was declined.\n");
-                Request_Poll_Cleanup();
-                return;
-            }
 			if (votes_needed == 0) // majority NO
 			{
 				if (player != clanring_request.owner)
@@ -277,6 +184,7 @@ void(entity player, float cast) Request_Poll_Vote =
 				sound(world, CHAN_AUTO, "misc/menu2.wav", 1, ATTN_NONE);
 				bprint("The request was declined.\n");
 				Request_Poll_Cleanup();
+				return;
 			}
 			else if (player.style & CLANRING_ADMINISTRATOR)
 			{
@@ -305,6 +213,13 @@ void(entity player, float cast) Request_Poll_Vote =
 void() Request_Poll_Announce =
 {
 	//self is the clanring_request
+	if (!VoteIP_IsConnectedHuman(self.owner))
+	{
+		bprint("The request was cancelled because its requester disconnected.\n");
+		Request_Poll_Cleanup();
+		return;
+	}
+
 	self.health -= 10;
 	
 	if (self.health <= 0)
@@ -450,10 +365,27 @@ float (string captiona, string captionb, void() passfunc, string pollname = "") 
 // as Request_Poll_Vote would, but without a per-player "voted" line.
 void() Request_Poll_Recount =
 {
-    if (clanring_request == world)
-        return;
+	if (clanring_request == world)
+		return;
 
-    // Check majority YES against currently connected voters
+	// Never leave a poll owning a disconnected client edict. The engine may
+	// reuse that edict for a new connection, which would otherwise transfer
+	// implicit ballot ownership and the requester's displayed name.
+	if (!VoteIP_IsConnectedHuman(clanring_request.owner))
+	{
+		bprint("The request was cancelled because its requester disconnected.\n");
+		Request_Poll_Cleanup();
+		return;
+	}
+
+	if (VoteIP_EligibleCount(VOTE_BALLOT_LIVE) <= 0)
+	{
+		bprint("The request was cancelled because no eligible voters remain.\n");
+		Request_Poll_Cleanup();
+		return;
+	}
+
+	// Check majority YES against currently connected voters
     local float yn;
     yn = Request_Poll_Votes_Needed(1);
     if (yn == 0)

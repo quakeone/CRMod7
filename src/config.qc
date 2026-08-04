@@ -1485,6 +1485,9 @@ void() clanring_main_config =
 	// Ensure custom cvars exist before parsing config so cvar_set works on them
 		registercvar("cr_allow_leavemealone", "1");
 		registercvar("cr_suggest_countdown_hint", "1");
+		registercvar("cr_vote_unique_ip", "1");
+		registercvar("cr_vote_unique_ip_exempt_private", "0");
+		registercvar("cr_vote_unique_ip_admin_exempt", "1");
 		registercvar("cr_hh_weaponstay_pref", "-1");
 		registercvar("cr_pubctf_runes_override", "-1");
 		registercvar("cr_lockdown_until", "0");

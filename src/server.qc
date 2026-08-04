@@ -696,6 +696,9 @@ void () clanring_init_world =
     registercvar("cr_ffa_start_delay", "3");
     registercvar("cr_ffa_item_alpha", "0.5");
     registercvar("cr_ffa_item_alpha_time", "5");
+    registercvar("cr_vote_unique_ip", "1");
+    registercvar("cr_vote_unique_ip_exempt_private", "0");
+    registercvar("cr_vote_unique_ip_admin_exempt", "1");
     registercvar("cr_autotrack", "0");
     clanring_playmode = cvar("samelevel");
     startup_playmode = cvar("cr_startmode");
@@ -1776,6 +1779,9 @@ void () clanring_client_connect =
     self.clanring_ghost_wait = 0;
     self.trigger_field = world; // last spawn point
     self.use = SUB_Null;//used for voting/warp
+    self.vote = 0;
+    self.map_vote_slot = 0;
+    self.vote_ip_notice_until = 0;
     self.style = 0;
     self.delayed_impulse = 0;
     self.clanring_cam_delay = 0;
@@ -1838,14 +1844,13 @@ void () clanring_client_disconnect =
     self.oldname 				= string_null;
     self.statstate				= 0;
     
-    if (clanring_request != world)
-    {
-        if (self.vote)
-        {
-            self.vote = 0;
-            Request_Poll_Vote(self, 1);//Check for a 'yes' majority
-        }
-    }
+    self.vote = 0;
+    self.map_vote_slot = 0;
+    self.vote_ip_notice_until = 0;
+
+    // Intermission totals are derived from connected client ballot state.
+    if (intermission_running)
+        VoteMap_Recount();
 
     // If we're in match mode, then inform match and score modules
     // Must inform score module first!  Score module checks to see if the
@@ -1930,6 +1935,7 @@ void () clanring_put_client_in_server =
     self.movetype    = MOVETYPE_WALK;
     self.finaldest_y = MOVETYPE_WALK;
     self.style       = self.style | CLANRING_CONNECTED;//placed here before assigning to a team
+    VoteIP_RefreshClientIdentity(self);
 
     //utils_make_scheduled_event(clanring_bf_think, 0.1);
 
@@ -3773,7 +3779,10 @@ void () clanring_start_frame =
     }
     else
     {
-        if (intermission_running)
+        // The DM3 automatic screenshot sequence temporarily sets the engine's
+        // intermission flag. Only a real end-of-level intermission may select
+        // a map and issue changelevel.
+        if (intermission_running && !(clanring_state & CLANRING_TAKING_AUTOSS))
         {
             if (time >= intermission_exittime)
             {
@@ -3785,6 +3794,10 @@ void () clanring_start_frame =
                 string temp = "";
                 float winner = 1;            // default to slot 1 ("nextmap")
                 float best = -1;             // reset every round
+
+                // Rebuild from connected client state so removed/disconnected
+                // ballots and runtime cvar changes cannot leave phantom totals.
+                VoteMap_Recount();
 
                 for (float i = 1; i <= 5; i++)
                 {

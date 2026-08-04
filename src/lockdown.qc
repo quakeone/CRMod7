@@ -45,39 +45,7 @@ void() lockdown_register_cvars =
 
 string(string ip_with_port) lockdown_normalize_ip =
 {
-    local string ip;
-    local float pos, colon_count, i;
-
-    ip = ip_with_port;
-    if (!ip || ip == "")
-        return "";
-
-    // [IPv6]:port or [IPv6]
-    if (substring(ip, 0, 1) == "[")
-    {
-        pos = strstrofs(ip, "]", 0);
-        if (pos > 1)
-            return substring(ip, 1, pos - 1);
-        return ip;
-    }
-
-    // IPv4:port (or hostname:port) -> strip trailing port.
-    // Plain IPv6 addresses contain multiple ':' and should be kept as-is.
-    colon_count = 0;
-    for (i = 0; i < strlen(ip); i = i + 1)
-    {
-        if (substring(ip, i, 1) == ":")
-            colon_count = colon_count + 1;
-    }
-
-    if (colon_count == 1)
-    {
-        pos = strstrofs(ip, ":", 0);
-        if (pos > 0)
-            return substring(ip, 0, pos);
-    }
-
-    return ip;
+	return clanring_normalize_ip(ip_with_port);
 };
 
 void() lockdown_clear_ips =
