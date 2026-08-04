@@ -376,7 +376,7 @@ void() console_list_ghosts =
         cprint3("\"  ", num, "  | ");
     
         szTeam = strings_get_teamname2(e.height);
-        if (e.owner.owner == e)
+        if (e.owner != world)
             frag = e.owner.frags;
         else
             frag = e.frags;
@@ -393,7 +393,7 @@ void() console_list_ghosts =
         else
             pad = " |  ";
         num = ftos(frag);
-        if (e.owner.owner == e)
+        if (e.owner != world)
             cprint6(szTeam, pad, num, "  | ", e.owner.netname, "\"\n");
         else
             cprint4(szTeam, pad, num, "  | Disconnected\"\n");

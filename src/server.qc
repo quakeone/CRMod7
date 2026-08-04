@@ -671,6 +671,13 @@ void () clanring_init_world =
     // Reset map-scoped team info generation on each level load.
     team_info_global_gen = 0;
 
+    // Key the ghost address fingerprint per map, so a collision cannot be
+    // worked out against a hash an attacker knows in advance.
+    clanring_ghost_key = floor(random() * 65536);
+    clanring_ghost_probe_fails = 0;
+    clanring_ghost_probe_seen = 0;
+    clanring_ghost_probe_wait = 0;
+
     //CRMOD - string to be used throughout code to show version number.
     //version.year.month.day
     string vstring = strftime(TRUE, "%y.%m");
@@ -1364,7 +1371,7 @@ void () clanring_send_ignore_this =
         ghostent = find(world, classname, "clanring_ghost");
         while (ghostent)
         {
-            if (ghostent.owner.owner != ghostent)
+            if (ghostent.owner == world)
                 temp = 1;
             ghostent = find(ghostent, classname, "clanring_ghost");
         }
@@ -1764,6 +1771,9 @@ void () clanring_client_connect =
 //	self.finaldest_y = MOVETYPE_WALK;
     self.killed = 0;
     self.owner = world;      // no ghost
+    self.clanring_ghostless = FALSE;
+    self.clanring_ghost_fails = 0;
+    self.clanring_ghost_wait = 0;
     self.trigger_field = world; // last spawn point
     self.use = SUB_Null;//used for voting/warp
     self.style = 0;

@@ -329,6 +329,15 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .float  clanring_badstats_telewalk_ignore_until; // suppress counting immediately after spawn/restore and briefly after a count
 .entity clanring_walkover_cache_next; // linked-list pointer for cached spawn/tele walkover entities
 .float join_time;					// time when player joined the server
+.float clanring_ghostless;             // admitted to a match without reconnect state
+float clanring_ghost_key;               // per-map key for the ghost address fingerprint
+float clanring_ghost_probe_fails;       // unverified restore failures inside the current window
+float clanring_ghost_probe_seen;        // time of the last unverified failure
+float clanring_ghost_probe_wait;        // server-wide floor delay on unverified restores
+.float clanring_ghost_ip;               // ghost: address fingerprint, low word
+.float clanring_ghost_ip2;              // ghost: address fingerprint, high word
+.float clanring_ghost_fails;            // failed ghost code attempts this connection
+.float clanring_ghost_wait;             // time before another ghost code attempt is accepted
 .vector clanring_backpacks;			// track rl|lg|gl lost/taken backpacks
 .vector deathorigin;
 //.float killed_who[16];				// players you killed; the number of times killed_who[playerno].netname

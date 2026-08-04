@@ -32,6 +32,7 @@
 
 // Function declarations
 void() match_timer_think2;
+string(string ip_with_port) lockdown_normalize_ip;
 void() match_list_ghosts;
 void() match_enter_ghost_code;
 void() match_start_unpause_countdown;
@@ -39,7 +40,7 @@ void() match_notready;
 void() match_start_timer;
 void() Suggest_MaybePrintCountdownHint;
 void() match_unpause;
-void(entity ghostent) match_restore_ghost;
+float(entity ghostent) match_restore_ghost;
 float() match_is_imbalanced;
 void() spawns_restore_model;
 void() votables_disable_item;
@@ -479,6 +480,7 @@ void() match_item_reset =
 void() match_init_player =
 {
     self.style = self.style - (self.style & CLANRING_READY);
+    self.clanring_ghostless = FALSE;
     self.finaldest_x = time; // So we don't get autokickedd!!
     observer_start ();
     clear_name();
@@ -490,6 +492,8 @@ void() match_init_player =
 void() match_unready_player =
 {
     self.style = self.style - (self.style & CLANRING_READY);
+    self.owner = world;
+    self.clanring_ghostless = FALSE;
     clear_name();
 };
 
@@ -513,7 +517,7 @@ void() match_reset =
     // remove all backpacks
     utils_do_item(SUB_Remove, "item_backpack");
 
-    // unready all players
+    // unready all players (also clears each player's ghost pointer)
     utils_do_players(match_unready_player);
 
     // remove all ghosts
@@ -580,8 +584,10 @@ void() match_gib_player =
                 }
 
                 // end of match
-                remove(self.owner);
+                if (self.owner)
+                    remove(self.owner);
                 self.owner = world;
+                self.clanring_ghostless = FALSE;
             }
         }
     }
@@ -2395,6 +2401,51 @@ entity (float code) match_find_ghost =
     return e;
 };
 
+#define MATCH_GHOST_CODE_MIN   10
+#define MATCH_GHOST_CODE_COUNT 90
+#define MATCH_GHOST_RESULT_NO_ADDRESS -1
+
+// The only style bits a ghost may carry.  Privileges are deliberately absent:
+// a ghost code is not an authentication token.  Masked on the way in and on
+// the way out, so a ghost from an older progs cannot hand out rights either.
+#define MATCH_GHOST_STYLE (CLANRING_HEADS_UP | CLANRING_SMART_WEAPON | CLANRING_AUTOSTATS)
+
+// Return an unused ghost code, or 0 when all codes are occupied.  The scan is
+// O(edicts + 90) and does not depend on lucky random retries.
+float() match_allocate_ghost_code =
+{
+    local float used[90];
+    local float i, code, index, start;
+    local entity ghost;
+
+    for (i = 0; i < MATCH_GHOST_CODE_COUNT; i = i + 1)
+        used[i] = FALSE;
+
+    ghost = find(world, classname, "clanring_ghost");
+    while (ghost)
+    {
+        code = floor(ghost.count);
+        if ((code >= MATCH_GHOST_CODE_MIN)
+            && (code < MATCH_GHOST_CODE_MIN + MATCH_GHOST_CODE_COUNT))
+            used[code - MATCH_GHOST_CODE_MIN] = TRUE;
+
+        ghost = find(ghost, classname, "clanring_ghost");
+    }
+
+    start = bound(0,
+                  floor(random() * MATCH_GHOST_CODE_COUNT),
+                  MATCH_GHOST_CODE_COUNT - 1);
+
+    for (i = 0; i < MATCH_GHOST_CODE_COUNT; i = i + 1)
+    {
+        index = (start + i) % MATCH_GHOST_CODE_COUNT;
+        if (!used[index])
+            return MATCH_GHOST_CODE_MIN + index;
+    }
+
+    return 0;
+};
+
 //
 //  S E N D  G H O S T  A L I A S E S
 //
@@ -2403,7 +2454,7 @@ entity (float code) match_find_ghost =
 //  alias ghostcode echo Your ghostcode is 29
 //  alias ghost "impulse 127;w5;impulse 232;w5;impulse 239"
 //
-void () match_send_ghost_aliases = 
+void () match_send_ghost_aliases =
 {
     local float tens, ones;
     stuffcmd(self, strcat("alias ghostcode echo Your ghost code is ", ftos(self.owner.count), "\n"));
@@ -2417,23 +2468,171 @@ void () match_send_ghost_aliases =
                           "\"\n"));
 };
 
+void() match_clear_ghost_aliases =
+{
+    stuffcmd(self, "alias ghostcode echo You do not have a ghost\n");
+    stuffcmd(self, "alias ghost impulse 127\n");
+};
+
+//
+//  G H O S T   A D D R E S S   B I N D I N G
+//
+//  A ghost code is a convenience, not a credential: it is two digits, it is
+//  printed to the whole team by ghostlist, and anyone may try codes.  The
+//  code therefore only selects which ghost to restore; the client address
+//  decides whether it may be restored.
+//
+//  The address is kept as two keyed 16 bit words rather than a zoned string,
+//  so the ghost stays a plain float entity with nothing to release on the
+//  several paths that remove it.  The key is redrawn every map, so a collision
+//  cannot be worked out in advance; each word also stays inside exact float
+//  range.  Even so, treat this as a filter on an address the attacker cannot
+//  choose, not as authentication.
+//
+//  Note this binds an address, not a person: clients sharing one address (a
+//  household, a NAT, a shared proxy) can restore each other's ghosts.  That is
+//  inherent to address binding and no fingerprint width changes it -- only a
+//  server-issued secret would, at the cost of a longer code to re-enter.
+//
+float(string ip, float mult) match_ip_hash =
+{
+    local float h, i, n;
+
+    n = strlen(ip);
+    if (!n)
+        return 0;                   // callers read 0/0 as "no address"
+
+    h = clanring_ghost_key;
+    for (i = 0; i < n; i = i + 1)
+        h = (h * mult + str2chr(ip, i)) % 65536;
+
+    return h;
+};
+
+//
+//  May this client restore that ghost?
+//
+//    0  refused
+//    1  binding is not enforced for this pair
+//    2  the address was checked and matched
+//
+//  cr_ghost_bind_ip: 0 off, 1 bind when both sides have an address, 2 also
+//  refuse when either side has none (engine will not report it, or the ghost
+//  predates binding).  2 is the fail-closed setting: on an engine without
+//  address reporting it disables ghost restore entirely.
+//
+float(entity ghost) match_ghost_address_ok =
+{
+    local string ip;
+    local float a, b, mode;
+
+    mode = cvar("cr_ghost_bind_ip");
+    if (mode < 1)
+        return 1;
+
+    if (!ghost.clanring_ghost_ip && !ghost.clanring_ghost_ip2)
+        return (mode >= 2) ? 0 : 1;     // ghost carries no address
+
+    ip = lockdown_normalize_ip(infokey(self, INFOKEY_P_IP));
+    a = match_ip_hash(ip, 31);
+    b = match_ip_hash(ip, 131);
+    if (!a && !b)
+        return (mode >= 2) ? 0 : 1;     // no address reported for this client
+
+    if ((a == ghost.clanring_ghost_ip) && (b == ghost.clanring_ghost_ip2))
+        return 2;
+
+    return 0;
+};
+
+//
+//  F A I L E D   R E S T O R E
+//
+//  One generic answer for every failure, so attempts cannot be used to map
+//  which codes exist or who owns them, plus a growing delay so the 90 code
+//  space cannot be walked.  The real reason goes to the server log.
+//
+void(string reason) match_ghost_penalize =
+{
+    local float delay, probe_cooldown;
+
+    self.clanring_ghost_fails = self.clanring_ghost_fails + 1;
+
+    delay = 2 * self.clanring_ghost_fails;
+    if (delay > 30)
+        delay = 30;
+    self.clanring_ghost_wait = time + delay;
+
+    if (self.clanring_ghost_fails >= 3)
+        cprint(sprintf("%s: failed ghost restore #%g (%s)\n",
+                       self.netname, self.clanring_ghost_fails, reason));
+
+    // A client can reset its own counter by reconnecting; this one it cannot.
+    // Only unverified attempts reach here, so an address-verified owner is
+    // never delayed by someone else probing.  Do not refresh the global wait
+    // while it is active: otherwise a steady stream of blocked probes could
+    // keep the server in cooldown forever.
+    probe_cooldown = (time < clanring_ghost_probe_wait);
+    if (!probe_cooldown)
+    {
+        if (time > clanring_ghost_probe_seen + 120)
+            clanring_ghost_probe_fails = 0;     // window expired
+        clanring_ghost_probe_seen = time;
+        clanring_ghost_probe_fails = clanring_ghost_probe_fails + 1;
+        if (clanring_ghost_probe_fails > 8)
+        {
+            clanring_ghost_probe_wait = time + 15;
+            clanring_ghost_probe_fails = 0;     // consume this window
+            clanring_ghost_probe_seen = time;
+        }
+    }
+};
+
+void(string reason) match_ghost_restore_failed =
+{
+    match_ghost_penalize(reason);
+    sprint(self, "Ghost unavailable\n");
+};
+
+
 //
 //  M A K E  G H O S T
 //
 //  Create a ghost for the player (if does not already have one)
 //  and tell him what his ghost code is.
 //
-void () match_make_ghost =
+float () match_make_ghost =
 {
+    local float ghostcode, bind_mode, ip_hash1, ip_hash2;
+    local string ip;
+
     // can't have two ghosts
     if (self.owner)
         remove(self.owner);
+    self.owner = world;
+
+    // In fail-closed mode, do not mint a code that can never be restored.
+    // This also rejects the vanishingly rare nonempty address which hashes to
+    // 0/0, since that pair is reserved for "no address".
+    bind_mode = cvar("cr_ghost_bind_ip");
+    ip = lockdown_normalize_ip(infokey(self, INFOKEY_P_IP));
+    ip_hash1 = match_ip_hash(ip, 31);
+    ip_hash2 = match_ip_hash(ip, 131);
+    if ((bind_mode >= 2) && ((!ip) || (!ip_hash1 && !ip_hash2)))
+    {
+        self.clanring_ghostless = TRUE;
+        match_clear_ghost_aliases();
+        return MATCH_GHOST_RESULT_NO_ADDRESS;
+    }
 
     // create ghost code
-    local float ghostcode;
-    ghostcode = 10 + floor(89.99 * random());
-    while (match_find_ghost(ghostcode))
-        ghostcode = 10 + floor(89.99 * random());
+    ghostcode = match_allocate_ghost_code();
+    if (!ghostcode)
+    {
+        self.clanring_ghostless = TRUE;
+        match_clear_ghost_aliases();
+        return FALSE;
+    }
 
     // initialize ghost
     self.owner = spawn();
@@ -2447,8 +2646,15 @@ void () match_make_ghost =
     self.owner.mangle = self.mangle;	// killstats
     self.owner.movetype = MOVETYPE_NONE;
     self.owner.finaldest_y = MOVETYPE_NONE;
+
+    // Bind the ghost to the address that created it.
+    self.owner.clanring_ghost_ip = ip_hash1;
+    self.owner.clanring_ghost_ip2 = ip_hash2;
+
+    self.clanring_ghostless = FALSE;
     match_send_ghost_aliases ();
     stuffcmd(self, "ghostcode\n");
+    return TRUE;
 };
 
 //
@@ -2469,6 +2675,12 @@ void () match_request_restore_ghost =
     if (self.style & CLANRING_READY)
     {
         sprint(self, "You are already in the match\n");
+        return;
+    }
+
+    if (time < self.clanring_ghost_wait)
+    {
+        sprint(self, "Too many attempts; wait a moment\n");
         return;
     }
 
@@ -2497,18 +2709,33 @@ void () match_enter_ghost_code =
     {
         // ghost code has been entered
         local entity e;
+        local float addr;
 
         e = match_find_ghost(self.count);
         if (!e)
-            sprint(self, "Ghost not found\n");
+            match_ghost_restore_failed("no such code");
+        else if (e.owner != world)                  // owner is still connected
+            match_ghost_restore_failed("ghost still claimed");
         else
         {
-            // Check to make sure the client is gone
-            if (e.owner.owner == e)
-                sprint2(self, e.owner.netname, " owns this ghost\n");
-            else
-                match_restore_ghost(e);
+            addr = match_ghost_address_ok(e);
+            if (addr == 2)
+                match_restore_ghost(e);         // proven owner: never throttled
+            else if (time < clanring_ghost_probe_wait)
+                match_ghost_restore_failed("server-wide probe cooldown");
+            else if (!addr)
+                match_ghost_restore_failed("address does not match");
+            else if (!match_restore_ghost(e))
+            {
+                // Right code, but the player could not be seated and the
+                // address never proved who they were.  match_put_player_in_team
+                // has already said why, so only charge the attempt: an unbound
+                // server still must not answer code probes for free.
+                match_ghost_penalize("unverified address, admission refused");
+            }
         }
+
+
         self.use = SUB_Null;
     }
 };
@@ -2521,29 +2748,37 @@ void () match_enter_ghost_code =
 //  called is if there is a match in progress and the player entering
 //  the ghostcode is an uncommitted observer.
 //
-void(entity ghostent) match_restore_ghost =
+float(entity ghostent) match_restore_ghost =
 {
     local string temp;
     local string plural;
 
     local float col = bound(0, ghostent.height, 13);
     local entity pteam;
+    local float old_team, old_height;
 
+    // Admission can fail (team full, invalid colour).  Nothing may be
+    // committed before it succeeds -- a player left holding CLANRING_READY
+    // is refused by match_request_restore_ghost on every retry.
+    old_team = self.team;
+    old_height = self.height;
     self.team = col + 1;
-    self.style = self.style | ghostent.style | CLANRING_READY;
-    
+
     temp = ftos(col);
     stuffcmd(self, strcat("color ", temp, "\n"));
-    
+
     if (!match_put_player_in_team())    // self.height is set in here
     {
+        self.team = old_team;
+        self.height = old_height;
         stuffcmd(self, "color 0\n");
         clear_name();
-        return;
+        return FALSE;
     }
 
     // Must ready before observer_end, or will be made observer again
     // Must observer_end before setting frags, or frags will be set to 0
+    self.style = self.style | (ghostent.style & MATCH_GHOST_STYLE) | CLANRING_READY;
     observer_end();
 
     // Force server-side colours immediately (shirt & pants)
@@ -2570,7 +2805,6 @@ void(entity ghostent) match_restore_ghost =
     self.clanring_qdkill = ghostent.clanring_qdkill;
     self.clanring_ptwep = ghostent.clanring_ptwep;
     self.clanring_ptkill = ghostent.clanring_ptkill;
-    self.clanring_hack_count = ghostent.clanring_hack_count;	// clanring
     self.true_kills = ghostent.true_kills;
     self.pos1_x	= ghostent.pos1_x;
     self.pos1_y	= ghostent.pos1_y;
@@ -2623,14 +2857,12 @@ void(entity ghostent) match_restore_ghost =
         self.attack_finished = ghostent.attack_finished;
         self.pain_finished = ghostent.pain_finished;
         self.air_finished = ghostent.air_finished;
-        self.invincible_time = ghostent.invincible_time;
-        self.invincible_finished = ghostent.invincible_time;
-        self.invisible_time = ghostent.invisible_time;
-        self.invisible_finished = ghostent.invisible_time;
-        self.super_time = ghostent.super_time;
-        self.super_damage_finished = ghostent.super_time;
-        self.rad_time = ghostent.rad_time;
-        self.radsuit_finished = ghostent.rad_time;
+        // Absolute expiry times.  match_unpause_player() adds the pause
+        // duration afterwards, exactly as it does for players who stayed.
+        self.invincible_finished = ghostent.invincible_finished;
+        self.invisible_finished = ghostent.invisible_finished;
+        self.super_damage_finished = ghostent.super_damage_finished;
+        self.radsuit_finished = ghostent.radsuit_finished;
         self.show_hostile = ghostent.show_hostile;
         self.jump_flag = ghostent.jump_flag;
         self.swim_flag = ghostent.swim_flag;
@@ -2659,6 +2891,9 @@ void(entity ghostent) match_restore_ghost =
         ghostent.state = 0;
     }
     self.owner = ghostent;
+    self.clanring_ghostless = FALSE;
+    self.clanring_ghost_fails = 0;
+    self.clanring_ghost_wait = 0;
     ghostent.owner = self;
     temp = ftos(self.height);
     stuffcmd(self, strcat("color ", temp, "\n"));
@@ -2684,19 +2919,21 @@ void(entity ghostent) match_restore_ghost =
     self.style = self.style - (self.style & CLANRING_OBSERVER);//R00k bugfix
 
     if ((clanring_request != world) || (!(clanring_state & CLANRING_MATCH_PAUSED)) || (clanring_state & CLANRING_UNPAUSING) || (!teamplay))
-        return;
+        return TRUE;   // restored; only the auto-unpause vote is skipped
 
     pteam = clanring_sentinel.next_team;
     while (pteam)
     {
         if (pteam.count != self.next_team.count)
-            return;
+            return TRUE;   // restored; only the auto-unpause vote is skipped
 
         pteam = pteam.next_team;
     }
 
     if (vote_init("\bunpause the match\b", "", match_start_unpause_countdown))
         vote_yes();
+
+    return TRUE;
 };
 
 void() match_no_ring_check = 
@@ -2754,6 +2991,8 @@ float request_timelimit;
 //
 void() match_ready =
 {
+    local float ghost_result;
+
     if (clanring_state & CLANRING_MATCH_WAIT)
     {
         sprint(self, "Try again in 5 seconds\n");
@@ -2816,8 +3055,23 @@ void() match_ready =
     if (!(self.style & CLANRING_READY))
         return;
 
-    // Give the player a ghost
-    match_make_ghost ();
+    // Give the player a ghost.  Ghost exhaustion is fail-open: the player
+    // remains eligible to play, but cannot restore reconnect state.
+    ghost_result = match_make_ghost();
+    if (ghost_result == 0)
+    {
+        sprint(self, "Reconnect protection is unavailable.\n");
+        sprint(self, "You may play, but cannot restore if you disconnect.\n");
+        cprint(sprintf("WARNING: ghost code table full; %s entered without a ghost\n",
+                       self.netname));
+    }
+    else if (ghost_result == MATCH_GHOST_RESULT_NO_ADDRESS)
+    {
+        sprint(self, "Reconnect protection is unavailable on this engine.\n");
+        sprint(self, "You may play, but cannot restore if you disconnect.\n");
+        cprint(sprintf("WARNING: no client address; %s entered without a ghost\n",
+                       self.netname));
+    }
 
     self.oflags = self.oflags - (self.oflags & OBSERVER_QUAKETV);	//Sputnik
     observer_end ();
@@ -3097,11 +3351,12 @@ void() match_notready =
     announce2(self.netname, " is not ready");
     
     // He was ready but the match hadn't started, so remove his ghost
-    remove(self.owner);
+    if (self.owner)
+        remove(self.owner);
     self.owner = world;
-    
-    stuffcmd(self, "alias ghostcode echo You do not have a ghost\n");
-    stuffcmd(self, "alias ghost impulse 127\n");
+    self.clanring_ghostless = FALSE;
+
+    match_clear_ghost_aliases();
     
     match_remove_player(self);
     
@@ -4399,6 +4654,8 @@ void() match_verify_team =
 //
 void(entity player) match_disconnect_notify =
 {
+    local float has_ghost, active_player;
+
     quaketag_disconnect_notify (player);
 
     if (!(player.style & CLANRING_OBSERVER))
@@ -4416,6 +4673,8 @@ void(entity player) match_disconnect_notify =
                 match_try_start_countdown();
             }
         }
+        self.owner = world;
+        self.clanring_ghostless = FALSE;
         return;
     }
 
@@ -4424,138 +4683,142 @@ void(entity player) match_disconnect_notify =
     // Check to see if we need to stop the match
     if (clanring_state & CLANRING_MATCH_STARTED)
     {
-        // Copy his info to his ghost
-        if (!self.owner)// Sanity check added 2/6/99
-        {
+        has_ghost = (self.owner != world);
+        active_player = !(self.style & CLANRING_OBSERVER);
+
+        if (!has_ghost && !self.clanring_ghostless)
             cprint("Internal error #3.\n");
-        }
-        else
+
+        // Copy ordinary player state only when reconnect storage exists.
+        if (has_ghost && active_player)
         {
-            if (!(self.style & CLANRING_OBSERVER))
+            // copy always
+            self.owner.frags 		= self.frags;
+            self.owner.dest 		= self.dest;
+            self.owner.dest1 		= self.dest1;
+            self.owner.dest2 		= self.dest2;
+            self.owner.mangle 		= self.mangle;
+            self.owner.clanring_qdwep 		= self.clanring_qdwep;
+            self.owner.clanring_qdkill 		= self.clanring_qdkill;
+            self.owner.clanring_ptwep 		= self.clanring_ptwep;
+            self.owner.clanring_ptkill 		= self.clanring_ptkill;
+            self.owner.style 		= self.style & MATCH_GHOST_STYLE;
+            self.owner.true_kills 	= self.true_kills;
+            self.owner.pos1_x 		= self.pos1_x;
+            self.owner.pos1_y 		= self.pos1_y;
+            self.owner.pos1_z 		= self.pos1_z;
+            self.owner.pos2_y 		= self.pos2_y;
+            self.owner.pos2_z 		= self.pos2_z;
+            self.owner.captime 		= self.captime;
+            self.owner.dmg_taken	= self.dmg_taken;
+               self.owner.dmg_given	= self.dmg_given;
+            self.owner.ewep			= self.ewep;
+             self.owner.statstate 	= self.statstate;
+                       
+            self.owner.clanring_badstats = self.clanring_badstats;
+            self.owner.clanring_badstats2 = self.clanring_badstats2;
+            self.owner.clanring_badstats_bores = self.clanring_badstats_bores;
+            self.owner.clanring_badstats_spawnwalk = self.clanring_badstats_spawnwalk;
+            self.owner.clanring_badstats_telewalk = self.clanring_badstats_telewalk;
+            
+            self.owner.fpickups		= self.fpickups;
+            self.owner.fcaptures	= self.fcaptures;
+            self.owner.fdefenses	= self.fdefenses;
+            self.owner.freturns 	= self.freturns;
+            self.owner.fcassists 	= self.fcassists;
+            self.owner.fcfrags   	= self.fcfrags;
+            self.owner.captime   	= self.captime;
+        }
+
+        // Autopause is player behavior, not ghost behavior.  A ghostless
+        // player must still trigger it when disconnecting.
+        if (active_player && (clanring_playmode & CLANRING_AUTO_PAUSE))
+        {
+            match_pause();
+            if ((clanring_request != world)&&(clanring_request.classname == "match_pause"))	//Remove active request to pause
+                Request_Poll_Cleanup();
+            bprint("\bClanring autopause activated\n");
+            cprint("Clanring autopause activated\n");
+            bprint("\bType '\btimerstart\b' to restart match\n");
+            clanring_state = clanring_state | CLANRING_AUTO_PAUSED;
+            match_pause_player();
+        }
+
+        // Snapshot paused state only when reconnect storage exists.
+        if (has_ghost && active_player
+            && (clanring_state & CLANRING_MATCH_PAUSED)
+            && (self.deadflag == DEAD_NO))
+        {
+            // mark data as valid
+            self.owner.state = 1;
+            self.owner.frame = self.frame;
+            self.owner.effects = self.effects;					
+            self.owner.origin = self.origin;
+            self.owner.angles = self.angles;
+            self.owner.waterlevel = self.waterlevel;
+            self.owner.watertype = self.watertype;
+            self.owner.clanring_old_velocity = self.clanring_old_velocity;
+            self.owner.punchangle = self.punchangle;
+            self.owner.nextthink = self.nextthink + 1000000;
+            self.owner.think = self.think;
+            self.owner.health = self.health;
+            self.owner.items = self.items;
+            self.owner.items = self.items - (self.items & (IT_KEY1 | IT_KEY2));//just in case.
+            self.owner.armortype = self.armortype;
+            self.owner.armorvalue = self.armorvalue;
+            self.owner.weapon = self.weapon;
+            self.owner.weaponmodel = self.weaponmodel;
+            self.owner.weaponframe = self.weaponframe;
+            self.owner.currentammo = self.currentammo;
+            self.owner.ammo_shells = self.ammo_shells;
+            self.owner.ammo_nails = self.ammo_nails;
+            self.owner.ammo_rockets = self.ammo_rockets;
+            self.owner.ammo_cells = self.ammo_cells;
+            self.owner.flags = self.flags;
+            self.owner.walkframe = self.walkframe;
+            self.owner.attack_finished = self.attack_finished;
+            self.owner.pain_finished = self.pain_finished;
+            self.owner.air_finished = self.air_finished;
+            self.owner.invincible_finished = self.invincible_finished;
+            self.owner.invisible_finished = self.invisible_finished;
+            self.owner.super_damage_finished = self.super_damage_finished;
+            self.owner.radsuit_finished = self.radsuit_finished;
+            self.owner.show_hostile = self.show_hostile;
+            self.owner.jump_flag = self.jump_flag;
+            self.owner.swim_flag = self.swim_flag;
+            self.owner.bubble_count = self.bubble_count;
+
+            // check mega healths
+            local entity mh;
+            mh = find(world, classname, "item_health");
+            while (mh)
             {
-                // copy always
-                self.owner.frags 		= self.frags;
-                self.owner.dest 		= self.dest;
-                self.owner.dest1 		= self.dest1;
-                self.owner.dest2 		= self.dest2;
-                self.owner.mangle 		= self.mangle;
-                self.owner.clanring_qdwep 		= self.clanring_qdwep;
-                self.owner.clanring_qdkill 		= self.clanring_qdkill;
-                self.owner.clanring_ptwep 		= self.clanring_ptwep;
-                self.owner.clanring_ptkill 		= self.clanring_ptkill;
-                self.owner.clanring_hack_count 	= self.clanring_hack_count;
-                self.owner.style 		= self.style & (CLANRING_ADMINISTRATOR | CLANRING_HEADS_UP | CLANRING_SMART_WEAPON | CLANRING_AUTOSTATS);
-                self.owner.true_kills 	= self.true_kills;
-                self.owner.pos1_x 		= self.pos1_x;
-                self.owner.pos1_y 		= self.pos1_y;
-                self.owner.pos1_z 		= self.pos1_z;
-                self.owner.pos2_y 		= self.pos2_y;
-                self.owner.pos2_z 		= self.pos2_z;
-                self.owner.captime 		= self.captime;
-                self.owner.dmg_taken	= self.dmg_taken;
-                   self.owner.dmg_given	= self.dmg_given;
-                self.owner.ewep			= self.ewep;
-                 self.owner.statstate 	= self.statstate;
-                           
-                self.owner.clanring_badstats = self.clanring_badstats;
-                self.owner.clanring_badstats2 = self.clanring_badstats2;
-                self.owner.clanring_badstats_bores = self.clanring_badstats_bores;
-                self.owner.clanring_badstats_spawnwalk = self.clanring_badstats_spawnwalk;
-                self.owner.clanring_badstats_telewalk = self.clanring_badstats_telewalk;
-                
-                self.owner.fpickups		= self.fpickups;
-                self.owner.fcaptures	= self.fcaptures;
-                self.owner.fdefenses	= self.fdefenses;
-                self.owner.freturns 	= self.freturns;
-                self.owner.fcassists 	= self.fcassists;
-                self.owner.fcfrags   	= self.fcfrags;
-                self.owner.captime   	= self.captime;
-                
-                // check autopause
-                if (clanring_playmode & CLANRING_AUTO_PAUSE)
-                {
-                    match_pause();
-                    if ((clanring_request != world)&&(clanring_request.classname == "match_pause"))	//Remove active request to pause
-                        Request_Poll_Cleanup();
-                    bprint("\bClanring autopause activated\n");
-                    cprint("Clanring autopause activated\n");
-                    bprint("\bType '\btimerstart\b' to restart match\n");
-                    clanring_state = clanring_state | CLANRING_AUTO_PAUSED;
-                    match_pause_player();
-                }
-
-                // copy on pause
-                if ((clanring_state & CLANRING_MATCH_PAUSED) && (self.deadflag == DEAD_NO))
-                {
-                    // mark data as valid
-                    self.owner.state = 1;
-                    self.owner.frame = self.frame;
-                    self.owner.effects = self.effects;					
-                    self.owner.origin = self.origin;
-                    self.owner.angles = self.angles;
-                    self.owner.waterlevel = self.waterlevel;
-                    self.owner.watertype = self.watertype;
-                    self.owner.clanring_old_velocity = self.clanring_old_velocity;
-                    self.owner.punchangle = self.punchangle;
-                    self.owner.nextthink = self.nextthink + 1000000;
-                    self.owner.think = self.think;
-                    self.owner.health = self.health;
-                    self.owner.items = self.items;
-                    self.owner.items = self.items - (self.items & (IT_KEY1 | IT_KEY2));//just in case.
-                    self.owner.armortype = self.armortype;
-                    self.owner.armorvalue = self.armorvalue;
-                    self.owner.weapon = self.weapon;
-                    self.owner.weaponmodel = self.weaponmodel;
-                    self.owner.weaponframe = self.weaponframe;
-                    self.owner.currentammo = self.currentammo;
-                    self.owner.ammo_shells = self.ammo_shells;
-                    self.owner.ammo_nails = self.ammo_nails;
-                    self.owner.ammo_rockets = self.ammo_rockets;
-                    self.owner.ammo_cells = self.ammo_cells;
-                    self.owner.flags = self.flags;
-                    self.owner.walkframe = self.walkframe;
-                    self.owner.attack_finished = self.attack_finished;
-                    self.owner.pain_finished = self.pain_finished;
-                    self.owner.air_finished = self.air_finished;
-                    self.owner.invincible_finished = self.invincible_finished;
-                    self.owner.invisible_finished = self.invisible_finished;
-                    self.owner.super_damage_finished = self.super_damage_finished;
-                    self.owner.radsuit_finished = self.radsuit_finished;
-                    self.owner.invincible_time = self.invincible_finished - time; // R00k: how many seconds remain
-                    self.owner.invisible_time = self.invisible_finished - time;
-                    self.owner.super_time = self.super_damage_finished - time;
-                    self.owner.rad_time = self.radsuit_finished - time;
-                    self.owner.show_hostile = self.show_hostile;
-                    self.owner.jump_flag = self.jump_flag;
-                    self.owner.swim_flag = self.swim_flag;
-                    self.owner.bubble_count = self.bubble_count;
-
-                    // check mega healths
-                    local entity mh;
-                    mh = find(world, classname, "item_health");
-                    while (mh)
-                    {
-                        if ((mh.healtype == 2) && (mh.owner == self))
-                            mh.owner = self.owner;
-                        mh = find(mh, classname, "item_health");
-                    }
-                }
+                if ((mh.healtype == 2) && (mh.owner == self))
+                    mh.owner = self.owner;
+                mh = find(mh, classname, "item_health");
             }
         }
 
         // if he's turned himself into an observer, then get rid of his ghost
         if (self.style & CLANRING_OBSERVER)
         {
-            if (self.owner)
+            if (has_ghost)
                 remove(self.owner);
-            else	// Sanity check added 5/15/98
+            else if (!self.clanring_ghostless)
                 cprint("Internal error #1.\n");
 
-            stuffcmd(self, "alias ghostcode echo You do not have a ghost\n");
-            stuffcmd(self, "alias ghost impulse 127\n");
+            match_clear_ghost_aliases();
+        }
+        else if (has_ghost)
+        {
+            // The ghost outlives the client slot so the player can come back
+            // for it.  Mark it unclaimed rather than leaving it pointing at a
+            // slot that the next connection will reuse.
+            self.owner.owner = world;
         }
 
         self.owner = world;
+        self.clanring_ghostless = FALSE;
 
 /*R00k: removed
         // check to see if he was top 2 in individual mode
@@ -4591,17 +4854,21 @@ void(entity player) match_disconnect_notify =
     // have no ghost.  So let's return before we remove world, okay? :p
     // That's what was causing it!
     if (clanring_state & CLANRING_MATCH_WAIT)
+    {
+        self.owner = world;
+        self.clanring_ghostless = FALSE;
         return;
+    }
 
     // He was ready but the match hadn't started, so remove his ghost
     if (self.owner)
         remove(self.owner);
-    else	// Sanity check added 5/15/98
+    else if (!self.clanring_ghostless)
         cprint("Internal error #2.\n");
 
     self.owner = world;
-    stuffcmd(self, "alias ghostcode echo You do not have a ghost\n");
-    stuffcmd(self, "alias ghost impulse 127\n");
+    self.clanring_ghostless = FALSE;
+    match_clear_ghost_aliases();
 
     // Check to see if we need to stop the timer
     if ((clanring_state & CLANRING_TIMER_STARTED) && (clanring_numteams < 2))
@@ -4646,7 +4913,7 @@ void() match_list_ghosts =
         {
             sprint(self, "\b----------------+----\n");
             num = strings_ftos_gold(e.count);
-            if (e.owner.owner == e)
+            if (e.owner != world)
                 pname = e.owner.netname;
             else
                 pname = "Disconnected";

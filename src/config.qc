@@ -1500,6 +1500,7 @@ void() clanring_main_config =
 			registercvar("sv_pak0_only", "0");
 			registercvar("cr_gsheets_validated_sig", "0");
 			registercvar("cr_autotrack", "0");	// 0 = CRMod autocam scoring, 1 = KTX autotrack
+      registercvar("cr_ghost_bind_ip", "1");  // 0=off, 1=bind when available, 2=fail closed
 		exec_clanring_cfg("configs/clanring.cfg");
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.

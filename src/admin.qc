@@ -619,7 +619,7 @@ void() admin_list_ghosts =
 		num = ftos(e.count);
 		sprint3(self, " ", num, " \xFC");
 		szTeam = strings_get_teamname2 (e.height);
-				if (e.owner.owner == e)
+				if (e.owner != world)
 		frag = e.owner.frags;
 		else
 		frag = e.frags;
@@ -636,7 +636,7 @@ void() admin_list_ghosts =
 		else
 		pad = "\xFC ";
 		num = ftos(frag);
-		if (e.owner.owner == e)
+		if (e.owner != world)
 		sprint(self, szTeam, pad, num, " \xFC", e.owner.netname, "\n");
 		else
 		sprint(self, szTeam, pad, num, " \xFC Disconnected\n");
