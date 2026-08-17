@@ -309,7 +309,27 @@ entity () FindIntermission =
     if (spot)
         return spot;
 
-    objerror ("FindIntermission: no spot");
+    // DM-only maps (no info_intermission, no info_player_start) would objerror
+    // here, which removes the changelevel entity mid-think and leaves every
+    // player stuck at '0 0 0'. Fall back to any spawn point instead.
+    spot = find(world, classname, "info_player_deathmatch");
+    if (spot)
+        return spot;
+    spot = find(world, classname, "info_player_team1");
+    if (spot)
+        return spot;
+    spot = find(world, classname, "info_player_team2");
+    if (spot)
+        return spot;
+    spot = find(world, classname, "info_player_coop");
+    if (spot)
+        return spot;
+
+    dprint ("FindIntermission: no spot, using first player\n");
+    spot = find(world, classname, "player");
+    if (spot)
+        return spot;
+
     return world; //R00k added
 };
 
@@ -508,6 +528,10 @@ void() execute_changelevel =
 
     intermission_pos = FindIntermission ();
     clanring_angle = intermission_pos.mangle;
+    // Spawn-point fallbacks carry angles, not mangle. info_intermission copies
+    // mangle into angles at spawn, so this is a no-op for a real camera spot.
+    if (clanring_angle == '0 0 0')
+        clanring_angle = intermission_pos.angles;
     other = find(world, classname, "player");
     while (other != world)
     {

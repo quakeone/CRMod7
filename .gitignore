@@ -12,3 +12,7 @@ src/qc_compile_output.txt
 src/release/csprogs.dat
 src/release/progs.dat
 src/fteqcc64
+
+# Server console logs — contain the live Google Sheets script URL and API key
+# in plaintext (PF_uri_get echoes the full query string).
+qconsole.log
