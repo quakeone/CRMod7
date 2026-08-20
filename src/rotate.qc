@@ -51,6 +51,67 @@ float ROTATE_DOOR_STAYOPEN = 1;
 .string group;
 .string event;
 
+.float rotate_engine;   // controller is letting the engine spin its targets
+
+// spawnflags for rotate_object
+float ROTATE_OBJECT_SOLID = 1;
+
+float rotate_bmodel_checked;   // whether the engine has been asked about rotation
+float rotate_bmodel_spin;      // engine will turn MOVETYPE_PUSH entities itself
+float rotate_movetime;         // interval the update in progress has to cover
+
+
+//=========================
+//
+// rotate_tic
+//
+// Rotation looks smooth when its samples are evenly spaced, because the client
+// interpolates between the last two it received.  A think that comes due
+// inside the frame it runs in gets clamped to that frame, so one sample lands
+// on every frame, evenly; the old hardcoded 0.02 straddled frame boundaries
+// instead and drifted, which is what the rate wobble was.
+//
+//=========================
+
+float() rotate_tic =
+{
+   local float tick;
+
+   tick = sys_ticrate;
+   if ( ( tick <= 0 ) || ( tick > 0.01 ) )
+      {
+      tick = 0.01;   // covers any server frame rate up to 100fps
+      }
+   else if ( tick < 0.001 )
+      {
+      tick = 0.001;
+      }
+
+   return tick;
+};
+
+//=========================
+//
+// rotate_engine_spin
+//
+// QSS and FTE will turn a MOVETYPE_PUSH entity themselves once the mod asks
+// for DP_SV_ROTATINGBMODEL, advancing its angles every physics frame instead
+// of once per think.  Asking is what switches it on, so only ask when a map
+// actually spawns something that rotates.
+//
+//=========================
+
+float() rotate_engine_spin =
+{
+   if ( !rotate_bmodel_checked )
+      {
+      rotate_bmodel_checked = TRUE;
+      rotate_bmodel_spin = checkextension( "DP_SV_ROTATINGBMODEL" );
+      }
+
+   return rotate_bmodel_spin;
+};
+
 
 //=========================
 //
@@ -147,7 +208,18 @@ void() RotateTargets =
          vz = ( v_up      * org_z );
          ent.neworigin = vx + vy + vz;
          ent.neworigin = self.origin - self.oldorigin + (ent.neworigin - ent.oldorigin);
-         ent.velocity = (ent.neworigin-ent.origin)*25;
+
+         // cover the gap by the time the next update lands.  The old fixed
+         // multiplier only covered half of it against a 0.02 tick, so the clip
+         // brush trailed the brushwork it was standing in for.
+         if ( rotate_movetime > 0 )
+            {
+            ent.velocity = (ent.neworigin-ent.origin) * ( 1 / rotate_movetime );
+            }
+         else
+            {
+            ent.velocity = (ent.neworigin-ent.origin)*25;
+            }
          }
       ent = find( ent, targetname, self.target);
       }
@@ -263,12 +335,156 @@ void( float amount ) SetDamageOnTargets =
 //
 //************************************************
 
+void() movewall_blocked;
+
+//=========================
+//
+// rotate_engine_eligible
+//
+// True when every object this controller drives is a rotate_object sitting on
+// the controller's own origin: a spin in place, with no orbit for the QC to
+// walk the objects through and no movewall to drag along behind them.  That
+// is the case the engine can take over wholesale.
+//
+//=========================
+
+float() rotate_engine_eligible =
+   {
+   local entity ent;
+   local float found;
+
+   if ( self.modelindex )
+      {
+      // the controller carries brushwork of its own to turn
+      return FALSE;
+      }
+
+   ent = find( world, targetname, self.target);
+   while( ent )
+      {
+      if ( ent.rotate_type != OBJECT_ROTATE )
+         {
+         return FALSE;
+         }
+      if ( vlen( ent.oldorigin ) > 0.5 )
+         {
+         return FALSE;
+         }
+      found = TRUE;
+      ent = find( ent, targetname, self.target);
+      }
+
+   // QSS enables rotating-bmodel behavior VM-wide when this extension is
+   // queried, so do not ask until the controller is otherwise eligible.
+   if ( !found )
+      {
+      return FALSE;
+      }
+
+   return rotate_engine_spin();
+   };
+
+//=========================
+//
+// rotate_object_keepalive
+//
+// Two bits of housekeeping for an object the engine is turning.
+//
+// Pusher physics only run for the stretch between the object's ltime and its
+// next think, so an object with nothing scheduled sits still.  Stay a long
+// way ahead of it and the engine gives it a full frame every frame.  This is
+// what func_movewall's think has always been for.
+//
+// Angles the engine accumulates are never wrapped either, and a server that
+// stays on one map for hours will drift far enough out that a float stops
+// resolving a frame's worth of turn.  Wrapping is invisible - angles go over
+// the wire modulo 360 and the client takes the short way round between two
+// samples - so fold them back while we are here.
+//
+//=========================
+
+void() rotate_object_keepalive =
+   {
+   self.angles = SUB_NormalizeAngles( self.angles );
+
+   if ( self.movetype == MOVETYPE_PUSH )
+      {
+      self.nextthink = self.ltime + 10;
+      }
+   else
+      {
+      self.nextthink = time + 10;
+      }
+   };
+
+//=========================
+//
+// rotate_engine_link
+//
+// Hand the objects to the engine.  They keep the solidity rotate_object gave
+// them unless the mapper asked for collision, so this changes how the spin is
+// driven, not what it clips against.
+//
+//=========================
+
+void() rotate_engine_link =
+   {
+   local entity ent;
+
+   ent = find( world, targetname, self.target);
+   while( ent )
+      {
+      if ( ent.spawnflags & ROTATE_OBJECT_SOLID )
+         {
+         // pusher physics, so players get carried and shoved out of the way
+         ent.solid = SOLID_BSP;
+         ent.movetype = MOVETYPE_PUSH;
+         ent.blocked = movewall_blocked;
+         ent.ltime = time;
+         ent.think = rotate_object_keepalive;
+         ent.nextthink = ent.ltime + 10;
+         setorigin( ent, ent.origin );   // relink with the new solidity
+         }
+      else
+         {
+         // nothing to collide with, so the cheaper noclip physics will do:
+         // the engine turns it every frame without any pusher bookkeeping
+         ent.movetype = MOVETYPE_NOCLIP;
+         ent.think = rotate_object_keepalive;
+         ent.nextthink = time + 10;
+         }
+      ent = find( ent, targetname, self.target);
+      }
+   };
+
+//=========================
+//
+// rotate_setspin
+//
+//=========================
+
+void( float frac ) rotate_setspin =
+   {
+   local entity ent;
+   local vector avel;
+
+   avel = self.rotate * frac;
+
+   ent = find( world, targetname, self.target);
+   while( ent )
+      {
+      ent.avelocity = avel;
+      ent = find( ent, targetname, self.target);
+      }
+   };
+
 void() rotate_entity_think =
    {
    local float t;
 
    t = time - self.ltime;
    self.ltime = time;
+   rotate_movetime = t;
 
    if ( self.state == STATE_SPEEDINGUP )
       {
@@ -299,7 +515,82 @@ void() rotate_entity_think =
    self.angles = self.angles + ( self.rotate * t );
    self.angles = SUB_NormalizeAngles( self.angles );
    RotateTargets();
-   self.nextthink = time + 0.02;
+   self.nextthink = time + rotate_tic();
+   };
+
+//=========================
+//
+// rotate_entity_spin_think
+//
+// Engine-driven rotation only has to be revisited while the rate is changing.
+// Once it settles the engine carries on turning the objects by itself, so the
+// think stops rather than resampling something that no longer moves.
+//
+//=========================
+
+void() rotate_entity_spin_think =
+   {
+   local float t;
+
+   t = time - self.ltime;
+   self.ltime = time;
+
+   if ( self.state == STATE_SPEEDINGUP )
+      {
+      self.count = self.count + self.cnt * t;
+      if ( self.count >= 1 )
+         {
+         self.count = 1;
+         self.state = STATE_ACTIVE;
+         }
+      }
+   else if ( self.state == STATE_SLOWINGDOWN )
+      {
+      self.count = self.count - self.cnt * t;
+      if ( self.count <= 0 )
+         {
+         self.count = 0;
+         self.state = STATE_INACTIVE;
+         }
+      }
+   else
+      {
+      self.count = 1;
+      }
+
+   rotate_setspin( self.count );
+
+   if ( ( self.state == STATE_ACTIVE ) || ( self.state == STATE_INACTIVE ) )
+      {
+      // the objects stop where they are instead of snapping back to the
+      // controller's angles the way RotateTargetsFinal did
+      self.think = SUB_Null;
+      self.nextthink = -1;
+      return;
+      }
+
+   self.nextthink = time + rotate_tic();
+   };
+
+//=========================
+//
+// rotate_entity_start
+//
+//=========================
+
+void() rotate_entity_start =
+   {
+   if ( self.rotate_engine )
+      {
+      self.think = rotate_entity_spin_think;
+      }
+   else
+      {
+      self.think = rotate_entity_think;
+      }
+
+   self.nextthink = time + rotate_tic();
+   self.ltime = time;
    };
 
 void() rotate_entity_use =
@@ -315,19 +606,22 @@ void() rotate_entity_use =
             {
             self.count = 1;
             self.state = STATE_SLOWINGDOWN;
+            rotate_entity_start();   // the engine path stops thinking when steady
             }
          else
             {
             self.state = STATE_INACTIVE;
             self.think = SUB_Null;
+            if ( self.rotate_engine )
+               {
+               rotate_setspin( 0 );
+               }
             }
          }
       }
    else if ( self.state == STATE_INACTIVE )
       {
-      self.think = rotate_entity_think;
-      self.nextthink = time + 0.02;
-      self.ltime = time;
+      rotate_entity_start();
       if ( self.speed )
          {
          self.count = 0;
@@ -354,12 +648,17 @@ void() rotate_entity_use =
 void() rotate_entity_firstthink =
    {
    LinkRotateTargets();
+
+   self.rotate_engine = rotate_engine_eligible();
+   if ( self.rotate_engine )
+      {
+      rotate_engine_link();
+      }
+
    if ( self.spawnflags & ROTATE_ENTITY_START_ON )
       {
       self.state = STATE_ACTIVE;
-      self.think = rotate_entity_think;
-      self.nextthink = time + 0.02;
-      self.ltime = time;
+      rotate_entity_start();
       }
    else
       {
@@ -383,6 +682,14 @@ If "deathtype" is set with a string, this is the message that will appear when a
 "rotate" is the rate to rotate.
 "target" is the center of rotation.
 "speed"  is how long the entity takes to go from standing still to full speed and vice-versa.
+
+When every targeted object is a rotate_object sitting on this entity's origin -
+a spin in place, rather than objects orbiting it - the engine is left to turn
+them itself.  That advances their angles every physics frame instead of once
+per think, which is noticeably smoother, and lets rotate_object's SOLID flag
+replace the func_movewall that would otherwise clip them.  Anything else (an
+orbit, a func_movewall in the group, or brushwork on this entity itself) keeps
+the original QuakeC rotation.
 */
 
 void() func_rotate_entity =
@@ -460,6 +767,7 @@ void() rotate_train_think =
 
    t = time - self.ltime;
    self.ltime = time;
+   rotate_movetime = t;
 
    if ( ( self.endtime ) && ( time >= self.endtime ) )
       {
@@ -485,7 +793,7 @@ void() rotate_train_think =
    self.angles = SUB_NormalizeAngles( self.angles );
    RotateTargets();
 
-   self.nextthink = time + 0.02;
+   self.nextthink = time + rotate_tic();
    };
 
 void() rotate_train_use =
@@ -959,8 +1267,14 @@ void() func_movewall =
    self.ltime = time;
    };
 
-/*QUAKED rotate_object (0 .5 .8) ? X X X X X X X X NOT_ON_EASY NOT_ON_NORMAL NOT_ON_HARD_OR_NIGHTMARE NOT_IN_DEATHMATCH NOT_IN_COOP NOT_IN_SINGLEPLAYER X NOT_ON_HARD_ONLY NOT_ON_NIGHTMARE_ONLY
+/*QUAKED rotate_object (0 .5 .8) ? SOLID X X X X X X X NOT_ON_EASY NOT_ON_NORMAL NOT_ON_HARD_OR_NIGHTMARE NOT_IN_DEATHMATCH NOT_IN_COOP NOT_IN_SINGLEPLAYER X NOT_ON_HARD_ONLY NOT_ON_NIGHTMARE_ONLY
 This defines an object to be rotated.  Used as the target of func_rotate_door.
+
+SOLID gives the object real rotating collision, so it doesn't need a
+func_movewall to clip it.  It only applies when the object spins in place on
+a func_rotate_entity (see that entity's notes) and the engine supports
+DP_SV_ROTATINGBMODEL - QSS and FTE do.  Otherwise the object stays non-solid
+and a func_movewall is still needed.
 */
 void() rotate_object =
    {
@@ -1019,6 +1333,7 @@ void() rotate_door_think =
 
    t = time - self.ltime;
    self.ltime = time;
+   rotate_movetime = t;
 
    if ( time < self.endtime )
       {
@@ -1032,7 +1347,7 @@ void() rotate_door_think =
       self.think = rotate_door_think2;
       }
 
-   self.nextthink = time + 0.01;
+   self.nextthink = time + rotate_tic();
    };
 
 void() rotate_door_reversedirection =
@@ -1059,7 +1374,7 @@ void() rotate_door_reversedirection =
 
    self.rotate = ( self.dest - start ) * ( 1 / self.speed );
    self.think = rotate_door_think;
-   self.nextthink = time + 0.02;
+   self.nextthink = time + rotate_tic();
    self.endtime = time + self.speed - ( self.endtime - time );
    self.ltime = time;
    };
@@ -1118,7 +1433,7 @@ void() rotate_door_use =
 
    self.rotate = ( self.dest - start ) * ( 1 / self.speed );
    self.think = rotate_door_think;
-   self.nextthink = time + 0.01;
+   self.nextthink = time + rotate_tic();
    self.endtime = time + self.speed;
    self.ltime = time;
    };
