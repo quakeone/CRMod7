@@ -7,6 +7,7 @@
 //
 float () match_prewar;
 float () mode_is_arena;
+float() stats_weapon_carrier_kills_enabled;
 void() utils_update_server_time;
 void() utils_save_disconnect_log;
 // from strings.qc
@@ -4290,8 +4291,11 @@ void(entity ev) webhook_stats_info =
     }
     APPEND_SAFE("```\n");
 
-    // ---- K/D, damage, ewep ----
-    APPEND_SAFE("\n**K/D | dmg given, dmg taken | ewep**\n");
+    // ---- K/D, weapon-carrier kills, damage, ewep ----
+    if (stats_weapon_carrier_kills_enabled())
+        APPEND_SAFE("\n**K/D | RLk LGk | dmg given, dmg taken | ewep**\n");
+    else
+        APPEND_SAFE("\n**K/D | dmg given, dmg taken | ewep**\n");
     APPEND_SAFE("```\n");
     {
         local float k_seen, k_inc, k_obs, k_limit;
@@ -4314,10 +4318,19 @@ void(entity ev) webhook_stats_info =
             {
                 zname = strzone(utils_dequake_for_discord(p.netname));
                 tmps = strzone(sprintf("%g/%g", p.true_kills, p.mangle_z));
-                APPEND_SAFE(sprintf("%s %5s | %5g %5g | %5g\n",
-                                    strpad(name_col_w, zname), tmps,
-                                    p.dmg_given, p.dmg_taken,
-                                    p.ewep));
+                if (stats_weapon_carrier_kills_enabled())
+                {
+                    local string weapon_kills;
+                    weapon_kills = sprintf("%3g %3g", p.stats_rl_carrier_kills, p.stats_lg_carrier_kills);
+                    APPEND_SAFE(sprintf("%s %5s | %s | %5g %5g | %5g\n",
+                                        strpad(name_col_w, zname), tmps, weapon_kills,
+                                        p.dmg_given, p.dmg_taken, p.ewep));
+                }
+                else
+                    APPEND_SAFE(sprintf("%s %5s | %5g %5g | %5g\n",
+                                        strpad(name_col_w, zname), tmps,
+                                        p.dmg_given, p.dmg_taken,
+                                        p.ewep));
                 strunzone(tmps);
                 strunzone(zname);
                 k_inc += 1; lines += 1;
@@ -4328,6 +4341,8 @@ void(entity ev) webhook_stats_info =
         }
     }
     APPEND_SAFE("```\n");
+    if (stats_weapon_carrier_kills_enabled())
+        APPEND_SAFE("RLk/LGk: enemies killed carrying RL/LG; both count if carrying both.\n");
 
     if (clanring_playmode & CLANRING_HH_MODE)
     {

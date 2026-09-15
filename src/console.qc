@@ -409,15 +409,20 @@ void() console_list_ghosts =
 void() console_show_killstats =
 {
 	 entity player;
-	 float c;
+	 float c, show_weapon_kills;
 
 	c = 16;//Workaround for lagout players corrupting the link list...
+	show_weapon_kills = stats_weapon_carrier_kills_enabled();
 	
 	cprint("\"------------\"\n");
 	cprint("\" Kill Stats \"\n");
 	cprint("\"------------\"\n");
-	cprint("\" frags | enemies | self | teammates | killed | dtk | dgv |     name\"\n");
-	cprint(  "-------+---------+------+-----------+--------+-----+-----+-----------------\n");
+	cprint("\" frags | enemies |");
+	if (show_weapon_kills) cprint(" RLk | LGk |");
+	cprint(" self | teammates | killed | dtk | dgv |     name\"\n");
+	cprint("-------+---------+");
+	if (show_weapon_kills) cprint("-----+-----+");
+	cprint("------+-----------+--------+-----+-----+-----------------\n");
 
 	if (mode_is_arena())
 	{
@@ -440,6 +445,13 @@ void() console_show_killstats =
 		cprint("  |   ");
 		utils_cprint_int3(((player.true_kills + player.mangle_x) + player.mangle_y));
 		cprint("   | ");
+		if (show_weapon_kills)
+		{
+			utils_cprint_int3(player.stats_rl_carrier_kills);
+			cprint(" | ");
+			utils_cprint_int3(player.stats_lg_carrier_kills);
+			cprint(" | ");
+		}
 		utils_cprint_int3(player.mangle_x);
 		cprint("  |    ");
 		utils_cprint_int3(player.mangle_y);

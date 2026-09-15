@@ -922,6 +922,11 @@ void() json_emit_match_document =
 
                     json_kv_number("score",  p.frags);
                     json_kv_number("kills",  p.true_kills);
+                    if (stats_weapon_carrier_kills_enabled())
+                    {
+                        json_kv_number("rl_carrier_kills", p.stats_rl_carrier_kills);
+                        json_kv_number("lg_carrier_kills", p.stats_lg_carrier_kills);
+                    }
                     json_kv_number("deaths", deaths);
                     json_kv_number("kdr",    kdr_val);
 

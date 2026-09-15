@@ -3312,6 +3312,9 @@ void(entity targ, entity attacker) ClientObituary =
     local string deathstring2 = "";
     local string deathstring3 = "";
 
+    // Record before frag scoring can trigger end-of-match output.
+    stats_record_weapon_carrier_kill(targ, attacker);
+
     rnum = random ();
     if (targ.classname == "player")
     {

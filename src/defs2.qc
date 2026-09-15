@@ -670,6 +670,8 @@ float	clanring_afk_timeout;
 .float stats_defense_weapon;        //
 .float stats_defense_armor;         //
 .float stats_discharge_kills;       //
+.float stats_rl_carrier_kills;      // enemy kills while victim carried an RL
+.float stats_lg_carrier_kills;      // enemy kills while victim carried an LG
 .float stats_gl_frac;               //
 .float stats_gl_tot;                //
 .float enemy_hurt_time;				// timestamp of when you last hurt an opponent.
