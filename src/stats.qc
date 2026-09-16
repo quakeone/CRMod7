@@ -169,6 +169,8 @@ void() stats_reset_player =
 	self.fctime = 0;
 	self.captime = 1200;//default time = matchtime;
 	self.true_kills = 0;
+	self.stats_rl_carrier_kills = 0;
+	self.stats_lg_carrier_kills = 0;
 	self.direct_hit = 0;
 	self.killed = FALSE;
 	self.stats_item_ssg = 0;
@@ -434,18 +436,53 @@ void() stats_show_pentstats =
 	sprint(self, "\n");
 };
 
+// Weapon-carrier kills describe weapon control when weaponstay is off.
+float() stats_weapon_carrier_kills_enabled =
+{
+	return deathmatch == 1 && !mode_is_arena() &&
+	       !(clanring_playmode & CLANRING_PRACTICE_MODE);
+};
+
+void(entity targ, entity attacker) stats_record_weapon_carrier_kill =
+{
+	if (!stats_weapon_carrier_kills_enabled() || match_prewar() ||
+	    gameover || intermission_running ||
+	    (clanring_state & (CLANRING_MATCH_OVER | CLANRING_MATCH_PAUSED)))
+		return;
+
+	// Telefrag damage is attributed to a temporary entity owned by the killer.
+	if (attacker.classname == "teledeath" || attacker.classname == "teledeath3")
+		attacker = attacker.owner;
+
+	if (targ.classname != "player" || attacker.classname != "player" ||
+	    targ == attacker || (teamplay && targ.team == attacker.team))
+		return;
+
+	// Count inventory at death, including weapons that were not selected.
+	// Carrying both weapons contributes to both counters.
+	if (targ.items & IT_ROCKET_LAUNCHER)
+		attacker.stats_rl_carrier_kills += 1;
+	if (targ.items & IT_LIGHTNING)
+		attacker.stats_lg_carrier_kills += 1;
+};
+
 void() stats_show_killstats =
 {
 	local entity player;
-	local float c;
+	local float c, show_weapon_kills;
 
 	c = 16;//Workaround for lag-out players corrupting the link list...
+	show_weapon_kills = stats_weapon_carrier_kills_enabled();
 
 	sprint(self, "\n");
 	sprint(self, "\bkills\b\n");
 	sprint(self, "\n");
-	sprint(self, "frags\xFCopp\xFCavng\xFCslf\xFCtm \xFCkld\xFC dc\xFC dtk \xFC dgv \xFC ewp \xFC     name\n");
-	sprint(self, "\b-----+---+----+---+---+---+---+-----+-----+-----+---------------\n");
+	sprint(self, "frags\xFCopp\xFC");
+	if (show_weapon_kills) sprint(self, "RLk\xFCLGk\xFC");
+	sprint(self, "avng\xFCslf\xFCtm \xFCkld\xFC dc\xFC dtk \xFC dgv \xFC ewp \xFC     name\n");
+	sprint(self, "\b-----+---+");
+	if (show_weapon_kills) sprint(self, "\b---+---+");
+	sprint(self, "\b----+---+---+---+---+-----+-----+-----+---------------\n");
 	
 	player = clanring_sentinel.next_player;
 
@@ -467,6 +504,13 @@ void() stats_show_killstats =
 		}
 		utils_print_int3(player.true_kills);
 		sprint(self, "\xFC");
+		if (show_weapon_kills)
+		{
+			utils_print_int3(player.stats_rl_carrier_kills);
+			sprint(self, "\xFC");
+			utils_print_int3(player.stats_lg_carrier_kills);
+			sprint(self, "\xFC");
+		}
 		sprint(self, sprintf("%4g",player.stats_avenge_teammate));
 		sprint(self, "\xFC");
 		utils_print_int3(player.mangle_x);
@@ -1856,6 +1900,8 @@ void () stats_help =
 	sprint(self, " kills\n");
 	sprint(self, "\n");
 	sprint(self, " \bopp\b  opponents killed\n");
+	sprint(self, " \bRLk\b  enemies killed carrying a rocket launcher\n");
+	sprint(self, " \bLGk\b  enemies killed carrying a lightning gun\n");
 	sprint(self, " \bslf\b  times killed self\n");
 	sprint(self, " \btm\b   teammates killed\n");
 	sprint(self, " \bkld\b  times killed by an enemy\n");
