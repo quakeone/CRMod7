@@ -205,6 +205,7 @@ void () clanring_precache_matchsounds;
 void () ra_apply_worldspawn_gravity;
 void () votables_disable_item;
 void () SUB_regen;
+void () powerup_touch;
 float() QuadControl_CountSpawners;
 void (float value) clanring_set_teamplay;
 void (float value) clanring_set_fraglimit;
@@ -388,6 +389,14 @@ void(float ghost) G1v1_UpdateQuadAlpha =
     e = find(world, classname, "item_artifact_super_damage");
     while (e)
     {
+        // An explicit quadoff hides the item outside a duel. Restore its FFA
+        // ghost on reentry; g1v1_quad_ghosted still blocks powerup_touch.
+        if (ghost && InDMNormalMode() && e.touch == powerup_touch && e.model == "")
+        {
+            e.model = e.mdl;
+            e.solid = SOLID_TRIGGER;
+            setorigin(e, e.origin);
+        }
         ffa_item_update_alpha(e);
         e = find(e, classname, "item_artifact_super_damage");
     }
@@ -445,13 +454,13 @@ void() AutoGhostQuad_Refresh =
             g1v1_in_effect     = TRUE;
             g1v1_saved_no_quad = (clanring_playmode & CLANRING_NO_QUAD) != 0;
 
-            if (!(clanring_playmode & CLANRING_NO_QUAD))
+            if (!g1v1_quad_override && !(clanring_playmode & CLANRING_NO_QUAD))
             {
                 clanring_playmode = clanring_playmode | CLANRING_NO_QUAD; // default OFF in 1v1
                 utils_set_cvar("samelevel", clanring_playmode);
             }
-            g1v1_quad_ghosted = TRUE; // ghost in FFA, hide in matches
-            G1v1_UpdateQuadAlpha(TRUE);
+            g1v1_quad_ghosted = (clanring_playmode & CLANRING_NO_QUAD) != 0;
+            G1v1_UpdateQuadAlpha(g1v1_quad_ghosted);
         }
         else
         {
@@ -469,14 +478,17 @@ void() AutoGhostQuad_Refresh =
         g1v1_quad_ghosted = FALSE;
         G1v1_UpdateQuadAlpha(FALSE);
 
-        // Restore pre-1v1 setquad state and physically sync items to that
+        // Explicit choices survive leaving/reentering the duel roster too.
+        if (g1v1_quad_override)
+            g1v1_saved_no_quad = (clanring_playmode & CLANRING_NO_QUAD) != 0;
+
+        // Restore pre-1v1 setquad state only when no explicit choice replaced it.
         if (g1v1_saved_no_quad)
         {
-            // was OFF before 1v1
+            // Remove any FFA ghost now that the 1v1 pickup guard is gone.
+            utils_do_item(votables_disable_item, "item_artifact_super_damage");
             if (!(clanring_playmode & CLANRING_NO_QUAD))
             {
-                // use standard path: disable removes/pauses items
-                utils_do_item(votables_disable_item, "item_artifact_super_damage");
                 clanring_playmode = clanring_playmode | CLANRING_NO_QUAD;
                 bprint("Quad disabled\n");
                 utils_set_cvar("samelevel", clanring_playmode);

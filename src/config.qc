@@ -196,6 +196,7 @@ void(string command, string value) config_command =
 		case "quadon":
 		{
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;
+			g1v1_quad_override = TRUE; // also honor an already-enabled explicit choice
 			if (clanring_playmode & CLANRING_NO_QUAD)
 				votables_set_quad ();
 			break;
@@ -203,6 +204,7 @@ void(string command, string value) config_command =
 		case "quadoff":
 		{
 			if (clanring_state & CLANRING_IGNORE_CONSOLE) return;
+			g1v1_quad_override = TRUE;
 			if (!(clanring_playmode & CLANRING_NO_QUAD))
 				votables_set_quad ();
 			break;
@@ -1689,6 +1691,8 @@ void() clanring_main_config =
 			registercvar("cr_autotrack", "0");	// 0 = CRMod autocam scoring, 1 = KTX autotrack
       registercvar("cr_ghost_bind_ip", "1");  // 0=off, 1=bind when available, 2=fail closed
 		exec_clanring_cfg("configs/clanring.cfg");
+	// Global settings are defaults. Map configs and subsequent commands override them.
+	g1v1_quad_override = FALSE;
 	config_command("-done-", ""); //finalize settings
 	localcmd("sv_aim 1\n");	//forced, no vertical aim assist.
 }

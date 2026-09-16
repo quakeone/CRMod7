@@ -1812,12 +1812,14 @@ void(float command) console_command =
 		}
 		case 25:
 		{
+			g1v1_quad_override = TRUE; // explicit even when the bit already matches
 			if (clanring_playmode & CLANRING_NO_QUAD)
 				votables_set_quad ();
 			break;
 		}
-		case 26:		
+		case 26:
 		{
+			g1v1_quad_override = TRUE; // explicit even when the bit already matches
 			if (!(clanring_playmode & CLANRING_NO_QUAD))
 				votables_set_quad ();
 			break;

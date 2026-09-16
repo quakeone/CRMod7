@@ -2225,6 +2225,8 @@ void () votables_disable_item =
 //
 void () votables_set_quad =
 {
+    // Only an accepted vote/admin/console change reaches this setter.
+    g1v1_quad_override = TRUE;
     // Override the automatic 1v1 default. FFA ghosts disabled Quad; matches hide it.
     if (g1v1_in_effect)
     {
