@@ -41,6 +41,7 @@ void () UnHookPlayer;
 void (entity player, float reset) TeamCaptureDropFlagOfPlayer;
 void () respawn;
 void () DropRune;
+void () powerup_drop;
 void () Request_Poll_Recount;
 
 //
@@ -718,6 +719,24 @@ void () observer_demo_start =
 			centerprint(self,sprintf("eyecam \[%s\]", self.movetarget.netname));
 		self.laststattime = time + 2;//Delay the flagstatus bar for 2 seconds.			
 	}
+};
+
+//
+//  D R O P  P O W E R U P S
+//
+//  A live player who chooses to spectate leaves their powerups behind
+//  when powerup dropping is enabled. Call before observer_start().
+//
+void () observer_drop_powerups =
+{
+	if (!(clanring_gameconfig & CLANRING_POWERUP_DROP))
+		return;
+	if (self.style & CLANRING_OBSERVER)
+		return;
+	if ((self.deadflag != DEAD_NO) || (self.health <= 0))
+		return;	// PlayerDie already dropped them
+
+	powerup_drop();
 };
 
 //
@@ -1937,6 +1956,7 @@ void (float response) observer_confirm_leave_response =
 	if (response)
 	{
 		bprint(sprintf("%s became an \bobserver\b.\n", self.netname));
+		observer_drop_powerups ();
 		observer_start ();
 	}
 	else
@@ -2019,7 +2039,10 @@ void () observer_impulse =
 				((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head && self.hh_eyecam_target != world))
                 observer_confirm();
             else
+            {
+                observer_drop_powerups();
                 observer_start();
+            }
         }
         else if (self.impulse >= 147 && self.impulse != 156)
             sprint(self, "You must be an observer first\n");

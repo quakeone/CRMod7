@@ -4364,7 +4364,10 @@ void(string cmd) SV_ParseClientCommand =
                     ((clanring_playmode & CLANRING_HH_MODE) && self.hh_is_head && self.hh_eyecam_target != world))
                     observer_confirm();
                 else
-                    observer_start();    
+                {
+                    observer_drop_powerups();
+                    observer_start();
+                }
             }
             return;
         

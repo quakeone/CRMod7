@@ -1,4 +1,5 @@
 void () observer_start;
+void () observer_drop_powerups;
 void () observer_end;
 void () clanring_load_matchsounds;
 void () stats_final_summary;
@@ -997,6 +998,7 @@ void (float response) arena_observer_confirm_leave_response =
 	{
 		if (self.next_team != world)
 		{
+			observer_drop_powerups();
 			RemoveFromTeam();
 			observer_start();
 		}
