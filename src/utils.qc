@@ -782,14 +782,13 @@ void () afk_name =
 	m = max(0, floor(t / 60));
 	tm = ftos(m);
 
-	// Show elapsed time even when another status (ready/dead) also applies.
+	// Keep the suffix short enough for the scoreboard status column:
+	// ready players show "Ready AFK" without a timer, dead is never shown.
 	text = "\bAFK\b";
+
 	if ((self.style & CLANRING_READY) && (!(clanring_state & CLANRING_MATCH_STARTED)) && (!(clanring_state & CLANRING_MATCH_OVER)))
 		text = "\bReady AFK\b";
-	else if (self.health < 1)
-		text = "\bdead\b \bAFK\b";
-
-	if (m < 1)
+	else if (m < 1)
 		text = strcat(text, " brb");
 	else
 	{
