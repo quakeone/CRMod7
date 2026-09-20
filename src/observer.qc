@@ -765,6 +765,7 @@ void () observer_start =
 	}
 
 	self.style = self.style | CLANRING_OBSERVER;
+	self.ready_reminder_checks = 0;
 	team_info_reset_receiver_state();
 	self.hud_last_sig_ctf = -1;
 	self.hud_last_sig_observer = -1;

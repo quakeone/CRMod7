@@ -680,6 +680,7 @@ float	clanring_afk_timeout;
 .float stats_gl_tot;                //
 .float enemy_hurt_time;				// timestamp of when you last hurt an opponent.
 .float ready_check_time;			// timestamp of when player last used ready? command
+.float ready_reminder_checks;       // consecutive ready? checks as the sole unready player
 
 float stats_timelimit;
 float stats_matchtype;

@@ -491,6 +491,7 @@ void() match_init_player =
 //
 void() match_unready_player =
 {
+    self.ready_reminder_checks = 0;
     self.style = self.style - (self.style & CLANRING_READY);
     self.owner = world;
     self.clanring_ghostless = FALSE;
@@ -2999,6 +3000,7 @@ void() match_ready =
     }
 
     self.style = self.style | CLANRING_READY;
+    self.ready_reminder_checks = 0;
     
     if (!(clanring_state & CLANRING_MATCH_STARTED))
     {
@@ -3885,8 +3887,40 @@ void() match_show_not_ready =
     
     // Update the timestamp
     self.ready_check_time = time;
-    
-    if (match_all_ready())
+
+    local entity player, unready_player = world;
+    local float unready_count = 0, ready_count = 0;
+    for (player = world; (player = find(player, classname, "player")); )
+    {
+        if (!(player.style & CLANRING_CONNECTED) || (player.style & CLANRING_OBSERVER))
+            continue;
+        if (player.style & CLANRING_READY)
+            ready_count += 1;
+        else
+        {
+            unready_count += 1;
+            unready_player = player;
+        }
+    }
+
+    // Count accepted queries from all callers. Notify once per uninterrupted
+    // run with the same lone unready player and at least one ready player.
+    for (player = world; (player = find(player, classname, "player")); )
+    {
+        if (unready_count != 1 || ready_count == 0 || player != unready_player)
+            player.ready_reminder_checks = 0;
+        else if (player.ready_reminder_checks < 3)
+        {
+            player.ready_reminder_checks += 1;
+            if (player.ready_reminder_checks == 3)
+            {
+                sprint(player, "Friendly reminder: everyone else is ready and waiting for you. Type ready when you're set, or observer to sit this one out.\n");
+                centerprint(player, "Everyone else is ready!\nWe're waiting for you to start.\n\nType ready when you're set,\nor observer to sit this one out.\n");
+            }
+        }
+    }
+
+    if (unready_count == 0)
     {
         if (!clanring_numteams)
             sprint3(self, "No ", clanring_szteam, "s present\n");
@@ -3899,10 +3933,9 @@ void() match_show_not_ready =
     }
     else
     {
-        local entity player;
         bprint("The following players are \bnot\b ready:\n");
         player = find(world, classname, "player");
-while (player)
+        while (player)
         {
             if (!(player.style & (CLANRING_OBSERVER | CLANRING_READY)) && (player.style & CLANRING_CONNECTED))
             {
