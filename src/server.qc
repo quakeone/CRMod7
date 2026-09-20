@@ -734,6 +734,7 @@ void () clanring_init_world =
     registercvar("cr_ffa_start_delay", "3");
     registercvar("cr_ffa_item_alpha", "0.5");
     registercvar("cr_ffa_item_alpha_time", "5");
+    registercvar("cr_vote_duration", "20");
     registercvar("cr_vote_unique_ip", "1");
     registercvar("cr_vote_unique_ip_exempt_private", "0");
     registercvar("cr_vote_unique_ip_admin_exempt", "1");

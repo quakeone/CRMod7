@@ -21,6 +21,7 @@
 */
 
 float VOTE_IN_PROGRESS_SPAM_COOLDOWN = 3; // seconds
+.float vote_expires_at; // Deadline captured when a live yes/no vote starts.
 
 void() Request_Poll_Cleanup =
 {
@@ -220,9 +221,9 @@ void() Request_Poll_Announce =
 		return;
 	}
 
-	self.health -= 10;
+	local float remaining = self.vote_expires_at - time;
 	
-	if (self.health <= 0)
+	if (remaining <= 0)
 	{
 		self.nextthink = -99;
 		self.think = SUB_Null;
@@ -280,10 +281,10 @@ void() Request_Poll_Announce =
 			bprint("\n Type \byes\b or \bno\b in console to cast your vote.\n\n");
 		}
 
-		if (self.health < 40)	// 30, 20, 10
-			bprint(sprintf(" request expires in %s seconds.\n", strings_ftos_gold(self.health)));
+		if (remaining < 40)
+			bprint(sprintf(" request expires in %s seconds.\n", strings_ftos_gold(ceil(remaining))));
 
-		self.nextthink = time + 10;
+		self.nextthink = min(time + 10, self.vote_expires_at);
 		self.think = Request_Poll_Announce;	// Doubt we have to refresh this but...
 	}
 };
@@ -320,14 +321,18 @@ float (string captiona, string captionb, void() passfunc, string pollname = "") 
 		return FALSE;
 	}
 	
+	local float duration = cvar("cr_vote_duration");
+	if (duration <= 0)
+		duration = 20;
+
 	clanring_request = spawn();
 	clanring_request.owner = self;
 	clanring_request.noise1 = strzone(captiona);
 	clanring_request.noise2 = strzone(captionb);
 	clanring_request.classname = pollname;			// We can use the classname to determine criteria for certain requests.
-	clanring_request.nextthink = time + 10;			// Announce the request every 10 seconds.
+	clanring_request.vote_expires_at = time + duration;
+	clanring_request.nextthink = min(time + 10, clanring_request.vote_expires_at);
 	clanring_request.think = Request_Poll_Announce;
-	clanring_request.health = 20;					// This will be the time-limit for how long to wait for everyone to cast a vote.
 	clanring_request.touch = passfunc;				// Call this function if the poll is positive
 
 	// Safety: clear any stale ballots from prior polls before first announce
