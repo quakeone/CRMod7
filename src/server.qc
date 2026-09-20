@@ -3465,19 +3465,30 @@ void () clanring_periodic_checks =
         {
             if (!(self.movetarget))
             {
-                self.movetarget = observer_find_camera(world);// see if we can find a camera
-                if (self.movetarget)
+                // AutoPOV can temporarily fall back to fly/walk while players
+                // reconnect. Restore the selected view once a target exists.
+                if (self.oflags & OBSERVER_AUTO_POV)
                 {
-                    self.oflags = self.oflags | OBSERVER_GO_AUTO;
-                    observer_camera_start();
+                    self.movetarget = observer_find_target(world);
+                    if (self.movetarget)
+                        auto_pov_start();
                 }
                 else
-                                {
-                    self.movetarget = observer_find_target(world);// see if we can find a player
+                {
+                    self.movetarget = observer_find_camera(world);// see if we can find a camera
                     if (self.movetarget)
                     {
                         self.oflags = self.oflags | OBSERVER_GO_AUTO;
-                        observer_chase_start();
+                        observer_camera_start();
+                    }
+                    else
+                    {
+                        self.movetarget = observer_find_target(world);// see if we can find a player
+                        if (self.movetarget)
+                        {
+                            self.oflags = self.oflags | OBSERVER_GO_AUTO;
+                            observer_chase_start();
+                        }
                     }
                 }
             }

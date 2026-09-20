@@ -59,6 +59,9 @@ float clanring_allow_q14ever;  // 0 = disabled, 1 = enabled (special 14-mode)
 float OBSERVER_COMMENTARY       = 256;          // see running commentary
 float OBSERVER_POP_FORWARD    	= 512;
 float OBSERVER_QUAKETV 			= 2048;		    // Sputnik: added this for streaming via quaketv
+// Preferred automatic view, retained through walk/fly fallback and saved in parm12.
+// Only used while OBSERVER_QUAKETV is enabled.
+float OBSERVER_AUTO_POV          = 4096;
 
 /*
 // CRMOD qsmack variables

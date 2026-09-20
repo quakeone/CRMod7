@@ -629,6 +629,7 @@ void() auto_schedule_cameras =
 //
 void() auto_camera_start =
 {
+	self.oflags = self.oflags - (self.oflags & OBSERVER_AUTO_POV);
 	self.oflags = self.oflags | OBSERVER_QUAKETV;//R00k added OBSERVER_QUAKETV
 	self.oflags = self.oflags | OBSERVER_GO_AUTO;
 	observer_camera_start ();
@@ -641,6 +642,7 @@ void() auto_camera_start =
 //  start autochase from anywhere
 void() auto_chase_start =
 {
+	self.oflags = self.oflags - (self.oflags & OBSERVER_AUTO_POV);
 	self.oflags = self.oflags | OBSERVER_QUAKETV;//R00k added OBSERVER_QUAKETV
 	self.oflags = self.oflags | OBSERVER_GO_AUTO;
 	observer_chase_start ();
@@ -653,6 +655,7 @@ void() auto_chase_start =
 //  start autoeyecam from anywhere
 void() auto_pov_start =
 {
+	self.oflags = self.oflags | OBSERVER_AUTO_POV;
 	self.oflags = self.oflags | OBSERVER_QUAKETV;//R00k added OBSERVER_QUAKETV
 	self.oflags = self.oflags | OBSERVER_GO_AUTO;
 	observer_demo_start ();
