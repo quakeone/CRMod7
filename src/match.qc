@@ -3276,9 +3276,18 @@ void(entity pteam) match_remove_team =
 {
     local entity plast;
 
+    // world.count reads as 0, so callers can pass world for a teamless player;
+    // removing world or walking past the list end is a fatal QC error.
+    if (pteam == world)
+        return;
+
     plast = clanring_sentinel;
     while (plast.next_team != pteam) // find previous team in list
+    {
         plast = plast.next_team;
+        if (!plast)
+            return;  // team isn't in the list
+    }
     plast.next_team = pteam.next_team;  // fix list
     pqc_erase_team(pteam.height);
     // If first/second place still pointed at the team we're about to free,

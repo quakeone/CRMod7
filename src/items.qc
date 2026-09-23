@@ -2461,7 +2461,7 @@ void() DropBackpack =
 	{
 		item.netname = "Rocket Launcher";
 		// ELOHIM_MOD - quaketv code
-		if (other.next_team != world)
+		if (self.next_team != world)
 		{
 			self.next_team.mangle_z = self.next_team.mangle_z + 1; // stats
 		}

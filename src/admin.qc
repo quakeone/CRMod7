@@ -1214,6 +1214,12 @@ void() admin_auto_screenshot =
 	}
 	if ((self.style & CLANRING_OBSERVER) && (self.oflags & OBSERVER_DEMO))
 	{	// single player screenshot
+		// stuffcmd to a non-client (eyecam with no target) is a fatal QC error.
+		if (self.movetarget.classname != "player")
+		{
+			sprint(self, "No eyecam target\n");
+			return;
+		}
 		if ((clanring_state & CLANRING_MATCH_STARTED) && (self.movetarget.style & CLANRING_GLQUAKE))
 		{
 			sprint2(self, self.movetarget.netname, " is using GL Quake!\n");

@@ -154,6 +154,9 @@ void () quaketv_check_control =
 //
 void (entity player) quaketv_obtained_rl = 
 {
+	if (player.next_team == world)	// teamless player: would assign to world entity
+		return;
+
 	if (teamplay && (clanring_playmode & CLANRING_MATCH_MODE))
 	{
 		player.next_team.ammo_rockets = player.next_team.ammo_rockets + 1;
@@ -190,6 +193,9 @@ void (entity player) quaketv_obtained_rl =
 void (entity player) quaketv_lost_rl_bookkeeping =
 {
 	if (match_prewar())	//R00k: fix assignment to world entity when someone type kill in prewar
+		return;
+
+	if (player.next_team == world)
 		return;
 
 	if (teamplay && (clanring_playmode & CLANRING_MATCH_MODE))
