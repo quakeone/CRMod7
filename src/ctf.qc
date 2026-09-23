@@ -246,6 +246,15 @@ float(float team) ctf_match_get_top_record =
 	return FALSE;
 };
 
+// Publish a flag's state ("at base", "dropped", "carried") to serverinfo.
+void(entity flg, string status) ctf_set_flag_infokey =
+{
+	if (flg.team == RED)
+		forceinfokey(world, "red flag", status);
+	else
+		forceinfokey(world, "blue flag", status);
+};
+
 void(entity flg) RegenFlag =
 {
 	if (flg == world) return;
@@ -272,10 +281,7 @@ void(entity flg) RegenFlag =
 	flg.angles    	= flg.mangle;
 	flg.cnt       	= FLAG_AT_BASE; 
 
-	if ((flg.team == RED))
-		forceinfokey (world, "red flag","at base");
-	else
-		forceinfokey (world, "blue flag","at base");
+	ctf_set_flag_infokey(flg, "at base");
 
 	if (flg.owner != world)
 		flg.owner.items = flg.owner.items - (flg.owner.items & (IT_KEY1 | IT_KEY2));
@@ -400,10 +406,7 @@ void(entity flg) TeamDropFlag =
 	flg.solid      	= SOLID_TRIGGER;
 	flg.movetype   	= MOVETYPE_TOSS;
 
-	if ((flg.team == RED))
-		forceinfokey (world, "red flag","dropped");
-	else
-		forceinfokey (world, "blue flag","dropped");
+	ctf_set_flag_infokey(flg, "dropped");
 
 	clanring_play_compat_sound(flg, CHAN_AUTO, "misc/basekey.wav", "misc/medkey.wav", 1, ATTN_NONE);
 	
@@ -853,10 +856,7 @@ void() TeamCaptureFlagTouch =
 	self.owner		= other;
 	self.effects |= EF_NOMODELFLAGS;
 
-	if ((self.team == RED))
-		forceinfokey (world, "red flag","carried");
-	else
-		forceinfokey (world, "blue flag","carried");
+	ctf_set_flag_infokey(self, "carried");
 
 
 	if (!(clanring_playmode & CLANRING_MATCH_MODE))
@@ -1162,10 +1162,7 @@ void() place_flag =
 		return;
 	}	
 
-	if ((self.team == RED))
-		forceinfokey (world, "red flag","at base");
-	else
-		forceinfokey (world, "blue flag","at base");
+	ctf_set_flag_infokey(self, "at base");
 
 	self.oldorigin = self.origin;//base position
 };
@@ -1183,7 +1180,7 @@ void() item_flag_team1 =
 	self.owner     = world;		
 	self.effects   = self.effects | EF_RED;
 
-	forceinfokey (world, "red flag","at base");
+	ctf_set_flag_infokey(self, "at base");
 	
 	if (clanring_use_custom_ctf_flag_assets())
 	{
@@ -1238,7 +1235,7 @@ void() item_flag_team2 =
     self.owner     = world;	        
 	self.effects   = self.effects | EF_BLUE;
 
-	forceinfokey (world, "blue flag","at base");
+	ctf_set_flag_infokey(self, "at base");
 	
 	if (clanring_use_custom_ctf_flag_assets())
 	{		

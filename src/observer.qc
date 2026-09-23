@@ -140,11 +140,7 @@ void () observer_clear_players_infokeys =
 	while (player)
 	{		
 		if (player.style & CLANRING_CONNECTED)
-		{
-			forceinfokey(player, "observing", "off");
-			forceinfokey(player, "*observer", "off");
-			forceinfokey(player, "observer", "off");	
-		}
+			utils_set_observer_infokeys(player, "off", "off");
 		player = find(player, classname, "player");
 	}	
 };
@@ -156,57 +152,30 @@ void () observer_clear_players_infokeys =
 //
 void (entity player) observer_update_player_observer_key =
 {
-	if (!(self.style & CLANRING_OBSERVER))
+	local string mode;
+
+	if (!(player.style & CLANRING_OBSERVER))
 	{
 		if (player.style & CLANRING_CONNECTED)
-		{
-			forceinfokey(player, "observing", "off");
-			forceinfokey(player, "*observer", "off");
-			forceinfokey(player, "observer", "off");	
-		}
+			utils_set_observer_infokeys(player, "off", "off");
 		print("observer_update_player_observer_key: not an observer\n");
 		return;
 	}
 
 	if (player.oflags & OBSERVER_WALK)
-	{
-		forceinfokey(player, "*observer", "walk");
-		forceinfokey(player, "observer", "walk");
-	}
+		mode = "walk";
 	else if (player.oflags & OBSERVER_FLY)
-	{
-		forceinfokey(player, "*observer", "fly");
-		forceinfokey(player, "observer", "fly");
-	}
+		mode = "fly";
 	else if (player.oflags & OBSERVER_CHASE)
-	{
-		forceinfokey(player, "*observer", "chase");
-		forceinfokey(player, "observer", "chase");
-	}
+		mode = "chase";
 	else if (player.oflags & OBSERVER_DEMO)
-	{
-		forceinfokey(player, "*observer", "eyecam");
-		forceinfokey(player, "observer", "eyecam");
-	}
+		mode = "eyecam";
 	else if (player.oflags & OBSERVER_CAMERA)
-	{
-		forceinfokey(player, "*observer", "camera");
-		forceinfokey(player, "observer", "camera");
-	}
+		mode = "camera";
 	else
-	{
-		forceinfokey(player, "*observer", "off");
-		forceinfokey(player, "observer", "off");
-	}
+		mode = "off";
 
-	if (player.movetarget)
-	{
-		forceinfokey(player, "observing", player.movetarget.netname);
-	}
-	else
-	{
-		forceinfokey(player, "observing", "off");
-	}
+	utils_set_observer_infokeys(player, mode, (player.movetarget ? player.movetarget.netname : "off"));
 }
 //
 //  C L E A R  F L A G S
@@ -1008,9 +977,7 @@ void() observer_end =
 //	stuffcmd(self, "v_centerspeed 500\n");
 
 //Force these off now...
-	forceinfokey(self, "observer" , "off"); // woods
-	forceinfokey(self, "*observer", "off");
-	forceinfokey(self, "observing", "off");
+	utils_set_observer_infokeys(self, "off", "off"); // woods
 
 	if (self.style & CLANRING_HEADS_UP)
 		stuffcmd(self, "viewsize 100\n");

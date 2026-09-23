@@ -88,6 +88,12 @@ float() hh_loose_head_lifetime =
 	return 20;
 };
 
+void(entity player) hh_clear_head_infokeys =
+{
+	forceinfokey(player, "heads", "0");
+	forceinfokey(player, "headvalue", "0");
+};
+
 void(entity holder) hh_broadcast_head_total =
 {
 	if ((holder == world) || (holder.classname != "player"))
@@ -1308,16 +1314,12 @@ void(entity player, entity target) hh_set_eyecam =
 	if (target != world)
 	{
 		WriteEntity(MSG_ONE, target);
-		forceinfokey(player, "*observer", "eyecam");
-		forceinfokey(player, "observer", "eyecam");
-		forceinfokey(player, "observing", target.netname);
+		utils_set_observer_infokeys(player, "eyecam", target.netname);
 	}
 	else
 	{
 		WriteEntity(MSG_ONE, player);
-		forceinfokey(player, "*observer", "off");
-		forceinfokey(player, "observer", "off");
-		forceinfokey(player, "observing", "off");
+		utils_set_observer_infokeys(player, "off", "off");
 	}
 };
 
@@ -1761,8 +1763,7 @@ void(entity dst, entity src, float record_handler) hh_transfer_all_heads =
 
 	if (src.classname == "player")
 	{
-		forceinfokey(src, "heads", "0");
-		forceinfokey(src, "headvalue", "0");
+		hh_clear_head_infokeys(src);
 	}
 
 	while (head != world)
@@ -1792,8 +1793,7 @@ void(entity holder) hh_destroy_holder_heads =
 
 	if (holder.classname == "player")
 	{
-		forceinfokey(holder, "heads", "0");
-		forceinfokey(holder, "headvalue", "0");
+		hh_clear_head_infokeys(holder);
 	}
 
 	while (head != world)
@@ -1857,8 +1857,7 @@ void(entity holder, vector spawn_origin, float damage) hh_release_holder_heads =
 
 	if (holder.classname == "player")
 	{
-		forceinfokey(holder, "heads", "0");
-		forceinfokey(holder, "headvalue", "0");
+		hh_clear_head_infokeys(holder);
 	}
 
 	while (head != world)
@@ -2057,8 +2056,7 @@ void() hh_altar_touch =
 		other.hh_head_list = world;
 		other.ammo_heads = 0;
 		other.hh_head_total_value = 0;
-		forceinfokey(other, "heads", "0");
-		forceinfokey(other, "headvalue", "0");
+		hh_clear_head_infokeys(other);
 
 		while (head != world)
 		{
@@ -2077,8 +2075,7 @@ void() hh_altar_touch =
 		other.hh_head_list = world;
 		other.ammo_heads = 0;
 		other.hh_head_total_value = 0;
-		forceinfokey(other, "heads", "0");
-		forceinfokey(other, "headvalue", "0");
+		hh_clear_head_infokeys(other);
 		score = hh_score_value(recovered);
 		hh_award_player_frag(other, score);
 

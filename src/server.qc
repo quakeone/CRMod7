@@ -3448,20 +3448,9 @@ void () clanring_periodic_checks =
         observer_find_teleport();
         observer_check_size();
 
-        //Update player's name for eyecam
+        //Update player's name for eyecam (engine only broadcasts changed keys)
         if (self.movetarget)
-        {
-            if (self.movetarget.netname != self.movetarget.oldname)
-            {
-                strunzone(self.movetarget.oldname);
-                self.movetarget.oldname = strzone(self.movetarget.netname);
-                observer_update_player_observer_key(self);
-            }
-            else if (!utils_str_eq(infokey(self, "observing"), self.movetarget.netname))
-            {
-                observer_update_player_observer_key(self);
-            }
-        }
+            observer_update_player_observer_key(self);
 
         if (self.oflags & OBSERVER_QUAKETV) //Sputnik: reset between map loads.
         {

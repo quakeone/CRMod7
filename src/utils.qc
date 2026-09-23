@@ -3098,6 +3098,14 @@ float(string a, string b) utils_str_eq =
     return !strcmp(a, b);
 };
 
+// Publish the observer mode ("*observer" and legacy "observer") and target.
+void(entity player, string mode, string observing) utils_set_observer_infokeys =
+{
+    forceinfokey(player, "*observer", mode);
+    forceinfokey(player, "observer", mode);
+    forceinfokey(player, "observing", observing);
+};
+
 // Return TRUE if 'player_name' contains "player" anywhere (case-insensitive-ish).
 // Note: If your QC supports strtolower(), replace the three checks with:
 //   if (strstrofs(strtolower(player_name), "player", 0) >= 0) return TRUE;
