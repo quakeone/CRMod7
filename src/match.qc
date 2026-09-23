@@ -2324,6 +2324,14 @@ float () match_unready_afk_start_blockers =
             self = oldself;
             found_blocker = TRUE;
 
+            // notready can refuse (match started or post-match wait); rescanning
+            // a player who is still ready would loop forever.
+            if (player.style & CLANRING_READY)
+            {
+                player = find(player, classname, "player");
+                continue;
+            }
+
             // Restart the scan because match_notready mutates the team/player lists.
             player = find(world, classname, "player");
             continue;

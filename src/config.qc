@@ -767,7 +767,7 @@ void () exec_warp_main_menu =
 		return;
 	}
 
-	while ((line = fgets(f)) && (i < WARP_CATEGORY_SIZE))
+	while ((line = fgets(f)) && (i < WARP_CATEGORY_SIZE - 1))
 	{
 		float argc = tokenize(line);
 		if (!argc)
