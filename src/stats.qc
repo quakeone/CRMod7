@@ -143,6 +143,10 @@ string(float want_match_record) stats_format_captime_record =
 void() stats_reset_player =
 {
 	self.mangle = self.dest = self.dest2 = self.dest1 = self.clanring_badstats = self.clanring_badstats2 = '0 0 0';
+	self.clanring_badstats_wait_time = 0;
+	self.clanring_badstats_wait_count = 0;
+	self.clanring_badstats_wait_pending = 0;
+	self.clanring_badstats_wait_active = 0;
 	self.clanring_badstats_bores = 0;
 	self.clanring_badstats_spawnwalk = 0;
 	self.clanring_badstats_spawnwalk_on = FALSE;
@@ -242,7 +246,7 @@ void() stats_show_badstats =
 {
 	local entity player;
 	local float tot_enemy, tot_done;
-	local float show_walkovers;
+	local float show_walkovers, wait_average;
 
 	show_walkovers = stats_badstats_has_walkover_categories();
 
@@ -252,13 +256,13 @@ void() stats_show_badstats =
 
 	if (show_walkovers)
 	{
-		sprint(self, " paks \xFC self \xFC team \xFC bore \xFC lava \xFC axe  \xFC fall \xFC spwn \xFC tele \xFC      name\n");
-		sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
+		sprint(self, " paks \xFC self \xFC team \xFC bore \xFC lava \xFC axe  \xFC fall \xFC spwn \xFC tele \xFC wait \xFC      name\n");
+		sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
 	}
 	else
 	{
-		sprint(self, " paks \xFC self \xFC team \xFC bore \xFC lava \xFC axe  \xFC fall \xFC      name\n");
-		sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
+		sprint(self, " paks \xFC self \xFC team \xFC bore \xFC lava \xFC axe  \xFC fall \xFC wait \xFC      name\n");
+		sprint(self, "\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAB\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\n");
 	}
 	player = clanring_sentinel.next_player;
 	while (player)
@@ -319,6 +323,10 @@ void() stats_show_badstats =
 			else
 				sprint(self, " \xFC ");
 		}
+		wait_average = 0;
+		if (player.clanring_badstats_wait_count > 0)
+			wait_average = player.clanring_badstats_wait_time / player.clanring_badstats_wait_count;
+		sprint(self, sprintf("%4.1f \xFC ", wait_average));
 		sprint2(self, player.netname, "\n");
 		player = player.next_player;
 	}
@@ -1934,6 +1942,7 @@ void () stats_help =
 	sprint(self, " \bfall\b  falling deaths\n");
 	sprint(self, " \bspwn\b  spawn-point walkovers\n");
 	sprint(self, " \btele\b  teleporter-exit walkovers\n");
+	sprint(self, " \bwait\b  average voluntary respawn wait (seconds)\n");
 	sprint(self, "\n");
 	sprint(self, " head hunters\n");
 	sprint(self, "\n");
@@ -2027,6 +2036,9 @@ void() stats_copy_statistics =
 		s.clanring_badstats_bores = p.clanring_badstats_bores;
 		s.clanring_badstats_spawnwalk = p.clanring_badstats_spawnwalk;
 		s.clanring_badstats_telewalk = p.clanring_badstats_telewalk;
+		s.clanring_badstats_wait_time = p.clanring_badstats_wait_time;
+		s.clanring_badstats_wait_count = p.clanring_badstats_wait_count;
+
 		s.netname = p.netname;
 		s.dmg_taken	= p.dmg_taken;
 		s.dmg_given	= p.dmg_given;

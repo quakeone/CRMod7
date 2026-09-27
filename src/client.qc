@@ -642,6 +642,15 @@ void() respawn =
 {
 //	if (!(clanring_gameconfig & CLANRING_DEADBODY_FILTER))
 //	CreateDeadBody (self);//R00k new corpse routine.
+    // Only completed, eligible respawns contribute to the match average.
+    if (self.clanring_badstats_wait_active && !match_prewar() &&
+        !(clanring_state & (CLANRING_MATCH_OVER | CLANRING_MATCH_PAUSED)) &&
+        !mode_is_arena() && !(clanring_playmode & CLANRING_HH_MODE) &&
+        !(self.style & CLANRING_OBSERVER))
+    {
+        self.clanring_badstats_wait_time += self.clanring_badstats_wait_pending;
+        self.clanring_badstats_wait_count += 1;
+    }
     SetNewParms2 ();
 
     PutClientInServer ();
@@ -1386,6 +1395,9 @@ void() PutClientInServer =
     //     }
     // }
 
+    self.clanring_badstats_wait_pending = 0;
+    self.clanring_badstats_wait_active = FALSE;
+
     DecodeLevelParms ();
 
     // Any spawn/respawn should force a fresh receiver baseline.
@@ -1808,6 +1820,15 @@ void() PlayerDeathThink =
 
         if (!(clanring_playmode & CLANRING_WIPEOUT_MODE) || ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0)))
             return;
+    }
+    // DEAD_DEAD is reached after the mandatory death animation. Include
+    // holding buttons down here: releasing them is part of choosing to respawn.
+    if (!mode_is_arena() && !(clanring_playmode & CLANRING_HH_MODE) &&
+        !match_prewar() && !(clanring_state & (CLANRING_MATCH_OVER | CLANRING_MATCH_PAUSED)))
+    {
+        if (self.clanring_badstats_wait_active)
+            self.clanring_badstats_wait_pending += frametime;
+        self.clanring_badstats_wait_active = TRUE;
     }
     // wait for all buttons released
     if (self.deadflag == DEAD_DEAD)

@@ -328,6 +328,11 @@ vector 	clanring_angle;					// used for both autoss and intermission
 .float  clanring_badstats_spawnwalk; // times player entered a spawn point volume
 .float  clanring_badstats_spawnwalk_on; // debounce state: currently overlapping a spawn point
 .float  clanring_badstats_spawnwalk_ignore_until; // suppress counting immediately after spawn/restore and briefly after a count
+// Voluntary respawn wait: completed total/count and current life accumulator.
+.float clanring_badstats_wait_time;
+.float clanring_badstats_wait_count;
+.float clanring_badstats_wait_pending;
+.float clanring_badstats_wait_active;
 .float  clanring_badstats_telewalk; // times player entered a teleporter exit volume
 .float  clanring_badstats_telewalk_on; // debounce state: currently overlapping a teleporter exit
 .float  clanring_badstats_telewalk_ignore_until; // suppress counting immediately after spawn/restore and briefly after a count
