@@ -41,6 +41,17 @@ string(string maparg) VoteMenu_FormatMapChoice =
         redify(strpad(21, substring(title, 0, 21))));
 };
 
+// Display columns are independent of the stored choice/changelevel token.
+string(string choice, float name_width) VoteMenu_FormatDisplayChoice =
+{
+    string name, title;
+
+    tokenize(choice);
+    name = argv(0);
+    title = strtrim(substring(choice, strlen(name), strlen(choice)));
+    return sprintf("%s %s", strpad(name_width, name), strpad(21, title));
+};
+
 float(string choice) VoteMenu_IsCurrentMap =
 {
     if (!choice || choice == "")
@@ -78,6 +89,7 @@ float () VoteMenu_Init =
     string nextmap_textline[6];
     float usedIndices[6];
     float nextlevel, index = 1, canUse = FALSE, show_console_info;
+    float name_width = 16;
 
     // Reinitialization can happen when a player repeatedly advances an active
     // nextmap vote. Release the previous menu before replacing its strings.
@@ -172,20 +184,20 @@ float () VoteMenu_Init =
 	VOTE_MENU_TEXTLINE[5] = "\5 A\n\n";
 	VOTE_MENU_TEXTLINE[6] = "\n\n";
 
-	VOTE_MENU_TEXTLINE[1] = strreplace("A", (strpad(38, vote_map_choices[1])), VOTE_MENU_TEXTLINE[1]);
-	VOTE_MENU_TEXTLINE[7] = redify(VOTE_MENU_TEXTLINE[1]);
-
-	VOTE_MENU_TEXTLINE[2] = strreplace("A", (strpad(38, vote_map_choices[2])), VOTE_MENU_TEXTLINE[2]);
-	VOTE_MENU_TEXTLINE[8] = redify(VOTE_MENU_TEXTLINE[2]);
-
-	VOTE_MENU_TEXTLINE[3] = strreplace("A", (strpad(38, vote_map_choices[3])), VOTE_MENU_TEXTLINE[3]);
-	VOTE_MENU_TEXTLINE[9] = redify(VOTE_MENU_TEXTLINE[3]);
-
-	VOTE_MENU_TEXTLINE[4]  = strreplace("A", (strpad(38, vote_map_choices[4])), VOTE_MENU_TEXTLINE[4]);
-	VOTE_MENU_TEXTLINE[10] = redify(VOTE_MENU_TEXTLINE[4]);
-
-	VOTE_MENU_TEXTLINE[5]  = strreplace("A", (strpad(38, vote_map_choices[5])), VOTE_MENU_TEXTLINE[5]);
-	VOTE_MENU_TEXTLINE[11] = redify(VOTE_MENU_TEXTLINE[5]);
+    // Centerprint centers each line separately. Use one name-column width
+    // for all five rows so long seasonal tokens cannot shift either column.
+    for (float slot = 1; slot <= 5; slot++)
+    {
+        tokenize(vote_map_choices[slot]);
+        name_width = max(name_width, strlen(argv(0)));
+    }
+    for (float slot = 1; slot <= 5; slot++)
+    {
+        VOTE_MENU_TEXTLINE[slot] = strreplace("A",
+            VoteMenu_FormatDisplayChoice(vote_map_choices[slot], name_width),
+            VOTE_MENU_TEXTLINE[slot]);
+        VOTE_MENU_TEXTLINE[slot + 6] = redify(VOTE_MENU_TEXTLINE[slot]);
+    }
 
 	VOTE_MENU_TEXTLINE[1] = strzone(VOTE_MENU_TEXTLINE[1]);
 	VOTE_MENU_TEXTLINE[2] = strzone(VOTE_MENU_TEXTLINE[2]);
