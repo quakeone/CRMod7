@@ -565,6 +565,9 @@ float 	debug = 0;
 .entity hookentity;
 .string client;
 .float  client_ver_code; // encoded as (major*10000 + minor*100 + patch)
+.float  qprobe_until;     // woods -- accept a Qrack q_version reply until this time
+.float  qprobe_announced; // woods -- "has connected" line already printed for this probe
+.entity qprobe_event;     // woods -- pending announce timeout for this probe (world once it fires)
 
 //---custom 'server modules' off-hand hook added for pub mode. (FIXME: remove this shit)
 .float 	hook_out;

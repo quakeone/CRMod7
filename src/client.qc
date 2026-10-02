@@ -4312,6 +4312,11 @@ void(string cmd) SV_ParseClientCommand =
     local float args, modecmd, mapnumber=0;
     local string arg0 = "", arg1 = "", arg2 = "";
 
+    if (server_check_qrack_reply(cmd))  // before the connected check, or an early reply leaks into chat
+        return;
+    if (server_check_zircon(cmd))       // before the connected check: Zircon is detected during signon
+        return;
+
     if (!(self.style & CLANRING_CONNECTED))
     {
         clientcommand(self, cmd); //this client has not finished connecting, or has lagged out.

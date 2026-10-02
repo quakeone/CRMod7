@@ -1695,7 +1695,17 @@ string() server_find_myClient =
         }
         else
         {
-            text = ".\n";									//anything else
+            myClient = infokey(self,"_crmod_client");		//Qrack/Zircon, found by server_probe_qrack/server_check_zircon (private key, survives map changes)
+            if (myClient != "")
+            {
+                if (myClient == "Zircon")
+                    self.client = "Zircon";
+                else
+                    self.client = "Qrack";
+                text = (sprintf(" with %s.\n", myClient));
+            }
+            else
+                text = ".\n";								//anything else
         }
     }
 
@@ -1709,6 +1719,113 @@ string() server_find_myClient =
 
     return text;
  }
+
+// woods -- Qrack sends no *ver, but answers any print containing ": q_version"
+// with "say Qrack <version>" (say_team when cl_mm2). Probe unidentified clients,
+// hold their "has connected" line briefly, and swallow the reply in
+// SV_ParseClientCommand. No \x01 chat marker, so QSS-style clients ignore it.
+void () server_qrack_probe_timeout =
+{
+    local entity player = self.owner;
+
+    if (player.qprobe_event == self)
+    {
+        player.qprobe_event = world;
+        if (!player.qprobe_announced && clienttype(player) == CLIENTTYPE_REAL)
+        {
+            player.qprobe_announced = TRUE;
+            bprint (player.netname, " has connected.\n");
+        }
+    }
+    remove(self);
+};
+
+void () server_probe_qrack =
+{
+    if (infokey(self, "_crmod_dpcheck") != "1")   // DarkPlaces-family clients never answer q_version
+        sprint (self, "CRMod: q_version\n");
+    self.qprobe_until = time + 10;	// late replies are still swallowed
+    self.qprobe_announced = FALSE;
+    self.qprobe_event = utils_make_scheduled_event(server_qrack_probe_timeout, 2);
+};
+
+// Returns TRUE if cmd was a q_version reply from Qrack and has been consumed.
+float (string cmd) server_check_qrack_reply =
+{
+    local float args, ofs;
+    local string arg0, ver;
+
+    if (time >= self.qprobe_until)
+        return FALSE;
+
+    args = tokenize(cmd);
+    if (args < 2)
+        return FALSE;
+    arg0 = argv(0);
+    if ((arg0 != "say" && arg0 != "say_team") || argv(1) != "Qrack")
+        return FALSE;
+
+    // tokenize splits on parens, so take the raw text: "Qrack (x86_32) (build N)"
+    ofs = strstrofs(cmd, "Qrack");
+    ver = substring(cmd, ofs, 48);
+    ver = strreplace("\n", "", ver);
+    ver = strreplace("\"", "", ver);
+    ver = strreplace("\\", "", ver);
+
+    self.qprobe_until = 0;
+    self.client = "Qrack";
+    forceinfokey(self, "_crmod_client", ver);
+
+    if (!self.qprobe_announced)
+    {
+        self.qprobe_announced = TRUE;
+        bprint (self.netname, " has connected with ", ver, ".\n");
+    }
+    return TRUE;
+};
+
+// woods -- Zircon (a DarkPlaces fork, one of the few with protocol 666) sends no
+// *ver, but always sends rate_burstsize during signon. That only marks the
+// DarkPlaces family, so confirm with Zircon's own cvar via $ expansion before
+// labelling it. Runs before spawn, so the result lives in private userinfo.
+// Returns TRUE if cmd was our confirmation reply and has been consumed.
+float (string cmd) server_check_zircon =
+{
+    local string arg0, val;
+
+    if (tokenize(cmd) < 1)
+        return FALSE;
+    arg0 = argv(0);
+
+    if (arg0 == "rate_burstsize")
+    {
+        if (infokey(self, "*ver") == "" && infokey(self, "*client") == "" && infokey(self, "_crmod_client") == "")
+        {
+            forceinfokey(self, "_crmod_dpcheck", "1");
+            stuffcmd(self, "cmd crmod_zircon $cl_zircon_move\n");
+        }
+        return FALSE;   // still handled as usual
+    }
+
+    if (arg0 != "crmod_zircon")
+        return FALSE;
+
+    // cl_zircon_move may be 0 or 1; an unexpanded "$cl_zircon_move" means not Zircon
+    val = argv(1);
+    if (infokey(self, "_crmod_dpcheck") == "1" && val != "" && substring(val, 0, 1) != "$")
+    {
+        forceinfokey(self, "_crmod_dpcheck", "");
+        forceinfokey(self, "_crmod_client", "Zircon");
+        self.client = "Zircon";
+
+        if (self.qprobe_event && !self.qprobe_announced)   // confirmed while the connect line is held
+        {
+            self.qprobe_announced = TRUE;
+            bprint (self.netname, " has connected with Zircon.\n");
+        }
+    }
+    return TRUE;    // never pass crmod_zircon on to the engine
+};
 
 //
 //  C L I E N T  C O N N E C T
@@ -1751,7 +1868,10 @@ void () clanring_client_connect =
         if (client_name != "qss-m")
             forceinfokey(self, "chat", "");
 
-        bprint (self.netname," has connected", text);
+        if (text == ".\n")               // unidentified: no *ver, *client or saved Qrack key
+            server_probe_qrack();       //announces once Qrack replies, or after a short timeout
+        else
+            bprint (self.netname," has connected", text);
     }
     else 
     {
