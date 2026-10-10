@@ -18,7 +18,7 @@
 //  side-by-side comparison until the weights are calibrated.
 //
 
-#define QPER_VERSION            "qper2-provisional-1"
+#define QPER_VERSION            "qper2-provisional-2"
 
 // core
 #define QPER_W_DMG              0.5     // per 100 effective enemy damage
@@ -68,6 +68,7 @@
 #define QPER_REF_MIN_MINS       2       // shortest stint that updates the reference
 #define QPER_REF_FILE           "stats/qper_ref.txt"
 #define QPER_REF_MAX            32
+#define QPER_REF_PROVISIONAL_MINS 300 // minimum observed player-minutes, separate from short stints
 
 #define QPER_TERMS              19
 #define QPER_T_DAMAGE           0
@@ -95,6 +96,8 @@ float qper_ref_rate[QPER_REF_MAX];
 float qper_ref_mins[QPER_REF_MAX];
 float qper_ref_count;
 float qper_ref_loaded;
+float qper_match_ref_valid, qper_match_ref_rate, qper_match_ref_mins;
+string qper_match_ref_key;
 float qper_cost_id, qper_cost_v;    // largest cost found by qper_find_top_terms
 
 // ------------------------------------------------------------
@@ -156,6 +159,7 @@ void(entity p) qper_stint_end =
 {
 	if (!p.qper_stint_open)
 		return;
+	qper_sample(p);
 	p.qper_active_bank = p.qper_active_bank + qper_stint_secs(p);
 	p.qper_stint_open = FALSE;
 };
@@ -186,6 +190,9 @@ void(entity v) qper_ledger_clear =
 
 void(entity p) qper_reset_player =
 {
+	qper_telemetry_reset(p);
+	// Late joins after a completed match must not erase its export snapshot.
+	if (!(clanring_state & CLANRING_MATCH_OVER)) qper_match_ref_valid = FALSE;
 	p.qper_kill_credit = 0;
 	p.qper_assist_credit = 0;
 	p.qper_cap_credit = 0;
@@ -197,8 +204,10 @@ void(entity p) qper_reset_player =
 	p.qper_poss_since = 0;
 	p.qper_final = 0;
 	p.qper_final_valid = FALSE;
+	p.qper_final_reference = p.qper_final_reference_mins = 0;
 	p.qper_active_bank = 0;
 	qper_stint_begin(p);
+	p.qper_telemetry_mark = qper_active_secs(p);
 };
 
 void(entity p) qper_on_connect =
@@ -211,6 +220,7 @@ void(entity p) qper_on_connect =
 void(entity p) qper_on_spawn =
 {
 	p.qper_spawn_time = time;
+	p.qper_telemetry_mark = qper_active_secs(p);
 	qper_ledger_clear(p);
 };
 
@@ -346,7 +356,7 @@ void(entity victim, entity attacker, float amount) qper_ledger_add =
 // ------------------------------------------------------------
 // Shared kill credit
 // ------------------------------------------------------------
-float(entity v) qper_kill_pool =
+float(entity v, float ramp) qper_kill_pool_imp =
 {
 	local float m, exempt, age, f;
 
@@ -370,13 +380,18 @@ float(entity v) qper_kill_pool =
 
 	// Fresh spawns are worth less, ramping up smoothly so delaying a kill gains little.
 	f = 1;
-	if (!exempt)
+	if (ramp && !exempt)
 	{
 		age = time - v.qper_spawn_time;
 		if (age < QPER_SPAWN_RAMP)
 			f = QPER_SPAWN_FLOOR + (1 - QPER_SPAWN_FLOOR) * max(0, age) / QPER_SPAWN_RAMP;
 	}
 	return QPER_W_KILL * m * f;
+};
+
+float(entity v) qper_kill_pool =
+{
+	return qper_kill_pool_imp(v, TRUE);
 };
 
 void(entity victim, entity killer) qper_credit_kill =
@@ -390,6 +405,15 @@ void(entity victim, entity killer) qper_credit_kill =
 		return;
 
 	pool = qper_kill_pool(victim);
+	killer.qper_kill_pool_full += qper_kill_pool_imp(victim, FALSE);
+	killer.qper_kill_pool_awarded += pool;
+	if ((qper_is_ctf() && victim.flag_carrier) || victim.super_damage_finished > time
+		|| victim.invincible_finished > time || (qper_weapon_control() && (victim.items & (IT_ROCKET_LAUNCHER | IT_LIGHTNING))))
+		killer.qper_spawn_exempt++;
+	if (time - victim.qper_spawn_time < 1) { killer.qper_spawn_lt1++; victim.qper_spawn_deaths_lt1++; }
+	else if (time - victim.qper_spawn_time < 2) { killer.qper_spawn_1to2++; victim.qper_spawn_deaths_1to2++; }
+	else if (time - victim.qper_spawn_time < 4) { killer.qper_spawn_2to4++; victim.qper_spawn_deaths_2to4++; }
+	else { killer.qper_spawn_ge4++; victim.qper_spawn_deaths_ge4++; }
 	qper_ledger_decay(victim);
 
 	total = 0;
@@ -598,7 +622,7 @@ float(entity p, float id) qper_term =
 		case QPER_T_DEATHS:          return -QPER_W_DEATH * p.mangle_z;
 		case QPER_T_SELF_DEATHS:     return -(QPER_W_DEATH + QPER_W_SELF_DEATH) * p.mangle_x;
 		case QPER_T_TEAMKILLS:       return -(QPER_W_TEAMKILL * p.mangle_y + QPER_W_QUAD_TEAMKILL * p.stats_teamkill_quad);
-		case QPER_T_TEAMDMG:         return -QPER_W_TEAMDMG * p.clanring_badstats_z / 100;
+		case QPER_T_TEAMDMG:         return -QPER_W_TEAMDMG * p.qper_team_damage / 100;
 		case QPER_T_WEAPON_LOSS:     return wc ? -QPER_W_WEAPON_LOSS * p.clanring_badstats_x : 0;
 	}
 	return 0;
@@ -635,7 +659,7 @@ string(entity p, float id) qper_term_label =
 		case QPER_T_DEATHS:          return sprintf("deaths (%g)", p.mangle_z);
 		case QPER_T_SELF_DEATHS:     return sprintf("self/env deaths (%g)", p.mangle_x);
 		case QPER_T_TEAMKILLS:       return sprintf("teamkills (%g)", p.mangle_y);
-		case QPER_T_TEAMDMG:         return sprintf("team damage (%g)", p.clanring_badstats_z);
+		case QPER_T_TEAMDMG:         return sprintf("team damage (%g)", p.qper_team_damage);
 		case QPER_T_WEAPON_LOSS:     return sprintf("weapons given away (%g)", p.clanring_badstats_x);
 	}
 	return "";
@@ -709,6 +733,8 @@ void() qper_ref_load =
 	local filestream f;
 	local string line;
 
+	local float old;
+	for (old = 0; old < qper_ref_count; old++) strunzone(qper_ref_key[old]);
 	qper_ref_loaded = TRUE;
 	qper_ref_count = 0;
 
@@ -720,13 +746,13 @@ void() qper_ref_load =
 
 	while ((line = fgets(f)) && (qper_ref_count < QPER_REF_MAX))
 	{
-		if (tokenize(line) < 3)
+		if (tokenize(line) < 4 || argv(0) != QPER_VERSION)
 			continue;
-		if (stof(argv(1)) <= 0)
+		if (stof(argv(3)) <= 0)
 			continue;
-		qper_ref_key[qper_ref_count] = strzone(argv(0));
-		qper_ref_rate[qper_ref_count] = stof(argv(1));
-		qper_ref_mins[qper_ref_count] = stof(argv(2));
+		qper_ref_key[qper_ref_count] = strzone(argv(1));
+		qper_ref_rate[qper_ref_count] = stof(argv(2));
+		qper_ref_mins[qper_ref_count] = stof(argv(3));
 		qper_ref_count = qper_ref_count + 1;
 	}
 	fclose(f);
@@ -744,7 +770,7 @@ void() qper_ref_save =
 		return;
 	}
 	for (i = 0; i < qper_ref_count; i = i + 1)
-		fputs(f, sprintf("%s %.4f %.1f\n", qper_ref_key[i], qper_ref_rate[i], qper_ref_mins[i]));
+		fputs(f, sprintf("%s %s %.4f %.1f\n", QPER_VERSION, qper_ref_key[i], qper_ref_rate[i], qper_ref_mins[i]));
 	fclose(f);
 };
 
@@ -824,6 +850,32 @@ float(entity p) qper_own_weight =
 	return mins / (mins + QPER_SHRINK_MINS);
 };
 
+// Frozen players retain the exact reference used, including its maturity.
+float(entity p) qper_player_reference =
+{
+	return p.qper_final_valid ? p.qper_final_reference : qper_reference_rate();
+};
+
+float() qper_display_reference =
+{
+	return (qper_match_ref_valid && (clanring_playmode & CLANRING_MATCH_MODE)) ? qper_match_ref_rate : qper_reference_rate();
+};
+
+float() qper_display_reference_mins =
+{
+	return (qper_match_ref_valid && (clanring_playmode & CLANRING_MATCH_MODE)) ? qper_match_ref_mins : qper_reference_mins();
+};
+
+string() qper_display_cohort =
+{
+	return (qper_match_ref_valid && (clanring_playmode & CLANRING_MATCH_MODE)) ? qper_match_ref_key : qper_cohort_key();
+};
+
+float() qper_reference_provisional =
+{
+	return qper_display_reference_mins() < QPER_REF_PROVISIONAL_MINS;
+};
+
 // QPER points contributed by a raw FE amount for this player.
 float(entity p, float fe) qper_points =
 {
@@ -832,7 +884,7 @@ float(entity p, float fe) qper_points =
 	mins = qper_active_mins(p);
 	if (mins <= 0)
 		return 0;
-	return 15 * qper_own_weight(p) * (fe / mins) / qper_reference_rate();
+	return 15 * qper_own_weight(p) * (fe / mins) / qper_player_reference(p);
 };
 
 float(entity p) qper_live_rating =
@@ -903,14 +955,22 @@ void(float aborted) qper_match_end =
 		p = find(p, classname, "player");
 	}
 
+	qper_match_ref_rate = qper_reference_rate();
+	qper_match_ref_mins = qper_reference_mins();
+	if (qper_match_ref_key) strunzone(qper_match_ref_key);
+	qper_match_ref_key = strzone(qper_cohort_key());
+	qper_match_ref_valid = TRUE;
 	sum_contrib = 0;
 	sum_mins = 0;
 	p = find(world, classname, "player");
 	while (p != world)
 	{
-		if (p.join_time > 0 && stats_has_nontrivial_activity(p))
+		if (p.join_time > 0 && (qper_active_secs(p) > 0 || stats_has_nontrivial_activity(p)))
 		{
+			p.qper_final_valid = FALSE;
 			p.qper_final = qper_live_rating(p);
+			p.qper_final_reference = qper_match_ref_rate;
+			p.qper_final_reference_mins = qper_match_ref_mins;
 			p.qper_final_valid = TRUE;
 			mins = qper_active_mins(p);
 			if (mins >= QPER_REF_MIN_MINS)
@@ -1006,6 +1066,9 @@ void() stats_show_per =
 	sprint(self, "\n");
 	if (any_provisional)
 		sprint(self, sprintf("  * under %g active minutes, provisional\n\n", QPER_PROVISIONAL_MINS));
+
+	if (qper_reference_provisional())
+		sprint(self, sprintf("  QPER reference provisional: %g/%g observed player-minutes\n\n", floor(qper_display_reference_mins()), QPER_REF_PROVISIONAL_MINS));
 
 	if (bestp)
 		qper_print_reasons(self, bestp, sprintf("  why %s led QPER:\n", bestp.netname));

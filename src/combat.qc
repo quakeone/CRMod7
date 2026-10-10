@@ -908,6 +908,9 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 		}
 	}
 
+	qper_applied_damage(targ, inflictor, attacker, max(0, save + overkill));
+	qper_sample(targ); // flush the living interval before health or runes change
+
 	//R00k -stats-
 	if ( ((targ.classname == "player") && (attacker.classname == "player")) && (targ != attacker) && ((!teamplay) || (targ.team != attacker.team)) )
 	{

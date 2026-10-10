@@ -992,6 +992,7 @@ void() weapon_touch =
 	}
 	else
 	{
+        qper_sample(other);
 		string itname = string_null;
 		if (self.weapon == IT_SUPER_SHOTGUN)
 		{
@@ -1085,6 +1086,7 @@ void() weapon_touch =
 
 		bound_other_ammo ();
 
+		qper_acquire(other, self.weapon, 0);
 		other.items = other.items | self.weapon;
 
 // change to the weapon
@@ -1230,6 +1232,7 @@ void() ammo_touch =
 	if (other.health <= 0)
 		return;
 
+	qper_sample(other);
 // if the player was using his best weapon, change up to the new one if better
 	stemp = self;
 	self = other;
@@ -1925,6 +1928,7 @@ void() powerup_touch =
 		self.think = SUB_regen;
 	}
 
+	qper_sample(other);
 // do the apropriate action
 	if (self.items == IT_SUIT)
 	{
@@ -2134,6 +2138,8 @@ PLAYER BACKPACKS
 */
 void() BackpackTouch =
 {
+    local vector qper_old_ammo;
+    local float qper_old_cells, qper_old_items;
 	local string s;
 	local float best, new, acount, bswitch, headtake;
 	local entity stemp;
@@ -2249,7 +2255,11 @@ void() BackpackTouch =
 	self = other;
 	best = W_BestWeapon ();
 	self = stemp;
-// change weapons
+	qper_sample(other);
+    qper_old_ammo = [other.ammo_shells, other.ammo_nails, other.ammo_rockets];
+    qper_old_cells = other.ammo_cells;
+    qper_old_items = other.items;
+    // change weapons
 	other.ammo_shells = (other.ammo_shells + self.ammo_shells);
 	other.ammo_nails = (other.ammo_nails + self.ammo_nails);
 	other.ammo_rockets = (other.ammo_rockets + self.ammo_rockets);
@@ -2294,6 +2304,7 @@ void() BackpackTouch =
 	}
 	other.items = (other.items | new);
 	bound_other_ammo ();
+    qper_transfer(self, other, new, qper_old_items, qper_old_ammo, qper_old_cells);
 	if (self.ammo_shells)
 	{
 		if (acount)
@@ -2351,6 +2362,7 @@ void() BackpackTouch =
 		self.ammo_nails = 0;
 		self.ammo_rockets = 0;
 		self.ammo_cells = 0;
+		self.qper_drop_id = 0;
 		self.owner = world;
 		self.enemy = world;
 	}
@@ -2414,6 +2426,7 @@ void() DropBackpack =
 	item.origin	= self.origin - '0 0 24';
     item.classname = "item_backpack";    // ELOHIM_MOD
 	item.owner = self;	// ELOHIM_MOD
+    qper_drop_origin(item, self, FALSE);
 	item.items = self.weapon;
 	item.enemy = self.enemy;	// for backpack stats
 
@@ -2494,6 +2507,8 @@ void() DropBackpack =
 
 void() Team_weapon_touch =
 {
+    local vector qper_old_ammo;
+    local float qper_old_cells, qper_old_items;
 	local float	new, best;
 	local entity	stemp;
 
@@ -2529,7 +2544,11 @@ void() Team_weapon_touch =
 		return;
 	}
 
-	best = W_BestWeapon();
+	qper_sample(other);
+    qper_old_ammo = [other.ammo_shells, other.ammo_nails, other.ammo_rockets];
+    qper_old_cells = other.ammo_cells;
+    qper_old_items = other.items;
+    best = W_BestWeapon();
 
 	if (self.weapon == IT_NAILGUN)
 	{
@@ -2587,6 +2606,7 @@ void() Team_weapon_touch =
 		}
 	}
 
+	qper_transfer(self, other, new, qper_old_items, qper_old_ammo, qper_old_cells);
 	other.items = other.items | new;
 
 	stemp = self;
@@ -2611,6 +2631,7 @@ void() Team_weapon_touch =
 void() TossWeapon =
 {
 	local entity item;
+    qper_sample(self);
 
 	if (self.style & CLANRING_OBSERVER)
 		return; // no observer tossing items
@@ -2646,6 +2667,7 @@ void() TossWeapon =
 	//===================================================================
 	item = spawn();
 	item.owner = self;
+    qper_drop_origin(item, self, TRUE);
 	makevectors(self.v_angle);
 	setorigin(item, self.origin + '0 0 16');
 	item.velocity = aim(self, 1);
@@ -2796,6 +2818,8 @@ void() TossWeapon =
 
 void() Team_Ammo_Touch=
 {
+    local vector qper_old_ammo;
+    local float qper_old_cells, qper_old_items;
 	local entity etemp;
 	local float  donttake;	// 1998-08-15 Do not take unnecessary items but fire all targets by Maddes
 
@@ -2831,7 +2855,11 @@ void() Team_Ammo_Touch=
 	if (other.health <= 0)
 		return;
 
-	donttake = 0;	// 1998-08-15 Do not take unnecessary items but fire all targets by Maddes
+	qper_sample(other);
+    qper_old_ammo = [other.ammo_shells, other.ammo_nails, other.ammo_rockets];
+    qper_old_cells = other.ammo_cells;
+    qper_old_items = other.items;
+    donttake = 0;	// 1998-08-15 Do not take unnecessary items but fire all targets by Maddes
 
 	// shotgun
 	if (self.classname=="item_shells")
@@ -2872,6 +2900,7 @@ void() Team_Ammo_Touch=
 	if (!donttake)
 	{
 		bound_other_ammo ();
+        qper_transfer(self, other, 0, qper_old_items, qper_old_ammo, qper_old_cells);
 		sound (other, CHAN_ITEM, "weapons/lock4.wav", 1, ATTN_NORM);
 		etemp=self;
 		self=other;
@@ -2892,6 +2921,7 @@ void() Team_Ammo_Touch=
 void() TossAmmo =
 {
 	local entity	item;
+    qper_sample(self);
 	local float		ammo = 0;
 	local string	cname = "";
 	local string	m = "";
@@ -3009,6 +3039,7 @@ void() TossAmmo =
 
 	item = spawn();
 	item.owner = self;
+    qper_drop_origin(item, self, TRUE);
 	makevectors(self.v_angle);
 	setorigin(item, self.origin + '0 0 16');
 	item.velocity = v_forward;

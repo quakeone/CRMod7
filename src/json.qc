@@ -259,6 +259,15 @@ void json_null()
 // convenience
 void json_kv_string(string k, string v){ json_key(k); json_string(v); }
 void json_kv_number(string k, float v){ json_key(k); json_number(v); }
+// Calibration inputs must retain float precision to reproduce a frozen rating.
+void json_kv_precise_number(string k, float v)
+{
+    json_key(k);
+    json__pending_key = 0;
+    json__count[json__depth]++;
+    json__emit(sprintf("%.9g", v));
+}
+
 void json_kv_bool  (string k, float b){ json_key(k); json_bool(b); }
 void json_kv_null  (string k){ json_key(k); json_null(); }
 
@@ -866,11 +875,16 @@ void() json_emit_match_document =
         json_kv_number("team size",  stats_matchtype);
         json_kv_number("timelimit",  stats_timelimit);
         json_kv_number("deathmatch", deathmatch);
+        json_kv_number("teamplay", teamplay);
+        json_kv_number("hook_enabled", !(clanring_playmode & CLANRING_NO_HOOK));
+        json_kv_number("runes_enabled", qper_is_ctf() && !clanring_sv_pak0_only && ((clanring_playmode & CLANRING_RUNES) != 0));
         json_key("qper"); json_begin_object();
           json_kv_string("version",   QPER_VERSION);
-          json_kv_string("cohort",    qper_cohort_key());
-          json_kv_number("reference", round2d(qper_reference_rate()));
-          json_kv_number("reference_minutes", floor(qper_reference_mins()));
+          json_kv_string("cohort",    qper_display_cohort());
+          json_kv_precise_number("reference", qper_display_reference());
+          json_kv_precise_number("reference_minutes", qper_display_reference_mins());
+          json_kv_precise_number("reference_provisional", qper_reference_provisional());
+          json_kv_precise_number("reference_minimum_minutes", QPER_REF_PROVISIONAL_MINS);
         json_end_object();
 
         // ---- Teams ---------------------------------------------------------
@@ -880,6 +894,10 @@ void() json_emit_match_document =
           {
             json_begin_object();
               json_kv_string("name",  t.netname);
+              local float roster_count = 0;
+              p = t.next_player;
+              while (p && p != world) { if (p.next_team == t && p.join_time > 0) roster_count++; p = p.next_player; }
+              json_kv_number("participating_players", roster_count);
               json_kv_string("color", str_rtrim(strings_get_teamname3(t.height)));
 
               // team summary (vectors)
@@ -921,7 +939,7 @@ void() json_emit_match_document =
                   local float tot_done  = tot_enemy + p.clanring_badstats_y + p.clanring_badstats_z;
                   local float self_pct  = json_pct(p.clanring_badstats_y,  tot_done);
                   local float team_pct  = json_pct(p.clanring_badstats_z,  tot_done);
-                  local float per_val = 0.1; if (p.join_time > 0){ local float s2 = time - p.join_time; if (s2 > 1) per_val = Q1_PER_Calc_Eff(p) / (s2 / 60); if (per_val < 0.1) per_val = 0.1; }
+                  local float per_val = 0.1; if (p.join_time > 0){ local float s2 = time - p.join_time; if (s2 > 1) per_val = Q1_PER_Calc_Eff(p) / max(1, s2 / 60); if (per_val < 0.1) per_val = 0.1; }
 
                   json_begin_object();
                     json_kv_string("name", p.netname);
@@ -1025,13 +1043,104 @@ void() json_emit_match_document =
                     json_kv_number("per",         round2d(qper_rating(p)));
                     json_kv_number("per_v1",      per_val);
                     json_key("qper"); json_begin_object();
-                      json_kv_number("active_secs",   floor(qper_active_secs(p)));
-                      json_kv_number("contribution",  round2d(qper_contribution(p)));
-                      json_kv_number("provisional",   qper_is_provisional(p));
-                      json_kv_number("assist_credit", round2d(p.qper_assist_credit));
+                      json_kv_precise_number("active_secs",   qper_active_secs(p));
+                      json_kv_precise_number("contribution",  qper_contribution(p));
+                      json_kv_precise_number("provisional",   qper_is_provisional(p));
+                      json_kv_precise_number("reference", qper_player_reference(p));
+                      json_kv_precise_number("reference_minutes", p.qper_final_valid ? p.qper_final_reference_mins : qper_reference_mins());
+                      json_kv_precise_number("kill_credit", p.qper_kill_credit);
+                      json_kv_precise_number("capture_credit", p.qper_cap_credit);
+                      json_kv_precise_number("steal_credit", p.qper_steal_credit);
+                      json_kv_precise_number("prior_points", 15 * (1 - qper_own_weight(p)));
+                      json_kv_precise_number("assist_credit", p.qper_assist_credit);
+                      json_key("raw_inputs"); json_begin_object();
+                        json_kv_precise_number("damage", p.dmg_given);
+                        json_kv_precise_number("carrier_damage", p.ewep);
+                        json_kv_precise_number("kill_credit", p.qper_kill_credit);
+                        json_kv_precise_number("capture_credit", p.qper_cap_credit);
+                        json_kv_precise_number("steal_credit", p.qper_steal_credit);
+                        json_kv_precise_number("returns", p.freturns);
+                        json_kv_precise_number("defenses", p.fdefenses);
+                        json_kv_precise_number("carrier_defenses", p.fcdefenses);
+                        json_kv_precise_number("quads", p.clanring_qdwep_z);
+                        json_kv_precise_number("pents", p.clanring_ptwep_z);
+                        json_kv_precise_number("rings", p.stats_item_ring);
+                        json_kv_precise_number("red_armor", p.stats_item_redarmor);
+                        json_kv_precise_number("yellow_armor", p.stats_item_yellowarmor);
+                        json_kv_precise_number("mega", p.stats_item_mega);
+                        json_kv_precise_number("rl_pickups", p.stats_item_rl);
+                        json_kv_precise_number("lg_pickups", p.stats_item_lg);
+                        json_kv_precise_number("quad_support", p.stats_quad_secure);
+                        json_kv_precise_number("enemy_deaths", p.mangle_z);
+                        json_kv_precise_number("self_deaths", p.mangle_x);
+                        json_kv_precise_number("teamkills", p.mangle_y);
+                        json_kv_precise_number("quad_teamkills", p.stats_teamkill_quad);
+                        json_kv_precise_number("team_damage", p.qper_team_damage);
+                        json_kv_precise_number("weapon_loss", p.clanring_badstats_x);
+                      json_end_object();
+                      json_key("telemetry"); json_begin_object();
+                        json_kv_precise_number("team_damage", p.qper_team_damage);
+                        json_kv_precise_number("kill_pool_full", p.qper_kill_pool_full);
+                        json_kv_precise_number("kill_pool_awarded", p.qper_kill_pool_awarded);
+                        json_kv_precise_number("spawn_exempt", p.qper_spawn_exempt);
+                        json_kv_precise_number("spawn_lt1", p.qper_spawn_lt1);
+                        json_kv_precise_number("spawn_1to2", p.qper_spawn_1to2);
+                        json_kv_precise_number("spawn_2to4", p.qper_spawn_2to4);
+                        json_kv_precise_number("spawn_ge4", p.qper_spawn_ge4);
+                        json_kv_precise_number("spawn_deaths_lt1", p.qper_spawn_deaths_lt1);
+                        json_kv_precise_number("spawn_deaths_1to2", p.qper_spawn_deaths_1to2);
+                        json_kv_precise_number("spawn_deaths_2to4", p.qper_spawn_deaths_2to4);
+                        json_kv_precise_number("spawn_deaths_ge4", p.qper_spawn_deaths_ge4);
+                        json_kv_precise_number("weapon_donations", p.qper_weapon_donations);
+                        json_kv_precise_number("weapon_donations_received", p.qper_weapon_donations_received);
+                        json_kv_precise_number("pack_recoveries", p.qper_pack_recoveries);
+                        json_kv_precise_number("pack_concessions", p.qper_pack_concessions);
+                        json_kv_precise_number("access_rl_secs", p.qper_access_rl_secs);
+                        json_kv_precise_number("access_lg_secs", p.qper_access_lg_secs);
+                        json_kv_precise_number("armed_secs", p.qper_armed_secs);
+                        json_kv_precise_number("acquire_world", p.qper_acquire_world);
+                        json_kv_precise_number("acquire_pack", p.qper_acquire_pack);
+                        json_kv_precise_number("acquire_donation", p.qper_acquire_donation);
+                        json_kv_precise_number("ammo_supplied_shells", p.qper_ammo_supplied_shells);
+                        json_kv_precise_number("ammo_supplied_nails", p.qper_ammo_supplied_nails);
+                        json_kv_precise_number("ammo_supplied_rockets", p.qper_ammo_supplied_rockets);
+                        json_kv_precise_number("ammo_supplied_cells", p.qper_ammo_supplied_cells);
+                        json_kv_precise_number("enemy_axe", p.qper_enemy_axe);
+                        json_kv_precise_number("enemy_sg", p.qper_enemy_sg);
+                        json_kv_precise_number("enemy_ssg", p.qper_enemy_ssg);
+                        json_kv_precise_number("enemy_ng", p.qper_enemy_ng);
+                        json_kv_precise_number("enemy_sng", p.qper_enemy_sng);
+                        json_kv_precise_number("enemy_gl", p.qper_enemy_gl);
+                        json_kv_precise_number("enemy_rl", p.qper_enemy_rl);
+                        json_kv_precise_number("enemy_lg", p.qper_enemy_lg);
+                        json_kv_precise_number("enemy_other", p.qper_enemy_other);
+                        json_kv_precise_number("team_axe", p.qper_team_axe);
+                        json_kv_precise_number("team_sg", p.qper_team_sg);
+                        json_kv_precise_number("team_ssg", p.qper_team_ssg);
+                        json_kv_precise_number("team_ng", p.qper_team_ng);
+                        json_kv_precise_number("team_sng", p.qper_team_sng);
+                        json_kv_precise_number("team_gl", p.qper_team_gl);
+                        json_kv_precise_number("team_rl", p.qper_team_rl);
+                        json_kv_precise_number("team_lg", p.qper_team_lg);
+                        json_kv_precise_number("team_other", p.qper_team_other);
+                        json_kv_precise_number("quad_secs", p.qper_quad_secs);
+                        json_kv_precise_number("quad_damage", p.qper_quad_damage);
+                        json_kv_precise_number("pent_secs", p.qper_pent_secs);
+                        json_kv_precise_number("pent_damage", p.qper_pent_damage);
+                        json_kv_precise_number("ring_secs", p.qper_ring_secs);
+                        json_kv_precise_number("ring_damage", p.qper_ring_damage);
+                        json_kv_precise_number("resistance_secs", p.qper_resistance_secs);
+                        json_kv_precise_number("resistance_damage", p.qper_resistance_damage);
+                        json_kv_precise_number("strength_secs", p.qper_strength_secs);
+                        json_kv_precise_number("strength_damage", p.qper_strength_damage);
+                        json_kv_precise_number("haste_secs", p.qper_haste_secs);
+                        json_kv_precise_number("haste_damage", p.qper_haste_damage);
+                        json_kv_precise_number("regen_secs", p.qper_regen_secs);
+                        json_kv_precise_number("regen_damage", p.qper_regen_damage);
+                      json_end_object();
                       json_key("terms"); json_begin_object();
                         for (f = 0; f < QPER_TERMS; f = f + 1)
-                          json_kv_number(qper_term_key(f), round2d(qper_term(p, f)));
+                          json_kv_precise_number(qper_term_key(f), qper_term(p, f));
                       json_end_object();
                     json_end_object();
                     json_kv_number("direct_hits", p.direct_hit);

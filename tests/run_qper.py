@@ -4,6 +4,8 @@
 Usage: python3 tests/run_qper.py --engine /path/to/QSS-M --pak0 /path/to/id1/pak0.pak
 """
 import argparse
+import json
+import math
 from pathlib import Path
 import re
 import shutil
@@ -43,6 +45,15 @@ def main():
         for path in (repo / "src").iterdir():
             if path.suffix in {".qc", ".src"}:
                 shutil.copy2(path, source / path.name)
+
+        # Synthetic players have no network channel. Keep gameplay hooks real,
+        # replacing only outbound console/client commands with inert UI sinks.
+        extensions = source / "fteextensions.qc"
+        code = extensions.read_text(encoding="latin1")
+        code, stuff_count = re.subn(r"(\bstuffcmd\s*=)\s*#21;", r"\1 {};", code)
+        code, sprint_count = re.subn(r"(\bsprint\s*=)\s*#24;", r"\1 {};", code)
+        assert stuff_count == 1 and sprint_count == 2
+        extensions.write_text(code, encoding="latin1")
 
         # Keep real BSP geometry but omit unrelated map entities and startup.
         with args.pak0.open("rb") as pak:
@@ -84,7 +95,37 @@ def main():
             output += logfile.read_text(encoding="latin1")
         assert result.returncode == 0 and "QPER TEST PASSED:" in output and "QPER TEST FAILED:" not in output, f"Engine exit {result.returncode}:\n{output}"
         ref = [p for p in mod.rglob("qper_ref.txt")]
-        assert ref and ref[0].read_text().split() == ["tdm_dmm3_4", "2.4000", "300.0"], ref and ref[0].read_text()
+        assert ref and ref[0].read_text().split() == ["qper2-provisional-2", "tdm_dmm3_4", "2.4000", "300.0"], ref and ref[0].read_text()
+        exports = list(mod.rglob("qper_test.json"))
+        assert len(exports) == 1, exports
+        document = json.loads(exports[0].read_text())
+        match = document["match"]
+        reference = match["qper"]
+        assert reference["version"] == "qper2-provisional-2"
+        assert math.isclose(reference["reference"], 1.8, abs_tol=1e-6) and reference["reference_minutes"] == 0
+        assert reference["reference_provisional"] == 1
+        assert match["deathmatch"] == 3 and match["teamplay"] == 1
+        players = match["teams"][0]["players"]
+        assert match["teams"][0]["participating_players"] == 1
+        assert len(players) == 1
+        player = players[0]
+        qper = player["qper"]
+        assert qper["reference"] == reference["reference"]
+        minutes = qper["active_secs"] / 60
+        reconstructed = qper["prior_points"] + 15 * sum(qper["terms"].values()) / ((minutes + 3) * qper["reference"])
+        assert math.isclose(reconstructed, player["per"], abs_tol=0.006), (reconstructed, player["per"])
+        assert qper["raw_inputs"]["team_damage"] == 42
+        assert qper["raw_inputs"]["damage"] == 14400
+        assert qper["telemetry"]["team_damage"] == 42
+        assert qper["telemetry"]["enemy_rl"] == 100
+        assert qper["telemetry"]["spawn_lt1"] == 2
+        assert player["per_v1"] > 0
+        ctf_exports = list(mod.rglob("qper_ctf_metadata.json"))
+        assert len(ctf_exports) == 1
+        ctf = json.loads(ctf_exports[0].read_text())["match"]
+        assert ctf["qper"]["cohort"] == "ctf_dmm3_4"
+        assert ctf["hook_enabled"] == 1 and ctf["runes_enabled"] == 1
+        print("Final JSON parsed; reference and rating reconstruction passed")
         print(next(line for line in output.splitlines() if "QPER TEST PASSED:" in line))
 
 

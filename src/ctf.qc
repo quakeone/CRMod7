@@ -1381,6 +1381,7 @@ void() RuneTouch =
 		return;
 	}
 
+	qper_sample(other);
 	other.player_flag = (other.player_flag | self.player_flag);
 	other.stats_item_runes +=1;
 	
@@ -1484,6 +1485,7 @@ void(float flag) Do_DropRune =
 
 void() DropRune =
 {
+    qper_sample(self);
 //	local entity e;
 
 	if (clanring_sv_pak0_only)
@@ -1608,6 +1610,7 @@ void() RuneRotHealthThink =
 */
 void() TossRune =
 {
+    qper_sample(self);
 	local entity item;
 //	local entity e;
 

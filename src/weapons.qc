@@ -509,6 +509,7 @@ W_FireRocket
 */
 void() W_FireRocket =
 {
+    qper_sample(self);
 	local entity missile;
 
     // ELOHIM_MOD - infinite ammo in practice mode
@@ -600,6 +601,7 @@ void(vector p1, vector p2, entity from, float damage) LightningDamage =
 
 void() W_FireLightning =
 {
+    qper_sample(self);
 	local	vector		org;
 	local	float		cells;
 
@@ -757,6 +759,7 @@ W_FireGrenade
 
 void() W_FireGrenade =
 {
+    qper_sample(self);
 	local	entity missile;
 
 	// ELOHIM_MOD - infinite ammo in practice mode unless safepractice is on

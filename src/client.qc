@@ -2776,6 +2776,7 @@ void() PlayerPostThink =
     if (!(self.style & CLANRING_CONNECTED))
         return;
 
+    qper_sample(self);
     Send_TeamInfo();
 
     // ELOHIM_MOD
