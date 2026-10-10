@@ -13,12 +13,13 @@
 //
 //  Layers: the core applies everywhere, weapon control only when weapons don't
 //  stay (dmm1), objectives only in CTF.  Reference averages are kept per
-//  cohort (mode, deathmatch, team size) in stats/qper_ref.txt and updated
-//  after every completed match.  The old PER (Q1_PER_Calc_Eff) is kept for
+//  cohort (mode, deathmatch, team size or FFA population) in stats/qper_ref.txt
+//  and updated after completed matches and qualifying public games. The old PER
+//  (Q1_PER_Calc_Eff) is kept for
 //  side-by-side comparison until the weights are calibrated.
 //
 
-#define QPER_VERSION            "qper2-provisional-2"
+#define QPER_VERSION            "qper2-provisional-3"
 
 // core
 #define QPER_W_DMG              0.5     // per 100 effective enemy damage
@@ -35,6 +36,14 @@
 #define QPER_W_TEAMKILL         1.0
 #define QPER_W_QUAD_TEAMKILL    1.5     // added to the teamkill cost
 #define QPER_W_TEAMDMG          0.15    // per 100 team damage
+
+// FFA: damage and survival retain an efficiency signal alongside finishes.
+#define QPER_FFA_W_DMG          0.4
+#define QPER_FFA_W_KILL         0.8
+#define QPER_FFA_FINISHER_SHARE  0.7
+#define QPER_FFA_W_DEATH        0.25
+#define QPER_FFA_SPAWN_FLOOR    0.6
+#define QPER_FFA_SPAWN_RAMP     2
 
 // weapon control (dmm1)
 #define QPER_W_EWEP             0.15    // per 100 damage to RL/LG carriers, on top of QPER_W_DMG
@@ -67,8 +76,9 @@
 #define QPER_REF_CAP_MINS       4000    // keeps the reference tracking recent play
 #define QPER_REF_MIN_MINS       2       // shortest stint that updates the reference
 #define QPER_REF_FILE           "stats/qper_ref.txt"
-#define QPER_REF_MAX            32
+#define QPER_REF_MAX            128
 #define QPER_REF_PROVISIONAL_MINS 300 // minimum observed player-minutes, separate from short stints
+#define QPER_PUBLIC_MIN_SECS    180 // contested seconds with at least three players to learn
 
 #define QPER_TERMS              19
 #define QPER_T_DAMAGE           0
@@ -100,6 +110,13 @@ float qper_match_ref_valid, qper_match_ref_rate, qper_match_ref_mins;
 string qper_match_ref_key;
 float qper_cost_id, qper_cost_v;    // largest cost found by qper_find_top_terms
 
+// Time-weighted population, excluding observers, solo play and empty teams.
+float qper_population_mark, qper_population_ready, qper_population_contested;
+float qper_population_players, qper_population_peak;
+float qper_population_secs, qper_population_player_secs, qper_population_three_secs;
+float qper_public_ended, qper_population_frozen;
+float qper_match_profile_valid, qper_match_ffa_profile;
+
 // ------------------------------------------------------------
 // Mode layers
 // ------------------------------------------------------------
@@ -111,6 +128,103 @@ float() qper_weapon_control =
 float() qper_is_ctf =
 {
 	return (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && !(clanring_playmode & CLANRING_PRACTICE_MODE);
+};
+
+float() qper_is_public =
+{
+	return !(clanring_playmode & (CLANRING_MATCH_MODE | CLANRING_PRACTICE_MODE)) && !mode_is_arena();
+};
+
+float() qper_is_ffa =
+{
+	if (teamplay || mode_is_arena() || (clanring_playmode &
+		(CLANRING_CAPTURE_THE_FLAG | CLANRING_HH_MODE | CLANRING_PRACTICE_MODE)))
+		return FALSE;
+	// Public FFA can temporarily have two players. Committed duels keep v2 weights.
+	if (clanring_playmode & CLANRING_MATCH_MODE)
+	{
+		if (qper_match_profile_valid) return qper_match_ffa_profile;
+		return !G1v1_MatchIsDuel();
+	}
+	return TRUE;
+};
+
+float(entity p) qper_population_participant =
+{
+	return p.qper_stint_open && (p.style & CLANRING_CONNECTED) && !(p.style & CLANRING_OBSERVER);
+};
+
+float() qper_population_clock =
+{
+	return qper_population_secs + ((qper_population_ready && qper_population_contested && !qper_population_frozen)
+		? max(0, time - qper_pause_now() - qper_population_mark) : 0);
+};
+
+void() qper_population_reset =
+{
+	qper_population_ready = qper_population_contested = FALSE;
+	qper_population_mark = time - qper_pause_now();
+	qper_population_players = qper_population_peak = 0;
+	qper_population_secs = qper_population_player_secs = qper_population_three_secs = 0;
+	qper_public_ended = FALSE;
+	qper_population_frozen = FALSE;
+	qper_match_profile_valid = FALSE;
+};
+
+void() qper_population_update =
+{
+	local entity p;
+	local float dt, count, first_team, opposing;
+
+	if (qper_population_frozen) return;
+	dt = qper_population_ready ? max(0, time - qper_pause_now() - qper_population_mark) : 0;
+	if (qper_population_contested)
+	{
+		qper_population_secs += dt;
+		qper_population_player_secs += dt * qper_population_players;
+		if (qper_population_players >= 3) qper_population_three_secs += dt;
+	}
+	qper_population_mark = time - qper_pause_now();
+	qper_population_ready = TRUE;
+	count = opposing = 0;
+	first_team = -1;
+	p = find(world, classname, "player");
+	while (p)
+	{
+		if (qper_population_participant(p))
+		{
+			count++;
+			if (first_team < 0) first_team = p.team;
+			else if (!teamplay || first_team != p.team) opposing = TRUE;
+		}
+		p = find(p, classname, "player");
+	}
+	qper_population_players = count;
+	qper_population_peak = max(qper_population_peak, count);
+	qper_population_contested = FALSE;
+	if (count < 2 || !opposing) return;
+	if (mode_is_arena() || (clanring_playmode & CLANRING_PRACTICE_MODE)) return;
+	if (gameover || intermission_running || (clanring_state & (CLANRING_MATCH_PAUSED | CLANRING_MATCH_OVER))) return;
+	if ((clanring_playmode & CLANRING_MATCH_MODE) && !(clanring_state & CLANRING_MATCH_STARTED)) return;
+	qper_population_contested = TRUE;
+};
+
+float() qper_average_players =
+{
+	local float secs, dt;
+	secs = qper_population_clock();
+	dt = max(0, secs - qper_population_secs);
+	return secs > 0 ? (qper_population_player_secs + dt * qper_population_players) / secs : 0;
+};
+
+string() qper_population_bucket =
+{
+	local float count;
+	count = qper_average_players();
+	if (count <= 2) return "2";
+	if (count <= 4) return "3-4";
+	if (count <= 8) return "5-8";
+	return "9+";
 };
 
 float() qper_ctf_live =
@@ -145,29 +259,36 @@ float(entity p) qper_stint_secs =
 {
 	if (!p.qper_stint_open)
 		return 0;
+	if (qper_is_public())
+		return max(0, qper_population_clock() - p.qper_stint_public_mark);
 	return max(0, (time - p.qper_stint_start) - (qper_pause_now() - p.qper_stint_pause_mark));
 };
 
 void(entity p) qper_stint_begin =
 {
+	qper_population_update();
 	p.qper_stint_start = time;
 	p.qper_stint_pause_mark = qper_pause_now();
+	p.qper_stint_public_mark = qper_population_clock();
 	p.qper_stint_open = TRUE;
+	qper_population_update();
 };
 
 void(entity p) qper_stint_end =
 {
 	if (!p.qper_stint_open)
 		return;
+	qper_population_update();
 	qper_sample(p);
 	p.qper_active_bank = p.qper_active_bank + qper_stint_secs(p);
 	p.qper_stint_open = FALSE;
+	qper_population_update();
 };
 
 float(entity p) qper_active_secs =
 {
 	// No stint was ever started (e.g. carried over a map change without a stats reset).
-	if (!p.qper_stint_open && p.qper_stint_start <= 0 && p.qper_active_bank <= 0 && p.join_time > 0)
+	if (!qper_is_public() && !p.qper_stint_open && p.qper_stint_start <= 0 && p.qper_active_bank <= 0 && p.join_time > 0)
 		return max(0, time - p.join_time);
 	return p.qper_active_bank + qper_stint_secs(p);
 };
@@ -192,7 +313,7 @@ void(entity p) qper_reset_player =
 {
 	qper_telemetry_reset(p);
 	// Late joins after a completed match must not erase its export snapshot.
-	if (!(clanring_state & CLANRING_MATCH_OVER)) qper_match_ref_valid = FALSE;
+	if (!(clanring_state & CLANRING_MATCH_OVER) && !qper_public_ended) qper_match_ref_valid = FALSE;
 	p.qper_kill_credit = 0;
 	p.qper_assist_credit = 0;
 	p.qper_cap_credit = 0;
@@ -215,6 +336,8 @@ void(entity p) qper_on_connect =
 	qper_conn_seq = qper_conn_seq + 1;
 	p.qper_conn_id = qper_conn_seq;
 	qper_ledger_clear(p);
+	// Carried clients on a new map may not have passed stats_reset_player.
+	if (!p.qper_stint_open) qper_stint_begin(p);
 };
 
 void(entity p) qper_on_spawn =
@@ -358,8 +481,11 @@ void(entity victim, entity attacker, float amount) qper_ledger_add =
 // ------------------------------------------------------------
 float(entity v, float ramp) qper_kill_pool_imp =
 {
-	local float m, exempt, age, f;
+	local float m, exempt, age, f, ffa, spawn_floor, spawn_ramp;
 
+	ffa = qper_is_ffa();
+	spawn_floor = ffa ? QPER_FFA_SPAWN_FLOOR : QPER_SPAWN_FLOOR;
+	spawn_ramp = ffa ? QPER_FFA_SPAWN_RAMP : QPER_SPAWN_RAMP;
 	m = 1;
 	exempt = FALSE;
 	if (qper_is_ctf() && v.flag_carrier)
@@ -383,10 +509,10 @@ float(entity v, float ramp) qper_kill_pool_imp =
 	if (ramp && !exempt)
 	{
 		age = time - v.qper_spawn_time;
-		if (age < QPER_SPAWN_RAMP)
-			f = QPER_SPAWN_FLOOR + (1 - QPER_SPAWN_FLOOR) * max(0, age) / QPER_SPAWN_RAMP;
+		if (age < spawn_ramp)
+			f = spawn_floor + (1 - spawn_floor) * max(0, age) / spawn_ramp;
 	}
-	return QPER_W_KILL * m * f;
+	return (ffa ? QPER_FFA_W_KILL : QPER_W_KILL) * m * f;
 };
 
 float(entity v) qper_kill_pool =
@@ -396,7 +522,7 @@ float(entity v) qper_kill_pool =
 
 void(entity victim, entity killer) qper_credit_kill =
 {
-	local float pool, total, i, share;
+	local float pool, total, i, share, finisher;
 	local entity e;
 
 	if (victim.classname != "player" || killer.classname != "player")
@@ -429,13 +555,14 @@ void(entity victim, entity killer) qper_credit_kill =
 		return;
 	}
 
-	killer.qper_kill_credit = killer.qper_kill_credit + pool * QPER_FINISHER_SHARE;
+	finisher = qper_is_ffa() ? QPER_FFA_FINISHER_SHARE : QPER_FINISHER_SHARE;
+	killer.qper_kill_credit = killer.qper_kill_credit + pool * finisher;
 	for (i = 0; i < 6; i = i + 1)
 	{
 		if (!qper_slot_valid(victim, i))
 			continue;
 		e = qper_slot_ent(victim, i);
-		share = pool * (1 - QPER_FINISHER_SHARE) * qper_slot_dmg(victim, i) / total;
+		share = pool * (1 - finisher) * qper_slot_dmg(victim, i) / total;
 		e.qper_kill_credit = e.qper_kill_credit + share;
 		if (e != killer)
 			e.qper_assist_credit = e.qper_assist_credit + share;
@@ -597,14 +724,15 @@ void(entity carrier) qper_flag_capture =
 // ------------------------------------------------------------
 float(entity p, float id) qper_term =
 {
-	local float ctf, wc;
+	local float ctf, wc, ffa;
 
 	ctf = qper_is_ctf();
 	wc = qper_weapon_control();
+	ffa = qper_is_ffa();
 
 	switch (id)
 	{
-		case QPER_T_DAMAGE:          return QPER_W_DMG * p.dmg_given / 100;
+		case QPER_T_DAMAGE:          return (ffa ? QPER_FFA_W_DMG : QPER_W_DMG) * p.dmg_given / 100;
 		case QPER_T_EWEP:            return wc ? QPER_W_EWEP * p.ewep / 100 : 0;
 		case QPER_T_KILLS:           return p.qper_kill_credit;
 		case QPER_T_CAPTURES:        return ctf ? p.qper_cap_credit : 0;
@@ -617,13 +745,13 @@ float(entity p, float id) qper_term =
 		case QPER_T_RING:            return QPER_W_RING * p.stats_item_ring;
 		case QPER_T_ARMOR:           return QPER_W_RA * p.stats_item_redarmor + QPER_W_YA * p.stats_item_yellowarmor + QPER_W_MEGA * p.stats_item_mega;
 		case QPER_T_WEAPONS:         return wc ? QPER_W_WEAPON_PICKUP * (p.stats_item_rl + p.stats_item_lg) : 0;
-		case QPER_T_QUAD_SUPPORT:    return QPER_W_QUAD_SUPPORT * p.stats_quad_secure;
+		case QPER_T_QUAD_SUPPORT:    return teamplay ? QPER_W_QUAD_SUPPORT * p.stats_quad_secure : 0;
 		// mangle_z: killed by an enemy; mangle_x: every self/environment death (lava included)
-		case QPER_T_DEATHS:          return -QPER_W_DEATH * p.mangle_z;
+		case QPER_T_DEATHS:          return -(ffa ? QPER_FFA_W_DEATH : QPER_W_DEATH) * p.mangle_z;
 		case QPER_T_SELF_DEATHS:     return -(QPER_W_DEATH + QPER_W_SELF_DEATH) * p.mangle_x;
 		case QPER_T_TEAMKILLS:       return -(QPER_W_TEAMKILL * p.mangle_y + QPER_W_QUAD_TEAMKILL * p.stats_teamkill_quad);
 		case QPER_T_TEAMDMG:         return -QPER_W_TEAMDMG * p.qper_team_damage / 100;
-		case QPER_T_WEAPON_LOSS:     return wc ? -QPER_W_WEAPON_LOSS * p.clanring_badstats_x : 0;
+		case QPER_T_WEAPON_LOSS:     return (wc && !ffa) ? -QPER_W_WEAPON_LOSS * p.clanring_badstats_x : 0;
 	}
 	return 0;
 };
@@ -708,6 +836,9 @@ string() qper_cohort_key =
 		mode = "tdm";
 	else
 		mode = "ffa";
+
+	if (qper_is_ffa())
+		return sprintf("ffa_dmm%g_pop%s", deathmatch, qper_population_bucket());
 
 	size = 0;
 	if (clanring_playmode & CLANRING_MATCH_MODE)
@@ -858,17 +989,17 @@ float(entity p) qper_player_reference =
 
 float() qper_display_reference =
 {
-	return (qper_match_ref_valid && (clanring_playmode & CLANRING_MATCH_MODE)) ? qper_match_ref_rate : qper_reference_rate();
+	return qper_match_ref_valid ? qper_match_ref_rate : qper_reference_rate();
 };
 
 float() qper_display_reference_mins =
 {
-	return (qper_match_ref_valid && (clanring_playmode & CLANRING_MATCH_MODE)) ? qper_match_ref_mins : qper_reference_mins();
+	return qper_match_ref_valid ? qper_match_ref_mins : qper_reference_mins();
 };
 
 string() qper_display_cohort =
 {
-	return (qper_match_ref_valid && (clanring_playmode & CLANRING_MATCH_MODE)) ? qper_match_ref_key : qper_cohort_key();
+	return qper_match_ref_valid ? qper_match_ref_key : qper_cohort_key();
 };
 
 float() qper_reference_provisional =
@@ -948,6 +1079,14 @@ void(float aborted) qper_match_end =
 	local entity p;
 	local float mins, sum_contrib, sum_mins;
 
+	if ((clanring_playmode & CLANRING_MATCH_MODE) && !qper_match_profile_valid)
+	{
+		qper_match_ffa_profile = qper_is_ffa();
+		qper_match_profile_valid = TRUE;
+	}
+	qper_population_update();
+	qper_population_frozen = TRUE;
+
 	p = find(world, classname, "player");
 	while (p != world)
 	{
@@ -985,6 +1124,15 @@ void(float aborted) qper_match_end =
 	if (aborted || mode_is_arena() || (clanring_playmode & CLANRING_PRACTICE_MODE))
 		return;
 	qper_ref_update(sum_contrib, sum_mins);
+};
+
+// Called before intermission clears inventories or displays any public stats.
+void() qper_public_end =
+{
+	if (!qper_is_public() || qper_public_ended) return;
+	qper_population_update();
+	qper_public_ended = TRUE;
+	qper_match_end(qper_population_three_secs < QPER_PUBLIC_MIN_SECS);
 };
 
 // ------------------------------------------------------------

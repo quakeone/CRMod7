@@ -440,6 +440,7 @@ void() worldspawn =
 void() StartFrame =
 {
     local entity serverinactive;
+    qper_population_update();
     //this restarts the server after 6 hour if no one is on the server
     //it keeps the server running smooth
 

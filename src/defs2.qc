@@ -1147,6 +1147,7 @@ string (string stats_filename, float include_mt, string empty_msg) captimes_read
 .float qper_active_bank;        // active seconds from closed stints
 .float qper_stint_start;
 .float qper_stint_pause_mark;
+.float qper_stint_public_mark;  // opponent-present clock at start of public participation
 .float qper_stint_open;
 .float qper_final;              // rating frozen at match end
 .float qper_final_valid;
@@ -1165,6 +1166,10 @@ void(entity flg, entity carrier) qper_flag_drop;
 void(entity carrier) qper_flag_capture;
 void(entity flg) qper_flag_reset;
 void(float aborted) qper_match_end;
+void() qper_public_end;
+void() qper_population_update;
+void() qper_population_reset;
+float() qper_pause_now;
 void() stats_show_per;
 void() stats_show_per_impulse;
 float(entity p) qper_rating;

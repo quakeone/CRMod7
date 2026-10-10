@@ -885,6 +885,13 @@ void() json_emit_match_document =
           json_kv_precise_number("reference_minutes", qper_display_reference_mins());
           json_kv_precise_number("reference_provisional", qper_reference_provisional());
           json_kv_precise_number("reference_minimum_minutes", QPER_REF_PROVISIONAL_MINS);
+          json_kv_precise_number("average_players", qper_average_players());
+          json_kv_precise_number("players_at_end", qper_population_players);
+          json_kv_precise_number("peak_players", qper_population_peak);
+          json_kv_precise_number("population_secs", qper_population_clock());
+          json_kv_precise_number("three_plus_secs", qper_population_three_secs);
+          if (qper_is_ffa()) json_kv_string("population_bucket", qper_population_bucket());
+          json_kv_string("profile", qper_is_ffa() ? "ffa" : "core");
         json_end_object();
 
         // ---- Teams ---------------------------------------------------------

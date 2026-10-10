@@ -8,10 +8,10 @@ in the existing cost term; the legacy badstats counter is unchanged.
 
 ## References and final ratings
 
-The formula version is `qper2-provisional-2`. Each reference file row is:
+The formula version is `qper2-provisional-3`. Each reference file row is:
 
 ```text
-qper2-provisional-2 tdm_dmm3_4 2.4000 300.0
+qper2-provisional-3 tdm_dmm3_4 2.4000 300.0
 ```
 
 The columns are formula version, cohort, observed contribution per minute,
@@ -19,7 +19,40 @@ and observed player-minutes. Rows for older formulas are ignored. Cohorts
 still distinguish mode, deathmatch rules, and configured team size. Actual
 participating roster counts and teamplay, hook, and rune settings are also
 exported so offline analysis can distinguish matches with different rules
-or uneven rosters.
+or uneven rosters. FFA uses deathmatch rules and time-weighted average
+participating population instead of configured team size, for example
+`ffa_dmm3_pop3-4`. Its population buckets are `2`, `3-4`, `5-8`, and `9+`;
+fractional averages use the upper boundary of each bucket. Map differences
+are exported for offline calibration rather than creating map-specific references.
+
+## FFA and public games
+
+Ordinary non-team deathmatch uses a provisional FFA profile: 0.4 per 100
+effective damage, a 0.8 kill pool with 70% reserved for the finisher and
+30% following recent damage, and a 0.25 enemy-death cost. Shared damage
+credit measures skill in FFA. It does not imply cooperation with the finisher.
+Self/environment deaths retain their total 1.0 cost. The spawn discount
+starts at 60% and reaches full value after two seconds. Existing small
+resource credits and dmm1 RL/LG-carrier bonuses remain; FFA pack-loss costs
+are disabled. Team modes retain their combat weights. CTF, headhunters,
+practice and arena modes do not select this profile. Committed 1v1 matches
+retain the core profile; a public FFA temporarily down to two players stays
+on the FFA profile and has a separate population bucket.
+
+Public participation time advances only with at least two connected,
+non-observer participants and, in team modes, at least two opposing teams.
+Dead players remain participants. Solo time, time with only teammates, and
+intermission waits are excluded from both rating minutes and exposure.
+Match-mode participation keeps its existing pause-adjusted clock.
+
+Every public map intermission freezes ratings and their original reference
+before inventories are cleared or end-of-game statistics are displayed.
+The reference learns only after at least 180 contested seconds with three
+or more participants; this gate applies to public FFA, TDM and CTF alike.
+The existing two-minute minimum per player still applies. Shorter games
+freeze without learning, and repeated intermission calls cannot learn twice.
+Practice and arena modes are excluded. Population averages include only
+contested time, and the frozen population survives late intermission joins.
 
 At match end, ratings retain the reference rate and reference minutes used
 to score them, before that match updates the reference. Explanation points
@@ -34,7 +67,12 @@ paused seconds. The legacy JSON PER now uses the display's one-minute floor.
 
 ## Player JSON
 
-The `qper` object includes active seconds, the scoring reference, reference
+The match-level `qper` object also exports `profile`, `average_players`,
+`players_at_end`, `peak_players`, `population_secs`, and `three_plus_secs`,
+plus `population_bucket` for FFA. Average population is weighted by seconds,
+not by how often a client or server frame samples it.
+
+The player `qper` object includes active seconds, the scoring reference, reference
 minutes, raw kill/assist/capture/steal credits, prior points, weighted `terms`,
 and `raw_inputs` for every formula input. Calibration numbers retain float
 precision. The displayed `per` is rounded to two decimal places.
@@ -92,7 +130,8 @@ python3 tests/run_qper.py --engine /path/to/quakespasm \
 ```
 
 The harness builds QuakeC and exercises real unpause, damage, item-transfer,
-reference, lifecycle, and JSON-export paths in a dedicated engine. Synthetic
+reference, lifecycle, public intermission, FFA profile, population, and
+JSON-export paths in a dedicated engine. Synthetic
 players have no network channel, so only `sprint` and `stuffcmd` are replaced
 with inert sinks. The Python checks parse the actual final JSON and reconstruct
 its frozen rating. Registered Quake assets are needed for mod execution.

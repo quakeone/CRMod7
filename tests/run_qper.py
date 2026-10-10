@@ -95,13 +95,13 @@ def main():
             output += logfile.read_text(encoding="latin1")
         assert result.returncode == 0 and "QPER TEST PASSED:" in output and "QPER TEST FAILED:" not in output, f"Engine exit {result.returncode}:\n{output}"
         ref = [p for p in mod.rglob("qper_ref.txt")]
-        assert ref and ref[0].read_text().split() == ["qper2-provisional-2", "tdm_dmm3_4", "2.4000", "300.0"], ref and ref[0].read_text()
+        assert ref and ref[0].read_text().split() == ["qper2-provisional-3", "tdm_dmm3_4", "2.4000", "300.0"], ref and ref[0].read_text()
         exports = list(mod.rglob("qper_test.json"))
         assert len(exports) == 1, exports
         document = json.loads(exports[0].read_text())
         match = document["match"]
         reference = match["qper"]
-        assert reference["version"] == "qper2-provisional-2"
+        assert reference["version"] == "qper2-provisional-3"
         assert math.isclose(reference["reference"], 1.8, abs_tol=1e-6) and reference["reference_minutes"] == 0
         assert reference["reference_provisional"] == 1
         assert match["deathmatch"] == 3 and match["teamplay"] == 1
@@ -125,6 +125,31 @@ def main():
         ctf = json.loads(ctf_exports[0].read_text())["match"]
         assert ctf["qper"]["cohort"] == "ctf_dmm3_4"
         assert ctf["hook_enabled"] == 1 and ctf["runes_enabled"] == 1
+        for mode, cohort, baseline in (
+            ("ffa", "ffa_dmm3_pop3-4", 1.5),
+            ("tdm", "tdm_dmm3_0", 1.8),
+            ("ctf", "ctf_dmm3_0", 1.8),
+        ):
+            public_exports = list(mod.rglob(f"qper_public_{mode}.json"))
+            assert len(public_exports) == 1, public_exports
+            public = json.loads(public_exports[0].read_text())["match"]
+            meta = public["qper"]
+            assert meta["cohort"] == cohort
+            assert math.isclose(meta["reference"], baseline, abs_tol=1e-6) and meta["reference_minutes"] == 0, (mode, meta)
+            assert meta["average_players"] == 3 and meta["players_at_end"] == 3
+            assert meta["peak_players"] == 3 and meta["population_secs"] == 180
+            assert meta["three_plus_secs"] == 180
+            assert meta["profile"] == ("ffa" if mode == "ffa" else "core")
+            if mode == "ffa":
+                assert meta["population_bucket"] == "3-4"
+            for team in public["teams"]:
+                for player in team["players"]:
+                    rating = player["qper"]
+                    assert rating["active_secs"] == 180
+                    assert rating["reference"] == meta["reference"]
+                    assert rating["reference_minutes"] == meta["reference_minutes"]
+                    points = rating["prior_points"] + 15 * sum(rating["terms"].values()) / (6 * baseline)
+                    assert math.isclose(points, player["per"], abs_tol=0.006), (points, player["per"])
         print("Final JSON parsed; reference and rating reconstruction passed")
         print(next(line for line in output.splitlines() if "QPER TEST PASSED:" in line))
 

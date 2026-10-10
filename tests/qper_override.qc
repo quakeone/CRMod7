@@ -472,6 +472,219 @@ void() qper_test_spawn_buckets =
     clanring_playmode = CLANRING_MATCH_MODE;
 };
 
+void(float mode, float teams) qper_test_public_setup =
+{
+    qper_test_retire_players();
+    time = time + 1000;
+    clanring_playmode = CLANRING_NORMAL_MODE | mode;
+    clanring_state = 0;
+    teamplay = teams; deathmatch = 3;
+    gameover = intermission_running = FALSE;
+    clanring_gameconfig = 0;
+    qper_pause_total = 0;
+    qper_match_ref_valid = FALSE;
+    qper_population_reset();
+    qper_population_update();
+};
+
+void() qper_test_ffa_profile =
+{
+    entity a, b, v;
+    qper_test_public_setup(0, 0);
+    a = qper_test_player(RED); b = qper_test_player(RED); v = qper_test_player(RED);
+    a.dmg_given = 100; a.mangle_z = 1; a.mangle_x = 1;
+    a.clanring_badstats_x = 1;
+    qper_assert(qper_is_ffa(), "normal non-team DM selects FFA profile");
+    qper_assert(qper_near(qper_term(a, QPER_T_DAMAGE), 0.4), "FFA damage retains efficiency credit");
+    qper_assert(qper_near(qper_term(a, QPER_T_DEATHS), -0.25), "FFA enemy death costs a quarter");
+    qper_assert(qper_near(qper_term(a, QPER_T_SELF_DEATHS), -1), "FFA self death keeps full cost");
+    qper_ledger_add(v, a, 90); qper_ledger_add(v, b, 10);
+    qper_credit_kill(v, b);
+    qper_assert(qper_near(b.qper_kill_credit, 0.584), "FFA finisher gets 70 percent plus damage share");
+    qper_assert(qper_near(a.qper_assist_credit, 0.216), "FFA recent damage gets remaining skill credit");
+    qper_assert(qper_near(a.qper_kill_credit + b.qper_kill_credit, 0.8), "FFA kill pool remains fixed");
+    v.qper_spawn_time = time;
+    qper_assert(qper_near(qper_kill_pool(v), 0.48), "FFA spawn floor is sixty percent");
+    v.qper_spawn_time = time - 1;
+    qper_assert(qper_near(qper_kill_pool(v), 0.64), "FFA spawn ramp halfway at one second");
+    v.qper_spawn_time = time - 2;
+    qper_assert(qper_near(qper_kill_pool(v), 0.8), "FFA spawn ramp complete at two seconds");
+    deathmatch = 1; v.items = IT_ROCKET_LAUNCHER; v.qper_spawn_time = time;
+    qper_assert(qper_term(a, QPER_T_WEAPON_LOSS) == 0, "FFA pack loss adds no second death cost");
+    qper_assert(qper_near(qper_kill_pool(v), 1.2), "FFA dmm1 carrier kill keeps bonus and spawn exemption");
+    teamplay = 1;
+    qper_assert(qper_near(qper_term(a, QPER_T_WEAPON_LOSS), -0.6), "TDM retains weapon loss cost");
+    qper_assert(qper_near(qper_term(a, QPER_T_DAMAGE), 0.5), "TDM retains damage weight");
+    qper_assert(qper_near(qper_term(a, QPER_T_DEATHS), -0.4), "TDM retains death weight");
+    teamplay = 0; deathmatch = 3; v.items = 0;
+    clanring_playmode = CLANRING_MATCH_MODE; clanring_numteams = 2;
+    qper_assert(!qper_is_ffa() && qper_near(qper_kill_pool(v), 0.24), "committed 1v1 match keeps existing core profile");
+    qper_match_ffa_profile = qper_is_ffa(); qper_match_profile_valid = TRUE;
+    clanring_numteams = 0;
+    qper_assert(!qper_is_ffa() && qper_near(qper_term(a, QPER_T_DAMAGE), 0.5), "clearing duel roster cannot switch final profile");
+    qper_match_profile_valid = FALSE; clanring_numteams = 3;
+    qper_match_ffa_profile = qper_is_ffa(); qper_match_profile_valid = TRUE;
+    clanring_numteams = 2;
+    qper_assert(qper_is_ffa(), "FFA match keeps its initial profile after roster shrinks");
+    clanring_playmode = CLANRING_NORMAL_MODE | CLANRING_HH_MODE;
+    qper_assert(!qper_is_ffa(), "headhunters does not inherit FFA profile");
+    clanring_playmode = CLANRING_NORMAL_MODE | CLANRING_CAPTURE_THE_FLAG;
+    qper_assert(!qper_is_ffa(), "CTF does not inherit FFA profile");
+};
+
+void() qper_test_public_time =
+{
+    entity a, b, observer, c;
+    qper_test_public_setup(0, 0);
+    a = qper_test_player(RED); a.join_time = time;
+    a.health = 100; a.items = IT_ROCKET_LAUNCHER; a.ammo_rockets = 10;
+    time += 90; qper_population_update(); qper_sample(a);
+    qper_assert(qper_active_secs(a) == 0 && a.qper_armed_secs == 0, "solo public time and exposure excluded");
+    b = qper_test_player(RED); b.join_time = time;
+    time += 60; qper_population_update(); qper_sample(a);
+    qper_assert(qper_near(qper_active_secs(a), 60) && qper_near(a.qper_armed_secs, 60), "opponent arrival starts active time and exposure");
+    b.health = 0; b.deadflag = DEAD_DEAD;
+    time += 30; qper_population_update();
+    qper_assert(qper_near(qper_active_secs(a), 90) && qper_population_players == 2, "dead opponents still count as participants");
+    observer = qper_test_player(BLUE); observer.style |= CLANRING_OBSERVER;
+    qper_population_update();
+    time += 30; qper_population_update();
+    qper_assert(qper_near(qper_average_players(), 2), "spectators do not affect population average");
+    qper_stint_end(b); b.style |= CLANRING_OBSERVER;
+    time += 45; qper_population_update();
+    qper_assert(qper_near(qper_active_secs(a), 120), "opponent departure stops active time");
+    c = qper_test_player(BLUE);
+    time += 15; qper_population_update(); qper_stint_end(a);
+    time += 30; qper_population_update();
+    qper_assert(qper_near(qper_active_secs(a), 135), "ended public stint stays frozen");
+
+    qper_test_public_setup(0, 1);
+    a = qper_test_player(RED); b = qper_test_player(RED);
+    time += 60; qper_population_update();
+    qper_assert(qper_active_secs(a) == 0, "public teammates alone are not opposition");
+    b.team = BLUE; qper_population_update();
+    time += 30; qper_population_update();
+    qper_assert(qper_near(qper_active_secs(a), 30), "public enemy team starts active clock");
+    b.team = RED; qper_population_update();
+    time += 30; qper_population_update();
+    qper_assert(qper_near(qper_active_secs(a), 30), "public clock stops when last opposing team leaves");
+
+    clanring_playmode = CLANRING_MATCH_MODE;
+    clanring_state = CLANRING_MATCH_STARTED;
+    qper_reset_player(a);
+    time += 60;
+    qper_assert(qper_near(qper_active_secs(a), 60), "match active time retains existing clock");
+};
+
+void() qper_test_population =
+{
+    entity a;
+    float i;
+    qper_test_public_setup(0, 0);
+    qper_test_player(RED); qper_test_player(RED);
+    time += 60; qper_population_update();
+    qper_assert(qper_cohort_key() == "ffa_dmm3_pop2", "two-player public FFA has separate cohort");
+    qper_test_player(RED); qper_test_player(RED);
+    time += 60; qper_population_update();
+    qper_assert(qper_near(qper_average_players(), 3) && qper_population_bucket() == "3-4", "FFA population averages changing rosters by time");
+    for (i = 0; i < 4; i++) qper_test_player(RED);
+    time += 120; qper_population_update();
+    qper_assert(qper_near(qper_average_players(), 5.5) && qper_population_bucket() == "5-8", "medium FFA cohort uses average rather than final roster");
+    deathmatch = 1;
+    qper_assert(qper_cohort_key() == "ffa_dmm1_pop5-8", "FFA cohorts retain deathmatch separation");
+    a = qper_test_player(RED); a.style |= CLANRING_OBSERVER; qper_population_update();
+    time += 60; qper_population_update();
+    qper_assert(qper_population_players == 8, "observer excluded from current population");
+    for (i = 0; i < 4; i++) qper_test_player(RED);
+    time += 600; qper_population_update();
+    qper_assert(qper_population_bucket() == "9+" && qper_population_peak == 12, "large FFA population has its own cohort");
+};
+
+void() qper_test_match_population =
+{
+    qper_test_public_setup(0, 1);
+    clanring_playmode = CLANRING_MATCH_MODE;
+    qper_test_player(RED); qper_test_player(BLUE); qper_test_player(RED);
+    time += 60; qper_population_update();
+    qper_assert(qper_population_clock() == 0, "warmup does not count toward population sampling");
+    clanring_state = CLANRING_MATCH_STARTED;
+    qper_population_reset(); qper_population_update();
+    time += 60; qper_population_update();
+    qper_assert(qper_near(qper_population_clock(), 60) && qper_near(qper_average_players(), 3), "match population sampling starts with committed play");
+    clanring_state |= CLANRING_MATCH_PAUSED;
+    clanring_match_pause_time = time;
+    time += 60; qper_population_update();
+    qper_assert(qper_near(qper_population_clock(), 60), "match pause excluded from population duration");
+    qper_pause_total += 60;
+    clanring_state = CLANRING_MATCH_STARTED;
+    qper_population_update();
+    time += 30; qper_population_update();
+    qper_assert(qper_near(qper_population_clock(), 90), "match population resumes without paused seconds");
+    qper_match_end(TRUE);
+    time += 20; qper_population_update();
+    qper_assert(qper_population_players == 3 && qper_near(qper_population_clock(), 90), "match end freezes original population before closing stints");
+};
+
+void(float mode, float teams, string filename) qper_test_public_intermission =
+{
+    entity a, b, c, group;
+    float rating, reference, learned;
+    qper_test_public_setup(mode, teams);
+    a = qper_test_player(RED); b = qper_test_player(BLUE); c = qper_test_player(RED);
+    a.join_time = b.join_time = c.join_time = time;
+    a.netname = "public a"; b.netname = "public b"; c.netname = "public c";
+    a.health = b.health = c.health = 100;
+    a.items = IT_ROCKET_LAUNCHER; a.ammo_rockets = 10;
+    a.dmg_given = b.dmg_given = c.dmg_given = 1800;
+    clanring_sentinel = spawn(); group = spawn(); group.height = RED; group.netname = "public";
+    clanring_sentinel.next_team = group; clanring_sentinel.next_player = a;
+    group.next_player = a; a.next_player = b; b.next_player = c;
+    a.next_team = b.next_team = c.next_team = group;
+    time += 180;
+    rating = qper_rating(a); reference = qper_reference_rate();
+    // The production map-end path must freeze before it clears player inventories.
+    gameover = TRUE;
+    execute_changelevel();
+    qper_assert(a.qper_final_valid && qper_public_ended, "real public intermission freezes QPER");
+    qper_assert(qper_near(qper_active_secs(a), 180), "public intermission closes active stint");
+    qper_assert(qper_near(a.qper_access_rl_secs, 180) && a.items == 0, "intermission flushes exposure before clearing inventory");
+    qper_assert(qper_near(qper_rating(a), rating) && qper_near(qper_display_reference(), reference), "public final rating and display keep scoring reference");
+    qper_assert(qper_near(qper_reference_mins(), 9), "qualifying public game learns all player-minutes");
+    learned = qper_reference_mins();
+    time += 20; qper_population_update(); qper_public_end();
+    qper_assert(qper_near(qper_reference_mins(), learned), "repeated intermission cannot learn twice");
+    qper_assert(qper_near(qper_active_secs(a), 180) && qper_near(qper_live_rating(a), rating), "intermission wait does not age rating or explanations");
+    qper_test_player(BLUE);
+    qper_assert(qper_near(qper_display_reference(), reference) && qper_population_players == 3, "late intermission join keeps frozen reference and population");
+    json_export_match_to_file(filename, FALSE);
+};
+
+void() qper_test_public_minimum =
+{
+    entity a;
+    float before;
+    qper_test_public_setup(0, 0);
+    a = qper_test_player(RED); qper_test_player(BLUE);
+    a.join_time = time; a.dmg_given = 1000;
+    before = qper_reference_mins();
+    time += 300; qper_public_end();
+    qper_assert(a.qper_final_valid && qper_reference_mins() == before, "two-player public game freezes without learning");
+    qper_test_public_setup(0, 0);
+    a = qper_test_player(RED); qper_test_player(BLUE); qper_test_player(RED);
+    a.join_time = time;
+    before = qper_reference_mins();
+    time += 179; qper_public_end();
+    qper_assert(a.qper_final_valid && qper_reference_mins() == before, "short three-player public game cannot learn");
+    qper_test_public_setup(0, 1);
+    qper_test_player(RED); qper_test_player(RED); qper_test_player(RED);
+    time += 300; qper_public_end();
+    qper_assert(qper_population_three_secs == 0, "three teammates alone do not qualify public learning");
+    qper_test_public_setup(CLANRING_PRACTICE_MODE, 0);
+    a = qper_test_player(RED); qper_test_player(BLUE); qper_test_player(RED);
+    time += 300; qper_public_end();
+    qper_assert(!a.qper_final_valid && !qper_public_ended, "practice excluded from public finalization");
+};
+
 void() qper_test_frozen_export =
 {
     entity p, redteam;
@@ -531,6 +744,16 @@ void() worldspawn =
     qper_test_telemetry();
     qper_test_item_paths();
     qper_test_spawn_buckets();
+    qper_test_ffa_profile();
+    qper_test_public_time();
+    qper_test_population();
+    qper_test_match_population();
+    qper_test_public_minimum();
+    qper_test_public_intermission(0, 0, "stats/qper_public_ffa.json");
+    qper_test_public_intermission(0, 1, "stats/qper_public_tdm.json");
+    qper_test_public_intermission(CLANRING_CAPTURE_THE_FLAG, 1, "stats/qper_public_ctf.json");
+    qper_public_ended = FALSE;
+    gameover = intermission_running = FALSE;
     qper_test_frozen_export();
 
     print(sprintf("QPER TEST PASSED: %g checks\n", qper_checks));

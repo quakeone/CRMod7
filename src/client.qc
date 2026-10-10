@@ -481,6 +481,8 @@ void() execute_changelevel =
 //	local float bcount;
 	float vote_time = 20;
 
+    qper_public_end();
+
 	// Begin every intermission with a fresh derived ballot. This also clears
 	// any state left by an earlier menu interaction on the same client edict.
 	VoteMap_ResetBallots();
@@ -3120,6 +3122,8 @@ void() ClientDisconnect =
     // (can happen since elohim_kick_player calls ClientDisconnect directly
     if (!(self.style & CLANRING_CONNECTED))
         return;
+
+    qper_stint_end(self);
 
     // ELOHIM_MOD - check for null name
     if (utils_illegal_name (self.netname))

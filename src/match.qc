@@ -1857,6 +1857,10 @@ void() match_begin =
     utils_do_weapons(weapon_prewar_cleanup);
 
     qper_match_ref_valid = FALSE; // the next match gets a fresh reference snapshot
+    qper_population_reset();
+    qper_match_ffa_profile = qper_is_ffa();
+    qper_match_profile_valid = TRUE;
+    qper_population_update();
     announce("The match has begun!");//Moved up here for autodemo
     utils_do_players(match_gib_player);//r00k after additional spawns...
 
