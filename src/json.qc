@@ -865,6 +865,13 @@ void() json_emit_match_document =
         json_kv_number("match size", clanring_maxteams);
         json_kv_number("team size",  stats_matchtype);
         json_kv_number("timelimit",  stats_timelimit);
+        json_kv_number("deathmatch", deathmatch);
+        json_key("qper"); json_begin_object();
+          json_kv_string("version",   QPER_VERSION);
+          json_kv_string("cohort",    qper_cohort_key());
+          json_kv_number("reference", round2d(qper_reference_rate()));
+          json_kv_number("reference_minutes", floor(qper_reference_mins()));
+        json_end_object();
 
         // ---- Teams ---------------------------------------------------------
         json_key("teams"); json_begin_array();
@@ -1010,10 +1017,23 @@ void() json_emit_match_document =
                         json_kv_number("fc_assists",   p.fcassists);
                         json_kv_number("fc_kills",     p.fcfrags);
                         json_kv_number("carry_time",   p.fcarries_time);
+                        json_kv_number("fc_assists_return", p.fcassists_return);
+                        json_kv_number("fc_assists_frag",   p.fcassists_frag);
                       json_end_object();
                     }
 
-                    json_kv_number("per",         per_val);
+                    json_kv_number("per",         round2d(qper_rating(p)));
+                    json_kv_number("per_v1",      per_val);
+                    json_key("qper"); json_begin_object();
+                      json_kv_number("active_secs",   floor(qper_active_secs(p)));
+                      json_kv_number("contribution",  round2d(qper_contribution(p)));
+                      json_kv_number("provisional",   qper_is_provisional(p));
+                      json_kv_number("assist_credit", round2d(p.qper_assist_credit));
+                      json_key("terms"); json_begin_object();
+                        for (f = 0; f < QPER_TERMS; f = f + 1)
+                          json_kv_number(qper_term_key(f), round2d(qper_term(p, f)));
+                      json_end_object();
+                    json_end_object();
                     json_kv_number("direct_hits", p.direct_hit);
                   json_end_object();
                   p = p.next_player;

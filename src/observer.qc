@@ -733,6 +733,7 @@ void () observer_start =
 		}
 	}
 
+	qper_stint_end(self);
 	self.style = self.style | CLANRING_OBSERVER;
 	self.ready_reminder_checks = 0;
 	team_info_reset_receiver_state();

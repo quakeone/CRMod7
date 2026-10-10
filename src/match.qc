@@ -1336,6 +1336,7 @@ void() match_end =
         clanring_numteams = 0;
     }
     match_cancel_initial_movement_check();
+    qper_match_end(clanring_match_aborted);
     clanring_state = clanring_state - (clanring_state & CLANRING_MATCH_STARTED);
     clanring_state = clanring_state - (clanring_state & CLANRING_TIMER_STARTED);
     clanring_state = ((clanring_state | CLANRING_MATCH_OVER) | CLANRING_MATCH_WAIT);
@@ -2809,6 +2810,13 @@ float(entity ghostent) match_restore_ghost =
     self.fcassists = ghostent.fcassists;
     self.fcfrags = ghostent.fcfrags;
     self.captime = ghostent.captime;
+    self.fcassists_return = ghostent.fcassists_return;
+    self.fcassists_frag = ghostent.fcassists_frag;
+    self.qper_kill_credit = ghostent.qper_kill_credit;
+    self.qper_assist_credit = ghostent.qper_assist_credit;
+    self.qper_cap_credit = ghostent.qper_cap_credit;
+    self.qper_steal_credit = ghostent.qper_steal_credit;
+    self.qper_active_bank = ghostent.qper_active_bank;    // observer_end already opened a new stint
     
     self.killed = ghostent.killed;
 
@@ -4217,6 +4225,7 @@ void() match_abort_pause_timeout =
     clanring_state = (clanring_state - (clanring_state & CLANRING_MATCH_PAUSED));
     clanring_state = (clanring_state - (clanring_state & CLANRING_AUTO_PAUSED));
 	clanring_match_pause_time = time - clanring_match_pause_time;
+	qper_pause_total = qper_pause_total + clanring_match_pause_time;
 
 	utils_do_items(match_unpause_item);
 	utils_do_item(match_unpause_item, "item_ffa_ghost_timer");
@@ -4261,6 +4270,7 @@ void() match_unpause =
     clanring_state = (clanring_state - (clanring_state & CLANRING_MATCH_PAUSED));
     clanring_state = (clanring_state - (clanring_state & CLANRING_AUTO_PAUSED));
     clanring_match_pause_time = time - clanring_match_pause_time;
+    qper_pause_total = qper_pause_total + clanring_match_pause_time;
     if (clanring_match_start_time)
         clanring_match_start_time = clanring_match_start_time + clanring_match_pause_time;
 	if (clanring_match_inactivity_check != world)
@@ -4766,6 +4776,15 @@ void(entity player) match_disconnect_notify =
             self.owner.fcassists 	= self.fcassists;
             self.owner.fcfrags   	= self.fcfrags;
             self.owner.captime   	= self.captime;
+
+            qper_stint_end(self);
+            self.owner.fcassists_return = self.fcassists_return;
+            self.owner.fcassists_frag = self.fcassists_frag;
+            self.owner.qper_kill_credit = self.qper_kill_credit;
+            self.owner.qper_assist_credit = self.qper_assist_credit;
+            self.owner.qper_cap_credit = self.qper_cap_credit;
+            self.owner.qper_steal_credit = self.qper_steal_credit;
+            self.owner.qper_active_bank = self.qper_active_bank;
         }
 
         // Autopause is player behavior, not ghost behavior.  A ghostless

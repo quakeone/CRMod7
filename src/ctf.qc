@@ -258,6 +258,8 @@ void(entity flg, string status) ctf_set_flag_infokey =
 void(entity flg) RegenFlag =
 {
 	if (flg == world) return;
+
+	qper_flag_reset(flg);
 	
 	flg.movetype  	= MOVETYPE_TOSS;
 	flg.solid     	= SOLID_TRIGGER;
@@ -393,6 +395,7 @@ void(entity flg) TeamDropFlag =
 	}
 
 	p.fctime += (time - p.flag_since);
+	qper_flag_drop(flg, p);
 
 //	if (clanring_playmode & CLANRING_MATCH_MODE)
 	//	p.next_team.fctime += (time - p.flag_since);
@@ -698,12 +701,19 @@ void() TeamCaptureFlagTouch =
 
 					// Check if there was a recent strategic return by a teammate
 					local entity returner;
+					local float returned_at;
 					if (other.team == RED)
+					{
 						returner = last_red_returner;
+						returned_at = last_red_return_time;
+					}
 					else
+					{
 						returner = last_blue_returner;
+						returned_at = last_blue_return_time;
+					}
 
-					if (returner && returner != other && (time - last_return_time < 5)) // 5 second window
+					if (returner && returner != other && (time - returned_at < 5)) // 5 second window
 					{
 						returner.strategic_returns = returner.strategic_returns + 1;
 					}
@@ -745,6 +755,7 @@ void() TeamCaptureFlagTouch =
 								announce2(p.netname," gets an assist for returning the \xC6\xCC\xC1\xC7!");
 								client_frag(p, TEAM_CAPTURE_RETURN_FLAG_ASSIST_BONUS);// awarded for returning a flag that causes a capture to happen almost immediately
 								p.fcassists = (p.fcassists + 1);//fstat
+								p.fcassists_return += 1;
 							}
 							
 							if ((p.last_fragged_carrier + TEAM_CAPTURE_FRAG_CARRIER_ASSIST_TIMEOUT) > time)
@@ -752,6 +763,7 @@ void() TeamCaptureFlagTouch =
 								announce2(p.netname," gets an assist for fragging the \xC6\xCC\xC1\xC7 carrier!");
 								client_frag(p, TEAM_CAPTURE_FRAG_CARRIER_ASSIST_BONUS);// award for fragging a flag carrier if a capture happens almost immediately
 								p.fcassists = (p.fcassists + 1);//fstat
+								p.fcassists_frag += 1;
 							}
 						}
 						else
@@ -774,6 +786,7 @@ void() TeamCaptureFlagTouch =
 				// Reset flag carry tracking when flag is captured
 				other.flag_carry_start = 0;
 
+				qper_flag_capture(other);
 				TeamCaptureRegenFlags ();// respawn flags
 				return;
 			}
@@ -794,11 +807,15 @@ void() TeamCaptureFlagTouch =
 
 			// Store who returned the flag for strategic return tracking
 			if (other.team == RED)
+			{
 				last_red_returner = other;
+				last_red_return_time = time;
+			}
 			else
+			{
 				last_blue_returner = other;
-    
-			last_return_time = time;
+				last_blue_return_time = time;
+			}
 
 		}
 		TeamCaptureReturnFlag (self);//send it back home
@@ -840,6 +857,8 @@ void() TeamCaptureFlagTouch =
 	other.items        	= (other.items | self.items);
 	other.flag_since   	= time;
 	
+	qper_flag_pickup(self, other, (self.cnt == FLAG_AT_BASE));
+
 	//pickup time only when taken from base
 	if (self.cnt == FLAG_AT_BASE)
 	{

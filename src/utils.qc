@@ -3884,7 +3884,7 @@ void(entity ev) webhook_stats_info =
     local string hdr_time;
     local float m, s;
     local float hourpos;
-    local float mins_norm, per_min, v;
+    local float v;
     local float b1, b2, b3, b4, b5;
     local float obs_participant;
     local float row_frags;
@@ -4647,7 +4647,7 @@ void(entity ev) webhook_stats_info =
         }
         if (opened2) APPEND_SAFE("```\n");
 
-        // ---- PER (top-5, per-min) + inline reasons for #1 ----
+        // ---- QPER (top-5) + inline reasons for #1 ----
         {
             local entity e1, e2, e3, e4, e5;
             local float opened3; opened3 = 0;
@@ -4665,10 +4665,7 @@ void(entity ev) webhook_stats_info =
                                    stats_has_nontrivial_activity(p));
                 if (((!(p.style & CLANRING_OBSERVER) && p.next_team != world) || obs_participant) && p.join_time > 0)
                 {
-                    mins_norm = max(1, (time - p.join_time) / 60);
-                    per_min   = Q1_PER_Calc_Eff(p) / mins_norm;
-                    if (per_min < 0.1) per_min = 0.1;
-                    v = per_min;
+                    v = qper_rating(p);
 
                     if (v > b1) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=b1; e2=e1; b1=v; e1=p; }
                     else if (v > b2) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=v; e2=p; }
@@ -4679,165 +4676,25 @@ void(entity ev) webhook_stats_info =
                 if (use_find) p = find(p, classname, "player"); else p = p.next_player;
             }
 
-            if (e1 && e1 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  1) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e1.netname)), b1)); }
-            if (e2 && e2 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  2) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e2.netname)), b2)); }
-            if (e3 && e3 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  3) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e3.netname)), b3)); }
-            if (e4 && e4 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  4) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e4.netname)), b4)); }
-            if (e5 && e5 != world) { if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; } APPEND_SAFE(sprintf("%s  5) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e5.netname)), b5)); }
+            if (e1 && e1 != world) { APPEND_SAFE("\n**QPER (top-5)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; }
+            if (e1 && e1 != world) APPEND_SAFE(sprintf("%s  1) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e1.netname)), b1));
+            if (e2 && e2 != world) APPEND_SAFE(sprintf("%s  2) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e2.netname)), b2));
+            if (e3 && e3 != world) APPEND_SAFE(sprintf("%s  3) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e3.netname)), b3));
+            if (e4 && e4 != world) APPEND_SAFE(sprintf("%s  4) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e4.netname)), b4));
+            if (e5 && e5 != world) APPEND_SAFE(sprintf("%s  5) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e5.netname)), b5));
 
             // Inline reasons for #1 (same code fence)
             if (e1 && e1 != world)
             {
-                if (!opened3) { APPEND_SAFE("\n**PER (top-5, per-min)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; }
-                local entity ep; ep = e1;
-
-                // per-minute normalizer
-                local float per_mins = max(1, (time - ep.join_time) / 60);
-
-                // recompute atomic terms (mirror of PER_PrintTop3Reasons), per-minute
-                local float dmg_min   = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? 142 : 100;
-                local float res_coeff = (clanring_playmode & CLANRING_CAPTURE_THE_FLAG) ? 10  : 13;
-
-                local float kd_spread  = ep.true_kills - ep.mangle_z;
-                local float dmg_spread = ep.dmg_given - ep.dmg_taken;
-                local float dmg_tokill = (ep.mangle_z > 0) ? (ep.dmg_taken / ep.mangle_z) : ep.dmg_taken;
-                local float resilience = dmg_tokill / dmg_min;
-                local float res_term   = res_coeff * max(0, pow(resilience, 1.2) - 1);
-                local float quad_mins  = ep.totalquad / 60;
-                local float quad_eff   = 0;
-                local float quad_eff_scale = 0;
-                local float quad_term  = 0;
-                local float quad_eff_pct = 0;
-                if (ep.clanring_qdwep_y > 0)
-                    quad_eff = ep.clanring_qdwep_x / ep.clanring_qdwep_y;
-                quad_eff_scale = bound(0.5, quad_eff / 0.22, 1.25);
-                if (quad_mins > 0)
-                    quad_term = 10.0 * pow(quad_mins, 0.5) * quad_eff_scale;
-                quad_eff_pct = floor(100 * quad_eff + 0.5);
-
-                local float T[20]; local float base, vv;
-                T[0]  = (0.9 * kd_spread * pow(fabs(kd_spread), 0.1125)) / per_mins;         // big KD spread
-                T[1]  = (0.6 * (dmg_spread / dmg_min)) / per_mins;                           // damage advantage
-                T[2]  = res_term / per_mins;                                                 // hard-to-kill bonus
-                T[3]  = (2.5 * ep.stats_powerup_denial_quad) / per_mins;                     // enemy Quad kills
-
-                T[4]  = quad_term / per_mins;                                                 // Quad control conversion
-                T[5]  = (5.0 * ep.clanring_ptwep_z) / per_mins;                              // Pents taken
-                T[6]  = (1.0 * ep.stats_item_ring) / per_mins;                               // Rings
-                T[7]  = (0.30 * ep.stats_item_redarmor) / per_mins;                          // RA
-                T[8]  = (0.10 * ep.stats_item_yellowarmor) / per_mins;                       // YA
-                T[9]  = (0.15 * ep.stats_item_mega) / per_mins;                              // Megas
-                T[10] = (0.20 * ep.stats_item_rl) / per_mins;                                // RL
-                T[11] = (0.20 * ep.stats_item_lg) / per_mins;                                // LG
-                T[12] = (0.75 * ep.stats_quad_secure) / per_mins;                            // quad securing
-                base = 13;
-
-                if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+                qper_find_top_terms(e1);
+                if (qper_top_id1 >= 0)
                 {
-                    T[13] = (2.5 * ep.fcaptures + 0.55 * pow(ep.fcaptures, 1.125)) / per_mins; // captures
-                    T[14] = (5.0 * pow(ep.fcarries_time / 60, 0.9)) / per_mins;                // long holds
-                    T[15] = (1.5 * ep.fcfrags) / per_mins;                                     // carrier kills
-                    T[16] = (0.25 * ep.freturns) / per_mins;                                   // returns
-                    T[17] = (2.25 * ep.strategic_returns) / per_mins;                          // strategic returns
-                    T[18] = (1.0 * ep.fdefenses + 0.23 * pow(ep.fdefenses, 1.10)) / per_mins;  // base defenses
-                    T[19] = (1.0 * ep.fcdefenses) / per_mins;                                  // carrier defenses
-                    base = 20;
-                }
-
-                // pick top-3 above a small threshold to avoid noise
-                local float min_show = 0.25;
-                local float r1v=-9999, r2v=-9999, r3v=-9999;
-                local float i1=-1, i2=-1, i3=-1;
-                {
-                    local float ii;
-                    for (ii = 0; ii < base; ii = ii + 1)
-                    {
-                        vv = T[ii];
-                        if (vv <= min_show) continue;
-                        if (vv > r1v) { r3v=r2v; i3=i2; r2v=r1v; i2=i1; r1v=vv; i1=ii; }
-                        else if (vv > r2v) { r3v=r2v; i3=i2; r2v=vv; i2=ii; }
-                        else if (vv > r3v) { r3v=vv; i3=ii; }
-                    }
-                }
-
-                // quad control helper: show seconds held + pickup count + conversion quality
-                local float quad_secs = floor(ep.totalquad + 0.5);
-                local float quad_takes = ep.clanring_qdwep_z;
-                local string quad_pickup_word; quad_pickup_word = "quad pickups";
-                if (quad_takes == 1) quad_pickup_word = "quad pickup";
-
-                // heading: keep within same fence
-                APPEND_SAFE(sprintf("\nwhy %s led PER:\n", utils_dequake_for_discord(ep.netname)));
-
-                // emit a line for each reason index
-                if (i1 >= 0)
-                {
-                    if      (i1 == 0)  APPEND_SAFE(sprintf("  1) big KD spread (%g-%g) (+%3.1f/min)\n", ep.true_kills, ep.mangle_z, r1v));
-                    else if (i1 == 1)  APPEND_SAFE(sprintf("  1) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r1v));
-                    else if (i1 == 2)  APPEND_SAFE(sprintf("  1) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r1v));
-                    else if (i1 == 3)  APPEND_SAFE(sprintf("  1) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r1v));
-                    else if (i1 == 4)  APPEND_SAFE(sprintf("  1) quad control conversion (%gs total; %g %s; %g%% eff) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, quad_eff_pct, r1v));
-                    else if (i1 == 5)  APPEND_SAFE(sprintf("  1) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r1v));
-                    else if (i1 == 6)  APPEND_SAFE(sprintf("  1) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r1v));
-                    else if (i1 == 7)  APPEND_SAFE(sprintf("  1) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r1v));
-                    else if (i1 == 8)  APPEND_SAFE(sprintf("  1) YA pickups (%g) (+%3.1f/min)\n", ep.stats_item_yellowarmor, r1v));
-                    else if (i1 == 9)  APPEND_SAFE(sprintf("  1) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r1v));
-                    else if (i1 == 10) APPEND_SAFE(sprintf("  1) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r1v));
-                    else if (i1 == 11) APPEND_SAFE(sprintf("  1) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r1v));
-                    else if (i1 == 12) APPEND_SAFE(sprintf("  1) quad securing (%g) (+%3.1f/min)\n", ep.stats_quad_secure, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 13) APPEND_SAFE(sprintf("  1) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 14) { local float cm=floor(ep.fcarries_time/60); local float cs=ep.fcarries_time-cm*60; APPEND_SAFE(sprintf("  1) long flag holds (%g:%02g) (+%3.1f/min)\n", cm, cs, r1v)); }
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 15) APPEND_SAFE(sprintf("  1) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 16) APPEND_SAFE(sprintf("  1) returns (%g) (+%3.1f/min)\n", ep.freturns, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 17) APPEND_SAFE(sprintf("  1) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 18) APPEND_SAFE(sprintf("  1) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r1v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i1 == 19) APPEND_SAFE(sprintf("  1) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r1v));
-                }
-                if (i2 >= 0)
-                {
-                    if      (i2 == 0)  APPEND_SAFE(sprintf("  2) big KD spread (%g-%g) (+%3.1f/min)\n", ep.true_kills, ep.mangle_z, r2v));
-                    else if (i2 == 1)  APPEND_SAFE(sprintf("  2) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r2v));
-                    else if (i2 == 2)  APPEND_SAFE(sprintf("  2) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r2v));
-                    else if (i2 == 3)  APPEND_SAFE(sprintf("  2) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r2v));
-                    else if (i2 == 4)  APPEND_SAFE(sprintf("  2) quad control conversion (%gs total; %g %s; %g%% eff) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, quad_eff_pct, r2v));
-                    else if (i2 == 5)  APPEND_SAFE(sprintf("  2) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r2v));
-                    else if (i2 == 6)  APPEND_SAFE(sprintf("  2) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r2v));
-                    else if (i2 == 7)  APPEND_SAFE(sprintf("  2) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r2v));
-                    else if (i2 == 8)  APPEND_SAFE(sprintf("  2) YA pickups (%g) (+%3.1f/min)\n", ep.stats_item_yellowarmor, r2v));
-                    else if (i2 == 9)  APPEND_SAFE(sprintf("  2) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r2v));
-                    else if (i2 == 10) APPEND_SAFE(sprintf("  2) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r2v));
-                    else if (i2 == 11) APPEND_SAFE(sprintf("  2) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r2v));
-                    else if (i2 == 12) APPEND_SAFE(sprintf("  2) quad securing (%g) (+%3.1f/min)\n", ep.stats_quad_secure, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 13) APPEND_SAFE(sprintf("  2) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 14) { local float cm2=floor(ep.fcarries_time/60); local float cs2=ep.fcarries_time-cm2*60; APPEND_SAFE(sprintf("  2) long flag holds (%g:%02g) (+%3.1f/min)\n", cm2, cs2, r2v)); }
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 15) APPEND_SAFE(sprintf("  2) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 16) APPEND_SAFE(sprintf("  2) returns (%g) (+%3.1f/min)\n", ep.freturns, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 17) APPEND_SAFE(sprintf("  2) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 18) APPEND_SAFE(sprintf("  2) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r2v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i2 == 19) APPEND_SAFE(sprintf("  2) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r2v));
-                }
-                if (i3 >= 0)
-                {
-                    if      (i3 == 0)  APPEND_SAFE(sprintf("  3) big KD spread (%g-%g) (+%3.1f/min)\n", ep.true_kills, ep.mangle_z, r3v));
-                    else if (i3 == 1)  APPEND_SAFE(sprintf("  3) damage advantage (+%g) (+%3.1f/min)\n", dmg_spread, r3v));
-                    else if (i3 == 2)  APPEND_SAFE(sprintf("  3) hard-to-kill bonus (~%3.1f dmg/life) (+%3.1f/min)\n", floor(dmg_tokill*10+0.5)/10, r3v));
-                    else if (i3 == 3)  APPEND_SAFE(sprintf("  3) enemy Quad kills (%g) (+%3.1f/min)\n", ep.stats_powerup_denial_quad, r3v));
-                    else if (i3 == 4)  APPEND_SAFE(sprintf("  3) quad control conversion (%gs total; %g %s; %g%% eff) (+%3.1f/min)\n", quad_secs, quad_takes, quad_pickup_word, quad_eff_pct, r3v));
-                    else if (i3 == 5)  APPEND_SAFE(sprintf("  3) Pents taken (%g) (+%3.1f/min)\n", ep.clanring_ptwep_z, r3v));
-                    else if (i3 == 6)  APPEND_SAFE(sprintf("  3) Rings taken (%g) (+%3.1f/min)\n", ep.stats_item_ring, r3v));
-                    else if (i3 == 7)  APPEND_SAFE(sprintf("  3) RA control (%g) (+%3.1f/min)\n", ep.stats_item_redarmor, r3v));
-                    else if (i3 == 8)  APPEND_SAFE(sprintf("  3) YA pickups (%g) (+%3.1f/min)\n", ep.stats_item_yellowarmor, r3v));
-                    else if (i3 == 9)  APPEND_SAFE(sprintf("  3) Megas taken (%g) (+%3.1f/min)\n", ep.stats_item_mega, r3v));
-                    else if (i3 == 10) APPEND_SAFE(sprintf("  3) RL pickups (%g) (+%3.1f/min)\n", ep.stats_item_rl, r3v));
-                    else if (i3 == 11) APPEND_SAFE(sprintf("  3) LG pickups (%g) (+%3.1f/min)\n", ep.stats_item_lg, r3v));
-                    else if (i3 == 12) APPEND_SAFE(sprintf("  3) quad securing (%g) (+%3.1f/min)\n", ep.stats_quad_secure, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 13) APPEND_SAFE(sprintf("  3) flag captures (%g) (+%3.1f/min)\n", ep.fcaptures, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 14) { local float cm3=floor(ep.fcarries_time/60); local float cs3=ep.fcarries_time-cm3*60; APPEND_SAFE(sprintf("  3) long flag holds (%g:%02g) (+%3.1f/min)\n", cm3, cs3, r3v)); }
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 15) APPEND_SAFE(sprintf("  3) carrier kills (%g) (+%3.1f/min)\n", ep.fcfrags, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 16) APPEND_SAFE(sprintf("  3) returns (%g) (+%3.1f/min)\n", ep.freturns, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 17) APPEND_SAFE(sprintf("  3) strategic returns (%g) (+%3.1f/min)\n", ep.strategic_returns, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 18) APPEND_SAFE(sprintf("  3) base defenses (%g) (+%3.1f/min)\n", ep.fdefenses, r3v));
-                    else if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && i3 == 19) APPEND_SAFE(sprintf("  3) carrier defenses (%g) (+%3.1f/min)\n", ep.fcdefenses, r3v));
+                    APPEND_SAFE(sprintf("\nwhy %s led QPER:\n", utils_dequake_for_discord(e1.netname)));
+                    APPEND_SAFE(sprintf("  1) %s (+%3.1f)\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id1)), qper_top_v1));
+                    if (qper_top_id2 >= 0)
+                        APPEND_SAFE(sprintf("  2) %s (+%3.1f)\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id2)), qper_top_v2));
+                    if (qper_top_id3 >= 0)
+                        APPEND_SAFE(sprintf("  3) %s (+%3.1f)\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id3)), qper_top_v3));
                 }
             }
         }

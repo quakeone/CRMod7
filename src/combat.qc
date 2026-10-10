@@ -913,6 +913,7 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 	{
 		targ.dmg_taken = targ.dmg_taken + save + overkill;
 		attacker.dmg_given = attacker.dmg_given + save + overkill;
+		qper_ledger_add(targ, attacker, save + overkill);
 		if ((targ.items & IT_ROCKET_LAUNCHER) || (targ.items & IT_LIGHTNING))
 		{
 			attacker.ewep = attacker.ewep + save + overkill;

@@ -1397,6 +1397,7 @@ void() PutClientInServer =
 
     self.clanring_badstats_wait_pending = 0;
     self.clanring_badstats_wait_active = FALSE;
+    qper_on_spawn(self);
 
     DecodeLevelParms ();
 
@@ -3370,6 +3371,7 @@ void(entity targ, entity attacker) ClientObituary =
                     targ.mangle_z = targ.mangle_z + 1;
                     client_frag (attacker.owner, 1);
                     attacker.owner.true_kills = (attacker.owner.true_kills + 1);
+                    qper_credit_kill(targ, attacker.owner);
                 }
                 announce3(targ.netname, " was telefragged by ", attacker.owner.netname);
             }
@@ -3388,6 +3390,7 @@ void(entity targ, entity attacker) ClientObituary =
             targ.mangle_z = targ.mangle_z + 1;
             client_frag (attacker.owner, 1);
             attacker.owner.true_kills = (attacker.owner.true_kills + 1);
+            qper_credit_kill(targ, attacker.owner);
             return;
         }
         if (targ.deathtype == "squish")
@@ -3407,6 +3410,7 @@ void(entity targ, entity attacker) ClientObituary =
                     announce3(attacker.netname, " squishes ", targ.netname);
                     client_frag (attacker, 1);
                     attacker.true_kills = (attacker.true_kills + 1);
+                    qper_credit_kill(targ, attacker);
                     return;
                 }
                 else
@@ -3659,6 +3663,7 @@ void(entity targ, entity attacker) ClientObituary =
                     targ.mangle_z = targ.mangle_z + 1;//STATS
                     client_frag (attacker, 1);
                     attacker.true_kills = (attacker.true_kills + 1);
+                    qper_credit_kill(targ, attacker);
                     deathstring2 = "";
                     rnum = attacker.weapon;
                     if (targ.deathtype == "nail")

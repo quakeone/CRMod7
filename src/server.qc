@@ -1328,6 +1328,7 @@ void () clanring_set_aliases =
     stuffcmd(self, "alias badstats impulse 174\n");
     stuffcmd(self, "alias teamstats impulse 175\n");
     stuffcmd(self, "alias flagstats impulse 176\n");
+    stuffcmd(self, "alias per impulse 177\n");
     stuffcmd(self, "alias autostats impulse 178\n");
     stuffcmd(self, "alias red \";color 4;w5;ready;\"\n");
     stuffcmd(self, "alias blue \";color 13;w5;ready;\"\n");
@@ -1948,6 +1949,7 @@ void () clanring_client_connect =
     self.ready_check_time = 0; //Initialize ready? command cooldown
     self.ready_reminder_checks = 0;
     self.join_time = time;
+    qper_on_connect(self);
 
     parm10 = parm10 - (parm10 & (CLANRING_READY | CLANRING_KICK_CONFIRM | CLANRING_MOTD | CLANRING_SETTING_OPTIONS | CLANRING_SCOREBOARD | CLANRING_CONFIRM_LEAVE));
 
@@ -2440,6 +2442,7 @@ void () stat_commands =
         sprint(self, " \bitstats\b     show item pickup statistics\n");
         sprint(self, " \bkillstats\b   show detailed kill statistics\n");
         sprint(self, " \bpentstats\b   show pentagram statistics\n");
+        sprint(self, " \bper\b         show player efficiency ratings\n");
         sprint(self, " \bquadstats\b   show quad-damage statistics\n");
         sprint(self, " \bstats\b       show current match statistics\n");
         sprint(self, " \bteamstats\b   show team totals\n");

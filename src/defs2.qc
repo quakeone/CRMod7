@@ -847,7 +847,8 @@ entity boss;
 .float strategic_returns;  // Flag returns that lead to team captures
 entity last_red_returner;
 entity last_blue_returner;
-float last_return_time;
+float last_red_return_time;   // per team so the other team's return can't revive a stale returner
+float last_blue_return_time;
 
 .float fcarries_time;        // Seconds spent carrying enemy flag (non-camping)
 .float flag_carry_start;     // When current carry started
@@ -1123,3 +1124,52 @@ string(string json, string key) gsheets_json_get_string;
 float(string json, string key) gsheets_json_get_number;
 void(string arr, float recordset) gsheets_parse_record_array;
 string (string stats_filename, float include_mt, string empty_msg) captimes_read_top3_from_file;
+
+// QPER v2 player efficiency rating (qper.qc)
+.float qper_conn_id;            // unique per connection, guards against reused client slots
+.float qper_spawn_time;
+.entity qper_l_e1, qper_l_e2, qper_l_e3, qper_l_e4, qper_l_e5, qper_l_e6;	// recent enemy damage on this life
+.float qper_l_id1, qper_l_id2, qper_l_id3, qper_l_id4, qper_l_id5, qper_l_id6;
+.float qper_l_d1, qper_l_d2, qper_l_d3, qper_l_d4, qper_l_d5, qper_l_d6;
+.float qper_l_time;             // time the ledger damage was last decayed to
+.float qper_kill_credit;        // shared kill credit (own finishes plus assist shares)
+.float qper_assist_credit;      // part of qper_kill_credit earned on kills finished by others
+.float qper_cap_credit;         // CTF capture credit
+.float qper_steal_credit;       // CTF credit for steals that didn't end in a capture
+.float fcassists_return;        // fcassists split: returns shortly before a capture
+.float fcassists_frag;          // fcassists split: carrier kills shortly before a capture
+.float qper_poss_id;            // player: possession carried; flag: active possession
+.float qper_poss_hold;          // seconds this player carried the current possession
+.float qper_poss_since;
+.float qper_poss_live;          // flag: possession started while stats were live
+.entity qper_poss_stealer;      // flag: player who took it from base
+.float qper_poss_stealer_id;
+.float qper_active_bank;        // active seconds from closed stints
+.float qper_stint_start;
+.float qper_stint_pause_mark;
+.float qper_stint_open;
+.float qper_final;              // rating frozen at match end
+.float qper_final_valid;
+float qper_conn_seq;
+float qper_poss_seq;
+float qper_pause_total;         // completed match pause seconds
+
+void(entity p) qper_reset_player;
+void(entity p) qper_on_connect;
+void(entity p) qper_on_spawn;
+void(entity p) qper_stint_end;
+void(entity victim, entity attacker, float amount) qper_ledger_add;
+void(entity victim, entity killer) qper_credit_kill;
+void(entity flg, entity carrier, float from_base) qper_flag_pickup;
+void(entity flg, entity carrier) qper_flag_drop;
+void(entity carrier) qper_flag_capture;
+void(entity flg) qper_flag_reset;
+void(float aborted) qper_match_end;
+void() stats_show_per;
+void() stats_show_per_impulse;
+float(entity p) qper_rating;
+float(entity p) qper_active_mins;
+void(entity p) qper_find_top_terms;
+string(entity p, float id) qper_term_label;
+float qper_top_id1, qper_top_id2, qper_top_id3;
+float qper_top_v1, qper_top_v2, qper_top_v3;
