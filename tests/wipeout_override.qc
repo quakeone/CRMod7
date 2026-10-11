@@ -152,6 +152,99 @@ void() wo_test_limit =
     wo_assert(wo_c.respawntime == 0 && !wipeout_team_in_play(wo_blue), "zero disables even solo first return");
 };
 
+void() wo_test_solo_limbo =
+{
+    wo_reset();
+    wo_die(wo_c);
+    self = wo_c; respawn();
+    wo_assert(IS_CA_OBSERVER(wo_c) && wo_c.ca_player_flag == PF_DEAD &&
+              wo_c.wipeout_solo_return && wipeout_team_in_play(wo_blue),
+              "real corpse-to-limbo transition preserves solo free return");
+    arena_main_loop();
+    wo_assert(boss.wait == 0, "solo limbo does not end a contested round");
+    self = wo_c; observer_pre_think();
+    wo_assert(!IS_CA_OBSERVER(wo_c) && wo_blue.teamalive == 1 &&
+              !wo_c.wipeout_solo_return && wo_c.respawntime == 0,
+              "solo exemption clears only after the actual return");
+
+    wo_reset(); wo_die(wo_c); arena_pause(); time += 10;
+    self = wo_c; respawn(); observer_pre_think();
+    wo_assert(IS_CA_OBSERVER(wo_c) && wo_c.wipeout_solo_return && wo_blue.teamalive == 0,
+              "solo corpse-to-limbo transition during pause keeps its queued return");
+    arena_unpause(); observer_pre_think();
+    wo_assert(!IS_CA_OBSERVER(wo_c) && wo_blue.teamalive == 1,
+              "paused solo first death returns after unpause");
+};
+
+void() wo_test_solo_pending_win =
+{
+    wo_reset();
+    wo_die(wo_c); wo_limbo(wo_c);
+    wo_die(wo_a); wo_die(wo_b);
+    arena_main_loop();
+    wo_assert(boss.wait == 0 && !boss.busy,
+              "wiped opponents cannot strand a pending solo return in a draw");
+    self = wo_c; observer_pre_think(); arena_main_loop();
+    wo_assert(wo_blue.teamalive == 1 && boss.wait == time + 4,
+              "solo survivor starts round-end wait after returning");
+    time += 4.1; arena_main_loop();
+    wo_assert(wo_blue.wins == 1 && wo_red.losses == 1 && boss.busy,
+              "pending solo survivor ultimately wins instead of drawing");
+};
+
+void() wo_test_queued_leave =
+{
+    entity queued;
+    wo_reset();
+    queued = spawn(); queued.classname = "player"; queued.netname = "queued";
+    queued.style = CLANRING_CONNECTED | CLANRING_OBSERVER;
+    queued.oflags = OBSERVER_FLY;
+    queued.use = SUB_Null;
+    self = queued;
+    wo_assert(join_team2(wo_red.team2), "late join enters the real team queue");
+    boss.start_players = 2;
+    self = wo_b; RemoveFromTeam();
+    wo_assert(IS_CA_OBSERVER(queued) && queued.ca_player_flag == PF_WAITING &&
+              wo_red.teamalive == 1 && wo_red.teamtotal == 1,
+              "waiting joiner stays queued when a round participant leaves");
+    wo_die(wo_a);
+    wo_assert(wo_a.wipeout_solo_return && wipeout_team_in_play(wo_red),
+              "queued joiner does not suppress remaining player's solo return");
+    self = queued; RemoveFromTeam();
+    wo_assert(wo_red.teamalive == 0 && wo_red.teamtotal == 1 && wo_a.wipeout_solo_return,
+              "queued player leaving does not alter participant counters");
+};
+
+void() wo_test_frame_wipe =
+{
+    wo_reset();
+    wo_die(wo_a); wo_die(wo_b);
+    sys_ready = TRUE;
+    clanring_rulescheck = time + 0.9;
+    clanring_nextcheck = clanring_nextcheck2 = time + 10;
+    clanring_start_frame();
+    wo_assert(boss.wait == time + 4 && !boss.timetofight,
+              "frame dispatch locks a wiped round before the next one-second rules check");
+
+    wo_reset(); sys_ready = TRUE;
+    clanring_playmode = CLANRING_CA_MODE | CLANRING_NO_HOOK;
+    wo_die(wo_a); wo_die(wo_b);
+    clanring_rulescheck = time + 0.9;
+    clanring_nextcheck = clanring_nextcheck2 = time + 10;
+    clanring_start_frame();
+    wo_assert(boss.wait == 0, "ordinary CA retains its one-second rules cadence");
+
+    wo_reset(); sys_ready = TRUE;
+    boss.state = CA_MATCH_ROUNDSTART; boss.count = 6;
+    clanring_rulescheck = time + 1;
+    clanring_start_frame();
+    wo_assert(boss.count == 6, "Wipeout countdown cannot tick between rules checks");
+    time += 1; clanring_start_frame(); clanring_start_frame();
+    wo_assert(boss.count == 5, "Wipeout countdown ticks once per second");
+    sys_ready = FALSE;
+    clanring_rulescheck = 0;
+};
+
 void() wo_test_pause =
 {
     entity grenade;
@@ -305,6 +398,10 @@ void() worldspawn =
     dm_num_spawns = 1;
     registercvar("cr_wipeout_max_respawns", "4");
     wo_test_wipes();
+    wo_test_solo_limbo();
+    wo_test_solo_pending_win();
+    wo_test_frame_wipe();
+    wo_test_queued_leave();
     wo_test_limit();
     wo_test_pause();
     wo_test_damage();

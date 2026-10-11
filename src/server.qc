@@ -3778,7 +3778,14 @@ void () clanring_start_frame =
         {
             if (mode_is_arena())
             {
-                if (time >= clanring_rulescheck)
+                // Wipeout elimination must lock combat on the next frame.
+                // Keep round countdowns on the ordinary one-second cadence.
+                if ((boss != world) && (clanring_playmode & CLANRING_WIPEOUT_MODE) &&
+                    (boss.state == CA_MATCH_PLAYING))
+                {
+                    arena_main_loop();
+                }
+                else if (time >= clanring_rulescheck)
                 {
                     if (boss != world)
                     {

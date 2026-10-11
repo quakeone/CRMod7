@@ -1492,7 +1492,10 @@ void() PutClientInServer =
     self.wipeout_regen_time = 0;
     self.wipeout_escape_time = 0;
     self.wipeout_last_alive_active = FALSE;
-    self.wipeout_solo_return = FALSE;
+    // The corpse-to-observer reset also passes through here. Keep a queued
+    // solo exemption until observer_end changes PF_DEAD to PF_PLAYING.
+    if (self.ca_player_flag != PF_DEAD)
+        self.wipeout_solo_return = FALSE;
     self.wipeout_ammo_grenades = (clanring_playmode & CLANRING_WIPEOUT_MODE) ? 6 : 0;
     self.effects 				= 0;
     self.regen_time   			= 0;

@@ -156,6 +156,7 @@ void () arena_main_loop =
 		{
 			local float round_is_over = FALSE;
 			local float team_alive = 0;
+			local float solo_return_pending = FALSE;
 			local entity e;
 
 			if (clanring_playmode & CLANRING_WIPEOUT_MODE)
@@ -166,13 +167,17 @@ void () arena_main_loop =
 					if (wipeout_team_in_play(e))
 					{
 						team_alive += 1;
+						if (e.teamalive == 0)
+							solo_return_pending = TRUE;
 					}
 					else
 						wipeout_clear_team_respawns(e);
 					e = e.next_team;
 				}
 
-				if (team_alive < 2)
+				// Let the free solo return complete before starting the wait,
+				// even if every opposing team was wiped in the same frame.
+				if ((team_alive < 2) && !solo_return_pending)
 					round_is_over = TRUE;
 			}
 			else 
