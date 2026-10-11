@@ -291,10 +291,12 @@ void(entity targ, entity attacker) Killed =
 		}
 	}
 	
+    // Apply the escape life before PlayerDie chooses the next respawn delay.
+    if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+        wipeout_reward_escape(targ, attacker);
+
 	self.takedamage = DAMAGE_NO;
-	
 	self.touch = SUB_Null;
-	
 	self.th_die ();
 	
 	if ((clanring_playmode & CLANRING_DMM4_MODE) || (clanring_playmode & CLANRING_AIRSHOT_MODE))
@@ -431,8 +433,6 @@ void(entity targ, entity attacker) Killed =
 		}
 		if (clanring_playmode & CLANRING_WIPEOUT_MODE)
 		{
-			wipeout_reward_escape(targ, attacker);
-
 			if ((attacker != targ) && (attacker.classname == "player") &&
 				(attacker.next_team != world) && (attacker.next_team != targ.next_team))
 			{
@@ -446,8 +446,8 @@ void(entity targ, entity attacker) Killed =
 				//TODO: too many messages? or show [rounddeaths] in obituary?
 				if (targ.next_team.teamalive > 1)
 				{
-					rtime = wipeout_get_respawn(targ, 1);
-					if (rtime < 999)
+					rtime = ceil(targ.respawntime - time);
+					if (targ.respawntime > time)
 						bprint4(targ.netname, " will respawn in ", ftos(rtime), " seconds\n");
 				}
 			}
@@ -474,7 +474,7 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 {
 	local	vector	dir;
 	local 	entity 	oldself;
-	local 	float 	save, overkill, take, teamdamage, old_damage = 0, longrange;
+	local 	float 	save, overkill, take, teamdamage, old_damage = 0, longrange, damage_per_point;
 	local 	string 	temp;//R00k moved here (combat.qc:509: error: Type mismatch on redeclaration of temp. string, should be __variant)
 
 	if (!targ.takedamage)
@@ -501,6 +501,11 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 
 	if (mode_is_arena())
 	{
+        // KTX Wipeout ignores falls/drowning and locks damage at round end.
+        if ((clanring_playmode & CLANRING_WIPEOUT_MODE) &&
+            ((boss.wait > 0) || (targ.deathtype == "falling") || (targ.deathtype == "drowning")))
+            return;
+
 		if ((inflictor.classname == "teledeath") && (boss.timetofight == FALSE)) //This is here for pre-game spawn's tdeath_touch to push the player out of the way...
 		{
 			if (targ.classname == "player")
@@ -927,11 +932,12 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
 			attacker.dmg_given_round = (attacker.dmg_given_round + (save + overkill));
 			attacker.dmg_cache = (attacker.dmg_cache + (save + overkill));
 			
-			while (attacker.dmg_cache >= (boss.health + boss.armorvalue))
-			{
-				attacker.frags += 1; //give player point for max damage+cache
-				attacker.dmg_cache = (attacker.dmg_cache - (boss.health + boss.armorvalue));//leftover damage carries over
-			}
+            damage_per_point = (clanring_playmode & CLANRING_WIPEOUT_MODE) ? 100 : max(1, boss.health + boss.armorvalue);
+            while (attacker.dmg_cache >= damage_per_point)
+            {
+                attacker.frags += 1;
+                attacker.dmg_cache -= damage_per_point;
+            }
 		}
 	}
 

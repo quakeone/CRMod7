@@ -19,6 +19,11 @@ void () clan_arena_init_world =
     boss.ammo_nails  	= 100;
     boss.ammo_rockets	= 50;
     boss.ammo_cells  	= 30;
+    if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+    {
+        boss.ammo_nails = 200;
+        boss.ammo_cells = 150;
+    }
     boss.items = ((((((((IT_SHOTGUN | IT_AXE) | IT_ROCKET_LAUNCHER) | IT_ARMOR3) | IT_SUPER_SHOTGUN) | IT_NAILGUN) | IT_GRENADE_LAUNCHER) | IT_LIGHTNING) | IT_SUPER_NAILGUN);
     boss.weapon = IT_ROCKET_LAUNCHER;// W_BestWeapon();
 
@@ -131,9 +136,9 @@ void CA_CenterprintToAll (string msg)
 
 void () arena_main_loop =
 {
-	if ((clanring_state & CLANRING_MATCH_PAUSED) && (!boss.unpausing))
+	if (clanring_state & CLANRING_MATCH_PAUSED)
 	{
-		if (time > boss.pauseblink)
+		if (!boss.unpausing && (time > boss.pauseblink))
 		{
 			WriteByte (MSG_ALL, SVC_CENTERPRINT);
 			WriteString (MSG_ALL, "\n\X90PAUSED\X91\n");
@@ -158,22 +163,17 @@ void () arena_main_loop =
 				e = boss.next_team;
 				while (e != world)
 				{
-					if ((e.teamalive > 0) || wipeout_team_has_pending_respawn(e))
+					if (wipeout_team_in_play(e))
 					{
 						team_alive += 1;
-
-						// if (e.teamalive == 1 && e.teamtotal > 1)
-						// 	spawn_quad = TRUE;
 					}
+					else
+						wipeout_clear_team_respawns(e);
 					e = e.next_team;
 				}
 
 				if (team_alive < 2)
 					round_is_over = TRUE;
-				else
-				{
-					wipeout_try_spawn_item();
-				}
 			}
 			else 
 			{
@@ -186,6 +186,8 @@ void () arena_main_loop =
 				if (boss.wait == 0)
 				{
 					boss.wait = (time + 4);//slight pause before end of round.
+					if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+						boss.timetofight = FALSE;
 					return;
 				}
 

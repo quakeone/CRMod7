@@ -757,16 +757,31 @@ W_FireGrenade
 ================
 */
 
+float(entity player) W_GrenadeAmmo =
+{
+    if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+        return player.wipeout_ammo_grenades;
+    return player.ammo_rockets;
+};
+
 void() W_FireGrenade =
 {
     qper_sample(self);
 	local	entity missile;
 
 	// ELOHIM_MOD - infinite ammo in practice mode unless safepractice is on
-	if (!(ammo_is_infinite()))
-		self.currentammo = self.ammo_rockets = self.ammo_rockets - 1;		
+    if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+    {
+        if (self.wipeout_ammo_grenades < 1)
+            return;
+        self.currentammo = self.wipeout_ammo_grenades = self.wipeout_ammo_grenades - 1;
+        if (self.wipeout_ammo_grenades == 0)
+            self.items = self.items - (self.items & IT_GRENADE_LAUNCHER);
+    }
+    else if (!(ammo_is_infinite()))
+        self.currentammo = self.ammo_rockets = self.ammo_rockets - 1;
 	//else //allow no spooge in match mode
-	if (clanring_playmode & CLANRING_NO_SPOOGE)
+	if ((clanring_playmode & CLANRING_NO_SPOOGE) && !(clanring_playmode & CLANRING_WIPEOUT_MODE))
 	{
 		self.lip = self.lip + 1;
 		if (self.lip >= 4)
@@ -1050,6 +1065,23 @@ PLAYER WEAPON USE
 */
 
 
+// Updating inventory must not restart a firing animation (solo recovery).
+void(entity player) W_RefreshCurrentAmmo =
+{
+    if ((player.weapon == IT_SHOTGUN) || (player.weapon == IT_SUPER_SHOTGUN))
+        player.currentammo = player.ammo_shells;
+    else if ((player.weapon == IT_NAILGUN) || (player.weapon == IT_SUPER_NAILGUN))
+        player.currentammo = player.ammo_nails;
+    else if (player.weapon == IT_GRENADE_LAUNCHER)
+        player.currentammo = W_GrenadeAmmo(player);
+    else if (player.weapon == IT_ROCKET_LAUNCHER)
+        player.currentammo = player.ammo_rockets;
+    else if (player.weapon == IT_LIGHTNING)
+        player.currentammo = player.ammo_cells;
+    else
+        player.currentammo = 0;
+};
+
 void W_SetCurrentAmmo(void) =
 {
 	if (self.health <= 0) // bug fix (thanks to QIP [www.inside3d.com/qip]
@@ -1097,7 +1129,7 @@ void W_SetCurrentAmmo(void) =
 	}
 	else if (self.weapon == IT_GRENADE_LAUNCHER)
 	{
-		self.currentammo = self.ammo_rockets;
+		self.currentammo = W_GrenadeAmmo(self);
 		self.weaponmodel = "progs/v_rock.mdl";
 		self.items = self.items | IT_ROCKETS;
 	}
@@ -1324,7 +1356,7 @@ void() W_ChangeWeapon =
 	else if (self.impulse == 6)
 	{
 		fl = IT_GRENADE_LAUNCHER;
-		if (self.ammo_rockets < 1)
+		if (W_GrenadeAmmo(self) < 1)
 			am = 1;
 	}
 	else if (self.impulse == 4)
@@ -1447,7 +1479,7 @@ void() CycleWeaponCommand =
 		else if (self.weapon == IT_SUPER_NAILGUN)
 		{
 			self.weapon = IT_GRENADE_LAUNCHER;
-			if (self.ammo_rockets < 1)
+			if (W_GrenadeAmmo(self) < 1)
 				am = 1;
 		}
 		else if (self.weapon == IT_GRENADE_LAUNCHER)
@@ -1499,7 +1531,7 @@ void() CycleWeaponReverseCommand =
 		else if (self.weapon == IT_ROCKET_LAUNCHER)
 		{
 			self.weapon = IT_GRENADE_LAUNCHER;
-			if (self.ammo_rockets < 1)
+			if (W_GrenadeAmmo(self) < 1)
 				am = 1;
 		}
 		else if (self.weapon == IT_GRENADE_LAUNCHER)
@@ -1580,11 +1612,16 @@ void() PreviousWeaponCommand =
 		if (self.ammo_nails < 1)
 			am = 1;
 	}
-	else if ((self.weapon == IT_GRENADE_LAUNCHER) || (self.weapon == IT_ROCKET_LAUNCHER))
-	{
-		if (self.ammo_rockets < 1)
-			am = 1;
-	}
+    else if (self.weapon == IT_GRENADE_LAUNCHER)
+    {
+        if (W_GrenadeAmmo(self) < 1)
+            am = 1;
+    }
+    else if (self.weapon == IT_ROCKET_LAUNCHER)
+    {
+        if (self.ammo_rockets < 1)
+            am = 1;
+    }
 	else if (self.weapon == IT_LIGHTNING)
 	{
 		if (self.ammo_cells < 1)

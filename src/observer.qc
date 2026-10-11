@@ -2465,7 +2465,9 @@ void () observer_pre_think =
 		}
 	}   
 
-	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (self.next_team != world) && (boss.state == CA_MATCH_PLAYING) && (boss.wait == 0))
+	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (self.next_team != world) &&
+        !(clanring_state & CLANRING_MATCH_PAUSED) && (boss.state == CA_MATCH_PLAYING) &&
+        (boss.wait == 0) && wipeout_team_in_play(self.next_team))
 	{
 		if (self.respawntime > 0)
 		{
@@ -2479,6 +2481,7 @@ void () observer_pre_think =
 				bprint2(self.netname, " has respawned\n");
 				wipeout_mark_team_escape(self.next_team, self);
 				self.next_team.teamalive += 1;
+				wipeout_update_last_alive(self.next_team);
 				wipeout_update_team_nextspawn(self.next_team);
 				return;
 			}

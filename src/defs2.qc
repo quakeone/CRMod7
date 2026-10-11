@@ -282,6 +282,9 @@ float intermission_exittime;        // moved here from Client.qc
 .float wipeout_regen_time;
 .float wipeout_spawn_time;
 .float wipeout_escape_time;
+.float wipeout_ammo_grenades;
+.float wipeout_last_alive_active;
+.float wipeout_solo_return;
 .float spawn_protect_finished;
 .float teamalive;
 .float teamtotal;
