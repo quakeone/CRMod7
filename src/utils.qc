@@ -4663,7 +4663,9 @@ void(entity ev) webhook_stats_info =
                                    p.join_time > 0 &&
                                    p.join_time >= participant_cutoff &&
                                    stats_has_nontrivial_activity(p));
-                if (((!(p.style & CLANRING_OBSERVER) && p.next_team != world) || obs_participant) && p.join_time > 0)
+                // FFA participants have no team; use the scoreboard's non-arena
+                // eligibility rather than requiring a team for QPER output.
+                if ((!(p.style & CLANRING_OBSERVER) || obs_participant) && p.join_time > 0)
                 {
                     v = qper_rating(p);
 
