@@ -48,6 +48,16 @@ void() Request_Poll_Cleanup =
 	while (trash_disco)
 	{
 		trash_disco.vote = 0;
+
+		// A CA join request that passed was already consumed by ca_cc_vote_join.
+		// Anything left here expired, was declined or was cancelled; if it stays
+		// set, Request_Join_Team refuses this player until the map changes.
+		if (trash_disco.cc_queue_vote)
+		{
+			trash_disco.cc_queue_vote = 0;
+			sprint(trash_disco, "Your join request ended. Pick a team to request again.\n");
+		}
+
 		trash_disco = find(trash_disco, classname, "player");
 	}
 };
