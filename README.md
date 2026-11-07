@@ -16,7 +16,7 @@ Based on the original [CRMod](https://github.com/jp-grossman/crmod) and [CRCTF](
 
 ### Arena Modes
 - **Clan Arena (CA)** - Round-based elimination with full starting loadout
-- **Clan Arena Wipeout** - CA variant with timed respawning
+- **Clan Arena Wipeout** - [Team elimination with timed respawning](docs/wipeout.md), following KTX rules
 - **Rocket Arena (RA)** - Tournament-style dueling with queue system
 - **Airshot Mode** - Specialized mode focusing on mid-air rocket combat
 - **DMM4 Mode** - Fast-paced 1 on 1 with 3 min deathmatch arena

@@ -24,12 +24,14 @@ void () airshot_init_world;
 void () dmm4_init_world;
 void () rocket_arena_init_world;
 float (entity player, float offset) wipeout_get_respawn;
-float (entity team) wipeout_team_has_pending_respawn;
+float () wipeout_max_respawns;
+float (entity team) wipeout_team_in_play;
+void (entity team) wipeout_clear_team_respawns;
+void (entity team) wipeout_update_last_alive;
 void (entity team) wipeout_update_team_nextspawn;
 void () dmm4_report_winner;
 void () wipeout_init_teams;
 //void () wipeout_try_spawn_quad;
-void () wipeout_try_spawn_item;
 void () respawn;
 void (entity pteam) ra_leave_next_queue;
 void (entity pteam) ra_join_next_queue;
@@ -116,27 +118,6 @@ void () arena_client_disconnect =
 {
 	if ((clanring_playmode & CLANRING_RA_MODE) && (self.next_team != world))
 		ra_leave_next_queue(self.next_team);
-
-	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (self.next_team != world))
-	{
-		// Only active/dead round participants were counted by
-		// wipeout_init_teams. Dead players already left teamalive at death;
-		// queued late-joiners were never included in either counter.
-		if (self.ca_player_flag == PF_PLAYING)
-		{
-			if (self.next_team.teamalive > 0)
-				self.next_team.teamalive -= 1;
-			if (self.next_team.teamtotal > 0)
-				self.next_team.teamtotal -= 1;
-		}
-		else if (self.ca_player_flag == PF_DEAD)
-		{
-			if (self.next_team.teamtotal > 0)
-				self.next_team.teamtotal -= 1;
-		}
-		self.respawntime = 0;
-		wipeout_update_team_nextspawn(self.next_team);
-	}
 
 	RemoveFromTeam();//R00k
 	self.team2    		= TEAM_SPECTATOR;
@@ -836,7 +817,6 @@ void (entity pteam) spawn_next_player =
 void () im_dead_now_what =
 {
 	local string tmp = "";
-	local entity e;
 	local float prnd=0;
 
 	if ((clanring_playmode & CLANRING_AIRSHOT_MODE) || (clanring_playmode & CLANRING_DMM4_MODE))
@@ -860,13 +840,20 @@ void () im_dead_now_what =
 			self.next_team.teamalive -= 1;
 			self.rounddeaths = (self.rounddeaths + 1);
 			self.respawntime = 0;
+			self.wipeout_solo_return = FALSE;
+			self.wipeout_regen_time = 0;
+			self.wipeout_escape_time = 0;
+			self.wipeout_last_alive_active = FALSE;
 
-			// KTX Wipeout allows four respawns per round. A suicide forfeits
-			// the remaining life instead of returning the player to limbo.
-			if ((self.rounddeaths <= 4) && !(self.just_suicided > 0))
+			// A suicide forfeits all remaining returns for this round.
+			if ((self.rounddeaths <= wipeout_max_respawns()) && !(self.just_suicided > 0))
+			{
 				self.respawntime = time + wipeout_get_respawn(self, 0);
+				if ((self.next_team.teamtotal == 1) && (self.rounddeaths <= 1) && (self.respawntime == time))
+					self.wipeout_solo_return = TRUE;
+			}
 
-			if ((self.next_team.teamalive < 1) && !wipeout_team_has_pending_respawn(self.next_team))
+			if (!wipeout_team_in_play(self.next_team))
 			{
 				bprint3 ("The ", self.next_team.netname, " has been \bwiped out\b\n");
 				prnd = floor(random() * 6) + 1;
@@ -881,26 +868,12 @@ void () im_dead_now_what =
 				else
 						clanring_play_compat_sound(world, CHAN_VOICE, "ra/laugh.wav", "", 1, ATTN_NONE); //R00k, this might be annoying?
 
-				e = self.next_team.chain_gang;
-				while (e)
-				{
-					if (e.style & CLANRING_CONNECTED)
-						e.respawntime = 0;
-					e = e.chain_gang;
-				}
-				self.next_team.nextspawn = 0;
+				wipeout_clear_team_respawns(self.next_team);
 			}
 			else
 			{
-				if (self.next_team.teamalive == 1)
-				{
-						clanring_play_compat_sound(world, CHAN_AUTO, "crx/lastone.wav", "", 1, ATTN_NONE);
-				}
-
-				// Set the team's next spawn for the HUD. Zero means this player
-				// has exhausted their lives (or used kill).
-				if (self.respawntime > 0)
-					wipeout_update_team_nextspawn(self.next_team);
+				wipeout_update_team_nextspawn(self.next_team);
+				wipeout_update_last_alive(self.next_team);
 			}
 		}
 	}
@@ -961,6 +934,31 @@ void () RemoveFromTeam =
 
 	remove_player_from_chain(self.next_team, self);
 	remove_player_from_stat_list(self.next_team, self);
+	if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+	{
+		// Apply to both disconnects and voluntary leaves, including while paused.
+		if (self.ca_player_flag == PF_PLAYING)
+		{
+			if (self.next_team.teamalive > 0)
+				self.next_team.teamalive -= 1;
+		}
+		if ((self.ca_player_flag == PF_PLAYING) || (self.ca_player_flag == PF_DEAD))
+		{
+			if (self.next_team.teamtotal > 0)
+				self.next_team.teamtotal -= 1;
+		}
+		self.respawntime = 0;
+		self.wipeout_solo_return = FALSE;
+		self.wipeout_regen_time = 0;
+		self.wipeout_last_alive_active = FALSE;
+		if (!wipeout_team_in_play(self.next_team))
+			wipeout_clear_team_respawns(self.next_team);
+		else
+		{
+			wipeout_update_team_nextspawn(self.next_team);
+			wipeout_update_last_alive(self.next_team);
+		}
+	}
 
 	//no players exist on this team, kill the team
 	if (number_teammates (self.next_team) == 0)
@@ -1495,6 +1493,20 @@ void () arena_unpause_player =
 {
 	self.pain_finished 	= (self.pain_finished + clanring_match_pause_time);
 	self.air_finished 	= (self.air_finished + clanring_match_pause_time);
+	if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+	{
+		if (self.respawntime > 0)
+			self.respawntime += clanring_match_pause_time;
+		if (self.wipeout_regen_time > 0)
+			self.wipeout_regen_time += clanring_match_pause_time;
+		if (self.wipeout_spawn_time > 0)
+			self.wipeout_spawn_time += clanring_match_pause_time;
+		if (self.wipeout_escape_time > 0)
+			self.wipeout_escape_time += clanring_match_pause_time;
+		if (self.spawn_protect_finished > 0)
+			self.spawn_protect_finished += clanring_match_pause_time;
+		self.laststattime = 0;
+	}
 
 	if ((IS_CA_OBSERVER(self)) || self.deadflag)
 	{
@@ -1502,6 +1514,11 @@ void () arena_unpause_player =
 	}
 	self.movetype = MOVETYPE_WALK;
 	self.velocity = self.clanring_old_velocity;
+	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait == 0))
+	{
+		self.style = self.style | CLANRING_OK_TO_SHOOT;
+		centerprint(self, "\bFIGHT!");
+	}
 	if ((self.nextthink == CONTENT_EMPTY))
 	{
 		return;
@@ -1532,18 +1549,33 @@ void () arena_fight_and_shoot =
 
 void () arena_unpause =
 {
+	local entity team;
+
 	if (!(clanring_state & CLANRING_MATCH_PAUSED))
 	{
 		return;
 	}
+	clanring_match_pause_time = time - clanring_match_pause_time;
 	clanring_state = clanring_state - (clanring_state & CLANRING_MATCH_PAUSED);
 	utils_do_projectiles (arena_unpause_item);
-	utils_do_arena_players (arena_unpause_player);
-	boss.timetofight = TRUE;//R00k added v1.4
+	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0))
+		boss.wait += clanring_match_pause_time;
+	boss.timetofight = !((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0));
 	announce ("Match unpaused");
 	WriteByte (MSG_ALL, SVC_CENTERPRINT);
 	WriteString (MSG_ALL, " ");
-	utils_do_arena_players (arena_fight_and_shoot);
+	utils_do_arena_players (arena_unpause_player);
+	if (clanring_playmode & CLANRING_WIPEOUT_MODE)
+	{
+		team = boss.next_team;
+		while (team != world)
+		{
+			wipeout_update_team_nextspawn(team);
+			team = team.next_team;
+		}
+	}
+	else
+		utils_do_arena_players (arena_fight_and_shoot);
 };
 
 //R00k changed:v1.4

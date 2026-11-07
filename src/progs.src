@@ -29,6 +29,8 @@ airshot.qc
 dmm4.qc
 headhunters.qc
 stats.qc
+qper.qc
+qper_telemetry.qc
 teamplay.qc
 score.qc
 quaketv.qc

@@ -1,4 +1,11 @@
 void() powerup_touch;
+void(entity player) W_RefreshCurrentAmmo;
+
+float () wipeout_max_respawns =
+{
+	registercvar("cr_wipeout_max_respawns", "4");
+	return max(0, floor(cvar("cr_wipeout_max_respawns")));
+};
 
 float (entity spot) wipeout_get_spawn_radius =
 {
@@ -20,7 +27,7 @@ float (entity spot) wipeout_get_spawn_radius =
 };
 
 // Match current KTX Wipeout pacing: respawn delay scales with team size,
-// is capped to a four-life schedule, and a solo player's first return is free.
+// defaults to four returns, and a solo player's first return is free.
 float (entity player, float offset) wipeout_get_respawn =
 {
 	local float deaths, multiple, teamsize;
@@ -30,13 +37,13 @@ float (entity player, float offset) wipeout_get_respawn =
 	if (teamsize < 1)
 		teamsize = 1;
 
-	if ((teamsize == 1) && (deaths == 1))
-		return 0;
 	if (deaths <= 0)
 		return 0;
 
-	if (deaths > 4)
+	if (deaths > wipeout_max_respawns())
 		return 999;
+	if ((teamsize == 1) && (deaths == 1))
+		return 0;
 
 	multiple = teamsize + 1;
 	if (multiple < 3)
@@ -50,19 +57,65 @@ float (entity player, float offset) wipeout_get_respawn =
 	return (deaths - 1) * (multiple * 2);
 };
 
-float (entity team) wipeout_team_has_pending_respawn =
+// A wipe ends the round even if teammates have returns queued. Only a solo
+// player's free first return keeps a team with nobody alive in the round.
+float (entity team) wipeout_team_in_play =
+{
+	local entity player;
+
+	if (team == world)
+		return FALSE;
+	if (team.teamalive > 0)
+		return TRUE;
+	if (team.teamtotal != 1)
+		return FALSE;
+
+	player = team.chain_gang;
+	while (player != world)
+	{
+		if ((player.style & CLANRING_CONNECTED) &&
+			(player.ca_player_flag == PF_DEAD) && player.wipeout_solo_return &&
+			(player.respawntime > 0))
+			return TRUE;
+		player = player.chain_gang;
+	}
+
+	return FALSE;
+};
+
+void (entity team) wipeout_clear_team_respawns =
 {
 	local entity player;
 
 	player = team.chain_gang;
 	while (player != world)
 	{
-		if ((player.style & CLANRING_CONNECTED) && (player.respawntime > 0))
-			return TRUE;
+		player.respawntime = 0;
+		player.wipeout_solo_return = FALSE;
+		player.wipeout_last_alive_active = FALSE;
 		player = player.chain_gang;
 	}
+	team.nextspawn = 0;
+};
 
-	return FALSE;
+void (entity team) wipeout_update_last_alive =
+{
+	local entity player;
+	local float last_alive;
+
+	player = team.chain_gang;
+	while (player != world)
+	{
+		last_alive = FALSE;
+		if ((team.teamalive == 1) && (team.teamtotal > 1) &&
+			(player.style & CLANRING_CONNECTED) && ((player.style & CLANRING_OBSERVER) == 0) &&
+			(player.ca_player_flag == PF_PLAYING) && (player.health > 0))
+			last_alive = TRUE;
+		if (last_alive && !player.wipeout_last_alive_active)
+			stuffcmd(player, "play misc/medkey.wav\n");
+		player.wipeout_last_alive_active = last_alive;
+		player = player.chain_gang;
+	}
 };
 
 void (entity team) wipeout_update_team_nextspawn =
@@ -152,6 +205,9 @@ void (entity player) wipeout_check_solo_regen =
 	local float required_time;
 
 	if ((player == world) || IS_CA_OBSERVER(player) ||
+		(player.health <= 0) || (player.deadflag != DEAD_NO) ||
+		(clanring_state & CLANRING_MATCH_PAUSED) || gameover ||
+		(boss.state != CA_MATCH_PLAYING) || (boss.wait > 0) ||
 		(player.next_team == world) || (player.next_team.teamtotal != 1) ||
 		(player.wipeout_regen_time <= 0))
 		return;
@@ -170,6 +226,9 @@ void (entity player) wipeout_check_solo_regen =
 	player.ammo_shells = 100;
 	player.ammo_rockets = 50;
 	player.ammo_cells = 150;
+	player.wipeout_ammo_grenades = 6;
+	player.items = player.items | IT_GRENADE_LAUNCHER;
+	W_RefreshCurrentAmmo(player);
 	player.wipeout_regen_time = 0;
 };
 

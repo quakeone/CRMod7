@@ -481,6 +481,8 @@ void() execute_changelevel =
 //	local float bcount;
 	float vote_time = 20;
 
+    qper_public_end();
+
 	// Begin every intermission with a fresh derived ballot. This also clears
 	// any state left by an earlier menu interaction on the same client edict.
 	VoteMap_ResetBallots();
@@ -1397,6 +1399,7 @@ void() PutClientInServer =
 
     self.clanring_badstats_wait_pending = 0;
     self.clanring_badstats_wait_active = FALSE;
+    qper_on_spawn(self);
 
     DecodeLevelParms ();
 
@@ -1486,6 +1489,14 @@ void() PutClientInServer =
     self.invisible_finished 	= 0;
     self.invincible_finished 	= 0;
     self.spawn_protect_finished = 0;
+    self.wipeout_regen_time = 0;
+    self.wipeout_escape_time = 0;
+    self.wipeout_last_alive_active = FALSE;
+    // The corpse-to-observer reset also passes through here. Keep a queued
+    // solo exemption until observer_end changes PF_DEAD to PF_PLAYING.
+    if (self.ca_player_flag != PF_DEAD)
+        self.wipeout_solo_return = FALSE;
+    self.wipeout_ammo_grenades = (clanring_playmode & CLANRING_WIPEOUT_MODE) ? 6 : 0;
     self.effects 				= 0;
     self.regen_time   			= 0;
     self.invincible_time 		= 0;
@@ -2775,6 +2786,7 @@ void() PlayerPostThink =
     if (!(self.style & CLANRING_CONNECTED))
         return;
 
+    qper_sample(self);
     Send_TeamInfo();
 
     // ELOHIM_MOD
@@ -3121,6 +3133,8 @@ void() ClientDisconnect =
     if (!(self.style & CLANRING_CONNECTED))
         return;
 
+    qper_stint_end(self);
+
     // ELOHIM_MOD - check for null name
     if (utils_illegal_name (self.netname))
     {
@@ -3372,6 +3386,7 @@ void(entity targ, entity attacker) ClientObituary =
                     targ.mangle_z = targ.mangle_z + 1;
                     client_frag (attacker.owner, 1);
                     attacker.owner.true_kills = (attacker.owner.true_kills + 1);
+                    qper_credit_kill(targ, attacker.owner);
                 }
                 announce3(targ.netname, " was telefragged by ", attacker.owner.netname);
             }
@@ -3390,6 +3405,7 @@ void(entity targ, entity attacker) ClientObituary =
             targ.mangle_z = targ.mangle_z + 1;
             client_frag (attacker.owner, 1);
             attacker.owner.true_kills = (attacker.owner.true_kills + 1);
+            qper_credit_kill(targ, attacker.owner);
             return;
         }
         if (targ.deathtype == "squish")
@@ -3409,6 +3425,7 @@ void(entity targ, entity attacker) ClientObituary =
                     announce3(attacker.netname, " squishes ", targ.netname);
                     client_frag (attacker, 1);
                     attacker.true_kills = (attacker.true_kills + 1);
+                    qper_credit_kill(targ, attacker);
                     return;
                 }
                 else
@@ -3661,6 +3678,7 @@ void(entity targ, entity attacker) ClientObituary =
                     targ.mangle_z = targ.mangle_z + 1;//STATS
                     client_frag (attacker, 1);
                     attacker.true_kills = (attacker.true_kills + 1);
+                    qper_credit_kill(targ, attacker);
                     deathstring2 = "";
                     rnum = attacker.weapon;
                     if (targ.deathtype == "nail")
