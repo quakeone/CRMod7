@@ -2813,7 +2813,9 @@ void() PlayerPostThink =
                         boss.allready = FALSE;
                 }
             }
-            else boss.allready = TRUE;
+            // Do not set allready TRUE here: a later client in this loop would
+            // erase an earlier unteamed client's block. The arena main loops
+            // re-arm it after each check.
         }
     }
 
