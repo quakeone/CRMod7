@@ -382,6 +382,7 @@ float () observer_enforce_cam_lock =
 	if (mate == world)
 	{
 		observer_freeze_in_place();
+		self.oflags = self.oflags | OBSERVER_CAM_LOCKED;
 		return TRUE;						// took them over; caller must not proceed
 	}
 
@@ -389,8 +390,58 @@ float () observer_enforce_cam_lock =
 	self.movetarget = mate;
 	observer_demo_start();
 	observer_lock_enforcing = FALSE;
+	self.oflags = self.oflags | OBSERVER_CAM_LOCKED;
 
 	return TRUE;
+};
+
+//
+//  C L E A R  C A M  L O C K  M O D E
+//
+//  .oflags outlives observer_end on purpose, so the next observer_start can put a
+//  player back in the mode they chose.  A mode the lock forced on them isn't a
+//  choice: left in place, the CAMERA bit from a freeze sends them to a real map
+//  camera the next time they go observer, with MOVETYPE_NONE and no way to move.
+//
+void () observer_clear_cam_lock_mode =
+{
+	local float mode;
+
+	mode = OBSERVER_FLY;
+	if (self.oflags & OBSERVER_AUTO)
+		mode = OBSERVER_DEMO;				// observer_start resumes this as auto eyecam
+
+	self.oflags = self.oflags - (self.oflags & (OBSERVER_CAM_LOCKED | OBSERVER_WALK | OBSERVER_FLY | OBSERVER_CHASE | OBSERVER_DEMO | OBSERVER_CAMERA));
+	self.oflags = self.oflags | mode;
+};
+
+//
+//  R E L E A S E  C A M  L O C K
+//
+//  Called every frame for observers.  Once the lock lifts, hand back the free view
+//  it took away; nothing else ever moves a player out of a forced mode.
+//
+void () observer_release_cam_lock =
+{
+	if (!(self.oflags & OBSERVER_CAM_LOCKED))
+		return;
+	if (auto_cam_locked())
+		return;
+
+	self.oflags = self.oflags - OBSERVER_CAM_LOCKED;
+
+	if (self.oflags & OBSERVER_AUTO)
+	{
+		if (self.oflags & OBSERVER_DEMO)
+			return;							// auto tracking carries on from here
+
+		// Frozen with no target: there is nothing for auto tracking to steer.
+		self.oflags = self.oflags | OBSERVER_GO_AUTO;
+		observer_demo_start();
+		return;
+	}
+
+	observer_fly_start();
 };
 
 // CRMOD
@@ -972,6 +1023,9 @@ void() observer_end =
 
 	self.killed = 0;
 	observer_check_demo_end();
+
+	if (self.oflags & OBSERVER_CAM_LOCKED)
+		observer_clear_cam_lock_mode();		// don't save a forced mode as their choice
 
 //	stuffcmd(self, "sm0\n");// CRMOD - smoothing off
 //	stuffcmd(self, "v_centerspeed 500\n");
@@ -2378,6 +2432,7 @@ void () observer_pre_think =
     local float jump;
 
     votables_map_vote_prompt_display();
+    observer_release_cam_lock();
 
     // Deal with button2.  jump is set to TRUE if button2 was just pressed,
     // FALSE otherwise.

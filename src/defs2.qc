@@ -62,6 +62,9 @@ float OBSERVER_QUAKETV 			= 2048;		    // Sputnik: added this for streaming via 
 // Preferred automatic view, retained through walk/fly fallback and saved in parm12.
 // Only used while OBSERVER_QUAKETV is enabled.
 float OBSERVER_AUTO_POV          = 4096;
+// The current mode was forced by the arena cam lock, not chosen.  Lives in oflags so
+// it travels with the forced mode through parm12 and can't be left behind by it.
+float OBSERVER_CAM_LOCKED        = 8192;
 
 /*
 // CRMOD qsmack variables
