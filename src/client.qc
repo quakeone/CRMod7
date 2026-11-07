@@ -4287,6 +4287,51 @@ float(string s) clanring_is_fq_print_trigger =
             s == "f_config"  || s == "f_random");
 };
 
+// TRUE if a client command would make QSS-M clients auto-respond. Clients only
+// check the end of the printed "name: message" line, so "say x: f_version"
+// triggers them the same way "say f_version" does. Engine command names are
+// case-insensitive, and s/st are the engine's say/say_team shortcuts.
+float(float args, string arg0, string arg1, string cmd) clanring_cmd_is_fq_trigger =
+{
+    local float end, start, c;
+    local string name;
+
+    if (clanring_is_fq_print_trigger(arg0))
+        return TRUE;
+
+    name = lowrcase(arg0);
+    if (name != "say" && name != "say_team" && name != "s" && name != "st")
+        return FALSE;
+
+    if (args == 2 && clanring_is_fq_print_trigger(arg1))
+        return TRUE;
+
+    // Host_Say strips a closing quote and line endings before printing.
+    end = strlen(cmd);
+    while (end > 0)
+    {
+        c = str2chr(cmd, end - 1);
+        if (c != 34 && c != 13 && c != 10)
+            break;
+        end = end - 1;
+    }
+
+    // The last word must follow ": " exactly, as it does in the printed line.
+    start = end;
+    while (start > 0)
+    {
+        if (str2chr(cmd, start - 1) == 32)
+            break;
+        start = start - 1;
+    }
+    if (start < 2)
+        return FALSE;
+    if (str2chr(cmd, start - 2) != 58)
+        return FALSE;
+
+    return clanring_is_fq_print_trigger(substring(cmd, start, end - start));
+};
+
 // TRUE while a match is actively running (block f_/q_ prints during it).
 float() clanring_match_blocks_fq_prints =
 {
@@ -4353,22 +4398,14 @@ void(string cmd) SV_ParseClientCommand =
 
     // Block QSS-M f_/q_ print triggers during an active match. They arrive as a
     // broadcast "say f_version" (and/or a raw "q_version" stringcmd); letting them
-    // through floods in-match players with everyone's auto-responses. QSS-M only
-    // auto-responds to exact one-token chat, so the say trigger requires exactly
-    // two tokens to avoid overblocking real chat.
-    if (clanring_match_blocks_fq_prints())
+    // through floods in-match players with everyone's auto-responses. QSS-M
+    // auto-responds to any chat line ending in ": <trigger>", so this also
+    // catches messages like "say x: f_version" without blocking other chat.
+    if (clanring_match_blocks_fq_prints()
+        && clanring_cmd_is_fq_trigger(args, arg0, arg1, cmd))
     {
-        if ((arg0 == "say" || arg0 == "say_team")
-            && args == 2 && clanring_is_fq_print_trigger(arg1))
-        {
-            clanring_fq_print_blocked_notify();
-            return;
-        }
-        if (clanring_is_fq_print_trigger(arg0))
-        {
-            clanring_fq_print_blocked_notify();
-            return;
-        }
+        clanring_fq_print_blocked_notify();
+        return;
     }
 
     switch (arg0)
