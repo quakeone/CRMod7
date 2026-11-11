@@ -125,12 +125,6 @@ void() motd_create =
 	intro.lip = 0;
 };
 
-void () motd_end =
-{
-	self.owner.style = self.owner.style - (self.owner.style & CLANRING_MOTD);
-	remove (self);
-};
-
 void ()motd_print =
 {	
 	// Allow AFK clients to still see arena join menus; otherwise suppress

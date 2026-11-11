@@ -89,18 +89,6 @@ void() hh_restore_weaponstay_pref =
 	hh_apply_weaponstay_setting(hh_weaponstay_pref_enabled(), FALSE);
 };
 
-void(float newmap) votables_request_set_hh =
-{
-	request_teamplay = -1;
-	votables_request_set_gametype_mode_map(8, -1, newmap);
-};
-
-void(float newteamplay, float newmap) votables_request_set_hh_variant =
-{
-	request_teamplay = newteamplay;
-	votables_request_set_gametype_mode_map(8, -1, newmap);
-};
-
 //
 //  S E N D  A L I A S E S
 //
@@ -1601,7 +1589,6 @@ void() votables_q14ever_enable_and_start_callback;
 void() votables_q14ever_disable_and_clear_callback;
 // Need QuakeTag helpers
 void() quaketag_start_regular_auto;
-void() quaketag_start_q14ever_auto;
 void() quaketag_clear;
 // q14ever presence/flag helpers (from quaketag.qc)
 float() Q14ever_AnyProps;

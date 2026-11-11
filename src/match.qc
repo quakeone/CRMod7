@@ -350,7 +350,6 @@ void()  rs_enforce_balanced_counts; // force balanced team-size targets for rpic
 float() rs_build_or_refresh;
 void()  rs_build_deck_from_roster;
 float() rs_same_roster;
-float() rs_next_labels;
 float(float n, float k) rs_choose;
 void()  rs_enforce_balanced_counts;
 float() rs_multinomial_total;
@@ -470,20 +469,6 @@ void() match_show_timelimit =
 void() match_item_reset =
 {
     self.nextthink = -1;
-};
-
-//
-//  I N I T  P L A Y E R
-//
-//  Initialize a player in match mode and make him an observer.
-//
-void() match_init_player =
-{
-    self.style = self.style - (self.style & CLANRING_READY);
-    self.clanring_ghostless = FALSE;
-    self.finaldest_x = time; // So we don't get autokickedd!!
-    observer_start ();
-    clear_name();
 };
 
 //
@@ -3745,33 +3730,6 @@ float() rs_same_roster =
             if (rs_plist[i] == seen[j]) { matchcount = matchcount + 1; break; }
 
     return (matchcount == rs_N);
-};
-
-// Lexicographic next_permutation over rs_labels[0..rs_N-1]
-float() rs_next_labels =
-{
-    local float i, j, l, r, tmp;
-
-    if (rs_N <= 1) return FALSE;
-
-    i = rs_N - 2;
-    while ((i >= 0) && (rs_labels[i] >= rs_labels[i + 1])) i = i - 1;
-    if (i < 0) return FALSE; // last permutation
-
-    j = rs_N - 1;
-    while (rs_labels[j] <= rs_labels[i]) j = j - 1;
-
-    // swap i <-> j
-    tmp = rs_labels[i]; rs_labels[i] = rs_labels[j]; rs_labels[j] = tmp;
-
-    // reverse suffix [i+1 .. end]
-    l = i + 1; r = rs_N - 1;
-    while (l < r)
-    {
-        tmp = rs_labels[l]; rs_labels[l] = rs_labels[r]; rs_labels[r] = tmp;
-        l = l + 1; r = r - 1;
-    }
-    return TRUE;
 };
 
 // Ensure deck matches current roster; rebuild if needed

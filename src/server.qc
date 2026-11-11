@@ -227,8 +227,6 @@ void() utils_namewatch_think;
 void() utils_refresh_overlay_if_renamed;
 void() match_refresh_spawn_markers;
 void(void () dofunc) utils_do_match_spawns;
-float(string player_name) utils_is_in_last_disconnects;
-float(string player_name) utils_name_has_player;
 void () score_init_world;
 void (float command) console_command;
 void () console_set_aliases;
@@ -272,8 +270,6 @@ void () PreviousWeaponCommand;
 void () StartRuneSpawnStart;
 void () player_hook1;
 void () player_hook3;
-void () HookFire2;
-void () ban_kick_client;
 void (entity client) clanring_kick_player;
 void () modes_commands;
 void () hh_startup;
@@ -1589,37 +1585,6 @@ void () clanring_remove_player_from_list =
 };
 
 
-//
-// B A N  K I C K  C L I E N T
-//
-// Used to kick connecting clients with an ip address which is on the banlist (ban.cfg).
-//
-void () ban_kick_client =
-{
-    local string temp;
-    local entity e;
-
-    if (banent != world)
-    {
-        e = self;
-
-        self = banent;
-
-        localcmd("ban ");
-        localcmd(self.trueip);
-        localcmd(" 255.255.255.255\n");
-        temp = ftos(self.colormap);
-        localcmd3("kick # ", temp, "\n");
-
-        if (self.style & CLANRING_CONNECTED)
-            ClientDisconnect ();
-
-        self = e;
-        remove(self);
-        banent = world;
-    }
-};
-
 //R00k: this finds teams active, and updates the scoreboard for new connecting clients
 void () find_pqc_teamscore_teams =
 {
@@ -2290,11 +2255,6 @@ void () clanring_help_misc =
     sprint(self, "\n");
 };
 
-void () clanring_info =
-{
-    sprint(self, "\n");
-};
-
 //
 //  C O M M A N D S
 //
@@ -2510,19 +2470,6 @@ void () clanring_ping_reply =
 
     cprint3("reply from \"", self.netname, "\"\n");
     self.lagcheck = time;
-};
-
-//
-//  B A D  I M P U L S E
-//
-//  Seems like some people get stuck with the old clanring bindings.
-//  Let them know that something ain't right.
-//
-void () clanring_bad_impulse =
-{
-    sprint(self, "You have entered an invalid impulse.\n");
-    sprint(self, "Your bindings may be incorrect - try\n");
-    sprint(self, "reconnecting to the server.\n");//TODO force an update of the server aliases..
 };
 
 //
@@ -2874,25 +2821,6 @@ void () clanring_admins =
     }
 };
 
-//R00k: this is pretty useless anymore...
-//
-//  W I N G L  D E T E C T
-//
-void (float quakever) clanring_wingl_detect =
-{
-    if (!(self.style & CLANRING_WINQUAKE) || !(self.style & CLANRING_GLQUAKE))
-    {
-        clanring_bad_impulse ();
-        return;
-    }
-
-    self.style = self.style - (self.style & (CLANRING_WINQUAKE | CLANRING_GLQUAKE));
-
-    if (quakever == 1)
-        self.style = self.style | CLANRING_WINQUAKE;
-    else if (quakever == 2)
-        self.style = self.style | CLANRING_GLQUAKE;
-};
 /*
 //-----------------------------------------------------------------------------------
 void () Practice_Object_Remove =
@@ -2996,7 +2924,6 @@ void () practice_spawn =
 void () TossAmmo;
 void () TossWeapon;
 void () TossRune;
-void () HookOff;
 void () votables_request_set_faststarts;
 void () votables_force_start;
 

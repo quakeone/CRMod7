@@ -25,7 +25,6 @@ void(float index, string label) lockdown_append_ip_label;
 void(string ip, string label) lockdown_add_ip_with_label;
 string(string ip) lockdown_connected_names_for_ip;
 string(string list, float index) lockdown_list_token_at;
-void(string ip) lockdown_add_ip;
 void() lockdown_clear_ips;
 float(string ip, entity except_client) lockdown_ip_has_other_connected_client;
 void() lockdown_release_if_server_empty;
@@ -194,11 +193,6 @@ string(string list, float index) lockdown_list_token_at =
     }
 
     return "";
-};
-
-void(string ip) lockdown_add_ip =
-{
-    lockdown_add_ip_with_label(ip, "");
 };
 
 float(string ip) lockdown_ip_allowed =

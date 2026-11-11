@@ -1372,7 +1372,6 @@ void(entity e) move_to_intermission =
     e.weaponmodel 	= string_null;
 };
 
-void() utils_dprint_time;
 void() PlayerDie;
 void() teamplay_force_player_ready;
 

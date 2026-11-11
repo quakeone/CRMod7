@@ -15,7 +15,6 @@
 
 void(string payload) match_post_json;
 void(string payload) match_post_json_deferred;
-string(string rel) mp_resolve_for_engine;
 
 // ============================================================================
 // 1) Constants & Globals
@@ -1542,25 +1541,6 @@ void(string entry) json_append_lastscores =
 
 
 // 1) Build JSON to an in-memory string (auto-compact if pretty is too large)
-
-string(float pretty) json_export_match_to_string =
-{
-    bprint(sprintf("[matchpost] build-json: begin (pretty=%g)\n", pretty));
-    json_begin_pretty(pretty);   // sets builder to string mode
-    json_emit_match_document();  // <-- single source of truth
-    local string out = json_result();        // grab the built JSON
-    bprint(sprintf("[matchpost] build-json: done bytes=%g\n", strlen(out)));
-    // If pretty output bumps into QC's ~1KB string limit, rebuild compact.
-    if (pretty != 0 && strlen(out) >= 1000)
-    {
-        bprint("[matchpost] build-json: pretty too large, retrying compact\n");
-        json_begin_pretty(0);
-        json_emit_match_document();
-        out = json_result();
-        bprint(sprintf("[matchpost] build-json (compact): bytes=%g\n", strlen(out)));
-    }
-    return out;
-};
 
 // 2) Write JSON to a file (STREAM builder to file; avoids QC string cap)
 void(string path, float pretty) json_export_match_to_file =

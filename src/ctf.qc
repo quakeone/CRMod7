@@ -77,12 +77,20 @@ float(float team) ctf_trial_get_top_record =
 
 		if (f >= 0)
 		{
-			local string line, player_name, meta_line;
+			local string line, player_name, meta_line, peek_line;
 			local float team_color, time_value;
 
+			peek_line = "";
 			while (TRUE)
 			{
-				line = fgets(f);
+				// A non-meta lookahead line is the next record's player line.
+				if (peek_line != "")
+				{
+					line = peek_line;
+					peek_line = "";
+				}
+				else
+					line = fgets(f);
 				if (!line) break;
 
 				// Player line
@@ -104,9 +112,7 @@ float(float team) ctf_trial_get_top_record =
 				{
 					local float argc = tokenize(meta_line);
 					if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
-					{
-						// Not a meta line; next loop handles it as the next record.
-					}
+						peek_line = meta_line; // not meta: feed it back as the next record
 				}
 
 				if (time_value > 0 && time_value < best_time && (team <= 0 || team_color == team))
@@ -189,12 +195,20 @@ float(float team) ctf_match_get_top_record =
 
 		if (f >= 0)
 		{
-			local string line, player_name, meta_line;
+			local string line, player_name, meta_line, peek_line;
 			local float team_color, time_value;
 
+			peek_line = "";
 			while (TRUE)
 			{
-				line = fgets(f);
+				// A non-meta lookahead line is the next record's player line.
+				if (peek_line != "")
+				{
+					line = peek_line;
+					peek_line = "";
+				}
+				else
+					line = fgets(f);
 				if (!line) break;
 
 				// Player line
@@ -216,9 +230,7 @@ float(float team) ctf_match_get_top_record =
 				{
 					local float argc = tokenize(meta_line);
 					if (!(argc >= 2 && argv(0) == "#" && strtolower(argv(1)) == "meta"))
-					{
-						// Not a meta line; next loop handles it as the next record.
-					}
+						peek_line = meta_line; // not meta: feed it back as the next record
 				}
 
 				if (time_value > 0 && time_value < best_time && (team <= 0 || team_color == team))

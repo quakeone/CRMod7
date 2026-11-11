@@ -836,34 +836,6 @@ void() stats_show_hhstats =
 	sprint(self, "\n");
 };
 
-void () stats_team_stats =
-{
-	local entity e;
-	local string t2;
-	
-	bprint ("\n");
-	e = boss.next_team;
-	
-	while (e != world)
-	{
-		t2 = strpad (8, e.netname);
-		bprint(t2);		
-		t2 = "";//testing (second team goes way off the screen)
-		bprint(" \bwon:\b ");				
-		t2 = ftos (e.wins);
-		bprint (t2);
-		t2 = "";//testing (second team goes way off the screen)
-		bprint(" \blost:\b ");
-		t2 = ftos (e.losses);
-		bprint (t2);		
-		t2 = "";//testing (second team goes way off the screen)
-		bprint("\n");
-		e = e.next_team;
-	}			
-	bprint ("\n");
-	remove(self);//kill temp ent that called this function.
-};
-
 //  S H O W  S U M M A R Y
 //
 //  Show kill and weapon efficiency for each player.

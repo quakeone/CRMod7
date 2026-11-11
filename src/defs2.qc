@@ -526,7 +526,6 @@ float clanring_tdm_ticrate;
 float	modelindex_head;
 .float	previous_weapon;
 
-float(float start, float end, float stepsize) rnd_number;
 //.vector norg;
 float 	teamscr1;
 float 	teamscr2;

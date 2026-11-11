@@ -345,18 +345,6 @@ string() clanring_hook_weapon_model =
     return "progs/v_axe.mdl";
 };
 
-string() clanring_hook_fire_sound =
-{
-    if (clanring_use_custom_hook_assets())
-        return clanring_compat_sound_path("weapons/chain1.wav", "knight/sword1.wav");
-    return clanring_compat_sound_path("hknight/hit.wav", "knight/sword1.wav");
-};
-
-string() clanring_hook_tick_sound =
-{
-    return clanring_compat_sound_path("blob/land1.wav", "player/axhit1.wav");
-};
-
 string() clanring_vote_pass_sound =
 {
     return clanring_compat_sound_path("misc/runekey.wav", "misc/medkey.wav");
@@ -837,28 +825,6 @@ void (string s) changelevel =
 		localcmd3("changelevel ", s, "\n");
 };
 
-void (entity client, float x) utils_sprint_time =
-{
-	local float  minutes;
-	local float  seconds;
-	local string temp;
-
-	minutes = floor(x / 60);
-	seconds = floor(((x/60) - minutes)*60);
-	
-	temp = ftos(minutes);
-	
-	sprint(client, temp);
-	sprint(client, ":");
-	
-	temp = ftos(seconds);
-	
-	if (seconds < 10)
-		sprint(client, "0");
-	
-	sprint(client, temp);
-};
-
 void (entity client, float t) utils_sprint_stat_time =
 {	
 	local float minutes;
@@ -928,115 +894,6 @@ void (float t) utils_cprint_time =
 	//--------------------
 	utils_cprint_int2 (csec);
 	//--------------------
-};
-
-void () utils_dprint_time =
-{
-	local float t;
-	local float hours;
-	local float minutes;
-	local float seconds;
-	local string temp;
-
-	t = 9932;
-	hours   = floor(t/3600);
-	minutes = floor(((t/3600)-hours)*60);
-	seconds = floor(((((t/3600)-hours)*60)-minutes)*60);
-
-	//--------------------
-	temp = ftos(hours);
-	if ((hours < 10))
-	{
-		bprint("0");
-	}
-	bprint(temp);
-	//--------------------
-	bprint(":");
-	//--------------------
-	temp = ftos(minutes);
-	if ((minutes < 10))
-	{
-		bprint("0");
-	}
-	bprint(temp);
-	//--------------------
-	bprint(":");
-	//--------------------
-	temp = ftos(seconds);
-	if ((seconds < 10))
-	{
-		bprint("0");
-	}
-	bprint(temp);
-};
-
-void (float t) utils_bprint_time =
-{
-	local float minutes;
-	local float seconds;
-	local float csec;
-	local string temp;
-
-//	hours   = floor(t/3600);
-//	minutes = floor(((t/60)-hours)*60);	
-//	seconds = floor(((((t/60)-hours)*60)-minutes)*60));
-
-	minutes = floor((t/60));
-	seconds = floor((((t/60)-minutes)*60));
-	csec    = floor((((((t/60)-minutes)*60)-seconds)*100));
-	
-	//--------------------
-	temp = ftos(minutes);
-	if ((minutes < 10))
-	   {
-	      bprint("0");
-	   }
-	bprint(temp);
-	//--------------------
-	bprint(":");
-	//--------------------
-	temp = ftos(seconds);
-	if ((seconds < 10))
-	   {
-	      bprint("0");
-	   }
-	bprint(temp);
-	//--------------------
-	bprint(".");
-	//--------------------
-	temp = ftos(csec);
-	if ((csec < 10))
-	   {
-	      bprint("0");
-	   }	
-	bprint(temp);	
-	//--------------------
-};
-
-//
-// G E T   T I M E   M I N U T E S   A N D   S E C O N D S
-//
-// Returns a string of t in mm:ss format, t is seconds
-//
-string (float t) utils_get_time_m_s =
-{
-	float minutes, seconds = 0;
-	string tmin="",tsec="";
-
-	minutes = floor((t/60));
-	seconds = floor((((t/60)-minutes)*60));
-
-	if ((minutes < 10))
-		tmin = sprintf("0%g", minutes);
-	else
-		tmin = sprintf("%g", minutes);
-
-	if ((seconds < 10))
-		tsec = sprintf("0%g", seconds);
-	else
-		tsec = sprintf("%g", seconds);
-
-	return sprintf("%s:%s", tmin, tsec);
 };
 
 //	
@@ -1507,88 +1364,6 @@ void (float f) utils_cprint_int3 =
     cprint(s);
 };
 
-//
-//  P R I N T  V E C
-//
-//  Prints a vector followed by CR to 'self'.
-//  Used for debugging.
-//
-void (vector v) utils_print_vec =
-{
-    local string s;
-
-    s = vtos(v);
-    sprint2(self, s, "\n");
-};
-
-//
-//  P R I N T  B I T
-//
-//  Prints a single bit to 'self'.
-//  Used for debugging.
-//
-void (float b) utils_print_bit =
-{
-    if (b)
-        sprint(self, "1");
-    else
-        sprint(self, "0");
-};
-
-//
-//  P R I N T  B I N
-//
-//  Prints a binary number followed by CR to 'self'.
-//  Used for debugging.
-//
-void (float n) utils_print_bin =
-{
-    local float bit;
-
-    if (!n)
-    {
-        sprint(self, "0\n");
-        return;
-    }
-
-    bit = 32768 * 32768 * 2;
-    while (bit > 0.5)
-    {
-        if (n & bit)
-        {
-            while (bit > 0.5)
-            {
-                utils_print_bit(n & bit);
-                bit = bit / 2;
-            }
-        }
-        bit = bit / 2;
-    }
-    sprint(self, "\n");
-};
-
-
-//
-//  D U M P  P O S I T I O N
-//
-//  Dumps all 3d position information for an entity to 'self'.
-//  Used for debugging.
-//
-void (entity e) utils_dump_position =
-{
-    sprint(self, "origin = ");
-    utils_print_vec(e.origin);
-    sprint(self, "mins = ");
-    utils_print_vec(e.mins);
-    sprint(self, "maxs = ");
-    utils_print_vec(e.maxs);
-    sprint(self, "size = ");
-    utils_print_vec(e.size);
-    sprint(self, "absmin = ");
-    utils_print_vec(e.absmin);
-    sprint(self, "absmax = ");
-    utils_print_vec(e.absmax);
-};
 
 //
 //  M I N
@@ -1621,21 +1396,6 @@ float (float a, float b, float c) utils_min3 =
     else
         d = b;
     if (d < c)
-        return d;
-    return c;
-};
-
-//
-//  M A X 3
-//
-float (float a, float b, float c) utils_max3 =
-{
-    local float d;
-    if (a > b)
-        d = a;
-    else
-        d = b;
-    if (d > c)
         return d;
     return c;
 };
@@ -2001,30 +1761,6 @@ void (float flag, string name) utils_toggle_gflag =
 	utils_set_cvar("gamecfg", clanring_gameconfig);
 };
 
-// CRMOD
-// S T U F F  T O  P L A Y E R
-//      by Paul Baker
-//
-//   stuffcmd's a message to the player by their entity number (status number).
-//   this is used primarily to tell a person they've been kicked.
-//
-
-void (float i, string txt) utils_stuff_to_player =
-{
-	local entity e;
-
-	e = find(world, classname, "player");
-	while (e != world)
-	{
-		if (e.colormap == i)
-		{
-			stuffcmd(e, txt);
-			return;
-		}
-		e = find(e, classname, "player");
-	}
-};
-
 //
 //  I L L E G A L  N A M E
 //
@@ -2069,21 +1805,6 @@ float (string cname) utils_illegal_name =
 // 	}
 // 	return world;
 // };
-
-//Returns a random vector bewteen m1 and m2
-
-vector (vector m1, vector m2) Rvec =
-{
-	local vector v;
-	
-	m2 = m2 - m1;
-	
-	v_x = m2_x * random() + m1_x;
-	v_y = m2_y * random() + m1_y;
-	v_z = m2_z * random() + m1_z;
-	
-	return  v;
-};
 
 // returns true if the maparg matches a name in the warp list
 float(string maparg) found_in_warp_list =
@@ -3106,36 +2827,6 @@ void(entity player, string mode, string observing) utils_set_observer_infokeys =
     forceinfokey(player, "observing", observing);
 };
 
-// Return TRUE if 'player_name' contains "player" anywhere (case-insensitive-ish).
-// Note: If your QC supports strtolower(), replace the three checks with:
-//   if (strstrofs(strtolower(player_name), "player", 0) >= 0) return TRUE;
-float(string player_name) utils_name_has_player =
-{
-    if (player_name == "")
-        return FALSE;
-
-    // Best-effort case-insensitive substring checks for common casings
-    if (strstrofs(player_name, "player", 0) >= 0) return TRUE;
-    if (strstrofs(player_name, "Player", 0) >= 0) return TRUE;
-    if (strstrofs(player_name, "PLAYER", 0) >= 0) return TRUE;
-    return FALSE;
-};
-
-// Returns TRUE if 'player_name' matches any entry in the recent disconnect log
-float(string player_name) utils_is_in_last_disconnects =
-{
-    local float i;
-    if (player_name == "")
-        return FALSE;
-
-    for (i = 0; i < disconnect_log_count && i < MAX_CLIENT_DISCONNECT_LOG; i = i + 1)
-    {
-        if (disconnect_log[i].player_name != "" && utils_str_eq(disconnect_log[i].player_name, player_name))
-            return TRUE;
-    }
-    return FALSE;
-};
-
 //
 // Get persistent server time that continues across map changes
 //
@@ -3440,26 +3131,6 @@ string(string a, string b) zcat =
     return strzone(t);      // return new zoned string
 };
 
-// Append segment with a hard cap, return new *zoned* msg (free old via zcat)
-string(string msg, string seg, float maxlen) append_capped_z =
-{
-    local float rem;
-    local string s, z;
-
-    if (!msg) msg = strzone("");
-
-    rem = maxlen - strlen(msg);
-    if (rem <= 0) return msg;
-
-    s = seg ? seg : "";
-    if (strlen(s) > rem) s = substring(s, 0, rem);
-
-    z = strzone(s);
-    msg = zcat(msg, z);
-    strunzone(z);
-    return msg;
-};
-
 // Buffer-based builder for large webhook stats messages (avoids tempstring overflow)
 void(float maxlen) webhook_stats_buf_begin =
 {
@@ -3520,14 +3191,6 @@ string(string body) Webhook_MakeContentPayloadZ =
     strunzone(esc);
     out = zcat(out, "\"}");
     return out; // zoned
-};
-
-// For legacy callers that want a tempstring payload (kept for compatibility)
-string(string raw) Webhook_MakeContentPayload =
-{
-    local string s;
-    s = raw ? raw : "";
-    return sprintf("{\"content\":\"%s\"}", json_escape(s));
 };
 
 // Macro for capped appends
@@ -3598,23 +3261,6 @@ string(string s) utils_dequake_for_discord =
             s = strreplace(sprintf("%c", i), "", s);
 
     return s;
-};
-
-// Compact helper: dequake -> json_escape
-string(string s) discord_escape =
-{
-    if (!s) return "";
-    return json_escape(utils_dequake_for_discord(s));
-};
-
-// Mask a secret URL for logs: keep head and tail only
-string(string s) webhook_mask =
-{
-    local float n;
-    if (!s) return "";
-    n = strlen(s);
-    if (n <= 20) return s;
-    return strcat(substring(s, 0, 12), "...", substring(s, n - 4, 4));
 };
 
 // Sanitize user-provided webhook URL text
@@ -5189,27 +4835,6 @@ void(string path, string data) mp_writefile =
     bprint(sprintf("[matchpost] wrote '%s'\n", path));
 };
 
-// Resolve a relative file (like "json/foo.json") to something the engine's fopen() can see.
-// Order: fs_gamedir -> (fs_basedir + '/' + game) -> (game + '/') -> "id1/" fallback.
-string(string rel) mp_resolve_for_engine =
-{
-    if (!rel || rel == "") return rel;
-    local string gdir = cvar_string("fs_gamedir");
-    local string bdir = cvar_string("fs_basedir");
-    local string mod  = cvar_string("game");
-    // Prefer an absolute fs_gamedir if available
-    if (gdir && gdir != "")
-        return strcat(gdir, "/", rel);
-    // Next: base dir + game
-    if (bdir && bdir != "" && mod && mod != "")
-        return strcat(bdir, "/", mod, "/", rel);
-    // Next: just the game subdir
-    if (mod && mod != "")
-        return strcat(mod, "/", rel);
-    // Fallback: id1
-    return strcat("id1/", rel);
-};
-
 // For quick diffs: persist what we actually send
 void(string data) mp_save_payload_for_debug =
 {
@@ -5511,48 +5136,6 @@ string(string s) utils_rstrip =
         i = i - 1;
     }
     return substring(s, 0, i + 1);
-};
-
-// Helpers: format a delta (in seconds) as a friendly "ago" string.
-// Examples: "1 Minute Ago", "12 Minutes Ago", "2 Hours Ago", "1 Day Ago"
-string(float dt) utils_fmt_ago =
-{
-    // ----- Smart "Ago" string: clamp tiny deltas to 1 minute -----
-    string ago;
-    if (dt < 60)
-    {
-        ago = "1 Minute Ago";
-    }
-    else if (dt < 3600)
-    {
-        float mins = floor(dt / 60);
-        if (mins < 1) mins = 1;
-        ago = (mins == 1) ? "1 Minute Ago" : strcat(ftos(mins), " Minutes Ago");
-    }
-    else if (dt < 86400)
-    {
-        float hours = floor(dt / 3600);
-        ago = (hours == 1) ? "1 Hour Ago" : strcat(ftos(hours), " Hours Ago");
-    }
-    else if (dt < 604800)
-    {
-        float days = floor(dt / 86400);
-        ago = (days == 1) ? "1 Day Ago" : strcat(ftos(days), " Days Ago");
-    }
-    else
-    {
-        float weeks = floor(dt / 604800);
-        ago = (weeks == 1) ? "1 Week Ago" : strcat(ftos(weeks), " Weeks Ago");
-    }
-    return ago;
-};
-
-// Truncate helper for neat headers (UTF-8 naive, fine for ASCII names)
-string(string s, float maxlen) utils_trunc =
-{
-    if (!s) return "";
-    if (strlen(s) <= maxlen) return s;
-    return sprintf("%s...", substring(s, 0, maxlen - 3));
 };
 
 // --- Mode normalization ------------------------------------------------

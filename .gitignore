@@ -9,6 +9,8 @@ src/compile.bat
 src/compile.sh
 src/fteqcc
 src/qc_compile_output.txt
+src/qc_compile.log
+src/qc.asm
 src/release/csprogs.dat
 src/release/progs.dat
 src/fteqcc64

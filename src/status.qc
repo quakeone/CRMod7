@@ -32,12 +32,6 @@ void() TeamCaptureCheckUpdate =
 	}
 };
 
-void() TeamCaptureResetUpdate =
-{
-	lastteamscrtime = 0;
-	TeamCaptureCheckUpdate ();
-};
-
 void() status_refresh_f_status_pref =
 {
 	local float enabled;

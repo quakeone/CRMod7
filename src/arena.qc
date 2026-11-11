@@ -7,7 +7,6 @@ void () stats_reset_player;
 void () observer_walk_start;
 void () vote_yes;
 void () observer_check_demo_end;
-void () stats_team_stats;
 void () RemoveFromTeam;
 void () ra_select_team;
 void() Request_Poll_Cleanup;
@@ -254,22 +253,6 @@ void () CheckForLastTwoPlayers =
 	sound (world, CHAN_ITEM, "ambience/thunder1.wav", 1, ATTN_NONE);
 }
 
-float () number_total_players =
-{
-	local float n = 0;
-	local entity e;
-
-	e = find (world, classname, "player");
-
-	while (e)
-	{
-		n = n + 1;
-		e = find (e, classname, "player");
-	}
-
-	return n;
-};
-
 void () cc_queue_reset =
 {
 	local entity e, oself;
@@ -310,15 +293,6 @@ void (string msg) ctprint =
 
 		e = find (e, classname, "player");
 	}
-};
-
-// Add player to the beginning of the chain
-void(entity list, entity player) add_player_to_chain_pre =
-{
-	//??? if (list == world) return;
-	
-	player.chain_gang = list.chain_gang;
-	list.chain_gang = player;
 };
 
 // Add player to the end of the chain
@@ -412,41 +386,6 @@ entity (float whichteam) find_team_entity =
 		e = e.next_team;
 	}
 	return world;
-};
-
-float () high_team =
-{
-	local entity e;
-	local float plr_highest, n;
-
-	e = boss.next_team;
-	plr_highest = 1;
-
-	// Find team with most players
-	while (e != world)
-	{
-		n = number_teammates (e);
-		if (n > plr_highest)
-		plr_highest = n;
-		e = e.next_team;
-	}
-
-	return (plr_highest);
-};
-
-float (float whichteam) lower_team =
-{
-	local entity pteam;
-	local float t,n;
-
-	pteam 	= find_team_entity (whichteam);
-	n 	= high_team();
-	t 	= number_teammates (pteam);
-
-	if (t < n)
-	return TRUE;
-	else
-	return FALSE;
 };
 
 void () find_team_place =
@@ -681,61 +620,6 @@ float (entity list) chain_gang_size =
 	}
 
 	return n;
-};
-
-//R00k used for debugging: Maybe pre-round onscreen display?
-void (entity pteam, entity admin) print_chain_gang =
-{
-	local entity e;
-
-	e = pteam;
-
-	while (e.chain_gang)
-	{
-		e = e.chain_gang;
-		sprint (admin, e.netname, "\n");
-	}
-};
-
-//R00k
-void (entity pteam) rotate_chain_gang =
-{
-	local entity e, thedude = world;
-	local float n, p;
-
-	p = chain_gang_size (pteam);
-
-	if (p <= boss.start_players)
-		return;
-
-	e = pteam;
-
-	for (n = 1; n <= p; n = n + 1)
-	{
-		e = e.chain_gang;
-
-		if (e.chain_gang == world)//find the end of the chain
-		{
-			thedude = e;
-			break;
-		}
-	}
-
-	remove_player_from_chain (pteam, thedude);//remove him from the END
-	add_player_to_chain_pre (pteam, thedude); //place him at the START
-};
-
-void () update_chain_gang =
-{
-	local entity pteam;
-
-	pteam = boss.next_team;
-
-	while (pteam != world)
-	{
-		rotate_chain_gang(pteam);
-		pteam = pteam.next_team;
-	}
 };
 
 void () respawn_teams =

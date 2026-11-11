@@ -27,7 +27,6 @@ entity(string key_name) SpawnCustomKeyDef;
 entity(string key_name) FindCustomKeyDef;
 float(entity client, float item_flags, float customkey_flags) HasKeys;
 void(entity client, float item_flags, float customkey_flags) GiveKeys;
-void(entity client) GiveAllKeys;
 void(entity client, float item_flags, float customkey_flags) RemoveKeys;
 
 
@@ -189,19 +188,6 @@ void(entity client, float item_flags, float customkey_flags) GiveKeys =
 	client.customkeys = client.customkeys | customkey_flags;
 };
 
-
-/*
-================
-GiveAllKeys
-
-Give the specified client the silver key, the gold key, and all of the
-custom keys that have been defined for the current map.  -- iw
-================
-*/
-void(entity client) GiveAllKeys =
-{
-	GiveKeys (client, IT_KEY1 | IT_KEY2, highest_custom_key * 2 - 1);
-};
 
 
 /*

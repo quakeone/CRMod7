@@ -1361,32 +1361,6 @@ void(entity player) hh_head_takeover =
 	centerprint(player, "You can haunt other players\nby holding jump to fly.\nKill the campers.");
 };
 
-void() hh_haunt_touch =
-{
-	if (ffa_start_lock_active())
-		return;
-
-	if (other.classname != "player")
-		return;
-
-	if ((other == self) || other.deadflag || (other.health <= 0) || !other.takedamage)
-		return;
-
-	if (self.hh_can_bite > time)
-		return;
-
-	if (random() < 0.5)
-		clanring_play_compat_sound(self, CHAN_VOICE, "hhsounds/bite1.wav", "", 1, ATTN_NONE);
-	else
-		clanring_play_compat_sound(self, CHAN_VOICE, "hhsounds/bite2.wav", "", 1, ATTN_NONE);
-
-	T_Damage(other, self, self, 5);
-	self.hh_stats_haunt_bites = self.hh_stats_haunt_bites + 1;
-	if (other.deadflag || (other.health <= 0))
-		self.hh_stats_haunt_kills = self.hh_stats_haunt_kills + 1;
-	self.hh_can_bite = time + 0.25;
-};
-
 void(entity player) hh_start_haunting =
 {
 	local float haunt_limit;
@@ -2259,11 +2233,6 @@ void(entity dead, vector spawn_origin) hh_spawn_head_at =
 	launch_velocity = VelocityForDamage(dead.health);
 	launch_velocity_z = launch_velocity_z + 120 + (random() * 120);
 	hh_release_head(head, spawn_origin, launch_velocity);
-};
-
-void(entity dead) hh_spawn_head =
-{
-	hh_spawn_head_at(dead, dead.origin);
 };
 
 void() hh_unlock_passed_head =

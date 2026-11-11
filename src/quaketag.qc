@@ -163,37 +163,6 @@ void() quaketag_start_regular_auto =
     }
 };
 
-// Start 14-mode Tag from server context: pick first connected non-observer player
-void() quaketag_start_q14ever_auto =
-{
-    // Overlay semantics: never clear/stop Tag. Attach to a valid player.
-    local entity target, p, keepself;
-    if (!clanring_allow_q14ever) return;
-    target = ((self != world) && (self.style & CLANRING_CONNECTED) && !(self.style & CLANRING_OBSERVER)) ? self : world;
-    if (target == world)
-    {
-        // Prefer current "it" if Tag is running
-        if (crmod_qtag_it != world) target = crmod_qtag_it;
-    }
-    if (target == world)
-    {
-        // Fallback: first active non-observer
-        p = find(world, classname, "player");
-        while (p)
-        {
-            if ((p.style & CLANRING_CONNECTED) && !(p.style & CLANRING_OBSERVER)) { target = p; break; }
-            p = find(p, classname, "player");
-        }
-    }
-    if (target == world) return;
-    keepself = self; self = target;
-    Q14ever_RemoveAllProps();
-    q14ever_spawn_penis(self);
-    // Use a non-AUTO channel to avoid masking Tag start SFX
-    sound(self, CHAN_ITEM, "dog/dsight.wav", 1, ATTN_NONE);
-    self = keepself;
-};
-
 // ?????????????????????????????????????????????????????????????
 // QuakeTag end-of-round awards (no cvars)
 // Uses fields added by the callouts patch:

@@ -48,7 +48,8 @@ Based on the original [CRMod](https://github.com/jp-grossman/crmod) and [CRCTF](
    # Double-click fteqcc64.exe to open the GUI
    # Click "Open Source File" and select src/progs.src
    # Click compile
-   
+   ```
+
 #### Linux
 1. **Download FTEQCC**
    ```bash
@@ -60,14 +61,16 @@ Based on the original [CRMod](https://github.com/jp-grossman/crmod) and [CRCTF](
 2. **Download CRMod 7 Source**
    ```bash
    # Download source code (or use git clone)
-   wget https://github.com/yourusername/crmod7/archive/main.zip
+   wget https://github.com/quakeone/CRMod7/archive/refs/heads/main.zip
    unzip main.zip
-   cd crmod7-main
+   cd CRMod7-main
    ```
 
 3. **Compile the mod**
    ```bash
-   ./fteqcc64 -src src
+   # fteqcc64 was extracted one directory up in step 1
+   ../fteqcc64 -src src
+   ```
 
 ### ✅ Output Files
 
