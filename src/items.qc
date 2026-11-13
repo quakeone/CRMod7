@@ -1997,6 +1997,10 @@ void() powerup_touch =
 		else
 			sound (other, CHAN_ITEM, self.noise, 1, ATTN_NONE);//R00k: most dm maps only have one quad, so announce it globally
 
+		// Already quadded: credit the elapsed window before quadtime restarts.
+		if ((other.super_damage_finished > time) && (other.items & IT_QUAD))
+			other.totalquad += (time - other.quadtime);
+
 		other.items = other.items | self.items;
 		ffa_item_hide_or_ghost(self);
 

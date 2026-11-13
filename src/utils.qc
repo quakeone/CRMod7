@@ -3425,15 +3425,18 @@ float(string s, float limit) Webhook_FindSplitPos =
     search_start = limit - 200;
     if (search_start < 100) search_start = 100;
 
+    // Use str2chr (no tempstrings) for per-character scans: a substring()
+    // per character can cycle the engine's tempstring ring (256 slots in
+    // QSS-M: the index is a byte) and clobber
+    // tempstrings the caller is still holding.
     {
-        local float i;
+        local float i, nextch;
         for (i = limit - 1; i > search_start; i = i - 1)
         {
-            if (substring(s, i, 1) == "\n")
+            if (str2chr(s, i) == 10)
             {
-                local string nextch;
-                nextch = substring(s, i + 1, 1);
-                if (nextch == "*" || nextch == "`")
+                nextch = str2chr(s, i + 1);
+                if (nextch == 42 || nextch == 96) // '*' or '`'
                 {
                     split_pos = i + 1;
                     break;
@@ -3447,7 +3450,7 @@ float(string s, float limit) Webhook_FindSplitPos =
         local float j;
         for (j = limit - 1; j > 0; j = j - 1)
         {
-            if (substring(s, j, 1) == "\n")
+            if (str2chr(s, j) == 10)
             {
                 split_pos = j + 1;
                 break;
@@ -4420,11 +4423,12 @@ void(entity ev) webhook_stats_info =
         local float prefix_len, split_pos, fence_count;
         local float end_in_code, suffix_len;
 
-        if (prepared) strunzone(prepared);
         prepared = strzone("");
 
-        // Keep well under QC tempstring limits to avoid PF_strcat overflow.
-        discord_limit = 900;
+        // Engine tempstrings are 1024 bytes and strcat/strreplace truncate
+        // silently. The JSON payload adds {"content":""} plus one byte per
+        // escaped newline, quote or backslash, so leave room for that.
+        discord_limit = 800;
 
         part_num = 1;
         delay_offset = 0;
@@ -4550,29 +4554,27 @@ void(entity ev) webhook_stats_info =
             seg = strreplace("\r", "\n", seg);
             seg = strreplace("\t", "    ", seg);
 
+            // Zone the segment before flushing: FLUSH creates many tempstrings
+            // and a tempstring seg can be overwritten (garbled headers,
+            // repeated chunks, broken ``` fences in the Discord output).
+            seg = strzone(seg);
+
             if (strlen(prepared) > 0 && (strlen(prepared) + strlen(seg) > discord_limit))
             {
                 WEBHOOK_STATS_FLUSH()
-                }
+            }
 
             if (strlen(seg) > discord_limit)
-                {
-                if (prepared) strunzone(prepared);
-                prepared = strzone(seg);
+            {
+                strunzone(prepared);
+                prepared = seg; // ownership moves to prepared
                 WEBHOOK_STATS_FLUSH()
                 continue;
-                }
+            }
 
-            if (prepared == "")
-                {
-                if (prepared) strunzone(prepared);
-                prepared = strzone(seg);
-                    }
-                    else
-                    {
-                prepared = zcat(prepared, seg);
-                    }
-                }
+            prepared = zcat(prepared, seg);
+            strunzone(seg);
+        }
 
         if (strlen(prepared) > 0)
             {

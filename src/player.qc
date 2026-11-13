@@ -729,15 +729,12 @@ void() PlayerDie =
 	   powerup_drop();
 
 	if (mode_is_arena())
-	{
 		im_dead_now_what();
 
-		if ((self.super_damage_finished > time) && (self.items & IT_QUAD))
-		{
-			self.totalquad += (time - self.quadtime);
-			//wipeout_drop_quad (self.super_damage_finished - time);
-		}
-	}
+	// Credit quad time held up to death in every mode: super_damage_finished
+	// is cleared below, so the expiry path in PlayerPostThink never runs.
+	if ((self.super_damage_finished > time) && (self.items & IT_QUAD))
+		self.totalquad += (time - self.quadtime);
 
 	self.items 					= self.items - (self.items & (IT_INVISIBILITY | IT_INVULNERABILITY | IT_SUIT | IT_QUAD| IT_SUPERHEALTH));
 	self.invisible_finished 	= 0;
