@@ -34,6 +34,36 @@ void () clan_arena_init_world =
 	ca_mvp_entity		= world;
 };
 
+// Announce when the upcoming round can decide the match early
+// (a team is one win from clinching before the final round).
+void () ca_announce_match_point =
+{
+	local entity e, leader = world;
+	local float need, n = 0;
+
+	if (boss.round >= boss.max_rounds)
+		return;
+
+	need = ceil(boss.max_rounds / 2);
+
+	e = boss.next_team;
+	while (e != world)
+	{
+		if (e.wins == (need - 1))
+		{
+			n = n + 1;
+			if (leader == world)
+				leader = e;
+		}
+		e = e.next_team;
+	}
+
+	if (n == 1)
+		announce(sprintf("\x85\bMatch point\b for The %s!\x85", leader.netname));
+	else if (n > 1)
+		announce("\x85\bMatch point\b!\x85");
+};
+
 float () ca_is_one_on_one =
 {
     local float teams_with_player = 0;
@@ -261,6 +291,8 @@ void () arena_main_loop =
 					local string stmp;
 					stmp = (report_winning_team());
 					bprint2 (stmp, "\n");
+
+					ca_announce_match_point();
 				}
 			}
 			else
