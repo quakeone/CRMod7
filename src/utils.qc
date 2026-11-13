@@ -3193,8 +3193,6 @@ string(string body) Webhook_MakeContentPayloadZ =
     return out; // zoned
 };
 
-// Macro for capped appends
-#define APPEND_SAFE(_segexpr) webhook_stats_buf_append((_segexpr))
 
 // ------------------------------------------------------------
 // Quake -> Discord sanitizer (preserve whitespace/padding)
@@ -3393,84 +3391,6 @@ string(string s) Webhook_TruncateForDiscord =
     return strcat(substring(s, 0, keep), suffix);
 };
 
-// Count ``` fences in a string
-float(string s) Webhook_CountFences =
-{
-    local float count, pos;
-
-    count = 0;
-    pos = 0;
-    while (TRUE)
-    {
-        pos = strstrofs(s, "```", pos);
-        if (pos < 0) break;
-        count = count + 1;
-        pos = pos + 3;
-    }
-
-    return count;
-};
-
-// Split helper: prefer section boundaries and avoid cutting ``` fences
-float(string s, float limit) Webhook_FindSplitPos =
-{
-    local float split_pos, search_start;
-    local float n;
-
-    n = strlen(s);
-    if (limit < 1) limit = 1;
-    if (n <= limit) return n;
-
-    split_pos = -1;
-    search_start = limit - 200;
-    if (search_start < 100) search_start = 100;
-
-    // Use str2chr (no tempstrings) for per-character scans: a substring()
-    // per character can cycle the engine's tempstring ring (256 slots in
-    // QSS-M: the index is a byte) and clobber
-    // tempstrings the caller is still holding.
-    {
-        local float i, nextch;
-        for (i = limit - 1; i > search_start; i = i - 1)
-        {
-            if (str2chr(s, i) == 10)
-            {
-                nextch = str2chr(s, i + 1);
-                if (nextch == 42 || nextch == 96) // '*' or '`'
-                {
-                    split_pos = i + 1;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (split_pos < 0)
-    {
-        local float j;
-        for (j = limit - 1; j > 0; j = j - 1)
-        {
-            if (str2chr(s, j) == 10)
-            {
-                split_pos = j + 1;
-                break;
-            }
-        }
-    }
-
-    if (split_pos < 0) split_pos = limit;
-
-    while (split_pos > 0)
-    {
-        if (split_pos >= 2 && substring(s, split_pos - 2, 3) == "```") { split_pos = split_pos - 2; continue; }
-        if (split_pos >= 1 && substring(s, split_pos - 1, 3) == "```") { split_pos = split_pos - 1; continue; }
-        break;
-    }
-
-    if (split_pos < 1) split_pos = min(limit, n);
-    return split_pos;
-};
-
 // ------------------------------------------------------------
 // PREP functions
 // ------------------------------------------------------------
@@ -3495,12 +3415,12 @@ void(entity ev) webhook_captime_info =
 // Forward declaration (defined later in sender pipeline section)
 void() webhook_do_post;
 
-// Prep function for stats continuation parts (ev.message already contains the chunk)
+// Prep function for stats continuation parts (ev.message is the @file payload)
 void(entity ev) webhook_stats_continuation_info =
 {
     local string urls, content;
 
-    content = ev.message;  // already zoned by caller
+    content = ev.message;  // "@discord/stats_N.json", zoned by webhook_stats_send
 
     urls = clanring_statsdiscordurl;
     if (urls == "") urls = cvar_string("webhook_stats_url");
@@ -3508,51 +3428,529 @@ void(entity ev) webhook_stats_continuation_info =
     if (ev.hook_url == "") return;
 
     if (ev.hook_payload) strunzone(ev.hook_payload);
-    ev.hook_payload = Webhook_MakeContentPayloadZ(content);
+    ev.hook_payload = strzone(content);
 };
 
-// Build and store a Discord "stats" message (safe against tempstring aliasing)
+// ------------------------------------------------------------
+// Discord stats: ANSI-colored tables
+// ------------------------------------------------------------
+// Tables go in ```ansi code blocks. Discord desktop/web render the colors;
+// mobile shows the same text without them. Color has one meaning per kind:
+// gold = best in column, red = worst (bad stats), gray = zero / N/A, and
+// player names take their team color.
+#define WST_MAXROWS 16
+#define WST_MAXCOLS 10
+
+#define WST_INT  0
+#define WST_PCT  1   // value < 0 shows N/A
+#define WST_DEC1 2
+#define WST_SECS 3
+#define WST_MMSS 4
+#define WST_TEAM 5   // row's team name (value unused)
+#define WST_BIG  6   // thousands separator
+
+#define WST_NONE  0
+#define WST_MAX   1  // highest value in gold
+#define WST_MIN   2  // lowest value in gold
+#define WST_WORST 3  // highest value in red
+
+#define WST_GOLD "[1;33m"
+#define WST_RED  "[1;31m"
+#define WST_GRAY "[30m"
+
+// Discord allows 2000 characters per message; strlen counts bytes, which is
+// never less than characters, so this leaves room for a reopened fence.
+#define WST_MSG_LIMIT 1900
+
+entity wst_row[WST_MAXROWS];
+float  wst_frags[WST_MAXROWS];
+float  wst_obs[WST_MAXROWS];
+float  wst_show[WST_MAXROWS];
+float  wst_nrows;
+float  wst_namew;
+float  wst_val[160];            // WST_MAXROWS * WST_MAXCOLS
+string wst_head[WST_MAXCOLS];
+float  wst_w[WST_MAXCOLS];
+float  wst_kind[WST_MAXCOLS];
+float  wst_rule[WST_MAXCOLS];
+float  wst_tgt[WST_MAXCOLS];
+float  wst_has[WST_MAXCOLS];
+float  wst_ncols;
+string wst_esc;                 // zoned ESC character
+string wst_awards;              // zoned awards line
+float  wst_nawards;
+float  wst_part;
+float  wst_delay;
+
+string(string code, string s) wst_paint =
+{
+    if (!wst_esc) wst_esc = strzone(chr2str(27));
+    if (code == "") return s;
+    return strcat(wst_esc, code, s, wst_esc, "[0m");
+};
+
+// ANSI color for a team color number (strings_get_teamname order)
+string(float h) wst_team_ansi =
+{
+    if (h == 4) return "[31m";                          // red
+    if (h == 13) return "[34m";                         // blue
+    if (h == 2 || h == 11) return "[36m";               // light blue, aqua
+    if (h == 3 || h == 5) return "[32m";                // green, olive
+    if (h == 1 || h == 6 || h == 12) return "[33m";     // brown, gold, yellow
+    if (h == 7 || h == 8 || h == 9) return "[35m";      // flesh, lavender, purple
+    return "[37m";
+};
+
+string(entity p) wst_name_code =
+{
+    if (!teamplay || p.next_team == world) return "";
+    return wst_team_ansi(p.next_team.height);
+};
+
+// Colored circle emoji for a team color number
+string(float h) wst_team_dot =
+{
+    if (h == 4) return "\xF0\x9F\x94\xB4";
+    if (h == 13 || h == 2 || h == 11) return "\xF0\x9F\x94\xB5";
+    if (h == 3 || h == 5) return "\xF0\x9F\x9F\xA2";
+    if (h == 6 || h == 12) return "\xF0\x9F\x9F\xA1";
+    if (h == 1) return "\xF0\x9F\x9F\xA4";
+    if (h == 7 || h == 8 || h == 9) return "\xF0\x9F\x9F\xA3";
+    return "\xE2\x9A\xAA";
+};
+
+// Escape Discord markdown in text shown outside code blocks
+string(string s) wst_md =
+{
+    s = strreplace("\\", "\\\\", s);
+    s = strreplace("*", "\\*", s);
+    s = strreplace("_", "\\_", s);
+    s = strreplace("~", "\\~", s);
+    s = strreplace("`", "\\`", s);
+    s = strreplace("|", "\\|", s);
+    return s;
+};
+
+// 10359 -> "10,359"
+string(float n) wst_thou =
+{
+    local float a, b;
+    n = floor(n);
+    if (n < 1000) return ftos(n);
+    a = floor(n / 1000);
+    b = n - a * 1000;
+    if (b < 10) return strcat(ftos(a), ",00", ftos(b));
+    if (b < 100) return strcat(ftos(a), ",0", ftos(b));
+    return strcat(ftos(a), ",", ftos(b));
+};
+
+string(float kind, float v, entity r) wst_fmt =
+{
+    local float m, s;
+    if (kind == WST_TEAM)
+        return (r.next_team != world) ? utils_rstrip(strings_get_teamname3(r.next_team.height)) : "";
+    if (kind == WST_PCT)  return (v < 0) ? "N/A" : strcat(ftos(v), "%");
+    if (kind == WST_BIG)  return wst_thou(v);
+    if (kind == WST_DEC1) return sprintf("%.1f", v);
+    if (kind == WST_SECS) return strcat(ftos(v), "s");
+    if (kind == WST_MMSS)
+    {
+        m = floor(v / 60);
+        s = floor(v - m * 60);
+        return strcat(ftos(m), (s < 10) ? ":0" : ":", ftos(s));
+    }
+    return ftos(v);
+};
+
+float(entity t) wst_team_rank =
+{
+    local float r;
+    local entity pt;
+    if (!teamplay || t == world) return 99;
+    r = 0;
+    pt = clanring_sentinel.next_team;
+    while (pt)
+    {
+        if (pt != t && (pt.frags > t.frags || (pt.frags == t.frags && pt.height < t.height)))
+            r = r + 1;
+        pt = pt.next_team;
+    }
+    return r;
+};
+
+// Collect every player who may appear in any table, ordered winning team
+// first, then by frags. Per-table eligibility is checked with wst_elig.
+void(float is_arena, float participant_cutoff) wst_collect =
+{
+    local entity p, te;
+    local float obs, n, i, j, best, key, bkey, tf, to;
+
+    wst_nrows = 0;
+    wst_namew = 4;
+    p = find(world, classname, "player");
+    while (p && wst_nrows < WST_MAXROWS)
+    {
+        obs = ((clanring_playmode & CLANRING_MATCH_MODE) &&
+               (p.style & CLANRING_OBSERVER) &&
+               p.join_time > 0 &&
+               p.join_time >= participant_cutoff &&
+               stats_has_nontrivial_activity(p));
+        if ((is_arena && p.next_team != world) || !(p.style & CLANRING_OBSERVER) || obs)
+        {
+            n = wst_nrows;
+            wst_row[n] = p;
+            wst_obs[n] = obs;
+            wst_frags[n] = p.frags;
+            if (obs && p.frags <= -90)
+                wst_frags[n] = p.true_kills - p.mangle_z;
+            wst_namew = max(wst_namew, strlen(utils_dequake_for_discord(p.netname)));
+            wst_nrows = n + 1;
+        }
+        p = find(p, classname, "player");
+    }
+    wst_namew = bound(4, wst_namew, 15);
+
+    // selection sort: team rank ascending, frags descending
+    for (i = 0; i < wst_nrows; i++)
+    {
+        best = i;
+        bkey = wst_team_rank(wst_row[i].next_team) * 1000000 - wst_frags[i];
+        for (j = i + 1; j < wst_nrows; j++)
+        {
+            key = wst_team_rank(wst_row[j].next_team) * 1000000 - wst_frags[j];
+            if (key < bkey) { best = j; bkey = key; }
+        }
+        if (best != i)
+        {
+            te = wst_row[i]; wst_row[i] = wst_row[best]; wst_row[best] = te;
+            tf = wst_frags[i]; wst_frags[i] = wst_frags[best]; wst_frags[best] = tf;
+            to = wst_obs[i]; wst_obs[i] = wst_obs[best]; wst_obs[best] = to;
+        }
+    }
+};
+
+#define WST_E_SCORE 0   // scoreboard
+#define WST_E_MAIN  1   // efficiency, kills, headhunters
+#define WST_E_ITEMS 2   // quad, bad stats, items
+#define WST_E_CTF   3
+#define WST_E_QPER  4
+
+float(float r, float which, float is_arena) wst_elig =
+{
+    local entity p;
+    local float obs, playing;
+    p = wst_row[r];
+    obs = wst_obs[r];
+    playing = (!(p.style & CLANRING_OBSERVER) || obs);
+    if (which == WST_E_SCORE) return playing;
+    if (which == WST_E_MAIN) return is_arena ? (p.next_team != world) : playing;
+    if (which == WST_E_ITEMS)
+        return playing && !((clanring_playmode & CLANRING_MATCH_MODE) && p.next_team == world && !obs);
+    if (which == WST_E_CTF) return ((!(p.style & CLANRING_OBSERVER) && p.next_team != world) || obs);
+    if (which == WST_E_QPER) return playing && p.join_time > 0;
+    return FALSE;
+};
+
+void() wst_reset =
+{
+    local float i;
+    wst_ncols = 0;
+    for (i = 0; i < WST_MAXROWS; i++)
+        wst_show[i] = FALSE;
+};
+
+void(string head, float w, float kind, float rule) wst_col =
+{
+    wst_head[wst_ncols] = head;
+    wst_w[wst_ncols] = w;
+    wst_kind[wst_ncols] = kind;
+    wst_rule[wst_ncols] = rule;
+    wst_ncols = wst_ncols + 1;
+};
+
+void(float r, float c, float v) wst_set =
+{
+    wst_val[r * WST_MAXCOLS + c] = v;
+};
+
+// Pick the highlighted value per column. Nothing is highlighted when fewer
+// than two rows show, when the best is zero (gold/red rules), or when more
+// than two players share it.
+void() wst_pick_targets =
+{
+    local float c, r, v, best, found, hits, shown;
+
+    shown = 0;
+    for (r = 0; r < wst_nrows; r++)
+        if (wst_show[r]) shown = shown + 1;
+
+    for (c = 0; c < wst_ncols; c++)
+    {
+        wst_has[c] = FALSE;
+        if (shown < 2 || wst_rule[c] == WST_NONE || wst_kind[c] == WST_TEAM)
+            continue;
+
+        found = FALSE;
+        best = 0;
+        for (r = 0; r < wst_nrows; r++)
+        {
+            if (!wst_show[r]) continue;
+            v = wst_val[r * WST_MAXCOLS + c];
+            if (wst_kind[c] == WST_PCT && v < 0) continue;
+            if (!found || (wst_rule[c] == WST_MIN ? (v < best) : (v > best)))
+            {
+                best = v;
+                found = TRUE;
+            }
+        }
+        if (!found) continue;
+        if (wst_rule[c] != WST_MIN && best <= 0) continue;
+
+        hits = 0;
+        for (r = 0; r < wst_nrows; r++)
+            if (wst_show[r] && wst_val[r * WST_MAXCOLS + c] == best)
+                hits = hits + 1;
+        if (hits > 2) continue;
+
+        wst_tgt[c] = best;
+        wst_has[c] = TRUE;
+    }
+};
+
+// Append one titled table to the stats buffer
+void(string title) wst_emit =
+{
+    local float r, c, v, shown;
+    local string line, cell, code, nm;
+
+    shown = 0;
+    for (r = 0; r < wst_nrows; r++)
+        if (wst_show[r]) shown = shown + 1;
+    if (!shown) return;
+
+    wst_pick_targets();
+
+    webhook_stats_buf_append(strcat("\n**", title, "**\n"));
+    webhook_stats_buf_append("```ansi\n");
+
+    line = strzone(strpad(wst_namew, ""));
+    for (c = 0; c < wst_ncols; c++)
+    {
+        if (wst_kind[c] == WST_TEAM)
+            line = zcat(line, strcat(" ", strpad(wst_w[c], wst_head[c])));
+        else
+            line = zcat(line, strcat(" ", strpad(-wst_w[c], wst_head[c])));
+    }
+    webhook_stats_buf_append(strcat(line, "\n"));
+    strunzone(line);
+
+    for (r = 0; r < wst_nrows; r++)
+    {
+        if (!wst_show[r]) continue;
+
+        // dequake first: it burns through many tempstrings
+        nm = strzone(utils_dequake_for_discord(wst_row[r].netname));
+        line = strzone(wst_paint(wst_name_code(wst_row[r]), strpad(wst_namew, nm)));
+        strunzone(nm);
+
+        for (c = 0; c < wst_ncols; c++)
+        {
+            v = wst_val[r * WST_MAXCOLS + c];
+            if (wst_kind[c] == WST_TEAM)
+                cell = strpad(wst_w[c], wst_fmt(WST_TEAM, 0, wst_row[r]));
+            else
+                cell = strpad(-wst_w[c], wst_fmt(wst_kind[c], v, wst_row[r]));
+
+            code = "";
+            if (wst_has[c] && v == wst_tgt[c])
+                code = (wst_rule[c] == WST_WORST) ? WST_RED : WST_GOLD;
+            else if (wst_kind[c] != WST_TEAM && (v == 0 || (wst_kind[c] == WST_PCT && v < 0)))
+                code = WST_GRAY;
+
+            line = zcat(line, strcat(" ", wst_paint(code, cell)));
+        }
+        webhook_stats_buf_append(strcat(line, "\n"));
+        strunzone(line);
+    }
+    webhook_stats_buf_append("```\n");
+};
+
+// Award from column 0 of wst_val (rows with wst_show set, value > 0).
+// Ties of up to two players are listed; larger ties are skipped.
+void(string label, float kind) wst_award =
+{
+    local float r, v, best, hits;
+    local string who, nm;
+
+    best = 0;
+    for (r = 0; r < wst_nrows; r++)
+    {
+        if (!wst_show[r]) continue;
+        v = wst_val[r * WST_MAXCOLS];
+        if (v > best) best = v;
+    }
+    if (best <= 0) return;
+
+    hits = 0;
+    for (r = 0; r < wst_nrows; r++)
+        if (wst_show[r] && wst_val[r * WST_MAXCOLS] == best)
+            hits = hits + 1;
+    if (hits > 2) return;
+
+    who = strzone("");
+    for (r = 0; r < wst_nrows; r++)
+    {
+        if (!(wst_show[r] && wst_val[r * WST_MAXCOLS] == best)) continue;
+        nm = strzone(wst_md(utils_dequake_for_discord(wst_row[r].netname)));
+        if (who == "")
+            who = zcat(who, nm);
+        else
+            who = zcat(who, strcat(", ", nm));
+        strunzone(nm);
+    }
+
+    if (wst_nawards > 0)
+        wst_awards = zcat(wst_awards, " \xC2\xB7 ");
+    wst_awards = zcat(wst_awards, strcat(label, " **", who, " ", wst_fmt(kind, best, world), "**"));
+    strunzone(who);
+    wst_nawards = wst_nawards + 1;
+};
+
+// ------------------------------------------------------------
+// Discord stats: sending
+// ------------------------------------------------------------
+// Each message is written to data/discord/stats_N.json and posted with
+// uri_post's "@file" body, so a message is not limited by the engine's
+// 1024-byte tempstrings and can use Discord's full message length.
+
+string(string s) wst_json_esc =
+{
+    if (!wst_esc) wst_esc = strzone(chr2str(27));
+    s = strreplace("\\", "\\\\", s);
+    s = strreplace("\"", "\\\"", s);
+    s = strreplace("\r", "", s);
+    s = strreplace("\n", "\\n", s);
+    s = strreplace("\t", "    ", s);
+    s = strreplace(wst_esc, "\\u001b", s);
+    return s;
+};
+
+float(string seg) wst_is_section =
+{
+    if (substring(seg, 0, 3) == "\n**") return TRUE;
+    if (substring(seg, 0, 3) == "## ") return TRUE;
+    return (substring(seg, 0, 2) == "**");
+};
+
+void(entity ev, float a, float b, float reopen, float closefence) wst_write_part =
+{
+    local string path, payload;
+    local float f, j;
+    local entity cont;
+
+    wst_part = wst_part + 1;
+    path = strzone(sprintf("discord/stats_%g.json", wst_part));
+    f = fopen(path, FILE_WRITE);
+    if (f < 0)
+    {
+        dprint("webhook: cannot write ", path, "\n");
+        strunzone(path);
+        return;
+    }
+    fputs(f, "{\"allowed_mentions\":{\"parse\":[]},\"content\":\"");
+    if (reopen) fputs(f, "```ansi\\n");
+    for (j = a; j < b; j++)
+        fputs(f, wst_json_esc(bufstr_get(webhook_stats_buf, j)));
+    if (closefence) fputs(f, "```");
+    fputs(f, "\"}");
+    fclose(f);
+
+    // fopen wrote <gamedir>/data/<path>; uri_post's "@" lookup tries that.
+    payload = strzone(strcat("@", path));
+    strunzone(path);
+
+    if (wst_part == 1)
+    {
+        if (ev.hook_payload) strunzone(ev.hook_payload);
+        ev.hook_payload = payload;
+    }
+    else
+    {
+        cont = spawn();
+        cont.classname = "webhook_event";
+        cont.message = payload;
+        cont.webhook_prepfn = webhook_stats_continuation_info;
+        cont.nextthink = time + wst_delay;
+        cont.think = webhook_do_post;
+        wst_delay = wst_delay + 0.5;
+    }
+};
+
+// Group buffered segments into messages, breaking between sections and only
+// splitting a section (closing and reopening its code block) if it can't fit.
+void(entity ev) webhook_stats_send =
+{
+    local float n, i, j, len, seclen, start, incode, reopen;
+    local string seg;
+
+    wst_part = 0;
+    wst_delay = 0.5;
+    n = buf_getsize(webhook_stats_buf);
+    start = 0;
+    len = 0;
+    incode = FALSE;
+    reopen = FALSE;
+
+    for (i = 0; i < n; i++)
+    {
+        seg = bufstr_get(webhook_stats_buf, i);
+        if (wst_is_section(seg))
+        {
+            seclen = 0;
+            for (j = i; j < n; j++)
+            {
+                if (j > i && wst_is_section(bufstr_get(webhook_stats_buf, j))) break;
+                seclen = seclen + strlen(bufstr_get(webhook_stats_buf, j));
+            }
+            if (len > 0 && len + seclen > WST_MSG_LIMIT)
+            {
+                wst_write_part(ev, start, i, reopen, FALSE);
+                start = i;
+                len = 0;
+                reopen = FALSE;
+            }
+            seg = bufstr_get(webhook_stats_buf, i);
+        }
+        else if (len > 0 && seg != "```\n" && len + strlen(seg) + 4 > WST_MSG_LIMIT)
+        {
+            wst_write_part(ev, start, i, reopen, incode);
+            start = i;
+            reopen = incode;
+            len = incode ? 8 : 0;
+            seg = bufstr_get(webhook_stats_buf, i);
+        }
+        len = len + strlen(seg);
+        if (seg == "```ansi\n") incode = TRUE;
+        else if (seg == "```\n") incode = FALSE;
+    }
+    if (start < n)
+        wst_write_part(ev, start, n, reopen, FALSE);
+};
+
+// Build and send the Discord "stats" message
 void(entity ev) webhook_stats_info =
 {
     local string urls;
     local entity p;
-    local float lines, maxlines;
-    local float use_find; // choose player iteration strategy (arena uses find())
-    local float is_arena;
-    local float eligible_players;
-    local float total_frags;
-    local float name_col_w;
-    local float name_len;
-
-    // efficiency helpers
-    local float kfrac, ktot, wfrac, wtot;
-    local string killpct, weappct;
-
-    // shared scratch
-    local string nm;
-    local string hdr_time;
-    local float m, s;
-    local float hourpos;
-    local float v;
-    local float b1, b2, b3, b4, b5;
-    local float obs_participant;
-    local float row_frags;
+    local float is_arena, r, v, k, m;
+    local float eligible_players, total_frags, hh_has_activity, obs;
     local float participant_cutoff;
-    local float hh_has_activity;
+    local float kfrac, ktot;
+    local float b1, b2, b3, b4, b5;
+    local entity e1, e2, e3, e4, e5;
+    local string nm, s;
 
-    // shared tempstring-safe buffers
-    local string line;          // reusable line buffer
-    local string zname;         // zoned name buffer
-    local string z_mmss;        // zoned "mm:ss"
-    local string mmss_tmp;      // temp "mm:ss" pre-zone
-    local string ss_str;        // seconds (zero-padded)
-    local string tmps;          // temp string for macros
-
-    float maxlen; maxlen = 8000;  // build full message, then split later
     is_arena = mode_is_arena();
-    // Always scan all player entities so match participants who moved to
-    // observer right at match end are still eligible for Discord output.
-    use_find = TRUE;
     v = clanring_timelimit;
     if (v <= 0) v = cvar("timelimit");
     if (v <= 0) v = 20;
@@ -3562,38 +3960,23 @@ void(entity ev) webhook_stats_info =
 
     // Skip Discord stats if there are fewer than two eligible players,
     // or if every player has 0 frags (idle/afk game).
+    wst_collect(is_arena, participant_cutoff);
     eligible_players = 0;
     total_frags = 0;
     hh_has_activity = 0;
-    name_col_w = 4; // at least width of "Name"
-    if (use_find) p = find(world, classname, "player");
-    else p = clanring_sentinel.next_player;
-    while (p)
+    for (r = 0; r < wst_nrows; r++)
     {
-        obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                           (p.style & CLANRING_OBSERVER) &&
-                           p.join_time > 0 &&
-                           p.join_time >= participant_cutoff &&
-                           stats_has_nontrivial_activity(p));
-
+        p = wst_row[r];
+        obs = wst_obs[r];
         if ((is_arena && p.next_team != world) ||
-            (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
+            (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs)))
         {
-            row_frags = p.frags;
-            if (obs_participant && row_frags <= -90)
-                row_frags = p.true_kills - p.mangle_z;
-
             eligible_players = eligible_players + 1;
-            total_frags = total_frags + row_frags;
+            total_frags = total_frags + wst_frags[r];
             if ((clanring_playmode & CLANRING_HH_MODE) && stats_has_nontrivial_activity(p))
                 hh_has_activity = TRUE;
-            name_len = strlen(utils_dequake_for_discord(p.netname));
-            if (name_len > name_col_w) name_col_w = name_len;
         }
-        if (use_find) p = find(p, classname, "player");
-        else p = p.next_player;
     }
-    name_col_w = bound(4, name_col_w, 15);
     if (eligible_players < 2)
         return;
     if ((total_frags <= 0) && !hh_has_activity)
@@ -3605,988 +3988,546 @@ void(entity ev) webhook_stats_info =
     Webhook_SetEventURLsMax3(ev, urls);
     if (ev.hook_url == "") return;
 
-    // -------------------------
-    // Header (piecewise)
-    // -------------------------
-    webhook_stats_buf_begin(maxlen);
-    APPEND_SAFE("\n## Match Statistics\n");
-    hdr_time = utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p"));
-    if (substring(hdr_time, 0, 1) == "0")
-        hdr_time = substring(hdr_time, 1, strlen(hdr_time) - 1);
-    hourpos = strstrofs(hdr_time, " ", 0);
-    if (hourpos >= 0 && substring(hdr_time, hourpos + 1, 1) == "0")
-        hdr_time = strcat(substring(hdr_time, 0, hourpos + 1), substring(hdr_time, hourpos + 2, strlen(hdr_time) - (hourpos + 2)));
-    APPEND_SAFE(hdr_time);
-    APPEND_SAFE("\n");
-    APPEND_SAFE(utils_dequake_for_discord(infokey(world, "hostname")));
-    APPEND_SAFE("\n");
-    // Enhanced header: "20 min 3v3 match on kaboom" or "15 of 20 min 3v3 match on kaboom"
-    // For non-match modes (normal/FFA), shows "10 min game on kaboom"
-    // Overtime: total time across regulation + OT periods, with "(N OT)" suffix.
+    webhook_stats_buf_begin(16000);
+
+    // QPER ranking (top 5), used for the MVP line and the QPER table
+    b1 = b2 = b3 = b4 = b5 = -9999;
+    e1 = e2 = e3 = e4 = e5 = world;
+    if (!is_arena)
     {
-        local string match_desc;
-        local float elapsed_mins, remaining_secs, tl;
-        local float reg_tl, ot_len, ot_n, current_period_tl, completed_mins, total_tl;
-        local string time_str, ot_suffix;
-        local string time_str_z, map_str_z;
-        local float is_match_mode;
-        local string game_type;
-
-        is_match_mode = (clanring_playmode & CLANRING_MATCH_MODE);
-        game_type = is_match_mode ? "match" : "game";
-
-        // Get timelimit (fall back to cvar if clanring_timelimit is 0)
-        tl = clanring_timelimit;
-        if (tl <= 0) tl = cvar("timelimit");
-        if (tl <= 0) tl = 20; // default fallback
-
-        // Resolve regulation length and OT contribution.  When the match has
-        // entered OT, clanring_timelimit has been overwritten with the OT
-        // length, so we need clanring_match_initial_timelimit to know what
-        // regulation actually was.
-        ot_n = clanring_overtime_count;
-        if (ot_n < 0) ot_n = 0;
-        reg_tl = clanring_match_initial_timelimit;
-        if (reg_tl <= 0) reg_tl = tl;
-        ot_len = (ot_n > 0) ? tl : 0;
-        current_period_tl = (ot_n > 0) ? ot_len : reg_tl;
-        completed_mins = (ot_n > 0) ? (reg_tl + (ot_n - 1) * ot_len) : 0;
-        total_tl = reg_tl + ot_n * ot_len;
-
-        ot_suffix = "";
-        if (ot_n == 1) ot_suffix = " (1 OT)";
-        else if (ot_n > 1) ot_suffix = sprintf(" (%g OT)", ot_n);
-
-        // Calculate elapsed time
-        if (is_match_mode && clanring_match_timer != world && current_period_tl > 0)
+        for (r = 0; r < wst_nrows; r++)
         {
-            // Match mode: use match timer to calculate elapsed time within
-            // the current period, then add any completed periods.
-            remaining_secs = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
-            if (remaining_secs < 0) remaining_secs = 0;
-            elapsed_mins = completed_mins + floor((current_period_tl * 60 - remaining_secs) / 60);
-            if (elapsed_mins < 1) elapsed_mins = 1;  // Show at least 1 minute
+            if (!wst_elig(r, WST_E_QPER, is_arena)) continue;
+            p = wst_row[r];
+            v = qper_rating(p);
+            if (v > b1) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=b1; e2=e1; b1=v; e1=p; }
+            else if (v > b2) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=v; e2=p; }
+            else if (v > b3) { b5=b4; e5=e4; b4=b3; e4=e3; b3=v; e3=p; }
+            else if (v > b4) { b5=b4; e5=e4; b4=v; e4=p; }
+            else if (v > b5) { b5=v; e5=p; }
+        }
+    }
 
-            // Show "X of Y min" if match ended early.
-            // Round up if less than 60 seconds remain (current period essentially complete)
-            if (remaining_secs > 0 && remaining_secs < 60) elapsed_mins = total_tl;
-            if (remaining_secs >= 60 && elapsed_mins < total_tl)
-                time_str = sprintf("%g of %g min%s", elapsed_mins, total_tl, ot_suffix);
+    // -------------------------
+    // Headline: score, details, MVP, awards
+    // -------------------------
+    {
+        local entity pteam, best_team, t1, t2;
+        local float best_score, num_teams, i;
+        local string hdr_time, time_str, map_z, line;
+        local float hourpos;
+
+        num_teams = 0;
+        if (teamplay)
+        {
+            pteam = clanring_sentinel.next_team;
+            while (pteam) { num_teams = num_teams + 1; pteam = pteam.next_team; }
+        }
+
+        line = strzone("## ");
+        if (num_teams >= 2)
+        {
+            // teams in descending score order (.cnt as printed flag)
+            t1 = t2 = world;
+            for (i = 0; i < num_teams; i = i + 1)
+            {
+                best_team = world;
+                best_score = -999999;
+                pteam = clanring_sentinel.next_team;
+                while (pteam)
+                {
+                    if ((pteam.cnt == 0) && (pteam.frags > best_score))
+                    {
+                        best_score = pteam.frags;
+                        best_team = pteam;
+                    }
+                    pteam = pteam.next_team;
+                }
+                if (best_team == world) break;
+                best_team.cnt = 1;
+                if (i == 0) t1 = best_team;
+                if (i == 1) t2 = best_team;
+
+                if (best_team.netname != "")
+                    nm = strzone(wst_md(utils_dequake_for_discord(best_team.netname)));
+                else
+                    nm = strzone(utils_rstrip(strings_get_teamname2(best_team.height)));
+
+                if (num_teams == 2 && i == 1)
+                    line = zcat(line, strcat(" \xE2\x80\x93 ", ftos(best_team.frags), " ", nm, " ", wst_team_dot(best_team.height)));
+                else if (num_teams == 2)
+                    line = zcat(line, strcat(wst_team_dot(best_team.height), " ", nm, " ", ftos(best_team.frags)));
+                else
+                {
+                    if (i > 0) line = zcat(line, " \xC2\xB7 ");
+                    line = zcat(line, strcat(wst_team_dot(best_team.height), " ", nm, " ", ftos(best_team.frags)));
+                }
+                strunzone(nm);
+            }
+            pteam = clanring_sentinel.next_team;
+            while (pteam) { pteam.cnt = 0; pteam = pteam.next_team; }
+        }
+        else
+        {
+            // no teams: top fragger (rows are sorted by frags)
+            for (r = 0; r < wst_nrows; r++)
+                if (wst_elig(r, WST_E_SCORE, is_arena)) break;
+            if (r < wst_nrows)
+            {
+                nm = strzone(wst_md(utils_dequake_for_discord(wst_row[r].netname)));
+                line = zcat(line, strcat("\xF0\x9F\x8F\x86 ", nm, " wins \xC2\xB7 ", ftos(wst_frags[r]), " frags"));
+                strunzone(nm);
+            }
+            else
+                line = zcat(line, "Match Statistics");
+        }
+        webhook_stats_buf_append(strcat(line, "\n"));
+        strunzone(line);
+
+        // Details line (Discord subtext)
+        {
+            local float tl, reg_tl, ot_len, ot_n, current_period_tl, completed_mins, total_tl;
+            local float remaining_secs, elapsed_mins, is_match_mode;
+            local string ot_suffix, modes;
+
+            is_match_mode = (clanring_playmode & CLANRING_MATCH_MODE);
+            tl = clanring_timelimit;
+            if (tl <= 0) tl = cvar("timelimit");
+            if (tl <= 0) tl = 20;
+
+            // When the match has entered OT, clanring_timelimit holds the OT
+            // length, so regulation comes from clanring_match_initial_timelimit.
+            ot_n = clanring_overtime_count;
+            if (ot_n < 0) ot_n = 0;
+            reg_tl = clanring_match_initial_timelimit;
+            if (reg_tl <= 0) reg_tl = tl;
+            ot_len = (ot_n > 0) ? tl : 0;
+            current_period_tl = (ot_n > 0) ? ot_len : reg_tl;
+            completed_mins = (ot_n > 0) ? (reg_tl + (ot_n - 1) * ot_len) : 0;
+            total_tl = reg_tl + ot_n * ot_len;
+
+            ot_suffix = "";
+            if (ot_n == 1) ot_suffix = " (1 OT)";
+            else if (ot_n > 1) ot_suffix = sprintf(" (%g OT)", ot_n);
+
+            if (is_match_mode && clanring_match_timer != world && current_period_tl > 0)
+            {
+                remaining_secs = (clanring_match_timer.lip * 60) + clanring_match_timer.count;
+                if (remaining_secs < 0) remaining_secs = 0;
+                elapsed_mins = completed_mins + floor((current_period_tl * 60 - remaining_secs) / 60);
+                if (elapsed_mins < 1) elapsed_mins = 1;
+                if (remaining_secs > 0 && remaining_secs < 60) elapsed_mins = total_tl;
+                if (remaining_secs >= 60 && elapsed_mins < total_tl)
+                    time_str = sprintf("%g of %g min%s", elapsed_mins, total_tl, ot_suffix);
+                else
+                    time_str = sprintf("%g min%s", total_tl, ot_suffix);
+            }
+            else if (!is_match_mode)
+            {
+                elapsed_mins = floor(time / 60);
+                if (elapsed_mins < 1) elapsed_mins = 1;
+                time_str = sprintf("%g min", elapsed_mins);
+            }
             else
                 time_str = sprintf("%g min%s", total_tl, ot_suffix);
+            time_str = strzone(time_str);
+
+            if      (clanring_playmode & CLANRING_RA_MODE)          modes = "Rocket Arena";
+            else if (clanring_playmode & CLANRING_CA_MODE)          modes = "Clan Arena";
+            else if (clanring_playmode & CLANRING_WIPEOUT_MODE)     modes = "Wipeout";
+            else if (clanring_playmode & CLANRING_DMM4_MODE)        modes = "DMM4";
+            else if (clanring_playmode & CLANRING_AIRSHOT_MODE)     modes = "Airshot";
+            else if (clanring_playmode & CLANRING_HH_MODE)          modes = "Headhunters";
+            else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+            {
+                if      (clanring_playmode & CLANRING_MATCH_MODE)    modes = "CTF Match";
+                else if (clanring_playmode & CLANRING_PRACTICE_MODE) modes = "CTF Practice";
+                else                                                 modes = "CTF Normal";
+            }
+            else
+            {
+                if      (clanring_playmode & CLANRING_MATCH_MODE)    modes = "DM Match";
+                else if (clanring_playmode & CLANRING_PRACTICE_MODE) modes = "DM Practice";
+                else                                                 modes = "DM FFA";
+            }
+
+            hdr_time = utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p"));
+            if (substring(hdr_time, 0, 1) == "0")
+                hdr_time = substring(hdr_time, 1, strlen(hdr_time) - 1);
+            hourpos = strstrofs(hdr_time, " ", 0);
+            if (hourpos >= 0 && substring(hdr_time, hourpos + 1, 1) == "0")
+                hdr_time = strcat(substring(hdr_time, 0, hourpos + 1), substring(hdr_time, hourpos + 2, strlen(hdr_time) - (hourpos + 2)));
+            hdr_time = strzone(hdr_time);
+
+            map_z = strzone(wst_md(utils_dequake_for_discord(clanring_current_mapname())));
+            line = strzone(strcat("-# ", map_z, " \xC2\xB7 ", time_str));
+            if (clanring_maxsize > 0)
+                line = zcat(line, sprintf(" %gv%g", clanring_maxsize, clanring_maxsize));
+            line = zcat(line, strcat(" \xC2\xB7 ", modes, " \xC2\xB7 "));
+            s = strzone(wst_md(utils_dequake_for_discord(infokey(world, "hostname"))));
+            line = zcat(line, strcat(s, " \xC2\xB7 ", hdr_time, "\n"));
+            webhook_stats_buf_append(line);
+            strunzone(s);
+            strunzone(line);
+            strunzone(map_z);
+            strunzone(hdr_time);
+            strunzone(time_str);
         }
-        else if (!is_match_mode)
+
+        // MVP line
+        if (e1 != world)
         {
-            // Normal/FFA mode: use server time to calculate actual elapsed time
-            elapsed_mins = floor(time / 60);
-            if (elapsed_mins < 1) elapsed_mins = 1;  // Show at least 1 minute
-            time_str = sprintf("%g min", elapsed_mins);
+            nm = strzone(wst_md(utils_dequake_for_discord(e1.netname)));
+            line = strzone(strcat("\xE2\xAD\x90 MVP **", nm, "** \xC2\xB7 ", sprintf("%.1f", b1), " QPER"));
+            line = zcat(line, strcat(" \xC2\xB7 ", ftos(e1.true_kills), "/", ftos(e1.mangle_z), " K/D"));
+            line = zcat(line, strcat(" \xC2\xB7 ", wst_thou(e1.dmg_given), " dmg"));
+            if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && e1.fcaptures > 0)
+                line = zcat(line, strcat(" \xC2\xB7 ", ftos(e1.fcaptures), (e1.fcaptures == 1) ? " cap" : " caps"));
+            webhook_stats_buf_append(strcat(line, "\n"));
+            strunzone(line);
+            strunzone(nm);
         }
-        else
-            time_str = sprintf("%g min%s", total_tl, ot_suffix);
 
-        // Zone strings to avoid tempstring aliasing.
-        time_str_z = strzone(time_str);
-        map_str_z = strzone(utils_dequake_for_discord(clanring_current_mapname()));
-        
-        if (clanring_maxsize > 0 && teamplay)
-            match_desc = sprintf("%s %gv%g %s on %s", time_str_z, clanring_maxsize, clanring_maxsize, game_type, map_str_z);
-        else if (clanring_maxsize > 0)
-            match_desc = sprintf("%s %gv%g on %s", time_str_z, clanring_maxsize, clanring_maxsize, map_str_z);
-        else
-            match_desc = sprintf("%s %s on %s", time_str_z, game_type, map_str_z);
-        APPEND_SAFE(match_desc);
+        // Awards (each reads column 0 of wst_val)
+        if (wst_awards) strunzone(wst_awards);
+        wst_awards = strzone("");
+        wst_nawards = 0;
 
-        if (time_str_z) strunzone(time_str_z);
-        if (map_str_z) strunzone(map_str_z);
+        wst_reset();
+        for (r = 0; r < wst_nrows; r++)
+        {
+            p = wst_row[r];
+            wst_show[r] = wst_elig(r, WST_E_MAIN, is_arena);
+            wst_set(r, 0, (p.dest1_z >= 50) ? floor(100 * p.dest2_z / p.dest1_z) : 0);
+        }
+        wst_award("\xF0\x9F\x8E\xAF Best LG", WST_PCT);
+        for (r = 0; r < wst_nrows; r++)
+        {
+            p = wst_row[r];
+            wst_set(r, 0, (p.dest_x >= 10) ? floor(100 * p.dest_y / p.dest_x) : 0);
+        }
+        wst_award("\xF0\x9F\x9A\x80 Best RL", WST_PCT);
+        for (r = 0; r < wst_nrows; r++)
+            wst_set(r, 0, wst_row[r].dmg_given);
+        wst_award("\xF0\x9F\x92\xA5 Top dmg", WST_BIG);
+
+        if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
+        {
+            for (r = 0; r < wst_nrows; r++)
+            {
+                wst_show[r] = wst_elig(r, WST_E_CTF, is_arena);
+                wst_set(r, 0, wst_row[r].fcaptures);
+            }
+            wst_award("\xF0\x9F\x9A\xA9 Most caps", WST_INT);
+            for (r = 0; r < wst_nrows; r++)
+                wst_set(r, 0, wst_row[r].freturns);
+            wst_award("\xF0\x9F\x9B\xA1\xEF\xB8\x8F Most returns", WST_INT);
+            for (r = 0; r < wst_nrows; r++)
+                wst_set(r, 0, floor(wst_row[r].fcarries_time));
+            wst_award("\xE2\x8F\xB1\xEF\xB8\x8F Longest hold", WST_MMSS);
+        }
+
+        if (!is_arena)
+        {
+            for (r = 0; r < wst_nrows; r++)
+            {
+                wst_show[r] = wst_elig(r, WST_E_ITEMS, is_arena);
+                wst_set(r, 0, wst_row[r].clanring_qdkill_x);
+            }
+            wst_award("\xE2\x9A\xA1 Most quad kills", WST_INT);
+            for (r = 0; r < wst_nrows; r++)
+            {
+                p = wst_row[r];
+                kfrac = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y + p.clanring_badstats_y + p.clanring_badstats_z;
+                wst_set(r, 0, (kfrac > 0) ? floor(100 * p.clanring_badstats_y / kfrac) : 0);
+            }
+            wst_award("\xF0\x9F\x98\xAC Most self dmg", WST_PCT);
+        }
+
+        if (wst_nawards > 0)
+            webhook_stats_buf_append(strcat(wst_awards, "\n"));
     }
-    APPEND_SAFE("\n");
 
-    // Modes (no label/brackets)
-    {
-        local string modes;
-
-        // Arena family first
-        if      (clanring_playmode & CLANRING_RA_MODE)          modes = "Rocket Arena";
-        else if (clanring_playmode & CLANRING_CA_MODE)          modes = "Clan Arena";
-        else if (clanring_playmode & CLANRING_WIPEOUT_MODE)     modes = "Wipeout";
-        else if (clanring_playmode & CLANRING_DMM4_MODE)        modes = "DMM4";
-        else if (clanring_playmode & CLANRING_AIRSHOT_MODE)     modes = "Airshot";
-        else if (clanring_playmode & CLANRING_HH_MODE)          modes = "Headhunters";
-        else if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
-        {
-            if      (clanring_playmode & CLANRING_MATCH_MODE)    modes = "CTF Match";
-            else if (clanring_playmode & CLANRING_PRACTICE_MODE) modes = "CTF Practice";
-            else                                                 modes = "CTF Normal";
-        }
-        else
-        {
-            if      (clanring_playmode & CLANRING_MATCH_MODE)    modes = "DM Match";
-            else if (clanring_playmode & CLANRING_PRACTICE_MODE) modes = "DM Practice";
-            else                                                 modes = "DM FFA";
-        }
-
-        APPEND_SAFE(modes);
-        APPEND_SAFE("\n");
-    }
-
-    // Team scores (for team games) - show winning team first
-    if (teamplay && clanring_sentinel.next_team)
-    {
-        local entity pteam, best_team;
-        local float best_score, num_teams, i;
-        local string tname, tscore;
-        
-        // Count teams
-        num_teams = 0;
-        pteam = clanring_sentinel.next_team;
-        while (pteam) { num_teams = num_teams + 1; pteam = pteam.next_team; }
-        
-        APPEND_SAFE("\n");
-        
-        // Output teams in descending score order (simple selection sort)
-        for (i = 0; i < num_teams; i = i + 1)
-        {
-            best_team = world;
-            best_score = -999999;
-            pteam = clanring_sentinel.next_team;
-            while (pteam)
-            {
-                // Find highest-scoring team not yet printed (use .cnt as printed flag)
-                if ((pteam.cnt == 0) && (pteam.frags > best_score))
-                {
-                    best_score = pteam.frags;
-                    best_team = pteam;
-                }
-                pteam = pteam.next_team;
-            }
-            if (best_team != world)
-            {
-                best_team.cnt = 1; // mark as printed
-                tname = utils_rstrip(strings_get_teamname2(best_team.height));
-                tscore = ftos(best_team.frags);
-                APPEND_SAFE(sprintf("%s: %s\n", tname, tscore));
-            }
-        }
-        // Reset printed flags
-        pteam = clanring_sentinel.next_team;
-        while (pteam) { pteam.cnt = 0; pteam = pteam.next_team; }
-    }
-
-    // Individual player scoreboard (always show) - sorted by frags descending
-    {
-        local float plines, num_players;
-        local entity best_player;
-        local string pname, pteamname;
-        local float ping_ms;
-        
-        // Count eligible players and reset printed flags
-        num_players = 0;
-        if (use_find) p = find(world, classname, "player");
-        else p = clanring_sentinel.next_player;
-        while (p)
-        {
-            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                               (p.style & CLANRING_OBSERVER) &&
-                               p.join_time > 0 &&
-                               p.join_time >= participant_cutoff &&
-                               stats_has_nontrivial_activity(p));
-            if (!(p.style & CLANRING_OBSERVER) || obs_participant)
-            {
-                p.cnt = 0; // reset printed flag
-                num_players = num_players + 1;
-            }
-            if (use_find) p = find(p, classname, "player");
-            else p = p.next_player;
-        }
-        
-        // Don't post stats for solo matches (only 1 player)
-        APPEND_SAFE("\n**Scoreboard**\n");
-        APPEND_SAFE("```\n");
-        if (teamplay)
-            APPEND_SAFE(sprintf("%s %-6s %5s %4s\n", strpad(name_col_w, "Name"), "Team", "Frags", "Ping"));
-        else
-            APPEND_SAFE(sprintf("%s %5s %4s\n", strpad(name_col_w, "Name"), "Frags", "Ping"));
-        APPEND_SAFE("\n");
-        plines = 0;
-        
-        // Output players in descending score order (selection sort)
-        for (i = 0; i < num_players && plines < 16; i = i + 1)
-        {
-            best_player = world;
-            best_score = -999999;
-            if (use_find) p = find(world, classname, "player");
-            else p = clanring_sentinel.next_player;
-            while (p)
-            {
-                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                                   (p.style & CLANRING_OBSERVER) &&
-                                   p.join_time > 0 &&
-                                   p.join_time >= participant_cutoff &&
-                                   stats_has_nontrivial_activity(p));
-                if ((!(p.style & CLANRING_OBSERVER) || obs_participant) && (p.cnt == 0))
-                {
-                    row_frags = p.frags;
-                    if (obs_participant && row_frags <= -90)
-                        row_frags = p.true_kills - p.mangle_z;
-                    if (row_frags > best_score)
-                    {
-                        best_score = row_frags;
-                        best_player = p;
-                    }
-                }
-                if (use_find) p = find(p, classname, "player");
-                else p = p.next_player;
-            }
-            if (best_player != world)
-            {
-                best_player.cnt = 1; // mark as printed
-                pname = strzone(utils_dequake_for_discord(best_player.netname));
-                if (teamplay && best_player.next_team != world)
-                    pteamname = utils_rstrip(strings_get_teamname3(best_player.next_team.height));
-                else
-                    pteamname = "";
-                
-                ping_ms = floor(best_player.ping_time + 0.5);
-                row_frags = best_player.frags;
-                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                                   (best_player.style & CLANRING_OBSERVER) &&
-                                   best_player.join_time > 0 &&
-                                   best_player.join_time >= participant_cutoff &&
-                                   stats_has_nontrivial_activity(best_player));
-                if (obs_participant && row_frags <= -90)
-                    row_frags = best_player.true_kills - best_player.mangle_z;
-                
-                if (pteamname != "")
-                    APPEND_SAFE(sprintf("%s %-6s %5.0f %4.0f\n", strpad(name_col_w, pname), pteamname, row_frags, ping_ms));
-                else
-                    APPEND_SAFE(sprintf("%s %5.0f %4.0f\n", strpad(name_col_w, pname), row_frags, ping_ms));
-                
-                strunzone(pname);
-                plines = plines + 1;
-            }
-        }
-        APPEND_SAFE("```\n");
-    }
     // New CTF record note
     if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
     {
-        APPEND_SAFE(utils_dequake_for_discord(clanring_new_record_player));
-        APPEND_SAFE(" set a new match capture record!\n\n");
+        nm = strzone(wst_md(utils_dequake_for_discord(clanring_new_record_player)));
+        webhook_stats_buf_append(strcat("\xF0\x9F\x8F\x81 **", nm, "** set a new match capture record!\n"));
+        strunzone(nm);
     }
 
-    #define PCT_STR(_frac,_tot) ( (_tot) > 0 ? sprintf("%g%%", floor(100 * (_frac) / (_tot))) : "N/A" )
-
-    // ---- Efficiency (kill% / weap% | bul nls rox lg | fpm) ----
-    APPEND_SAFE("**Efficiency (kill% / weap% | bul nls rox lg | fpm)**\n");
-    APPEND_SAFE("```\n");
+    // ---- Scoreboard ----
+    wst_reset();
+    if (teamplay) wst_col("team", 8, WST_TEAM, WST_NONE);
+    wst_col("frags", 5, WST_INT, WST_MAX);
+    wst_col("ping", 4, WST_INT, WST_NONE);
+    for (r = 0; r < wst_nrows; r++)
     {
-        lines = 0; maxlines = 16;
-        if (use_find) p = find(world, classname, "player");
-        else p = clanring_sentinel.next_player;
-        while (p && lines < maxlines)
-        {
-            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                               (p.style & CLANRING_OBSERVER) &&
-                               p.join_time > 0 &&
-                               p.join_time >= participant_cutoff &&
-                               stats_has_nontrivial_activity(p));
-            if ((is_arena && p.next_team != world) ||
-                (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
-            {
-                // kill + weapon accuracy
-                kfrac = p.true_kills;
-                ktot  = kfrac + p.mangle_z;
-
-                wtot  = p.dest1_x + p.dest1_y + p.dest1_z + p.dest_x;
-                wfrac = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
-
-                // per-weapon detail + frags per minute
-                local float fpm_val;
-                local string pct_bul, pct_nail, pct_rox, pct_lg, fpm_str;
-
-                fpm_val = 0;
-                if (p.join_time > 0)
-                {
-                    v = clanring_sentinel.matchTime;
-                    if (v <= 0) v = time;
-                    v = v - p.join_time;
-                    if (v > 0) fpm_val = p.true_kills * 60 / v;
-                }
-
-                // ZONE tempstrings so later tempstrings (like names) don't alias them
-                killpct = strzone(sprintf("%4s", PCT_STR(kfrac, ktot)));
-                weappct = strzone(sprintf("%4s", PCT_STR(wfrac, wtot)));
-
-                pct_bul  = strzone(sprintf("%4s", PCT_STR(p.dest2_x, p.dest1_x)));
-                pct_nail = strzone(sprintf("%4s", PCT_STR(p.dest2_y, p.dest1_y)));
-                pct_rox  = strzone(sprintf("%4s", PCT_STR(p.dest_y,  p.dest_x)));
-                pct_lg   = strzone(sprintf("%4s", PCT_STR(p.dest2_z, p.dest1_z)));
-                fpm_str  = strzone(sprintf("%4.1f", fpm_val));
-
-                zname = strzone(utils_dequake_for_discord(p.netname));
-                tmps = strzone(sprintf("%s / %s | %s %s %s %s | %s",
-                               killpct, weappct,
-                               pct_bul, pct_nail, pct_rox, pct_lg,
-                               fpm_str));
-                APPEND_SAFE(sprintf("%s %s\n", strpad(name_col_w, zname), tmps));
-                strunzone(tmps);
-                strunzone(killpct);
-                strunzone(weappct);
-                strunzone(pct_bul);
-                strunzone(pct_nail);
-                strunzone(pct_rox);
-                strunzone(pct_lg);
-                strunzone(fpm_str);
-                strunzone(zname);
-                lines = lines + 1;
-                if (webhook_stats_len > (maxlen - 120)) break;
-            }
-            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
-        }
+        wst_show[r] = wst_elig(r, WST_E_SCORE, is_arena);
+        k = 0;
+        if (teamplay) { wst_set(r, k, 0); k = k + 1; }
+        wst_set(r, k, wst_frags[r]);
+        wst_set(r, k + 1, floor(wst_row[r].ping_time + 0.5));
     }
-    APPEND_SAFE("```\n");
+    wst_emit("Scoreboard");
 
-    // ---- K/D, weapon-carrier kills, damage, ewep ----
-    if (stats_weapon_carrier_kills_enabled())
-        APPEND_SAFE("\n**K/D | RLk LGk | dmg given, dmg taken | ewep**\n");
-    else
-        APPEND_SAFE("\n**K/D | dmg given, dmg taken | ewep**\n");
-    APPEND_SAFE("```\n");
+    // ---- Efficiency ----
+    wst_reset();
+    wst_col("kill", 4, WST_PCT, WST_MAX);
+    wst_col("weap", 4, WST_PCT, WST_MAX);
+    wst_col("bul", 4, WST_PCT, WST_MAX);
+    wst_col("nls", 4, WST_PCT, WST_MAX);
+    wst_col("rox", 4, WST_PCT, WST_MAX);
+    wst_col("lg", 4, WST_PCT, WST_MAX);
+    wst_col("fpm", 4, WST_DEC1, WST_MAX);
+    for (r = 0; r < wst_nrows; r++)
     {
-        local float k_seen, k_inc, k_obs, k_limit;
-        k_seen = k_inc = k_obs = k_limit = 0;
+        p = wst_row[r];
+        wst_show[r] = wst_elig(r, WST_E_MAIN, is_arena);
 
-        lines = 0; maxlines = 16;
-        if (use_find) p = find(world, classname, "player");
-        else p = clanring_sentinel.next_player;
-        while (p && lines < maxlines)
+        kfrac = p.true_kills;
+        ktot  = kfrac + p.mangle_z;
+        wst_set(r, 0, (ktot > 0) ? floor(100 * kfrac / ktot) : -1);
+        ktot  = p.dest1_x + p.dest1_y + p.dest1_z + p.dest_x;
+        kfrac = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
+        wst_set(r, 1, (ktot > 0) ? floor(100 * kfrac / ktot) : -1);
+        wst_set(r, 2, (p.dest1_x > 0) ? floor(100 * p.dest2_x / p.dest1_x) : -1);
+        wst_set(r, 3, (p.dest1_y > 0) ? floor(100 * p.dest2_y / p.dest1_y) : -1);
+        wst_set(r, 4, (p.dest_x > 0) ? floor(100 * p.dest_y / p.dest_x) : -1);
+        wst_set(r, 5, (p.dest1_z > 0) ? floor(100 * p.dest2_z / p.dest1_z) : -1);
+
+        v = 0;
+        if (p.join_time > 0)
         {
-            k_seen += 1;
-
-            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                               (p.style & CLANRING_OBSERVER) &&
-                               p.join_time > 0 &&
-                               p.join_time >= participant_cutoff &&
-                               stats_has_nontrivial_activity(p));
-            if ((is_arena && p.next_team != world) ||
-                (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
-            {
-                zname = strzone(utils_dequake_for_discord(p.netname));
-                tmps = strzone(sprintf("%g/%g", p.true_kills, p.mangle_z));
-                if (stats_weapon_carrier_kills_enabled())
-                {
-                    local string weapon_kills;
-                    weapon_kills = sprintf("%3g %3g", p.stats_rl_carrier_kills, p.stats_lg_carrier_kills);
-                    APPEND_SAFE(sprintf("%s %5s | %s | %5g %5g | %5g\n",
-                                        strpad(name_col_w, zname), tmps, weapon_kills,
-                                        p.dmg_given, p.dmg_taken, p.ewep));
-                }
-                else
-                    APPEND_SAFE(sprintf("%s %5s | %5g %5g | %5g\n",
-                                        strpad(name_col_w, zname), tmps,
-                                        p.dmg_given, p.dmg_taken,
-                                        p.ewep));
-                strunzone(tmps);
-                strunzone(zname);
-                k_inc += 1; lines += 1;
-                if (webhook_stats_len > (maxlen - 120)) { k_limit += 1; break; }
-            }
-            else if ((p.style & CLANRING_OBSERVER) && !obs_participant) { k_obs += 1; }
-            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
+            m = clanring_sentinel.matchTime;
+            if (m <= 0) m = time;
+            m = m - p.join_time;
+            if (m > 0) v = p.true_kills * 60 / m;
         }
+        wst_set(r, 6, floor(v * 10 + 0.5) / 10);
     }
-    APPEND_SAFE("```\n");
-    if (stats_weapon_carrier_kills_enabled())
-        APPEND_SAFE("RLk/LGk: enemies killed carrying RL/LG; both count if carrying both.\n");
+    wst_emit("Efficiency");
 
+    // ---- Kills and damage ----
+    wst_reset();
+    wst_col("K", 3, WST_INT, WST_MAX);
+    wst_col("D", 3, WST_INT, WST_MIN);
+    if (stats_weapon_carrier_kills_enabled())
+    {
+        wst_col("RLk", 3, WST_INT, WST_MAX);
+        wst_col("LGk", 3, WST_INT, WST_MAX);
+    }
+    wst_col("dmg", 6, WST_INT, WST_MAX);
+    wst_col("taken", 6, WST_INT, WST_MIN);
+    wst_col("ewep", 5, WST_INT, WST_MAX);
+    for (r = 0; r < wst_nrows; r++)
+    {
+        p = wst_row[r];
+        wst_show[r] = wst_elig(r, WST_E_MAIN, is_arena);
+        wst_set(r, 0, p.true_kills);
+        wst_set(r, 1, p.mangle_z);
+        k = 2;
+        if (stats_weapon_carrier_kills_enabled())
+        {
+            wst_set(r, 2, p.stats_rl_carrier_kills);
+            wst_set(r, 3, p.stats_lg_carrier_kills);
+            k = 4;
+        }
+        wst_set(r, k, p.dmg_given);
+        wst_set(r, k + 1, p.dmg_taken);
+        wst_set(r, k + 2, p.ewep);
+    }
+    wst_emit("Kills and damage");
+    if (stats_weapon_carrier_kills_enabled())
+        webhook_stats_buf_append("-# RLk/LGk: enemies killed while carrying RL/LG\n");
+
+    // ---- Headhunters ----
     if (clanring_playmode & CLANRING_HH_MODE)
     {
-        APPEND_SAFE("\n**Headhunters**\n");
-        APPEND_SAFE("```\n");
-        APPEND_SAFE(sprintf("%s  pick rec scr  val peak drop\n", strpad(name_col_w, "name")));
-        lines = 0; maxlines = 16;
-        if (use_find) p = find(world, classname, "player");
-        else p = clanring_sentinel.next_player;
-
-        while (p && lines < maxlines)
+        wst_reset();
+        wst_col("pick", 4, WST_INT, WST_MAX);
+        wst_col("rec", 3, WST_INT, WST_MAX);
+        wst_col("scr", 3, WST_INT, WST_MAX);
+        wst_col("val", 4, WST_INT, WST_MAX);
+        wst_col("peak", 4, WST_INT, WST_MAX);
+        wst_col("drop", 4, WST_INT, WST_WORST);
+        for (r = 0; r < wst_nrows; r++)
         {
-            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                               (p.style & CLANRING_OBSERVER) &&
-                               p.join_time > 0 &&
-                               p.join_time >= participant_cutoff &&
-                               stats_has_nontrivial_activity(p));
-            if ((is_arena && p.next_team != world) ||
-                (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
-            {
-                zname = strzone(utils_dequake_for_discord(p.netname));
-                APPEND_SAFE(sprintf("%s  %4g %3g %3g %4g %4g %4g\n",
-                                    strpad(name_col_w, zname),
-                                    p.hh_stats_heads_picked,
-                                    p.hh_stats_heads_reclaimed,
-                                    p.hh_stats_heads_scored,
-                                    p.hh_stats_score_value,
-                                    p.hh_stats_peak_value,
-                                    p.hh_stats_heads_dropped));
-                strunzone(zname);
-
-                lines = lines + 1;
-                if (webhook_stats_len > (maxlen - 120)) break;
-            }
-            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
+            p = wst_row[r];
+            wst_show[r] = wst_elig(r, WST_E_MAIN, is_arena);
+            wst_set(r, 0, p.hh_stats_heads_picked);
+            wst_set(r, 1, p.hh_stats_heads_reclaimed);
+            wst_set(r, 2, p.hh_stats_heads_scored);
+            wst_set(r, 3, p.hh_stats_score_value);
+            wst_set(r, 4, p.hh_stats_peak_value);
+            wst_set(r, 5, p.hh_stats_heads_dropped);
         }
+        wst_emit("Headhunters");
 
-        APPEND_SAFE("\n");
-        APPEND_SAFE(sprintf("%s  hunt bite kil  time\n", strpad(name_col_w, "name")));
-        lines = 0; maxlines = 16;
-        if (use_find) p = find(world, classname, "player");
-        else p = clanring_sentinel.next_player;
-
-        while (p && lines < maxlines)
+        wst_reset();
+        wst_col("hunt", 4, WST_INT, WST_MAX);
+        wst_col("bite", 4, WST_INT, WST_MAX);
+        wst_col("kil", 3, WST_INT, WST_MAX);
+        wst_col("time", 5, WST_MMSS, WST_MAX);
+        for (r = 0; r < wst_nrows; r++)
         {
-            local float haunt_time;
-
-            obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                               (p.style & CLANRING_OBSERVER) &&
-                               p.join_time > 0 &&
-                               p.join_time >= participant_cutoff &&
-                               stats_has_nontrivial_activity(p));
-            if ((is_arena && p.next_team != world) ||
-                (!is_arena && (!(p.style & CLANRING_OBSERVER) || obs_participant)))
-            {
-                haunt_time = p.hh_stats_haunt_time;
-                if (p.hh_stats_haunt_start > 0)
-                    haunt_time = haunt_time + max(0, time - p.hh_stats_haunt_start);
-                m = floor(haunt_time / 60);
-                s = floor(haunt_time - (m * 60));
-                ss_str = ftos(s);
-                if (s < 10) ss_str = strcat("0", ss_str);
-                mmss_tmp = strcat(ftos(m), ":", ss_str);
-                z_mmss = strzone(mmss_tmp);
-
-                zname = strzone(utils_dequake_for_discord(p.netname));
-                APPEND_SAFE(sprintf("%s  %4g %4g %3g %5s\n",
-                                    strpad(name_col_w, zname),
-                                    p.hh_stats_haunts_started,
-                                    p.hh_stats_haunt_bites,
-                                    p.hh_stats_haunt_kills,
-                                    z_mmss));
-                strunzone(zname);
-                strunzone(z_mmss);
-
-                lines = lines + 1;
-                if (webhook_stats_len > (maxlen - 120)) break;
-            }
-            if (use_find) p = find(p, classname, "player"); else p = p.next_player;
+            p = wst_row[r];
+            wst_show[r] = wst_elig(r, WST_E_MAIN, is_arena);
+            v = p.hh_stats_haunt_time;
+            if (p.hh_stats_haunt_start > 0)
+                v = v + max(0, time - p.hh_stats_haunt_start);
+            wst_set(r, 0, p.hh_stats_haunts_started);
+            wst_set(r, 1, p.hh_stats_haunt_bites);
+            wst_set(r, 2, p.hh_stats_haunt_kills);
+            wst_set(r, 3, floor(v));
         }
-
-        APPEND_SAFE("```\n");
+        wst_emit("Haunts");
     }
 
-    if (!mode_is_arena())
+    if (!is_arena)
     {
-        // ---- Quad stats (quads time eff% opp self tm) ----
+        // ---- Quad (only players who took one) ----
+        wst_reset();
+        wst_col("quads", 5, WST_INT, WST_MAX);
+        wst_col("time", 5, WST_SECS, WST_MAX);
+        wst_col("eff", 4, WST_PCT, WST_MAX);
+        wst_col("opp", 3, WST_INT, WST_MAX);
+        wst_col("self", 4, WST_INT, WST_WORST);
+        wst_col("tm", 3, WST_INT, WST_WORST);
+        for (r = 0; r < wst_nrows; r++)
         {
-        // ---- Quad stats (quads time eff% opp self tm) ----
-            local float opened_quad; opened_quad = 0;
-            local float q_seen, q_inc, q_obs, q_noteam, q_limit;
-            q_seen = q_inc = q_obs = q_noteam = q_limit = 0;
-
-            lines = 0; maxlines = 16;
-            if (use_find) p = find(world, classname, "player");
-            else p = clanring_sentinel.next_player;
-
-            while (p && lines < maxlines)
-            {
-                q_seen += 1;
-                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                                   (p.style & CLANRING_OBSERVER) &&
-                                   p.join_time > 0 &&
-                                   p.join_time >= participant_cutoff &&
-                                   stats_has_nontrivial_activity(p));
-
-                if ((p.style & CLANRING_OBSERVER) && !obs_participant) { q_obs += 1; }
-                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world) && !obs_participant)   { q_noteam += 1; }
-                else
-                {
-                    if (!opened_quad) {
-                        APPEND_SAFE("\n**Quad stats (quads time eff% opp self tm)**\n");
-                        APPEND_SAFE("```\n");
-                        opened_quad = 1;
-                    }
-                    // quad efficiency percentage
-                    local float q_eff_pct = 0;
-                    if (p.clanring_qdwep_y > 0)
-                        q_eff_pct = floor(100 * p.clanring_qdwep_x / p.clanring_qdwep_y);
-
-                    // zone name to avoid tempstring aliasing
-                    nm    = utils_dequake_for_discord(p.netname);
-                    zname = strzone(nm);
-
-                    // one-shot formatted line
-                    line = sprintf(
-                        "%s  %2g %3gs %3g%% %2g %2g %2g\n",
-                        strpad(name_col_w, zname),
-                        p.clanring_qdwep_z,          // quads taken
-                        floor(p.totalquad + 0.5),    // hold time (seconds)
-                        q_eff_pct,                   // efficiency %
-                        p.clanring_qdkill_x,         // enemy kills while quad
-                        p.clanring_qdkill_z,         // self deaths while quad
-                        p.clanring_qdkill_y          // team kills while quad
-                    );
-
-                    APPEND_SAFE(line);
-                    strunzone(zname);
-
-                    q_inc += 1; lines += 1;
-                    if (webhook_stats_len > (maxlen - 120)) { q_limit += 1; break; }
-                }
-
-                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
-            }
-            // close if opened
+            p = wst_row[r];
+            wst_show[r] = FALSE;
+            if (p.clanring_qdwep_z > 0)
+                wst_show[r] = wst_elig(r, WST_E_ITEMS, is_arena);
+            wst_set(r, 0, p.clanring_qdwep_z);
+            wst_set(r, 1, floor(p.totalquad + 0.5));
+            wst_set(r, 2, (p.clanring_qdwep_y > 0) ? floor(100 * p.clanring_qdwep_x / p.clanring_qdwep_y) : -1);
+            wst_set(r, 3, p.clanring_qdkill_x);
+            wst_set(r, 4, p.clanring_qdkill_z);
+            wst_set(r, 5, p.clanring_qdkill_y);
         }
-        // close if opened
-        if (opened_quad) APPEND_SAFE("```\n");
+        wst_emit("Quad");
 
-        // ---- Bad stats (paks self% team% bore lava axe fall) ----
+        // ---- Bad stats ----
+        wst_reset();
+        wst_col("paks", 4, WST_INT, WST_WORST);
+        wst_col("self", 4, WST_PCT, WST_WORST);
+        wst_col("team", 4, WST_PCT, WST_WORST);
+        wst_col("bore", 4, WST_INT, WST_WORST);
+        wst_col("lava", 4, WST_INT, WST_WORST);
+        wst_col("axe", 3, WST_INT, WST_WORST);
+        wst_col("fall", 4, WST_INT, WST_WORST);
+        if (stats_badstats_has_walkover_categories())
         {
-            local float opened; opened = 0;
-            local float b_seen, b_inc, b_obs, b_noteam, b_limit;
-            b_seen = b_inc = b_obs = b_noteam = b_limit = 0;
-
-            lines = 0; maxlines = 16;
-            if (use_find) p = find(world, classname, "player");
-            else p = clanring_sentinel.next_player;
-
-            while (p && lines < maxlines)
-            {
-                b_seen += 1;
-                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                                   (p.style & CLANRING_OBSERVER) &&
-                                   p.join_time > 0 &&
-                                   p.join_time >= participant_cutoff &&
-                                   stats_has_nontrivial_activity(p));
-
-                if ((p.style & CLANRING_OBSERVER) && !obs_participant) { b_obs += 1; }
-                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world) && !obs_participant)   { b_noteam += 1; }
-                else
-                {
-                    if (!opened) {
-                        if (stats_badstats_has_walkover_categories())
-                            APPEND_SAFE("\n**Bad stats (paks self% team% bore lava axe fall spawn tele)**\n\n");
-                        else
-                            APPEND_SAFE("\n**Bad stats (paks self% team% bore lava axe fall)**\n\n");
-                        APPEND_SAFE("```\n");
-                        opened = 1;
-                    }
-                    // totals
-                    local float tot_enemy = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y;
-                    local float tot_done  = tot_enemy + p.clanring_badstats_y + p.clanring_badstats_z;
-
-                    // percentages
-                    local float self_pct = 0, team_pct = 0;
-                    if (tot_done > 0)
-                    {
-                        self_pct = floor(100 * p.clanring_badstats_y / tot_done);
-                        team_pct = floor(100 * p.clanring_badstats_z / tot_done);
-                    }
-
-                    // zone name to avoid tempstring aliasing
-                    nm    = utils_dequake_for_discord(p.netname);
-                    zname = strzone(nm);
-
-                    // one-shot formatted line
-                    if (stats_badstats_has_walkover_categories())
-                    {
-                        local string bad_tail;
-                        bad_tail = sprintf("%2g %2g %2g %2g %2g %2g",
-                                           p.clanring_badstats_bores,
-                                           p.clanring_badstats2_x,
-                                           p.clanring_badstats2_y,
-                                           p.clanring_badstats2_z,
-                                           p.clanring_badstats_spawnwalk,
-                                           p.clanring_badstats_telewalk);
-                        line = sprintf(
-                            "%s  %2g | %3g%% %3g%% | %s\n",
-                            strpad(name_col_w, zname),
-                            p.clanring_badstats_x,          // paks
-                            self_pct,                       // self %
-                            team_pct,                       // team %
-                            bad_tail
-                        );
-                    }
-                    else
-                    {
-                        local string bad_tail2;
-                        bad_tail2 = sprintf("%2g %2g %2g %2g",
-                                            p.clanring_badstats_bores,
-                                            p.clanring_badstats2_x,
-                                            p.clanring_badstats2_y,
-                                            p.clanring_badstats2_z);
-                        line = sprintf(
-                            "%s  %2g | %3g%% %3g%% | %s\n",
-                            strpad(name_col_w, zname),
-                            p.clanring_badstats_x,       // paks
-                            self_pct,                    // self %
-                            team_pct,                    // team %
-                            bad_tail2                    // bore, lava, axe, fall
-                        );
-                    }
-
-                    APPEND_SAFE(line);
-                    strunzone(zname);
-
-                    b_inc += 1; lines += 1;
-                    if (webhook_stats_len > (maxlen - 120)) { b_limit += 1; break; }
-                }
-
-                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
-            }
+            wst_col("spawn", 5, WST_INT, WST_NONE);
+            wst_col("tele", 4, WST_INT, WST_NONE);
         }
-        // close if opened
-        if (opened) APPEND_SAFE("```\n");
-
-        // ---- Items (Q RA YA MG RL LG) ----
+        for (r = 0; r < wst_nrows; r++)
         {
-            local float opened2; opened2 = 0;
-            local float it_seen, it_inc, it_obs, it_noteam, it_limit;
-            it_seen = it_inc = it_obs = it_noteam = it_limit = 0;
-
-            lines = 0; maxlines = 16;
-            if (use_find) p = find(world, classname, "player");
-            else p = clanring_sentinel.next_player;
-
-            while (p && lines < maxlines)
-            {
-                it_seen += 1;
-                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                                   (p.style & CLANRING_OBSERVER) &&
-                                   p.join_time > 0 &&
-                                   p.join_time >= participant_cutoff &&
-                                   stats_has_nontrivial_activity(p));
-
-                if ((p.style & CLANRING_OBSERVER) && !obs_participant) { it_obs += 1; }
-                else if ((clanring_playmode & CLANRING_MATCH_MODE) && (p.next_team == world) && !obs_participant)   { it_noteam += 1; }
-                else
-                {
-                    if (!opened2) {
-                        APPEND_SAFE("\n**Items (Q RA YA MG RL LG)**\n");
-                        APPEND_SAFE("```\n");
-                        opened2 = 1;
-                    }
-                    nm = utils_dequake_for_discord(p.netname);
-
-                    // Q = number of Quads taken (clanring_qdwep_z)
-                    APPEND_SAFE(sprintf("%s  %2g %2g %2g %2g %2g %2g\n",
-                                        strpad(name_col_w, nm),
-                                        p.clanring_qdwep_z,          // Q
-                                        p.stats_item_redarmor,       // RA
-                                        p.stats_item_yellowarmor,    // YA
-                                        p.stats_item_mega,           // MG
-                                        p.stats_item_rl,             // RL
-                                        p.stats_item_lg));           // LG
-
-                    it_inc += 1; lines += 1;
-                    if (webhook_stats_len > (maxlen - 120)) { it_limit += 1; break; }
-                }
-
-                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
-            }
+            p = wst_row[r];
+            wst_show[r] = wst_elig(r, WST_E_ITEMS, is_arena);
+            ktot = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y + p.clanring_badstats_y + p.clanring_badstats_z;
+            wst_set(r, 0, p.clanring_badstats_x);
+            wst_set(r, 1, (ktot > 0) ? floor(100 * p.clanring_badstats_y / ktot) : 0);
+            wst_set(r, 2, (ktot > 0) ? floor(100 * p.clanring_badstats_z / ktot) : 0);
+            wst_set(r, 3, p.clanring_badstats_bores);
+            wst_set(r, 4, p.clanring_badstats2_x);
+            wst_set(r, 5, p.clanring_badstats2_y);
+            wst_set(r, 6, p.clanring_badstats2_z);
+            wst_set(r, 7, p.clanring_badstats_spawnwalk);
+            wst_set(r, 8, p.clanring_badstats_telewalk);
         }
-        if (opened2) APPEND_SAFE("```\n");
+        wst_emit("Bad stats");
 
-        // ---- QPER (top-5) + inline reasons for #1 ----
+        // ---- Items ----
+        wst_reset();
+        wst_col("Q", 3, WST_INT, WST_MAX);
+        wst_col("RA", 3, WST_INT, WST_MAX);
+        wst_col("YA", 3, WST_INT, WST_MAX);
+        wst_col("MG", 3, WST_INT, WST_MAX);
+        wst_col("RL", 3, WST_INT, WST_MAX);
+        wst_col("LG", 3, WST_INT, WST_MAX);
+        for (r = 0; r < wst_nrows; r++)
         {
-            local entity e1, e2, e3, e4, e5;
-            local float opened3; opened3 = 0;
-            b1 = b2 = b3 = b4 = b5 = -9999;
-            e1 = e2 = e3 = e4 = e5 = world;
-
-            if (use_find) p = find(world, classname, "player");
-            else p = clanring_sentinel.next_player;
-            while (p)
-            {
-                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                                   (p.style & CLANRING_OBSERVER) &&
-                                   p.join_time > 0 &&
-                                   p.join_time >= participant_cutoff &&
-                                   stats_has_nontrivial_activity(p));
-                // FFA participants have no team; use the scoreboard's non-arena
-                // eligibility rather than requiring a team for QPER output.
-                if ((!(p.style & CLANRING_OBSERVER) || obs_participant) && p.join_time > 0)
-                {
-                    v = qper_rating(p);
-
-                    if (v > b1) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=b1; e2=e1; b1=v; e1=p; }
-                    else if (v > b2) { b5=b4; e5=e4; b4=b3; e4=e3; b3=b2; e3=e2; b2=v; e2=p; }
-                    else if (v > b3) { b5=b4; e5=e4; b4=b3; e4=e3; b3=v; e3=p; }
-                    else if (v > b4) { b5=b4; e5=e4; b4=v; e4=p; }
-                    else if (v > b5) { b5=v; e5=p; }
-                }
-                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
-            }
-
-            if (e1 && e1 != world) { APPEND_SAFE("\n**QPER (top-5)**\n\n"); APPEND_SAFE("```\n"); opened3 = 1; }
-            if (e1 && e1 != world) APPEND_SAFE(sprintf("%s  1) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e1.netname)), b1));
-            if (e2 && e2 != world) APPEND_SAFE(sprintf("%s  2) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e2.netname)), b2));
-            if (e3 && e3 != world) APPEND_SAFE(sprintf("%s  3) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e3.netname)), b3));
-            if (e4 && e4 != world) APPEND_SAFE(sprintf("%s  4) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e4.netname)), b4));
-            if (e5 && e5 != world) APPEND_SAFE(sprintf("%s  5) %5.1f\n", strpad(name_col_w, utils_dequake_for_discord(e5.netname)), b5));
-
-            // Inline reasons for #1 (same code fence)
-            if (e1 && e1 != world)
-            {
-                qper_find_top_terms(e1);
-                if (qper_top_id1 >= 0)
-                {
-                    APPEND_SAFE(sprintf("\nwhy %s led QPER:\n", utils_dequake_for_discord(e1.netname)));
-                    APPEND_SAFE(sprintf("  1) %s (+%3.1f)\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id1)), qper_top_v1));
-                    if (qper_top_id2 >= 0)
-                        APPEND_SAFE(sprintf("  2) %s (+%3.1f)\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id2)), qper_top_v2));
-                    if (qper_top_id3 >= 0)
-                        APPEND_SAFE(sprintf("  3) %s (+%3.1f)\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id3)), qper_top_v3));
-                }
-            }
+            p = wst_row[r];
+            wst_show[r] = wst_elig(r, WST_E_ITEMS, is_arena);
+            wst_set(r, 0, p.clanring_qdwep_z);
+            wst_set(r, 1, p.stats_item_redarmor);
+            wst_set(r, 2, p.stats_item_yellowarmor);
+            wst_set(r, 3, p.stats_item_mega);
+            wst_set(r, 4, p.stats_item_rl);
+            wst_set(r, 5, p.stats_item_lg);
         }
-        if (opened3) APPEND_SAFE("```\n");
+        wst_emit("Items");
+
+        // ---- QPER (top 5) + reasons for #1 ----
+        if (e1 != world)
+        {
+            webhook_stats_buf_append("\n**QPER (top 5)**\n");
+            webhook_stats_buf_append("```ansi\n");
+            for (k = 1; k <= 5; k++)
+            {
+                if (k == 1) { p = e1; v = b1; }
+                else if (k == 2) { p = e2; v = b2; }
+                else if (k == 3) { p = e3; v = b3; }
+                else if (k == 4) { p = e4; v = b4; }
+                else { p = e5; v = b5; }
+                if (p == world) break;
+
+                nm = strzone(utils_dequake_for_discord(p.netname));
+                s = strzone(wst_paint(wst_name_code(p), strpad(wst_namew, nm)));
+                webhook_stats_buf_append(strcat(ftos(k), ") ", s, " ",
+                                         wst_paint((k == 1) ? WST_GOLD : "", sprintf("%5.1f", v)), "\n"));
+                strunzone(s);
+                strunzone(nm);
+            }
+
+            qper_find_top_terms(e1);
+            if (qper_top_id1 >= 0)
+            {
+                nm = strzone(utils_dequake_for_discord(e1.netname));
+                webhook_stats_buf_append(strcat("\nwhy ", nm, " led:\n"));
+                strunzone(nm);
+                webhook_stats_buf_append(sprintf("  %s %s\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id1)),
+                                                 wst_paint(WST_GOLD, sprintf("+%.1f", qper_top_v1))));
+                if (qper_top_id2 >= 0)
+                    webhook_stats_buf_append(sprintf("  %s %s\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id2)),
+                                                     wst_paint(WST_GOLD, sprintf("+%.1f", qper_top_v2))));
+                if (qper_top_id3 >= 0)
+                    webhook_stats_buf_append(sprintf("  %s %s\n", utils_dequake_for_discord(qper_term_label(e1, qper_top_id3)),
+                                                     wst_paint(WST_GOLD, sprintf("+%.1f", qper_top_v3))));
+            }
+            webhook_stats_buf_append("```\n");
+        }
     }
 
     // ---- CTF ----
     if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
     {
+        wst_reset();
+        wst_col("cap", 3, WST_INT, WST_MAX);
+        wst_col("rtn", 3, WST_INT, WST_MAX);
+        wst_col("def", 3, WST_INT, WST_MAX);
+        wst_col("cdef", 4, WST_INT, WST_MAX);
+        wst_col("cfrg", 4, WST_INT, WST_MAX);
+        wst_col("hold", 5, WST_MMSS, WST_MAX);
+        for (r = 0; r < wst_nrows; r++)
         {
-            local float opened4; opened4 = 0;
-            lines = 0; maxlines = 16;
-            if (use_find) p = find(world, classname, "player");
-            else p = clanring_sentinel.next_player;
-
-            while (p && lines < maxlines)
-            {
-                obs_participant = ((clanring_playmode & CLANRING_MATCH_MODE) &&
-                                   (p.style & CLANRING_OBSERVER) &&
-                                   p.join_time > 0 &&
-                                   p.join_time >= participant_cutoff &&
-                                   stats_has_nontrivial_activity(p));
-                if ((!(p.style & CLANRING_OBSERVER) && p.next_team != world) || obs_participant)
-                {
-                    if (!opened4) {
-                        APPEND_SAFE("\n**CTF (cap rtn def cdef cfrg hold)**\n");
-                        APPEND_SAFE("```\n");
-                        opened4 = 1;
-                    }
-                    m = floor(p.fcarries_time / 60);
-                    s = p.fcarries_time - m * 60;
-
-                    // Build mm:ss and ZONE it (avoid %02g and temp aliasing)
-                    ss_str   = ftos(s);
-                    if (s < 10) ss_str = strcat("0", ss_str);
-                    mmss_tmp = strcat(ftos(m), ":", ss_str);
-                    z_mmss   = strzone(mmss_tmp);
-
-                    // Dequake name and ZONE it (avoid aliasing)
-                    nm    = utils_dequake_for_discord(p.netname);
-                    zname = strzone(nm);
-
-                    // One-shot format using only zoned/safe args
-                    line = sprintf(
-                        "%s  %3g %3g %3g %4g %4g %5s\n",
-                        strpad(name_col_w, zname),
-                        p.fcaptures, p.freturns, p.fdefenses, p.fcdefenses, p.fcfrags,
-                        z_mmss
-                    );
-
-                    APPEND_SAFE(line);
-
-                    // cleanup
-                    strunzone(z_mmss);
-                    strunzone(zname);
-
-                    lines = lines + 1;
-                    if (webhook_stats_len > (maxlen - 120)) break;
-                }
-                if (use_find) p = find(p, classname, "player"); else p = p.next_player;
-            }
+            p = wst_row[r];
+            wst_show[r] = wst_elig(r, WST_E_CTF, is_arena);
+            wst_set(r, 0, p.fcaptures);
+            wst_set(r, 1, p.freturns);
+            wst_set(r, 2, p.fdefenses);
+            wst_set(r, 3, p.fcdefenses);
+            wst_set(r, 4, p.fcfrags);
+            wst_set(r, 5, floor(p.fcarries_time));
         }
-        if (opened4) APPEND_SAFE("```\n");
+        wst_emit("CTF");
     }
 
-    // Normalize newlines/tabs, then split into multiple Discord messages if needed
-    {
-        local string prepared, seg;
-        local float discord_limit;
-        local float part_num, delay_offset;
-        local float carry_code;
-        local float buf_idx, buf_count;
-        local entity continuation_ev;
-        local string prefix, chunk_body, chunk_send, remainder, suffix;
-        local float prefix_len, split_pos, fence_count;
-        local float end_in_code, suffix_len;
-
-        prepared = strzone("");
-
-        // Engine tempstrings are 1024 bytes and strcat/strreplace truncate
-        // silently. The JSON payload adds {"content":""} plus one byte per
-        // escaped newline, quote or backslash, so leave room for that.
-        discord_limit = 800;
-
-        part_num = 1;
-        delay_offset = 0;
-        carry_code = 0;
-
-        buf_count = buf_getsize(webhook_stats_buf);
-
-#define WEBHOOK_STATS_FLUSH() \
-        while (strlen(prepared) > 0) \
-        { \
-            if (carry_code) { prefix = "```\n"; prefix_len = 4; } \
-            else { prefix = ""; prefix_len = 0; } \
-            split_pos = Webhook_FindSplitPos(prepared, discord_limit - prefix_len); \
-            chunk_body = substring(prepared, 0, split_pos); \
-            fence_count = Webhook_CountFences(chunk_body); \
-            end_in_code = carry_code; \
-            if (fence_count - floor(fence_count / 2) * 2 == 1) \
-                end_in_code = carry_code ? 0 : 1; \
-            suffix = ""; \
-            suffix_len = 0; \
-            if (end_in_code) \
-            { \
-                if (strlen(chunk_body) > 0 && substring(chunk_body, strlen(chunk_body) - 1, 1) == "\n") \
-                { \
-                    suffix = "```"; \
-                    suffix_len = 3; \
-                } \
-                else \
-                { \
-                    suffix = "\n```"; \
-                    suffix_len = 4; \
-                } \
-                if (split_pos + prefix_len + suffix_len > discord_limit) \
-                { \
-                    split_pos = Webhook_FindSplitPos(prepared, discord_limit - prefix_len - suffix_len); \
-                    chunk_body = substring(prepared, 0, split_pos); \
-                    fence_count = Webhook_CountFences(chunk_body); \
-                    end_in_code = carry_code; \
-                    if (fence_count - floor(fence_count / 2) * 2 == 1) \
-                        end_in_code = carry_code ? 0 : 1; \
-                    if (end_in_code) \
-                    { \
-                        if (strlen(chunk_body) > 0 && substring(chunk_body, strlen(chunk_body) - 1, 1) == "\n") \
-                            suffix = "```"; \
-                        else \
-                            suffix = "\n```"; \
-                    } \
-                    else \
-                    { \
-                        suffix = ""; \
-                    } \
-                } \
-            } \
-            chunk_send = prefix; \
-            chunk_send = strcat(chunk_send, chunk_body); \
-            if (end_in_code) chunk_send = strcat(chunk_send, suffix); \
-            chunk_send = strzone(chunk_send); \
- \
-            if (part_num == 1) \
-            { \
-                if (ev.hook_payload) strunzone(ev.hook_payload); \
-                ev.hook_payload = Webhook_MakeContentPayloadZ(chunk_send); \
-                strunzone(chunk_send); \
-            } \
-            else \
-            { \
-                continuation_ev = spawn(); \
-                continuation_ev.classname = "webhook_event"; \
-                continuation_ev.message = chunk_send; \
-                continuation_ev.webhook_prepfn = webhook_stats_continuation_info; \
-                continuation_ev.nextthink = time + 0.5 + delay_offset; \
-                continuation_ev.think = webhook_do_post; \
-                delay_offset = delay_offset + 0.5; \
-            } \
- \
-            remainder = substring(prepared, split_pos, strlen(prepared) - split_pos); \
-            remainder = strzone(remainder); \
-            if (end_in_code) \
-            { \
-                if (strlen(remainder) >= 3 && substring(remainder, 0, 3) == "```") \
-                { \
-                    tmps = substring(remainder, 3, strlen(remainder) - 3); \
-                    if (strlen(tmps) > 0 && substring(tmps, 0, 1) == "\n") \
-                        tmps = substring(tmps, 1, strlen(tmps) - 1); \
-                    strunzone(remainder); \
-                    remainder = strzone(tmps); \
-                    end_in_code = 0; \
-                } \
-                else if (strlen(remainder) >= 4 && substring(remainder, 0, 4) == "\n```") \
-                { \
-                    tmps = substring(remainder, 4, strlen(remainder) - 4); \
-                    if (strlen(tmps) > 0 && substring(tmps, 0, 1) == "\n") \
-                        tmps = substring(tmps, 1, strlen(tmps) - 1); \
-                    strunzone(remainder); \
-                    remainder = strzone(tmps); \
-                    end_in_code = 0; \
-                } \
-                else \
-                { \
-                    tmps = remainder; \
-                    while (strlen(tmps) > 0 && substring(tmps, 0, 1) == "\n") \
-                        tmps = substring(tmps, 1, strlen(tmps) - 1); \
-                    if (strlen(tmps) >= 2) \
-                    { \
-                        if (substring(tmps, 0, 2) == "**" || substring(tmps, 0, 2) == "##") \
-                            end_in_code = 0; \
-                    } \
-                } \
-            } \
-            if (prepared) strunzone(prepared); \
-            prepared = remainder; \
-             \
-            part_num = part_num + 1; \
-            carry_code = end_in_code; \
-        }
-
-        for (buf_idx = 0; buf_idx < buf_count; buf_idx = buf_idx + 1)
-        {
-            seg = bufstr_get(webhook_stats_buf, buf_idx);
-            if (seg == "") continue;
-
-            seg = strreplace("\r\n", "\n", seg);
-            seg = strreplace("\r", "\n", seg);
-            seg = strreplace("\t", "    ", seg);
-
-            // Zone the segment before flushing: FLUSH creates many tempstrings
-            // and a tempstring seg can be overwritten (garbled headers,
-            // repeated chunks, broken ``` fences in the Discord output).
-            seg = strzone(seg);
-
-            if (strlen(prepared) > 0 && (strlen(prepared) + strlen(seg) > discord_limit))
-            {
-                WEBHOOK_STATS_FLUSH()
-            }
-
-            if (strlen(seg) > discord_limit)
-            {
-                strunzone(prepared);
-                prepared = seg; // ownership moves to prepared
-                WEBHOOK_STATS_FLUSH()
-                continue;
-            }
-
-            prepared = zcat(prepared, seg);
-            strunzone(seg);
-        }
-
-        if (strlen(prepared) > 0)
-            {
-            WEBHOOK_STATS_FLUSH()
-                }
-
-#undef WEBHOOK_STATS_FLUSH
-
-        if (prepared) strunzone(prepared);
-    }
+    webhook_stats_send(ev);
     webhook_stats_buf_end();
-    #undef PCT_STR
 };
 
 
