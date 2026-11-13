@@ -1872,6 +1872,8 @@ void() powerup_drop =
 			//drop.alpha = (timeleft[i] - time)/16;	// R00k: fade the model based on time remaining
             drop.nextthink = timeleft[i];
 			drop.think = SUB_Remove;
+			// The player's expiry stopped counting when the pause began.
+			match_pause_new_item(drop, clanring_match_pause_time);
 			ffa_item_update_alpha(drop);
         }
     }
@@ -2503,6 +2505,7 @@ void() DropBackpack =
 	item.touch = BackpackTouch;
 	item.nextthink = time + 120;	//remove after 2 minutes
 	item.think = hh_backpack_expire;
+	match_pause_new_item(item, time);	// dropped on a disconnect during a pause
 };
 
 void() Team_weapon_touch =

@@ -3178,7 +3178,9 @@ void() ClientDisconnect =
     {
         powerup_drop(); // Spite the rage-quitter
         DropRune();
-        if (!(clanring_playmode & CLANRING_PRACTICE_MODE) && !(mode_is_arena()))
+        // When the ghost snapshots ammo and weapons, it keeps them instead.
+        if (!(clanring_playmode & CLANRING_PRACTICE_MODE) && !(mode_is_arena())
+            && !match_disconnect_keeps_inventory())
         {
             DropBackpack ();
         }

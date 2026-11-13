@@ -252,6 +252,7 @@ void () match_show_timelimit;
 void () match_impulse;
 void () match_init_world;
 void (entity player) match_disconnect_notify;
+float (entity client) match_notify_reconnect_ghost;
 void () vote_impulse;
 //void () execute_changelevel;
 void () NextLevel;
@@ -1404,6 +1405,10 @@ void () clanring_send_ignore_this =
     local float temp;
 
     stuffcmd(self.owner, "crx_ignorethis\n");	// test for binds
+    // Tell a returning player their ghost code before any auto-restore below,
+    // so the stuffed "ghost" uses this code rather than a stale alias.
+    if (clanring_playmode & CLANRING_MATCH_MODE)
+        match_notify_reconnect_ghost(self.owner);
     temp = 0;
     if (clanring_state & CLANRING_MATCH_PAUSED)
     {

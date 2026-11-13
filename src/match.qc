@@ -2134,7 +2134,10 @@ float () match_put_player_in_team =
                 if (clanring_maxsize != 16) // if locked
                     match_get_maxsize();    // update to current max size
 
-                if (pteam.count == clanring_maxsize)
+                // A ghost proves the player already held a seat on this team,
+                // so a restore is not bound by the size recomputed from who is
+                // still connected (e.g. one drop per side in a locked 2v2).
+                if ((pteam.count == clanring_maxsize) && !match_ghost_admitting)
                 {
                     sprint(self, "Team full.  A player must enter\n");
                     sprint(self, "'unlock' in console to let you join\n");
@@ -2455,18 +2458,23 @@ float() match_allocate_ghost_code =
 //  alias ghostcode echo Your ghostcode is 29
 //  alias ghost "impulse 127;w5;impulse 232;w5;impulse 239"
 //
-void () match_send_ghost_aliases =
+void(entity client, float code) match_stuff_ghost_aliases =
 {
     local float tens, ones;
-    stuffcmd(self, strcat("alias ghostcode echo Your ghost code is ", ftos(self.owner.count), "\n"));
+    stuffcmd(client, strcat("alias ghostcode echo Your ghost code is ", ftos(code), "\n"));
 
-    tens = floor(self.owner.count / 10);
-    ones = self.owner.count - 10 * tens;
-    stuffcmd(self, strcat("alias ghost \"impulse 127;w5;impulse ",
-                          ftos(tens + 230),
-                          ";w5;impulse ",
-                          ftos(ones + 230),
-                          "\"\n"));
+    tens = floor(code / 10);
+    ones = code - 10 * tens;
+    stuffcmd(client, strcat("alias ghost \"impulse 127;w5;impulse ",
+                            ftos(tens + 230),
+                            ";w5;impulse ",
+                            ftos(ones + 230),
+                            "\"\n"));
+};
+
+void () match_send_ghost_aliases =
+{
+    match_stuff_ghost_aliases(self, self.owner.count);
 };
 
 void() match_clear_ghost_aliases =
@@ -2515,6 +2523,55 @@ float(entity ghost) match_ghost_address_ok =
         return 2;
 
     return 0;
+};
+
+//
+//  R E C O N N E C T  G H O S T  N O T I C E
+//
+//  Called shortly after a client connects.  If an unclaimed ghost was made
+//  from this client's address, tell them its code privately and point their
+//  ghost aliases at it.  Only an address match (result 2) counts: with
+//  binding off or no address reported, the code would be revealed to anyone.
+//  The address is what unlocks the ghost, so this tells nobody anything they
+//  could not already use.  Returns the number of matching ghosts.
+//
+float(entity client) match_notify_reconnect_ghost =
+{
+    local entity oldself, e;
+    local float found, code;
+
+    if (!(clanring_state & CLANRING_MATCH_STARTED))
+        return 0;
+    if (client.style & CLANRING_READY)
+        return 0;
+
+    oldself = self;
+    self = client;      // match_ghost_address_ok reads the client from self
+    found = 0;
+    e = find(world, classname, "clanring_ghost");
+    while (e)
+    {
+        if ((e.owner == world) && (match_ghost_address_ok(e) == 2))
+        {
+            found = found + 1;
+            code = e.count;
+            sprint(client, "\bYour ghost code is ", strings_ftos_gold(code),
+                   strcat(" (", strings_get_teamname(e.height), ", "),
+                   strcat(ftos(e.frags), " frag", strings_szplural(e.frags), ")\n"));
+        }
+        e = find(e, classname, "clanring_ghost");
+    }
+    self = oldself;
+
+    if (found == 1)
+    {
+        match_stuff_ghost_aliases(client, code);
+        sprint(client, "Type \bghost\b to rejoin the match\n");
+    }
+    else if (found > 1)
+        sprint(client, "Type \bimpulse 127\b and enter your code to rejoin\n");
+
+    return found;
 };
 
 //
@@ -2727,7 +2784,7 @@ float(entity ghostent) match_restore_ghost =
 
     local float col = bound(0, ghostent.height, 13);
     local entity pteam;
-    local float old_team, old_height;
+    local float old_team, old_height, admitted;
 
     // Admission can fail (team full, invalid colour).  Nothing may be
     // committed before it succeeds -- a player left holding CLANRING_READY
@@ -2739,7 +2796,10 @@ float(entity ghostent) match_restore_ghost =
     temp = ftos(col);
     stuffcmd(self, strcat("color ", temp, "\n"));
 
-    if (!match_put_player_in_team())    // self.height is set in here
+    match_ghost_admitting = TRUE;
+    admitted = match_put_player_in_team();    // self.height is set in here
+    match_ghost_admitting = FALSE;
+    if (!admitted)
     {
         self.team = old_team;
         self.height = old_height;
@@ -2763,7 +2823,8 @@ float(entity ghostent) match_restore_ghost =
     self.dest1 = ghostent.dest1;
     self.dest2 = ghostent.dest2;
     self.mangle = ghostent.mangle;
-    self.statstate = ghostent.statstate;
+    // statstate is a client HUD setting; the reconnected client already has
+    // its own, and disconnect cleanup zeroes it before the ghost is saved.
     self.clanring_badstats = ghostent.clanring_badstats;
     self.clanring_badstats2 = ghostent.clanring_badstats2;
     self.clanring_badstats_bores = ghostent.clanring_badstats_bores;
@@ -2809,8 +2870,6 @@ float(entity ghostent) match_restore_ghost =
     self.qper_active_bank = ghostent.qper_active_bank;    // observer_end already opened a new stint
     qper_telemetry_copy(ghostent, self);
     self.qper_telemetry_mark = qper_active_secs(self);
-    
-    self.killed = ghostent.killed;
 
     // check for copy-on-pause data
     if (ghostent.state)
@@ -2827,6 +2886,13 @@ float(entity ghostent) match_restore_ghost =
         self.think = ghostent.think;
         self.health = ghostent.health;
         self.items = (self.items | ghostent.items);
+        // Disconnect cleanup strips IT_SUPERHEALTH before the snapshot, and
+        // without it health above max never rots back down.
+        if (self.health > self.max_health)
+        {
+            self.items = self.items | IT_SUPERHEALTH;
+            self.rotthink = time + 1;
+        }
         if (self.items & IT_QUAD)
             sprint(self, "You regained your Quad\n");
         self.armortype = ghostent.armortype;
@@ -3959,6 +4025,25 @@ void () match_pause_item =
         self.movetype = MOVETYPE_FLY;
 };
 
+//
+//  P A U S E  N E W  I T E M
+//
+//  An entity created while the match is paused never went through
+//  match_pause_item, but match_unpause_item will still subtract the pause
+//  offset from it.  Give it the offset here so its timer neither expires
+//  mid-pause nor goes negative at unpause.  frozen_at is the moment its
+//  countdown stopped: time for a fresh timer (time + N), or the pause start
+//  for an absolute expiry inherited from a paused player (*_finished).
+//
+void(entity e, float frozen_at) match_pause_new_item =
+{
+    if (!(clanring_state & CLANRING_MATCH_PAUSED))
+        return;
+    if (e.nextthink == -1)
+        return;
+    e.nextthink = e.nextthink + 1000000 - (frozen_at - clanring_match_pause_time);
+};
+
 
 //
 //  P A U S E  P L A Y E R
@@ -4658,6 +4743,32 @@ void() match_verify_team =
 };
 
 //
+//  D I S C O N N E C T  K E E P S  I N V E N T O R Y
+//
+//  Will match_disconnect_notify snapshot this disconnecting player's
+//  inventory into their ghost?  It does when the match is paused, or is
+//  about to be autopaused by this disconnect.  ClientDisconnect must then
+//  not also drop a backpack, or the ammo and weapon exist twice.  Keep the
+//  conditions in step with the snapshot block in match_disconnect_notify.
+//
+float() match_disconnect_keeps_inventory =
+{
+    if (!(clanring_playmode & CLANRING_MATCH_MODE) || mode_is_arena())
+        return FALSE;
+    if (!(clanring_state & CLANRING_MATCH_STARTED))
+        return FALSE;
+    if (!(self.style & CLANRING_READY) || (self.style & CLANRING_OBSERVER))
+        return FALSE;
+    if (self.deadflag != DEAD_NO)
+        return FALSE;
+    if (self.owner.classname != "clanring_ghost")
+        return FALSE;
+    if (clanring_state & CLANRING_MATCH_PAUSED)
+        return TRUE;
+    return (clanring_playmode & CLANRING_AUTO_PAUSE) ? TRUE : FALSE;
+};
+
+//
 //  D I S C O N N E C T  N O T I F Y
 //
 //  Called when a player disconnects from the server or enters
@@ -4759,7 +4870,10 @@ void(entity player) match_disconnect_notify =
 
         // Autopause is player behavior, not ghost behavior.  A ghostless
         // player must still trigger it when disconnecting.
-        if (active_player && (clanring_playmode & CLANRING_AUTO_PAUSE))
+        // Skip when already paused: this player was frozen by that pause, and
+        // freezing them again would stack a second think-timer offset.
+        if (active_player && (clanring_playmode & CLANRING_AUTO_PAUSE)
+            && !(clanring_state & CLANRING_MATCH_PAUSED))
         {
             match_pause();
             if ((clanring_request != world)&&(clanring_request.classname == "match_pause"))	//Remove active request to pause

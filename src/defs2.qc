@@ -351,6 +351,7 @@ float clanring_ghost_key;               // per-map key for address fingerprints
 float clanring_ghost_probe_fails;       // unverified restore failures inside the current window
 float clanring_ghost_probe_seen;        // time of the last unverified failure
 float clanring_ghost_probe_wait;        // server-wide floor delay on unverified restores
+float match_ghost_admitting;            // TRUE while match_restore_ghost seats a player
 .float clanring_ghost_ip;               // ghost: address fingerprint, low word
 .float clanring_ghost_ip2;              // ghost: address fingerprint, high word
 .float clanring_ghost_fails;            // failed ghost code attempts this connection
