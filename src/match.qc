@@ -4013,11 +4013,18 @@ void() match_show_not_ready =
 //
 //  P A U S E  I T E M
 //
+//  Only a pending think (nextthink > 0) is offset.  The engine zeroes
+//  nextthink once a think has run, so idle items (already respawned, or
+//  never taken) sit at 0; offsetting them would turn 0 into the pause
+//  duration at unpause and re-run their stale think (SUB_regen/PlaceItem).
+//  Unpause only removes the offset from entities at or above it.
+//
 void () match_pause_item =
 {
 	if (self.nextthink == -1)
 		return;
-	self.nextthink = self.nextthink + 1000000;
+	if (self.nextthink > 0)
+		self.nextthink = self.nextthink + 1000000;
 	self.clanring_old_velocity = self.velocity;
 	self.velocity = '0 0 0';
 
@@ -4039,7 +4046,7 @@ void(entity e, float frozen_at) match_pause_new_item =
 {
     if (!(clanring_state & CLANRING_MATCH_PAUSED))
         return;
-    if (e.nextthink == -1)
+    if (e.nextthink <= 0)
         return;
     e.nextthink = e.nextthink + 1000000 - (frozen_at - clanring_match_pause_time);
 };
@@ -4060,7 +4067,7 @@ void() match_pause_player =
 
     self.clanring_old_velocity = self.velocity;
     self.velocity = VEC_ORIGIN;
-    if (self.nextthink == -1)
+    if (self.nextthink <= 0)
         return;
     self.nextthink = self.nextthink + 1000000;
 };
@@ -4074,6 +4081,14 @@ void()match_abort_pause_timeout;
 void() match_show_pause =
 {
     local entity oldself;
+
+    // Unpause countdown running: don't abort under it or print over it.
+    if (clanring_state & CLANRING_UNPAUSING)
+    {
+        clanring_match_timer.nextthink = time + 1.5;
+        clanring_match_timer.think = match_show_pause;
+        return;
+    }
 //TODO:Detect afk players to lessen the time to abort
     if ((time - clanring_match_pause_time) > 600)	//R00k: Abort a match that has been paused for 10 minutes.
     {
@@ -4116,6 +4131,7 @@ void() match_pause =
 	utils_do_item(match_pause_item, "item_ffa_ghost_timer");
 	utils_do_item(match_pause_item, "item_ffa_ghost");
 	utils_do_item(match_pause_item, "item_backpack");
+	utils_do_item(match_pause_item, "health_rot");	// megahealth rot clock
     //R00k added -start
     utils_do_flags(match_pause_item);
     utils_do_hook(match_pause_item);
@@ -4136,18 +4152,48 @@ void() match_pause =
 //  C O U N T D O W N  P A U S E
 // 
 //
+//  The countdown entity holds its own state: .enemy is the team whose free
+//  pause this is, .count the seconds left.  It never reads the requester,
+//  who may leave or disconnect mid-countdown (next_team would be world).
+//
 void() match_countdown_pause =
 {
-    if (self.owner.next_team.pausetime > 3)
+    local entity pteam;
+
+    // The team must still be in the active chain; a freed team entity
+    // keeps its fields, so walk the chain instead of trusting .enemy.
+    if (mode_is_arena())
+        pteam = boss.next_team;
+    else
+        pteam = clanring_sentinel.next_team;
+    while ((pteam != world) && (pteam != self.enemy))
+        pteam = pteam.next_team;
+
+    if ((pteam == world) || gameover)
     {
-        remove(self);		
+        remove(self);
+        return;
+    }
+
+    // Match or round ended, or someone else paused first: give it back.
+    if ((clanring_state & CLANRING_MATCH_PAUSED) ||
+        (mode_is_arena() ? (boss.state != CA_MATCH_PLAYING) : !(clanring_state & CLANRING_MATCH_STARTED)))
+    {
+        pteam.pausetime = FALSE;
+        bprint(sprintf("The %s's free match pause was cancelled and can be used again.\n", pteam.netname));
+        remove(self);
+        return;
+    }
+
+    if (self.count <= 0)
+    {
+        remove(self);
         match_pause();
         return;
     }
-    bprint(sprintf("\[%g\]\n", (4 - self.owner.next_team.pausetime)));
-    if ((4 - self.owner.next_team.pausetime) <= 3)
-        sound (world, CHAN_AUTO, "buttons/switch04.wav", 1, ATTN_NONE);
-    self.owner.next_team.pausetime += 1;
+    bprint(sprintf("\[%g\]\n", self.count));
+    sound (world, CHAN_AUTO, "buttons/switch04.wav", 1, ATTN_NONE);
+    self.count = self.count - 1;
     self.nextthink = time + 1;
 };
 
@@ -4156,6 +4202,8 @@ void() match_countdown_pause =
 //
 void() match_request_pause =
 {
+    local entity countdown;
+
     if (!(mode_is_arena()))
     {
         if (!(clanring_state & CLANRING_MATCH_STARTED))
@@ -4186,7 +4234,9 @@ void() match_request_pause =
         {
             bprint(sprintf("%s used the %s's \bone\b free match pause.\n", self.netname, self.next_team.netname));
             self.next_team.pausetime = TRUE;
-            utils_make_scheduled_event(match_countdown_pause, 1);
+            countdown = utils_make_scheduled_event(match_countdown_pause, 1);
+            countdown.enemy = self.next_team;
+            countdown.count = 3;
             return;
         }
     }
@@ -4206,7 +4256,8 @@ void() match_unpause_item =
     if (self.nextthink == -1)
         return;
 
-	self.nextthink = self.nextthink - 1000000 + clanring_match_pause_time;
+	if (self.nextthink >= 1000000)
+		self.nextthink = self.nextthink - 1000000 + clanring_match_pause_time;
 	self.velocity = self.clanring_old_velocity;
     if (self.classname == "grenade")
         self.movetype = MOVETYPE_BOUNCE;
@@ -4230,6 +4281,11 @@ void() match_unpause_player =
     self.radsuit_finished 			= self.radsuit_finished + clanring_match_pause_time;
     self.air_finished 				= self.air_finished + clanring_match_pause_time;
     self.pain_finished 				= self.pain_finished + clanring_match_pause_time;
+    self.attack_finished 			= self.attack_finished + clanring_match_pause_time;	// remaining refire delay
+    if (self.rotthink)
+        self.rotthink 				= self.rotthink + clanring_match_pause_time;	// megahealth rot / regen-rune mega clock
+    if (self.combo_time)
+        self.combo_time 			= self.combo_time + clanring_match_pause_time;
 
     if ((self.style & CLANRING_OBSERVER) || self.deadflag)
         return;
@@ -4244,7 +4300,7 @@ void() match_unpause_player =
     self.finaldest_y 	= MOVETYPE_WALK;
     self.velocity 		= self.clanring_old_velocity;
 
-    if (self.nextthink == -1)
+    if (self.nextthink < 1000000)
         return;
 
     self.nextthink = self.nextthink - 1000000 + clanring_match_pause_time;
@@ -4283,6 +4339,7 @@ void() match_abort_pause_timeout =
 	utils_do_item(match_unpause_item, "item_ffa_ghost_timer");
 	utils_do_item(match_unpause_item, "item_ffa_ghost");
 	utils_do_item(match_unpause_item, "item_backpack");
+	utils_do_item(match_unpause_item, "health_rot");	// megahealth rot clock
     utils_do_flags (match_unpause_item);
     utils_do_hook (match_unpause_item);
     utils_do_item(match_unpause_item, "item_rune");
@@ -4333,6 +4390,7 @@ void() match_unpause =
 	utils_do_item(match_unpause_item, "item_ffa_ghost_timer");
 	utils_do_item(match_unpause_item, "item_ffa_ghost");
 	utils_do_item(match_unpause_item, "item_backpack");
+	utils_do_item(match_unpause_item, "health_rot");	// megahealth rot clock
 
     //R00k added -start
     utils_do_flags (match_unpause_item);

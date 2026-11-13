@@ -1315,7 +1315,9 @@ void () arena_pause_item =
 		return;
 	}
 
-	self.nextthink = (self.nextthink + 1000000);
+	// Offset only a pending think; see match_pause_item.
+	if (self.nextthink > 0)
+		self.nextthink = (self.nextthink + 1000000);
 	self.clanring_old_velocity = self.velocity;
 	self.velocity = '0 0 0';
 
@@ -1336,7 +1338,7 @@ void () arena_pause_player =
 	self.clanring_old_velocity 	= self.velocity;
 	self.velocity 		= '0 0 0';
 
-	if ((self.nextthink == CONTENT_EMPTY))
+	if (self.nextthink <= 0)
 	{
 		return;
 	}
@@ -1355,6 +1357,7 @@ void () arena_pause =
 	clanring_state = clanring_state | CLANRING_MATCH_PAUSED;
 	boss.timetofight = FALSE;//v1.4
 	utils_do_projectiles (arena_pause_item);
+	utils_do_item (arena_pause_item, "item_backpack");	// keep dropped packs from expiring
 	utils_do_arena_players (arena_pause_player);
 	announce ("Match paused");
 };
@@ -1365,7 +1368,8 @@ void () arena_unpause_item =
 	{
 		return;
 	}
-	self.nextthink = ((self.nextthink - 1000000) + clanring_match_pause_time);
+	if (self.nextthink >= 1000000)
+		self.nextthink = ((self.nextthink - 1000000) + clanring_match_pause_time);
 	self.velocity = self.clanring_old_velocity;
 	if ((self.classname == "grenade"))
 	{
@@ -1377,6 +1381,20 @@ void () arena_unpause_player =
 {
 	self.pain_finished 	= (self.pain_finished + clanring_match_pause_time);
 	self.air_finished 	= (self.air_finished + clanring_match_pause_time);
+	self.attack_finished 	= (self.attack_finished + clanring_match_pause_time);
+	// Powerups (airshot ring, dmm4 spawn pent, ...) keep their remaining time.
+	if (self.super_damage_finished)
+		self.super_damage_finished += clanring_match_pause_time;
+	if (self.invisible_finished)
+		self.invisible_finished += clanring_match_pause_time;
+	if (self.invincible_finished)
+		self.invincible_finished += clanring_match_pause_time;
+	if (self.radsuit_finished)
+		self.radsuit_finished += clanring_match_pause_time;
+	if (self.rotthink)
+		self.rotthink += clanring_match_pause_time;
+	if (self.combo_time)
+		self.combo_time += clanring_match_pause_time;
 	if (clanring_playmode & CLANRING_WIPEOUT_MODE)
 	{
 		if (self.respawntime > 0)
@@ -1398,12 +1416,14 @@ void () arena_unpause_player =
 	}
 	self.movetype = MOVETYPE_WALK;
 	self.velocity = self.clanring_old_velocity;
-	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait == 0))
+	// Resume the round in progress.  Don't call arena_fight_and_shoot here:
+	// that is round-start setup and would wipe killstreak/combo/pack counts.
+	if (boss.wait == 0)
 	{
 		self.style = self.style | CLANRING_OK_TO_SHOOT;
 		centerprint(self, "\bFIGHT!");
 	}
-	if ((self.nextthink == CONTENT_EMPTY))
+	if (self.nextthink < 1000000)
 	{
 		return;
 	}
@@ -1442,7 +1462,9 @@ void () arena_unpause =
 	clanring_match_pause_time = time - clanring_match_pause_time;
 	clanring_state = clanring_state - (clanring_state & CLANRING_MATCH_PAUSED);
 	utils_do_projectiles (arena_unpause_item);
-	if ((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0))
+	utils_do_item (arena_unpause_item, "item_backpack");
+	// Pending end-of-round delay (all arena modes) keeps its remaining time.
+	if (boss.wait > 0)
 		boss.wait += clanring_match_pause_time;
 	boss.timetofight = !((clanring_playmode & CLANRING_WIPEOUT_MODE) && (boss.wait > 0));
 	announce ("Match unpaused");
@@ -1458,8 +1480,6 @@ void () arena_unpause =
 			team = team.next_team;
 		}
 	}
-	else
-		utils_do_arena_players (arena_fight_and_shoot);
 };
 
 //R00k changed:v1.4
@@ -1471,6 +1491,7 @@ void () arena_unpause_countdown_think =
 		arena_unpause ();
 			clanring_play_compat_sound(world, CHAN_AUTO, "crx/fight.wav", "", 1, ATTN_NONE);
 		remove (self);
+		return;
 	}
 	else
 	{

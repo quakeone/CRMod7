@@ -2948,7 +2948,9 @@ void() PlayerPostThink =
             self.delayed_impulse = self.impulse;
     }
 
-    CheckCombos();
+    // Paused: combo_time is shifted on unpause, so don't let it lapse now.
+    if (!(clanring_state & CLANRING_MATCH_PAUSED))
+        CheckCombos();
 
     // ELOHIM_NO_POST_THINK is set for gameover, deadflag,
     // setting options and match paused
