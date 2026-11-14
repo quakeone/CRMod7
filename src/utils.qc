@@ -3462,6 +3462,8 @@ void(entity ev) webhook_stats_continuation_info =
 #define WST_MSG_LIMIT 1900
 
 entity wst_row[WST_MAXROWS];
+entity wst_team[WST_MAXROWS];  // teams, best score first
+float  wst_nteams;
 float  wst_frags[WST_MAXROWS];
 float  wst_obs[WST_MAXROWS];
 float  wst_show[WST_MAXROWS];
@@ -3500,22 +3502,91 @@ string(float h) wst_team_ansi =
     return "[37m";
 };
 
-string(entity p) wst_name_code =
+// Teams come from two places: TDM/CTF use clanring_sentinel's list with the
+// color in .height and score in .frags; the arena modes (CA, Wipeout,
+// Airshot, DMM4) use boss's "ca_team" list with the color in .team2 and
+// rounds won in .wins.
+string(string s) wst_md;
+
+float(entity t) wst_is_arena_team =
 {
-    if (!teamplay || p.next_team == world) return "";
-    return wst_team_ansi(p.next_team.height);
+    return (t != world && t.classname == "ca_team");
 };
 
-// Colored circle emoji for a team color number
-string(float h) wst_team_dot =
+// Team color number 1..13 (strings_get_teamname order), 0 if unknown
+float(entity t) wst_team_color =
 {
-    if (h == 4) return "\xF0\x9F\x94\xB4";
-    if (h == 13 || h == 2 || h == 11) return "\xF0\x9F\x94\xB5";
-    if (h == 3 || h == 5) return "\xF0\x9F\x9F\xA2";
-    if (h == 6 || h == 12) return "\xF0\x9F\x9F\xA1";
-    if (h == 1) return "\xF0\x9F\x9F\xA4";
-    if (h == 7 || h == 8 || h == 9) return "\xF0\x9F\x9F\xA3";
-    return "\xE2\x9A\xAA";
+    local float h;
+    if (t == world) return 0;
+    h = wst_is_arena_team(t) ? t.team2 : t.height;
+    if (h < 1 || h > 13) return 0;
+    return h;
+};
+
+float(entity t) wst_team_score =
+{
+    return wst_is_arena_team(t) ? t.wins : t.frags;
+};
+
+// Short team name for the headline (markdown-escaped)
+string(entity t) wst_team_label =
+{
+    local float h;
+    h = wst_team_color(t);
+    // arena teams are named "Blue team"; single-player arena teams use the player's name
+    if (h && (t.netname == "" || t.netname == strings_get_teamname(h)))
+        return utils_rstrip(strings_get_teamname2(h));
+    if (t.netname != "")
+        return wst_md(utils_dequake_for_discord(t.netname));
+    return "Team";
+};
+
+// Fill wst_team with the active teams, best score first (color breaks ties)
+void() wst_collect_teams =
+{
+    local entity t, te;
+    local float n, i, j, best;
+
+    wst_nteams = 0;
+    if (boss != world && wst_is_arena_team(boss.next_team))
+        t = boss.next_team;
+    else if (teamplay)
+        t = clanring_sentinel.next_team;
+    else
+        return;
+
+    while (t && wst_nteams < WST_MAXROWS)
+    {
+        n = wst_nteams;
+        wst_team[n] = t;
+        wst_nteams = n + 1;
+        t = t.next_team;
+    }
+
+    for (i = 0; i < wst_nteams; i++)
+    {
+        best = i;
+        for (j = i + 1; j < wst_nteams; j++)
+        {
+            if (wst_team_score(wst_team[j]) > wst_team_score(wst_team[best]) ||
+                (wst_team_score(wst_team[j]) == wst_team_score(wst_team[best]) &&
+                 wst_team_color(wst_team[j]) < wst_team_color(wst_team[best])))
+                best = j;
+        }
+        if (best != i)
+        {
+            te = wst_team[i]; wst_team[i] = wst_team[best]; wst_team[best] = te;
+        }
+    }
+};
+
+string(entity p) wst_name_code =
+{
+    local float h;
+    if (!wst_nteams) return "";
+    h = wst_team_color(p.next_team);
+    if (!h) return "";
+    return wst_team_ansi(h);
 };
 
 // Escape Discord markdown in text shown outside code blocks
@@ -3547,7 +3618,10 @@ string(float kind, float v, entity r) wst_fmt =
 {
     local float m, s;
     if (kind == WST_TEAM)
-        return (r.next_team != world) ? utils_rstrip(strings_get_teamname3(r.next_team.height)) : "";
+    {
+        m = wst_team_color(r.next_team);
+        return m ? utils_rstrip(strings_get_teamname3(m)) : "";
+    }
     if (kind == WST_PCT)  return (v < 0) ? "N/A" : strcat(ftos(v), "%");
     if (kind == WST_BIG)  return wst_thou(v);
     if (kind == WST_DEC1) return sprintf("%.1f", v);
@@ -3563,18 +3637,11 @@ string(float kind, float v, entity r) wst_fmt =
 
 float(entity t) wst_team_rank =
 {
-    local float r;
-    local entity pt;
-    if (!teamplay || t == world) return 99;
-    r = 0;
-    pt = clanring_sentinel.next_team;
-    while (pt)
-    {
-        if (pt != t && (pt.frags > t.frags || (pt.frags == t.frags && pt.height < t.height)))
-            r = r + 1;
-        pt = pt.next_team;
-    }
-    return r;
+    local float i;
+    if (t == world) return 99;
+    for (i = 0; i < wst_nteams; i++)
+        if (wst_team[i] == t) return i;
+    return 99;
 };
 
 // Collect every player who may appear in any table, ordered winning team
@@ -3584,6 +3651,7 @@ void(float is_arena, float participant_cutoff) wst_collect =
     local entity p, te;
     local float obs, n, i, j, best, key, bkey, tf, to;
 
+    wst_collect_teams();
     wst_nrows = 0;
     wst_namew = 4;
     p = find(world, classname, "player");
@@ -4009,60 +4077,29 @@ void(entity ev) webhook_stats_info =
     // Headline: score, details, MVP, awards
     // -------------------------
     {
-        local entity pteam, best_team, t1, t2;
-        local float best_score, num_teams, i;
+        local entity pteam;
+        local float num_teams, i;
         local string hdr_time, time_str, map_z, line;
         local float hourpos;
 
-        num_teams = 0;
-        if (teamplay)
-        {
-            pteam = clanring_sentinel.next_team;
-            while (pteam) { num_teams = num_teams + 1; pteam = pteam.next_team; }
-        }
+        num_teams = wst_nteams;
 
         line = strzone("## ");
         if (num_teams >= 2)
         {
-            // teams in descending score order (.cnt as printed flag)
-            t1 = t2 = world;
             for (i = 0; i < num_teams; i = i + 1)
             {
-                best_team = world;
-                best_score = -999999;
-                pteam = clanring_sentinel.next_team;
-                while (pteam)
-                {
-                    if ((pteam.cnt == 0) && (pteam.frags > best_score))
-                    {
-                        best_score = pteam.frags;
-                        best_team = pteam;
-                    }
-                    pteam = pteam.next_team;
-                }
-                if (best_team == world) break;
-                best_team.cnt = 1;
-                if (i == 0) t1 = best_team;
-                if (i == 1) t2 = best_team;
-
-                if (best_team.netname != "")
-                    nm = strzone(wst_md(utils_dequake_for_discord(best_team.netname)));
-                else
-                    nm = strzone(utils_rstrip(strings_get_teamname2(best_team.height)));
-
+                pteam = wst_team[i];
+                nm = strzone(wst_team_label(pteam));
                 if (num_teams == 2 && i == 1)
-                    line = zcat(line, strcat(" \xE2\x80\x93 ", ftos(best_team.frags), " ", nm, " ", wst_team_dot(best_team.height)));
-                else if (num_teams == 2)
-                    line = zcat(line, strcat(wst_team_dot(best_team.height), " ", nm, " ", ftos(best_team.frags)));
+                    line = zcat(line, strcat(" \xE2\x80\x93 ", ftos(wst_team_score(pteam)), " ", nm));
                 else
                 {
                     if (i > 0) line = zcat(line, " \xC2\xB7 ");
-                    line = zcat(line, strcat(wst_team_dot(best_team.height), " ", nm, " ", ftos(best_team.frags)));
+                    line = zcat(line, strcat(nm, " ", ftos(wst_team_score(pteam))));
                 }
                 strunzone(nm);
             }
-            pteam = clanring_sentinel.next_team;
-            while (pteam) { pteam.cnt = 0; pteam = pteam.next_team; }
         }
         else
         {
@@ -4072,7 +4109,7 @@ void(entity ev) webhook_stats_info =
             if (r < wst_nrows)
             {
                 nm = strzone(wst_md(utils_dequake_for_discord(wst_row[r].netname)));
-                line = zcat(line, strcat("\xF0\x9F\x8F\x86 ", nm, " wins \xC2\xB7 ", ftos(wst_frags[r]), " frags"));
+                line = zcat(line, strcat(nm, " wins \xC2\xB7 ", ftos(wst_frags[r]), " frags"));
                 strunzone(nm);
             }
             else
@@ -4175,7 +4212,7 @@ void(entity ev) webhook_stats_info =
         if (e1 != world)
         {
             nm = strzone(wst_md(utils_dequake_for_discord(e1.netname)));
-            line = strzone(strcat("\xE2\xAD\x90 MVP **", nm, "** \xC2\xB7 ", sprintf("%.1f", b1), " QPER"));
+            line = strzone(strcat("MVP **", nm, "** \xC2\xB7 ", sprintf("%.1f", b1), " QPER"));
             line = zcat(line, strcat(" \xC2\xB7 ", ftos(e1.true_kills), "/", ftos(e1.mangle_z), " K/D"));
             line = zcat(line, strcat(" \xC2\xB7 ", wst_thou(e1.dmg_given), " dmg"));
             if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && e1.fcaptures > 0)
@@ -4197,16 +4234,16 @@ void(entity ev) webhook_stats_info =
             wst_show[r] = wst_elig(r, WST_E_MAIN, is_arena);
             wst_set(r, 0, (p.dest1_z >= 50) ? floor(100 * p.dest2_z / p.dest1_z) : 0);
         }
-        wst_award("\xF0\x9F\x8E\xAF Best LG", WST_PCT);
+        wst_award("Best LG", WST_PCT);
         for (r = 0; r < wst_nrows; r++)
         {
             p = wst_row[r];
             wst_set(r, 0, (p.dest_x >= 10) ? floor(100 * p.dest_y / p.dest_x) : 0);
         }
-        wst_award("\xF0\x9F\x9A\x80 Best RL", WST_PCT);
+        wst_award("Best RL", WST_PCT);
         for (r = 0; r < wst_nrows; r++)
             wst_set(r, 0, wst_row[r].dmg_given);
-        wst_award("\xF0\x9F\x92\xA5 Top dmg", WST_BIG);
+        wst_award("Top dmg", WST_BIG);
 
         if (clanring_playmode & CLANRING_CAPTURE_THE_FLAG)
         {
@@ -4215,13 +4252,13 @@ void(entity ev) webhook_stats_info =
                 wst_show[r] = wst_elig(r, WST_E_CTF, is_arena);
                 wst_set(r, 0, wst_row[r].fcaptures);
             }
-            wst_award("\xF0\x9F\x9A\xA9 Most caps", WST_INT);
+            wst_award("Most caps", WST_INT);
             for (r = 0; r < wst_nrows; r++)
                 wst_set(r, 0, wst_row[r].freturns);
-            wst_award("\xF0\x9F\x9B\xA1\xEF\xB8\x8F Most returns", WST_INT);
+            wst_award("Most returns", WST_INT);
             for (r = 0; r < wst_nrows; r++)
                 wst_set(r, 0, floor(wst_row[r].fcarries_time));
-            wst_award("\xE2\x8F\xB1\xEF\xB8\x8F Longest hold", WST_MMSS);
+            wst_award("Longest hold", WST_MMSS);
         }
 
         if (!is_arena)
@@ -4231,14 +4268,14 @@ void(entity ev) webhook_stats_info =
                 wst_show[r] = wst_elig(r, WST_E_ITEMS, is_arena);
                 wst_set(r, 0, wst_row[r].clanring_qdkill_x);
             }
-            wst_award("\xE2\x9A\xA1 Most quad kills", WST_INT);
+            wst_award("Most quad kills", WST_INT);
             for (r = 0; r < wst_nrows; r++)
             {
                 p = wst_row[r];
                 kfrac = p.dest2_x + p.dest2_y + p.dest2_z + p.dest_y + p.clanring_badstats_y + p.clanring_badstats_z;
                 wst_set(r, 0, (kfrac > 0) ? floor(100 * p.clanring_badstats_y / kfrac) : 0);
             }
-            wst_award("\xF0\x9F\x98\xAC Most self dmg", WST_PCT);
+            wst_award("Most self dmg", WST_PCT);
         }
 
         if (wst_nawards > 0)
@@ -4249,20 +4286,20 @@ void(entity ev) webhook_stats_info =
     if ((clanring_playmode & CLANRING_CAPTURE_THE_FLAG) && (clanring_new_record_player != ""))
     {
         nm = strzone(wst_md(utils_dequake_for_discord(clanring_new_record_player)));
-        webhook_stats_buf_append(strcat("\xF0\x9F\x8F\x81 **", nm, "** set a new match capture record!\n"));
+        webhook_stats_buf_append(strcat("**", nm, "** set a new match capture record!\n"));
         strunzone(nm);
     }
 
     // ---- Scoreboard ----
     wst_reset();
-    if (teamplay) wst_col("team", 8, WST_TEAM, WST_NONE);
+    if (wst_nteams) wst_col("team", 8, WST_TEAM, WST_NONE);
     wst_col("frags", 5, WST_INT, WST_MAX);
     wst_col("ping", 4, WST_INT, WST_NONE);
     for (r = 0; r < wst_nrows; r++)
     {
         wst_show[r] = wst_elig(r, WST_E_SCORE, is_arena);
         k = 0;
-        if (teamplay) { wst_set(r, k, 0); k = k + 1; }
+        if (wst_nteams) { wst_set(r, k, 0); k = k + 1; }
         wst_set(r, k, wst_frags[r]);
         wst_set(r, k + 1, floor(wst_row[r].ping_time + 0.5));
     }

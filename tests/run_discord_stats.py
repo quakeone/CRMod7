@@ -117,10 +117,11 @@ def rows(body):
 def check_ctf(messages):
     check_common(messages)
     head = messages[0]
-    assert head.startswith("## \U0001F535 Blue 651 – 56 Red \U0001F534\n"), head[:80]
+    assert not re.search("[\U0001F000-\U0001FFFF\u2600-\u27BF\u2B50\u23F1]", head), "emoji in headline"
+    assert head.startswith("## Blue 651 – 56 Red\n"), head[:80]
     assert "-# bastard · 20 min 3v3 · CTF Match · test\\*host\\_ ·" in head
     assert "MVP **omicr0n**" in head
-    assert "\U0001F4A5 Top dmg **omicr0n 10,359**" in head
+    assert "Top dmg **omicr0n 10,359**" in head
     assert "Most caps **omicr0n, penguin 5**" in head
     assert "Longest hold **omicr0n 9:19**" in head
 
@@ -155,7 +156,8 @@ def check_ctf(messages):
 def check_ffa(messages):
     check_common(messages)
     head = messages[0]
-    assert head.startswith("## \U0001F3C6 q\"uote\\\\back wins · 30 frags\n"), head[:80]
+    assert not re.search("[\U0001F000-\U0001FFFF\u2600-\u27BF\u2B50\u23F1]", head), "emoji in headline"
+    assert head.startswith("## q\"uote\\\\back wins · 30 frags\n"), head[:80]
     text = "\n".join(messages)
     assert "q\"uote\\back" in text and "@everyone" in text
     assert "\\*bold\\*\\_x\\_" in head or "\\*bold\\*\\_x\\_" not in text
@@ -164,6 +166,22 @@ def check_ffa(messages):
     names = [r[:12].strip() for r in rows(found["Scoreboard"])]
     assert names == ["q\"uote\\back", "*bold*_x_", "@everyone"], names
     assert " team" not in found["Scoreboard"].splitlines()[0]
+
+
+def check_ca(messages):
+    check_common(messages)
+    head = messages[0]
+    assert not re.search("[\U0001F000-\U0001FFFF\u2600-\u27BF\u2B50\u23F1]", head), "emoji in headline"
+    assert head.startswith("## Blue 7 \u00b7 Red 4 \u00b7 Green 2\n"), head[:80]
+    assert "Clan Arena" in head
+    found = blocks(messages)
+    score = found["Scoreboard"]
+    names = [r.split()[0] for r in rows(score)]
+    assert names == ["bluetop", "bluelow", "redtop", "redlow", "greenguy"], names
+    assert "\x1b[34mbluetop" in score and "\x1b[31mredtop" in score and "\x1b[32mgreenguy" in score
+    teams = [r.split()[1] for r in rows(score)]
+    assert teams == ["Blue", "Blue", "Red", "Red", "Green"], teams
+    assert "Unknown" not in "\n".join(messages)
 
 
 def main():
@@ -200,6 +218,10 @@ def main():
         ffa = run_case(root, mod, engine, args.pak0, 2)
         check_ffa(ffa)
         print(f"FFA match: {len(ffa)} messages, escaping and mentions passed")
+
+        ca = run_case(root, mod, engine, args.pak0, 3)
+        check_ca(ca)
+        print(f"Clan Arena: {len(ca)} messages, three-team colors and score passed")
 
 
 if __name__ == "__main__":

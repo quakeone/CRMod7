@@ -193,12 +193,56 @@ void() dst_ffa_match =
     dst_run("ffa");
 };
 
-// server.cfg sets dst_case: 1 = CTF match twice in a row, 2 = FFA
+// Clan Arena with three teams on boss's ca_team list (teamplay off on purpose)
+entity(float color, float won) dst_ca_team =
+{
+    entity t = spawn();
+    t.classname = "ca_team";
+    t.team2 = color;
+    t.wins = won;
+    t.netname = strings_get_teamname(color);
+    t.next_team = boss.next_team;
+    boss.next_team = t;
+    return t;
+};
+
+void() dst_ca_match =
+{
+    entity p, blue, red, green;
+
+    teamplay = 0;
+    deathmatch = 1;
+    clanring_playmode = CLANRING_MATCH_MODE | CLANRING_CA_MODE;
+    clanring_maxsize = 2;
+    clanring_sentinel = spawn();
+    clanring_sentinel.matchTime = time;
+    boss = spawn();
+    red = dst_ca_team(COLOR_RED, 4);
+    green = dst_ca_team(3, 2);
+    blue = dst_ca_team(COLOR_BLUE, 7);   // list order != score order
+
+    p = dst_player("greenguy", world); p.next_team = green;
+    dst_core(p, 9, 30, 9, 12, 100, 20, 0, 0, 0, 0, 100, 30);
+    p = dst_player("redtop", world); p.next_team = red;
+    dst_core(p, 20, 30, 20, 10, 100, 20, 0, 0, 0, 0, 100, 40);
+    p = dst_player("bluelow", world); p.next_team = blue;
+    dst_core(p, 5, 30, 5, 9, 100, 10, 0, 0, 0, 0, 100, 20);
+    p = dst_player("bluetop", world); p.next_team = blue;
+    dst_core(p, 15, 30, 15, 6, 100, 30, 0, 0, 0, 0, 100, 50);
+    p = dst_player("redlow", world); p.next_team = red;
+    dst_core(p, 3, 30, 3, 14, 100, 10, 0, 0, 0, 0, 100, 25);
+
+    dst_run("ca");
+};
+
+// server.cfg sets dst_case: 1 = CTF match twice in a row, 2 = FFA, 3 = Clan Arena
 void() worldspawn =
 {
     time = 2000;
     if (cvar("dst_case") == 2)
         dst_ffa_match();
+    else if (cvar("dst_case") == 3)
+        dst_ca_match();
     else
     {
         dst_ctf_match();
