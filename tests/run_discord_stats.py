@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
-GOLD, RED, GRAY = "\x1b[1;33m", "\x1b[1;31m", "\x1b[30m"
+GOLD, RED = "\x1b[1;33m", "\x1b[1;31m"
 
 
 def build(repo, root, compiler):
@@ -137,7 +137,7 @@ def check_ctf(messages):
 
     eff, bad = found["Efficiency"], found["Bad stats"]
     assert GOLD + " 81%" in eff                      # omicr0n kill%
-    assert GRAY + " N/A" in eff                      # penguin nails
+    assert "\x1b[30m" not in "\n".join(messages)     # zeros and N/A stay plain
     assert eff.count(GOLD + " 2.1") == 1 or eff.count(GOLD + " 2.0") == 2
     assert RED + "   3" in bad                       # penguin paks
     assert "\x1b[34mnew 2 quake" in found["Scoreboard"]

@@ -3436,7 +3436,7 @@ void(entity ev) webhook_stats_continuation_info =
 // ------------------------------------------------------------
 // Tables go in ```ansi code blocks. Discord desktop/web render the colors;
 // mobile shows the same text without them. Color has one meaning per kind:
-// gold = best in column, red = worst (bad stats), gray = zero / N/A, and
+// gold = best in column, red = worst (bad stats), and
 // player names take their team color.
 #define WST_MAXROWS 16
 #define WST_MAXCOLS 10
@@ -3456,7 +3456,6 @@ void(entity ev) webhook_stats_continuation_info =
 
 #define WST_GOLD "[1;33m"
 #define WST_RED  "[1;31m"
-#define WST_GRAY "[30m"
 
 // Discord allows 2000 characters per message; strlen counts bytes, which is
 // never less than characters, so this leaves room for a reopened fence.
@@ -3764,8 +3763,6 @@ void(string title) wst_emit =
             code = "";
             if (wst_has[c] && v == wst_tgt[c])
                 code = (wst_rule[c] == WST_WORST) ? WST_RED : WST_GOLD;
-            else if (wst_kind[c] != WST_TEAM && (v == 0 || (wst_kind[c] == WST_PCT && v < 0)))
-                code = WST_GRAY;
 
             line = zcat(line, strcat(" ", wst_paint(code, cell)));
         }
