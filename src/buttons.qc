@@ -98,6 +98,19 @@ void() button_killed =
 	button_fire ();
 };
 
+void() button_match_reset =
+{
+	SUB_ResetMove(self.pos1);
+	self.state = STATE_BOTTOM;
+	self.frame = 0;
+	self.enemy = world;
+	if (self.max_health)
+	{
+		self.health = self.max_health;
+		self.takedamage = DAMAGE_YES;
+	}
+};
+
 /*QUAKED func_button (0 .5 .8) ?
 When a button is touched, it moves some distance in the direction of it's angle, triggers all of it's targets, waits some time, then returns to it's original position where it can be triggered again.
 
@@ -149,6 +162,7 @@ void() func_button =
 	self.classname = "button";		// CRMOD - need this for match pausing/unpausing
 	self.blocked = button_blocked;
 	self.use = button_use;
+	self.match_reset_entity = button_match_reset;
 	if (self.health)
 	{
 		self.max_health = self.health;

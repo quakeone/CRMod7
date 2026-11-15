@@ -537,6 +537,8 @@ float   AS_MISSILE              = 4;
 .float          wait;                   // time from firing to restarting
 .float          delay;                  // time from activation to firing
 .entity         trigger_field;  // door's trigger entity
+.string         spawn_door_message;
+.void()         match_reset_entity;     // restores a map mechanism at match start
 .string         noise4;
 
 //

@@ -134,6 +134,15 @@ void()  SUB_CalcMoveDone =
 };
 
 //=============================================================================
+void(vector position) SUB_ResetMove =
+{
+	self.velocity = '0 0 0';
+	self.nextthink = -1;
+	self.think = __NULL__;
+	self.think1 = __NULL__;
+	setorigin(self, position);
+};
+
 void() DelayThink =
 {
 	activator = self.enemy;
@@ -221,6 +230,8 @@ void() SUB_UseTargets =
 		t.classname = "DelayedUse";
 		t.nextthink = time + self.delay;
 		t.think = DelayThink;
+		if (self.match_reset_entity || (self.classname == "trigger_relay" && activator.classname == "player"))
+			t.match_reset_entity = SUB_Remove;
 		t.enemy = activator;
 		t.message = self.message;
 		t.killtarget = self.killtarget;

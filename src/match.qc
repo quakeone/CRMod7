@@ -1807,6 +1807,27 @@ void() match_updatestat_matchstarttime =
     multicast('0 0 0', MULTICAST_ONE_R);
 }
 
+// Restore map mechanisms before players spawn into the live match.
+void() match_reset_map_entities =
+{
+    local entity oldself, e, next;
+
+    if (!cvar("cr_match_reset_map_entities"))
+        return;
+
+    oldself = self;
+    for (e = nextent(world); e; e = next)
+    {
+        next = nextent(e);
+        if (e.match_reset_entity)
+        {
+            self = e;
+            self.match_reset_entity();
+        }
+    }
+    self = oldself;
+};
+
 //
 //  B E G I N
 //
@@ -1846,6 +1867,7 @@ void() match_begin =
     qper_match_ffa_profile = qper_is_ffa();
     qper_match_profile_valid = TRUE;
     qper_population_update();
+    match_reset_map_entities();
     announce("The match has begun!");//Moved up here for autodemo
     utils_do_players(match_gib_player);//r00k after additional spawns...
 

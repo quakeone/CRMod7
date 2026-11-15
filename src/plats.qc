@@ -171,6 +171,23 @@ void() plat_use =
 	plat_go_down();
 };
 
+void() plat_match_reset =
+{
+	self.cnt = 0;
+	if (self.targetname)
+	{
+		SUB_ResetMove(self.pos1);
+		self.state = STATE_UP;
+		self.use = plat_use;
+	}
+	else
+	{
+		SUB_ResetMove(self.pos2);
+		self.state = STATE_BOTTOM;
+		self.use = plat_trigger_use;
+	}
+};
+
 /*QUAKED func_plat (0 .5 .8) ? PLAT_LOW_TRIGGER
 speed	default 150
 
@@ -235,6 +252,7 @@ void() func_plat =
 		self.pos2_z = self.origin_z - self.size_z + 8;
 
 	self.use = plat_trigger_use;
+	self.match_reset_entity = plat_match_reset;
 
 	plat_spawn_inside_trigger ();	// the "start moving" trigger	
 

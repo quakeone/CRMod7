@@ -74,6 +74,15 @@ void() multi_trigger =
 		self.think = multi_wait;
 		self.nextthink = time + self.wait;
 	}
+	else if (self.match_reset_entity && (clanring_playmode & CLANRING_MATCH_MODE)
+		&& cvar("cr_match_reset_map_entities"))
+	{
+		// Keep a spent trigger_once inert so it can be rearmed for the next match.
+		self.use = SUB_Null;
+		self.touch = SUB_Null;
+		self.solid = SOLID_NOT;
+		self.nextthink = -1;
+	}
 	else
 	{	// we can't just remove (self) here, because this is a touch function
 		// called wheil C code is looping through area links...
@@ -119,6 +128,13 @@ void() multi_touch =
 	multi_trigger ();
 };
 
+void() multi_match_reset =
+{
+	self.nextthink = -1;
+	self.enemy = world;
+	multi_wait();
+};
+
 /*QUAKED trigger_multiple (.5 .5 .5) ? notouch
 Variable sized repeatable trigger.  Must be targeted at one or more entities.  If "health" is set, the trigger must be killed to activate each time.
 If "delay" is set, the trigger waits some time after activating before firing.
@@ -153,6 +169,8 @@ void() trigger_multiple =
 	if (!self.wait)
 		self.wait = 0.2;
 	self.use = multi_use;
+	if (self.classname == "trigger_multiple" && self.wait > 0)
+		self.match_reset_entity = multi_match_reset;
 
 	InitTrigger ();
 
@@ -175,6 +193,19 @@ void() trigger_multiple =
 	}
 };
 
+void() once_match_reset =
+{
+	if (self.use != SUB_Null)
+		return;
+
+	self.use = multi_use;
+	self.solid = SOLID_TRIGGER;
+	if (!self.max_health && !(self.spawnflags & SPAWNFLAG_NOTOUCH))
+		self.touch = multi_touch;
+	multi_match_reset();
+	setorigin(self, self.origin);
+};
+
 /*QUAKED trigger_once (.5 .5 .5) ? notouch
 Variable sized trigger. Triggers once, then removes itself.  You must set the key "target" to the name of another object in the level that has a matching
 "targetname".  If "health" is set, the trigger must be killed to activate.
@@ -192,6 +223,8 @@ void() trigger_once =
 {
 	self.wait = -1;
 	trigger_multiple();
+	if (!self.killtarget && !self.killtarget2)
+		self.match_reset_entity = once_match_reset;
 };
 
 //=============================================================================

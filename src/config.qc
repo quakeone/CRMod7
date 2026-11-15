@@ -1606,6 +1606,7 @@ void() clanring_main_config =
 	registercvar("cr_lockdown_labels", "");
 		registercvar("cr_lockdown_auto_release_on_match_start", "0");
 		registercvar("cr_dm_randomize_start", "1");
+		registercvar("cr_match_reset_map_entities", "1");
 		registercvar("cr_ffa_holidays", "1");
 		registercvar("cr_wipeout_max_respawns", "4");
 			registercvar("cr_ra_randomize_start", "1");

@@ -418,7 +418,7 @@ void() LinkDoors =
 		if (self.targetname)
 			starte.targetname = self.targetname;
 		if (self.message != "")
-			starte.message = self.message;
+			starte.spawn_door_message = starte.message = self.message;
 
 		t = find(t, classname, self.classname);	
 		if (!t)
@@ -467,6 +467,38 @@ void() LinkDoors =
 
 };
 
+
+void() door_match_reset =
+{
+	local entity door, shadow;
+
+	if (self.think == LinkDoors && self.nextthink > 0)
+		return;
+
+	SUB_ResetMove(self.pos1);
+	self.state = STATE_BOTTOM;
+	self.touch = door_touch;
+	self.message = self.spawn_door_message;
+	self.attack_finished = 0;
+	self.goalentity = world;
+	if (self.max_health)
+	{
+		self.health = self.max_health;
+		self.takedamage = DAMAGE_YES;
+	}
+	if (self.trigger_field && self.trigger_field.touch == door_trigger_touch)
+		self.trigger_field.attack_finished = 0;
+
+	shadow = self.shadowcontroller;
+	if (shadow && shadow.classname == "misc_shadowcontroller")
+	{
+		door = self;
+		self = shadow;
+		self.nextthink = -1;
+		misc_shadowcontroller();
+		self = door;
+	}
+};
 
 /*QUAKED func_door (0 .5 .8) ? START_OPEN x DOOR_DONT_LINK GOLD_KEY SILVER_KEY TOGGLE
 if two doors touch, they are assumed to be connected and operate as a unit.
@@ -550,6 +582,8 @@ void() func_door =
 
 	self.blocked = door_blocked;
 	self.use = door_use;
+	self.match_reset_entity = door_match_reset;
+	self.spawn_door_message = self.message;
 	
 	if (self.spawnflags & DOOR_SILVER_KEY){
 		keylock_set_silver_key ();
@@ -822,6 +856,24 @@ void() secret_touch =
 	}
 };
 
+void() secret_door_match_reset =
+{
+	SUB_ResetMove(self.oldorigin);
+	self.message = self.spawn_door_message;
+	self.attack_finished = 0;
+	if (!self.targetname || (self.spawnflags & SECRET_YES_SHOOT))
+	{
+		self.health = 10000;
+		self.takedamage = DAMAGE_YES;
+		self.th_pain = fd_secret_use;
+	}
+	else
+	{
+		self.health = 0;
+		self.takedamage = DAMAGE_NO;
+	}
+};
+
 /*QUAKED func_door_secret (0 .5 .8) ? open_once 1st_left 1st_down no_shoot always_shoot
 Basic secret door. Slides back, then to the side. Angle determines direction.
 wait  = # of seconds before coming back
@@ -885,6 +937,8 @@ void() func_door_secret =
 	self.blocked = secret_blocked;
 	self.speed = 50;
 	self.use = fd_secret_use;
+	self.match_reset_entity = secret_door_match_reset;
+	self.spawn_door_message = self.message;
 	if ( !self.targetname || self.spawnflags&SECRET_YES_SHOOT)
 	{
 		self.health = 10000;
