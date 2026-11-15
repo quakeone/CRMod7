@@ -4480,8 +4480,11 @@ void(entity ev) webhook_stats_info =
         wst_col("RA", 3, WST_INT, WST_MAX);
         wst_col("YA", 3, WST_INT, WST_MAX);
         wst_col("MG", 3, WST_INT, WST_MAX);
-        wst_col("RL", 3, WST_INT, WST_MAX);
-        wst_col("LG", 3, WST_INT, WST_MAX);
+        if (deathmatch != 3)   // dmm3 weapons stay, so pickup counts mean nothing
+        {
+            wst_col("RL", 3, WST_INT, WST_MAX);
+            wst_col("LG", 3, WST_INT, WST_MAX);
+        }
         for (r = 0; r < wst_nrows; r++)
         {
             p = wst_row[r];

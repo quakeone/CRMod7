@@ -146,6 +146,7 @@ def check_ctf(messages):
     quad = rows(found["Quad"])
     assert len(quad) == 3
     assert GOLD + " 210s" in found["Quad"]
+    assert found["Items"].splitlines()[0].split() == ["Q", "RA", "YA", "MG"]   # dmm3: no RL/LG
     ctf = found["CTF"]
     assert GOLD + " 9:19" in ctf
     qper = found["QPER (top 5)"]
