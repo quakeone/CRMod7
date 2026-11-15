@@ -164,6 +164,19 @@ void CA_CenterprintToAll (string msg)
     }
 }
 
+float (float teams) ca_balanced_autostart =
+{
+	local float first_team_size;
+
+	if (teams != 2 || (clanring_playmode & CLANRING_WIPEOUT_MODE) ||
+	    !cvar("cr_ca_balanced_autostart"))
+		return FALSE;
+
+	first_team_size = number_teammates(boss.next_team);
+	return first_team_size >= 2 &&
+	       first_team_size == number_teammates(boss.next_team.next_team);
+};
+
 void () arena_main_loop =
 {
 	if (clanring_state & CLANRING_MATCH_PAUSED)
@@ -345,6 +358,8 @@ void () arena_main_loop =
 	}
 	else if ((boss.state == CA_MATCH_WAITING))
 	{
+		local float teams = number_teams();
+
 		if (boss.forced)
 		{
 			boss.forced 	= FALSE;
@@ -358,10 +373,13 @@ void () arena_main_loop =
 			//announce("Match begins in \b10\b seconds.");
 			utils_do_players(reset_frags);
 		}
-		else if (number_teams () > 1 && boss.allready == TRUE)
+		else if (teams > 1 && (boss.allready || ca_balanced_autostart(teams)))
 		{
 			if (boss.wait == 0)
 			{
+				motd_top5 = string_null;
+				motd_top6 = string_null;
+
 				// No need to force match now.
 				if (clanring_request.noise1 == "\bforce match start\b")
 				Request_Poll_Cleanup();
@@ -388,16 +406,13 @@ void () arena_main_loop =
 				find_pqc_teamscore_teams();
 			}
 		}
-		else if (number_teams () < 2 || boss.allready == FALSE)
+		else if (boss.wait)
 		{
-			if (boss.wait)
-			{
-				announce ("\bResetting \brally\b timer.");
-				sound (world, CHAN_VOICE, "doors/drclos4.wav", 1, ATTN_NONE);
-				boss.wait = 0;
-				if (number_teams () >= 2)
+			announce ("\bResetting \brally\b timer.");
+			sound (world, CHAN_VOICE, "doors/drclos4.wav", 1, ATTN_NONE);
+			boss.wait = 0;
+			if (teams >= 2)
 				bprint("Use \bforce\b to start the match.\n");
-			}
 		}
 		boss.allready = TRUE;
 	}

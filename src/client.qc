@@ -2805,7 +2805,7 @@ void() PlayerPostThink =
                 {
                     boss.allready = FALSE;
 
-                    if (number_teams () > 1)
+                    if (!boss.wait && number_teams () > 1)
                     {
                         motd_top5 = self.netname;
                         motd_top6 = " \bis holding things up!\n";

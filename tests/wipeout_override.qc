@@ -389,6 +389,71 @@ void() wo_test_other_rules =
     wo_assert(wo_a.ammo_rockets == 4 && wo_a.wipeout_ammo_grenades == 6, "ordinary modes retain shared rocket ammunition");
 };
 
+void() wo_test_ca_autostart =
+{
+    entity spectator, blue_player, third_team;
+
+    wo_reset();
+    clanring_playmode = CLANRING_CA_MODE | CLANRING_NO_HOOK;
+    boss.state = CA_MATCH_WAITING;
+    boss.timetofight = FALSE;
+    spectator = spawn();
+    spectator.classname = "player";
+    spectator.netname = "Spectator";
+    spectator.style = CLANRING_CONNECTED | CLANRING_OBSERVER;
+    self = spectator;
+    cvar_set("cr_ca_balanced_autostart", "1");
+    PlayerPostThink();
+    arena_main_loop();
+    wo_assert(boss.wait == 0, "CA 2v1 keeps waiting for the unteamed player");
+
+    blue_player = wo_player(wo_blue, "D");
+    PlayerPostThink();
+    arena_main_loop();
+    wo_assert(boss.wait == time + 5 && boss.state == CA_MATCH_WAITING,
+              "CA 2v2 starts the rally with an unteamed player");
+
+    time += 5;
+    third_team = spawn();
+    wo_blue.next_team = third_team;
+    wo_player(third_team, "E");
+    PlayerPostThink();
+    arena_main_loop();
+    wo_assert(boss.wait == 0 && boss.state == CA_MATCH_WAITING,
+              "a third team cancels the balanced CA rally");
+    remove(third_team.chain_gang);
+    arena_remove_team(third_team);
+
+    cvar_set("cr_ca_balanced_autostart", "0");
+    PlayerPostThink();
+    arena_main_loop();
+    wo_assert(boss.wait == 0, "CA still waits when balanced autostart is disabled");
+    cvar_set("cr_ca_balanced_autostart", "1");
+    clanring_playmode |= CLANRING_WIPEOUT_MODE;
+    PlayerPostThink();
+    arena_main_loop();
+    wo_assert(boss.wait == 0, "Wipeout keeps its existing ready check");
+    clanring_playmode &= ~CLANRING_WIPEOUT_MODE;
+
+    wo_red.chain_gang = wo_a;
+    wo_a.chain_gang = world;
+    wo_blue.chain_gang = wo_c;
+    PlayerPostThink();
+    arena_main_loop();
+    wo_assert(boss.wait == 0, "CA 1v1 keeps waiting for the unteamed player");
+
+    wo_red.chain_gang = wo_b;
+    wo_blue.chain_gang = blue_player;
+    PlayerPostThink();
+    arena_main_loop();
+    time += 5;
+    PlayerPostThink();
+    wo_assert(!motd_top6, "the lobby does not blame the spectator during the CA rally");
+    arena_main_loop();
+    wo_assert(boss.state == CA_MATCH_ROUNDSTART && !boss.timetofight,
+              "balanced CA enters the normal fight countdown while the unteamed player remains");
+};
+
 void() worldspawn =
 {
     entity spot;
@@ -397,6 +462,7 @@ void() worldspawn =
     spot = spawn(); spot.classname = "info_player_deathmatch"; spot.origin = '512 512 128';
     dm_num_spawns = 1;
     registercvar("cr_wipeout_max_respawns", "4");
+    registercvar("cr_ca_balanced_autostart", "0");
     wo_test_wipes();
     wo_test_solo_limbo();
     wo_test_solo_pending_win();
@@ -409,6 +475,7 @@ void() worldspawn =
     wo_test_grenades();
     wo_test_escape();
     wo_test_other_rules();
+    wo_test_ca_autostart();
     print(sprintf("WIPEOUT TEST PASSED: %g checks\n", wipeout_checks));
     localcmd("quit\n");
 };

@@ -1608,6 +1608,7 @@ void() clanring_main_config =
 		registercvar("cr_dm_randomize_start", "1");
 		registercvar("cr_match_reset_map_entities", "1");
 		registercvar("cr_ffa_holidays", "1");
+		registercvar("cr_ca_balanced_autostart", "0");
 		registercvar("cr_wipeout_max_respawns", "4");
 			registercvar("cr_ra_randomize_start", "1");
 			registercvar("cr_hh_randomize_start", "0");
