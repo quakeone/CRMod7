@@ -906,12 +906,29 @@ string(string s) utils_rstrip;                 // from utils.qc (trim trailing s
 float() utils_server_time;
 void()  utils_update_server_time;
 
-// JSON helpers used by utils_show_last_scores (from json.qc)
+// JSON helpers (from json.qc) for units compiled before it
 string(string)              json_minify;
 string(string, float)       json_array_next_object;
 float                       json__it_next;  // iterator's next position
 string(string, string, string) json_obj_get_string;
 float(string, string, float)   json_obj_get_float;
+float(string, string, float)   json_obj_get_bool;
+string(string, string)         json_obj_get_raw;
+float(string, string)          json_obj_has;
+float(string)                  json_is_object;
+void()                         json_begin_compact;
+void(float f)                  json_begin_compact_to_file;
+void()                         json_clear_sink;
+string()                       json_result;
+void()                         json_begin_object;
+void()                         json_end_object;
+void()                         json_begin_array;
+void()                         json_end_array;
+void(string key)               json_key;
+void(string k, string v)       json_kv_string;
+void()                         json_string_open;
+void(string s)                 json_string_part;
+void()                         json_string_close;
 // Persistent time tracking system (similar to hunk storage)
 float server_persistent_time;     // Stores the accumulated server time
 float last_time_update;           // Tracks when persistent time was last updated
@@ -1126,8 +1143,6 @@ void() gsheets_read_capture_stats;
 float(string lookup_map, entity requester) gsheets_read_capture_stats_lookup;
 void(float is_match, float rank, string player, float teamcolor, float captime, string rec_date, string mt_str, float ping) gsheets_write_record;
 void(float reqid, float status, string body) gsheets_callback;
-string(string json, string key) gsheets_json_get_string;
-float(string json, string key) gsheets_json_get_number;
 void(string arr, float recordset) gsheets_parse_record_array;
 string (string stats_filename, float include_mt, string empty_msg) captimes_read_top3_from_file;
 

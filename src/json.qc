@@ -1,16 +1,31 @@
 // json.qc - JSON helpers
 // -----------------------------------------------------------------------------
+// Every place in the mod that writes or reads JSON should go through here.
+//
 // Contents
 //   1) Constants & Globals
-//   2) String Helpers (FTE/QSS compatible)
+//   2) String Helpers (escaping / number formatting)
 //   3) Emit/Sink (stream routing)
 //   4) Builder Core (state + primitives)
 //   5) Value Writers & Convenience
-//   6) Minimal Reader Helpers
-//   7) Streaming Reader Helpers (no long substrings)
-//   8) Utility Helpers (pct, blank checks, escaping, etc.)
+//   6) Reader Helpers (object/array lookup on an in-memory string)
+//   7) Span Reader Helpers (work on [start,end) offsets; no long substrings)
+//   8) Utility Helpers (pct, blank checks, file escaping, etc.)
 //   9) Domain Helper: gametype/playmode
 //  10) Public APIs: json_export_match_to_file / json_append_lastscores / utils_show_last_scores
+//
+// Writing:
+//   json_begin_compact();               // or json_begin_pretty(1) / json_begin_compact_to_file(fh)
+//   json_begin_object();
+//     json_kv_string("map", mapname);
+//     json_kv_number("time", 12.5);
+//   json_end_object();
+//   string payload = strzone(json_result());   // result is only valid until the next json_begin_*
+//
+// Reading:
+//   json_obj_get_string(obj, "key", "default")   // top-level key of an object, unescaped
+//   json_obj_get_float / json_obj_get_bool / json_obj_get_raw (raw value text, e.g. a nested array)
+//   json_array_next_object(arr, pos) + json__it_next  // iterate objects inside an array
 // -----------------------------------------------------------------------------
 
 void(string payload) match_post_json;
@@ -24,24 +39,32 @@ float JSON_CTX_OBJECT = 1;
 float JSON_CTX_ARRAY  = 2;
 
 string json__buf;
+float  json__buf_zoned;   // json__buf is a zoned copy (safe from tempstring recycling)
 float  json__depth;
+float  json__overflow;    // nesting levels beyond JSON_MAX_DEPTH (ignored, never indexed)
 float  json__ctx[32];
 float  json__count[32];
 float  json__pretty;      // 0 = compact, 1 = pretty with two-space indents
 float  json__pending_key; // 1 when an object key was just emitted
 float  json__pend_depth;
+float  json__str_open;    // TRUE while a json_string_open() value is being written
 
 // Streaming sink: declare WITHOUT initializer (FTE makes initialized globals const).
 // Use an enable flag to control writes to the sink.
 float json__sink_fh;
 float json__sink_enabled;
 
+// Longest escape is \u00xx (6 bytes per input char). Escaping at most this many
+// chars at a time keeps every result under the 1024-byte tempstring limit of
+// QSS-family engines (160 * 6 = 960).
+float JSON_ESCAPE_CHUNK = 160;
+
 string json__spaces = "                                                                "; // 64 spaces
 string json__hex    = "0123456789abcdef";
 
 
 // ============================================================================
-// 2) String Helpers (FTE/QSS compatible)
+// 2) String Helpers (escaping / number formatting)
 // ============================================================================
 float  str_len(string s){ return strlen(s); }
 string str_sub(string s, float start, float count){ return substring(s, start, count); }
@@ -55,7 +78,7 @@ string str_rtrim(string s)
     float n = str_len(s);
     while (n > 0)
     {
-        if (str_chr(str_sub(s, n-1, 1)) == 32) n = n - 1;
+        if (str2chr(s, n - 1) == 32) n = n - 1;
         else break;
     }
     return str_sub(s, 0, n);
@@ -70,38 +93,56 @@ string json__u00xx(float ch)
     return strcat("\\u00", str_sub(json__hex, hi, 1), str_sub(json__hex, lo, 1));
 }
 
-// Escape a JSON string safely
+// TRUE if s holds a C0 control char other than \t \n \r.
+// Uses str2chr only, so it creates no tempstrings.
+float json__has_ctl(string s)
+{
+    float n = strlen(s), i, v;
+    for (i = 0; i < n; i = i + 1)
+    {
+        v = str2chr(s, i);
+        if (v > 0 && v < 32 && v != 9 && v != 10 && v != 13) return TRUE;
+    }
+    return FALSE;
+}
+
+// Escape a string for use inside a JSON string literal (without the quotes).
+// Quake high-bit characters (128-255) pass through unchanged.
 string json_escape(string s)
 {
     if (!s) return "";
-    float n = str_len(s);
-    float i = 0;
-    string out = "";
-    while (i < n)
+    s = strreplace("\\", "\\\\", s);   // backslash first so later escapes aren't doubled
+    s = strreplace("\"", "\\\"", s);
+    s = strreplace("\n", "\\n", s);
+    s = strreplace("\r", "\\r", s);
+    s = strreplace("\t", "\\t", s);
+    if (!json__has_ctl(s)) return s;
+
+    // Rare: other control chars (e.g. ESC in ANSI colour codes) -> \u00xx
+    float v;
+    string c;
+    for (v = 1; v < 32; v = v + 1)
     {
-        string c = str_sub(s, i, 1);
-        float  v = str_chr(c);
-        if (v == 34)       out = strcat(out, "\\\"");     // '"'
-        else if (v == 92)  out = strcat(out, "\\\\");     // '\\'
-        else if (v == 10)  out = strcat(out, "\\n");
-        else if (v == 13)  out = strcat(out, "\\r");
-        else if (v == 9)   out = strcat(out, "\\t");
-        else if (v < 32)   out = strcat(out, json__u00xx(v));
-        else               out = strcat(out, c);
-        i = i + 1;
+        if (v == 9 || v == 10 || v == 13) continue;
+        c = chr2str(v);
+        if (strstrofs(s, c, 0) >= 0) s = strreplace(c, json__u00xx(v), s);
     }
-    return out;
+    return s;
 }
+
+// TRUE for ordinary numbers, FALSE for NaN / +-inf (which JSON can't represent).
+float json__finite(float v) { return (v - v) == 0; }
 
 // Trim trailing zeros from ftos output (keep integers compact)
 string json_ftos_trim(float f)
 {
     string s = ftos(f);
     if (str_index_of(s, ".", 0) < 0) return s;
-    float i = str_len(s) - 1;
-    while (i >= 0 && str_sub(s, i, 1) == "0") { s = str_sub(s, 0, i); i = i - 1; }
-    if (i >= 0 && str_sub(s, i, 1) == ".") { s = str_sub(s, 0, i); }
-    return s;
+    if (str_index_of(s, "e", 0) >= 0) return s;  // exponent form: leave as-is
+    float i = str_len(s);
+    while (i > 0 && str2chr(s, i - 1) == 48) i = i - 1;   // '0'
+    if (i > 0 && str2chr(s, i - 1) == 46) i = i - 1;      // '.'
+    return str_sub(s, 0, i);
 }
 
 
@@ -110,8 +151,14 @@ string json_ftos_trim(float f)
 // ============================================================================
 void json__emit(string s)
 {
-    if (json__sink_enabled) fputs(json__sink_fh, s);
-    else                    json__buf = strcat(json__buf, s);
+    if (json__sink_enabled) { fputs(json__sink_fh, s); return; }
+
+    // Keep the in-memory buffer zoned so engines that recycle tempstrings
+    // can't overwrite it while a document is being built.
+    string t = strcat(json__buf, s);
+    if (json__buf_zoned) strunzone(json__buf);
+    json__buf = strzone(t);
+    json__buf_zoned = TRUE;
 }
 
 // NOTE: some FTE setups alias 'filestream' to const; use float here.
@@ -124,8 +171,12 @@ void json_clear_sink(){ json__sink_enabled = 0; }
 // ============================================================================
 void json__reset()
 {
+    if (json__buf_zoned) strunzone(json__buf);
     json__buf = "";
+    json__buf_zoned = FALSE;
     json__depth = 0;
+    json__overflow = 0;
+    json__str_open = FALSE;
     json__pending_key = 0;
     json__pend_depth = 0;
     float k = 0;
@@ -137,88 +188,89 @@ void json__reset()
     }
 }
 
-void json_begin_pretty(float pretty){ json__reset(); json__pretty = pretty; }
+// In-memory builders always detach any file sink left over from a file export.
+void json_begin_pretty(float pretty){ json_clear_sink(); json__reset(); json__pretty = pretty; }
 void json_begin_compact(){ json_begin_pretty(0); }
+// Valid until the next json_begin_*; strzone() it if you need to keep it.
 string json_result(){ return json__buf; }
 
-void json_begin_pretty_to_file(float f, float pretty){ json_set_sink(f); json_begin_pretty(pretty); }
+void json_begin_pretty_to_file(float f, float pretty){ json_begin_pretty(pretty); json_set_sink(f); }
 void json_begin_compact_to_file(float f){ json_begin_pretty_to_file(f, 0); }
 
-void json__indent_line()
+void json__indent_to(float depth)
 {
     if (!json__pretty) return;
     json__emit("\n");
-    float need = json__depth * 2; if (need > 64) need = 64;
-    json__emit(str_sub(json__spaces, 0, need));
+    float need = depth * 2; if (need > 64) need = 64;
+    if (need > 0) json__emit(str_sub(json__spaces, 0, need));
 }
+void json__indent_line(){ json__indent_to(json__depth); }
 
-void json__push(float ctx){ json__depth = json__depth + 1; json__ctx[json__depth] = ctx; json__count[json__depth] = 0; }
-void json__pop(){ json__depth = json__depth - 1; }
+void json__push(float ctx)
+{
+    json__depth = json__depth + 1;
+    json__ctx[json__depth] = ctx;
+    json__count[json__depth] = 0;
+}
 
 
 // ============================================================================
 // 5) Value Writers & Convenience
 // ============================================================================
-void json_begin_object()
-{
-    if (json__depth > 0 && json__ctx[json__depth] == JSON_CTX_ARRAY)
-    {
-        if (json__count[json__depth] > 0) json__emit(",");
-        json__indent_line();
-        json__count[json__depth] = json__count[json__depth] + 1;
-    }
-    if (json__pending_key && json__pend_depth == json__depth) json__pending_key = 0;
-    json__emit("{");
-    json__push(JSON_CTX_OBJECT);
-    if (json__pretty) json__indent_line();
-}
-
-void json_end_object()
-{
-    float had_items = json__count[json__depth] > 0;
-    if (json__pretty && had_items)
-    {
-        json__emit("\n");
-        float need = (json__depth - 1) * 2; if (need > 64) need = 64;
-        json__emit(str_sub(json__spaces, 0, need));
-    }
-    json__emit("}");
-    json__pop();
-    if (json__depth >= 1 && json__ctx[json__depth] == JSON_CTX_OBJECT) json__count[json__depth] = json__count[json__depth] + 1;
-}
-
-void json_begin_array()
-{
-    if (json__depth > 0 && json__ctx[json__depth] == JSON_CTX_ARRAY)
-    {
-        if (json__count[json__depth] > 0) json__emit(",");
-        json__indent_line();
-        json__count[json__depth] = json__count[json__depth] + 1;
-    }
-    if (json__pending_key && json__pend_depth == json__depth) json__pending_key = 0;
-    json__emit("[");
-    json__push(JSON_CTX_ARRAY);
-    if (json__pretty) json__indent_line();
-}
-
-void json_end_array()
-{
-    float had_items = json__count[json__depth] > 0;
-    if (json__pretty && had_items)
-    {
-        json__emit("\n");
-        float need = (json__depth - 1) * 2; if (need > 64) need = 64;
-        json__emit(str_sub(json__spaces, 0, need));
-    }
-    json__emit("]");
-    json__pop();
-    if (json__depth >= 1 && json__ctx[json__depth] == JSON_CTX_OBJECT) json__count[json__depth] = json__count[json__depth] + 1;
-}
-
 void json__array_prepare_value(){ if (json__count[json__depth] > 0) json__emit(","); json__indent_line(); }
+
+// Called before every value (scalar, object or array): writes the separator
+// when inside an array and counts the value toward its parent container.
+// Returns FALSE when the value must be dropped (inside an over-depth container).
+float json__before_value()
+{
+    if (json__overflow > 0) return FALSE;
+    if (json__ctx[json__depth] == JSON_CTX_ARRAY)
+    {
+        json__array_prepare_value();
+        json__count[json__depth] = json__count[json__depth] + 1;
+    }
+    else if (json__pending_key && json__pend_depth == json__depth)
+    {
+        json__pending_key = 0;
+        json__count[json__depth] = json__count[json__depth] + 1;
+    }
+    return TRUE;
+}
+
+// A container nested deeper than JSON_MAX_DEPTH is written as a single null;
+// everything inside it, up to its matching end, is dropped.
+void json__begin_container(string opener, float ctx)
+{
+    if (json__overflow > 0) { json__overflow = json__overflow + 1; return; }
+    json__before_value();
+    if (json__depth >= JSON_MAX_DEPTH - 1)
+    {
+        json__emit("null");
+        json__overflow = 1;
+        return;
+    }
+    json__emit(opener);
+    json__push(ctx);
+}
+
+void json__end_container(string closer)
+{
+    if (json__overflow > 0) { json__overflow = json__overflow - 1; return; }
+    if (json__depth <= 0) return;   // unbalanced end: nothing open, ignore
+    if (json__pretty && json__count[json__depth] > 0) json__indent_to(json__depth - 1);
+    json__emit(closer);
+    json__depth = json__depth - 1;
+}
+
+void json_begin_object(){ json__begin_container("{", JSON_CTX_OBJECT); }
+void json_end_object()  { json__end_container("}"); }
+void json_begin_array() { json__begin_container("[", JSON_CTX_ARRAY); }
+void json_end_array()   { json__end_container("]"); }
 
 void json_key(string key)
 {
+    if (json__overflow > 0) return;
     if (json__ctx[json__depth] != JSON_CTX_OBJECT) return;
     if (json__count[json__depth] > 0) json__emit(",");
     json__indent_line();
@@ -227,517 +279,491 @@ void json_key(string key)
     json__pending_key = 1; json__pend_depth = json__depth;
 }
 
-void json_string(string v)
+// Pre-formatted JSON token (number, true/false/null, or an already-built fragment).
+void json_raw(string token){ if (json__before_value()) json__emit(token); }
+
+// Emit s escaped, a bounded chunk at a time (no quotes).
+void json__emit_escaped(string s)
 {
-    if (json__ctx[json__depth] == JSON_CTX_ARRAY) { json__array_prepare_value(); json__count[json__depth] = json__count[json__depth] + 1; }
-    else if (json__pending_key && json__pend_depth == json__depth) { json__pending_key = 0; json__count[json__depth] = json__count[json__depth] + 1; }
-    json__emit(strcat("\"", json_escape(v), "\""));
+    if (!s) return;
+    float i = 0, L = strlen(s), chunk;
+    while (i < L)
+    {
+        chunk = L - i; if (chunk > JSON_ESCAPE_CHUNK) chunk = JSON_ESCAPE_CHUNK;
+        json__emit(json_escape(substring(s, i, chunk)));
+        i = i + chunk;
+    }
 }
+
+// String value written in pieces, for text too long to hold in one string:
+//   json_key("content"); json_string_open(); json_string_part(a); json_string_part(b); json_string_close();
+void json_string_open()     { json__str_open = json__before_value(); if (json__str_open) json__emit("\""); }
+void json_string_part(string s){ if (json__str_open) json__emit_escaped(s); }
+void json_string_close()    { if (json__str_open) json__emit("\""); json__str_open = FALSE; }
+
+void json_string(string v){ json_string_open(); json_string_part(v); json_string_close(); }
+void json_null()          { json_raw("null"); }
+void json_bool(float truthy){ json_raw(truthy ? "true" : "false"); }
 
 void json_number(float v)
 {
-    if (json__ctx[json__depth] == JSON_CTX_ARRAY) { json__array_prepare_value(); json__count[json__depth] = json__count[json__depth] + 1; }
-    else if (json__pending_key && json__pend_depth == json__depth) { json__pending_key = 0; json__count[json__depth] = json__count[json__depth] + 1; }
-    json__emit(json_ftos_trim(v));
+    if (!json__finite(v)) { json_null(); return; }
+    json_raw(json_ftos_trim(v));
 }
 
-void json_bool(float truthy)
+// Up to 9 significant digits; calibration inputs must retain float precision
+// to reproduce a frozen rating.
+void json_precise_number(float v)
 {
-    if (json__ctx[json__depth] == JSON_CTX_ARRAY) { json__array_prepare_value(); json__count[json__depth] = json__count[json__depth] + 1; }
-    else if (json__pending_key && json__pend_depth == json__depth) { json__pending_key = 0; json__count[json__depth] = json__count[json__depth] + 1; }
-    json__emit(truthy ? "true" : "false");
-}
-
-void json_null()
-{
-    if (json__ctx[json__depth] == JSON_CTX_ARRAY) { json__array_prepare_value(); json__count[json__depth] = json__count[json__depth] + 1; }
-    else if (json__pending_key && json__pend_depth == json__depth) { json__pending_key = 0; json__count[json__depth] = json__count[json__depth] + 1; }
-    json__emit("null");
+    if (!json__finite(v)) { json_null(); return; }
+    json_raw(sprintf("%.9g", v));
 }
 
 // convenience
 void json_kv_string(string k, string v){ json_key(k); json_string(v); }
 void json_kv_number(string k, float v){ json_key(k); json_number(v); }
-// Calibration inputs must retain float precision to reproduce a frozen rating.
-void json_kv_precise_number(string k, float v)
-{
-    json_key(k);
-    json__pending_key = 0;
-    json__count[json__depth]++;
-    json__emit(sprintf("%.9g", v));
-}
-
+void json_kv_precise_number(string k, float v){ json_key(k); json_precise_number(v); }
 void json_kv_bool  (string k, float b){ json_key(k); json_bool(b); }
 void json_kv_null  (string k){ json_key(k); json_null(); }
+void json_kv_raw   (string k, string token){ json_key(k); json_raw(token); }
 
 
 // ============================================================================
-// 6) Minimal Reader Helpers (optional; handy elsewhere)
+// 6) Reader Helpers (object/array lookup on an in-memory string)
 // ============================================================================
-string json_minify(string s)
+// These scanners use str2chr() for every character test, so they create no
+// tempstrings while walking the input. Value lookups only consider the
+// object's own (depth 1) keys; nested objects/arrays are skipped whole.
+
+float json__skip_ok;        // FALSE when the last json__skip_value hit end-of-input
+float json__vs, json__ve;   // value span [vs, ve) from the last successful json__find_key
+
+float json__is_ws(float v){ return (v == 32 || v == 9 || v == 10 || v == 13); }
+
+float json__skip_ws(string s, float i, float n)
 {
-    if (!s) return "";
-    float i = 0, n = str_len(s);
-    float in_str = 0, esc = 0;
-    string out = "";
-    while (i < n)
-    {
-        string c = str_sub(s, i, 1); float v = str_chr(c);
-        if (in_str)
-        {
-            out = strcat(out, c);
-            if (esc) esc = 0; else if (v == 92) esc = 1; else if (v == 34) in_str = 0;
-            i = i + 1; continue;
-        }
-        if (v == 34) { in_str = 1; out = strcat(out, c); i = i + 1; continue; }
-        if (v == 32 || v == 9 || v == 10 || v == 13) { i = i + 1; continue; }
-        out = strcat(out, c); i = i + 1;
-    }
-    return out;
+    while (i < n && json__is_ws(str2chr(s, i))) i = i + 1;
+    return i;
 }
 
-float json__it_next;
-string json_array_next_object(string arr, float pos)
+// i points at an opening quote; returns the index just past the closing quote.
+float json__skip_string(string s, float i, float n)
 {
-    json__it_next = -1; if (!arr) return "";
-    float n = str_len(arr); float i = pos; float depth = 0, in_str = 0, esc = 0;
+    float v;
+    i = i + 1;
     while (i < n)
     {
-        string c = str_sub(arr, i, 1); float v = str_chr(c);
-        if (in_str){ if (esc) esc = 0; else if (v == 92) esc = 1; else if (v == 34) in_str = 0; i = i + 1; continue; }
-        if (v == 34) { in_str = 1; i = i + 1; continue; }
-        if (v == 91) { depth = depth + 1; i = i + 1; continue; }
-        if (v == 93) { depth = depth - 1; i = i + 1; continue; }
-        if (v == 123 && depth == 1)
+        v = str2chr(s, i);
+        if (v == 92) { i = i + 2; continue; }   // '\' + escaped char
+        i = i + 1;
+        if (v == 34) return i;                  // closing '"'
+    }
+    json__skip_ok = FALSE;
+    return n;
+}
+
+// i points at the first char of a value; returns the index just past it.
+float json__skip_value(string s, float i, float n)
+{
+    float v, depth;
+    json__skip_ok = TRUE;
+    if (i >= n) { json__skip_ok = FALSE; return n; }
+
+    v = str2chr(s, i);
+    if (v == 34) return json__skip_string(s, i, n);
+
+    if (v == 123 || v == 91)   // '{' or '['
+    {
+        depth = 0;
+        while (i < n)
         {
-            float start = i; float d = 1; i = i + 1;
-            while (i < n && d > 0)
-            {
-                c = str_sub(arr, i, 1); v = str_chr(c);
-                if (in_str){ if (esc) esc = 0; else if (v == 92) esc = 1; else if (v == 34) in_str = 0; i = i + 1; continue; }
-                if (v == 34) { in_str = 1; i = i + 1; continue; }
-                if (v == 123) d = d + 1; else if (v == 125) d = d - 1; i = i + 1;
-            }
-            float end = i; json__it_next = end; return str_sub(arr, start, end - start);
+            v = str2chr(s, i);
+            if (v == 34) { i = json__skip_string(s, i, n); continue; }
+            if (v == 123 || v == 91) depth = depth + 1;
+            else if (v == 125 || v == 93) { depth = depth - 1; if (depth <= 0) return i + 1; }
+            i = i + 1;
         }
+        json__skip_ok = FALSE;
+        return n;
+    }
+
+    // bare token: number / true / false / null
+    while (i < n)
+    {
+        v = str2chr(s, i);
+        if (v == 44 || v == 125 || v == 93 || json__is_ws(v)) break;
         i = i + 1;
     }
-    return "";
+    return i;
+}
+
+// Compare s[a, a+len) to key without allocating.
+float json__span_equals(string s, float a, float len, string key)
+{
+    if (strlen(key) != len) return FALSE;
+    float j;
+    for (j = 0; j < len; j = j + 1)
+        if (str2chr(s, a + j) != str2chr(key, j)) return FALSE;
+    return TRUE;
+}
+
+// Find a top-level key in the object that starts at/after o0 (leading
+// whitespace allowed) and ends before o1. On success sets json__vs/json__ve
+// to the raw value span (quotes included for strings) and returns TRUE.
+// Keys are compared as written (keys containing escapes won't match).
+float json__find_key(string s, float o0, float o1, string key)
+{
+    float i, v, k0, k1, vend;
+
+    i = json__skip_ws(s, o0, o1);
+    if (i >= o1 || str2chr(s, i) != 123) return FALSE;  // '{'
+    i = i + 1;
+
+    while (i < o1)
+    {
+        i = json__skip_ws(s, i, o1);
+        if (i >= o1) return FALSE;
+        v = str2chr(s, i);
+        if (v == 125) return FALSE;                 // '}' end of object
+        if (v == 44) { i = i + 1; continue; }       // ','
+        if (v != 34) return FALSE;                  // malformed: key must be quoted
+
+        k0 = i + 1;
+        i  = json__skip_string(s, i, o1);
+        k1 = i - 1;                                 // index of closing quote
+
+        i = json__skip_ws(s, i, o1);
+        if (i >= o1 || str2chr(s, i) != 58) return FALSE;  // ':'
+        i = json__skip_ws(s, i + 1, o1);
+        if (i >= o1) return FALSE;
+
+        vend = json__skip_value(s, i, o1);
+        if (json__span_equals(s, k0, k1 - k0, key))
+        {
+            json__vs = i;
+            json__ve = vend;
+            return TRUE;
+        }
+        if (vend <= i) vend = i + 1;
+        i = vend;
+    }
+    return FALSE;
+}
+
+float json__hexval(float v)
+{
+    if (v >= 48 && v <= 57)  return v - 48;        // 0-9
+    if (v >= 97 && v <= 102) return v - 87;        // a-f
+    if (v >= 65 && v <= 70)  return v - 55;        // A-F
+    return -1;
+}
+
+// Decode the inside of a JSON string literal, s[v0, v0+vlen).
+// Fast path (no backslashes) returns a single substring; otherwise copies
+// unescaped runs in chunks and decodes \" \\ \/ \b \f \n \r \t \u00XX.
+string json_unescape_span(string s, float v0, float vlen)
+{
+    float n = v0 + vlen;
+    float i = strstrofs(s, "\\", v0);
+    if (i < 0 || i >= n) return substring(s, v0, vlen);
+
+    string out = "";
+    float start = v0, v, code, h, k;
+    while (i >= 0 && i < n)
+    {
+        if (i > start) out = strcat(out, substring(s, start, i - start));
+        if (i + 1 >= n) { start = n; break; }
+        v = str2chr(s, i + 1);
+        start = i + 2;
+        if      (v == 110) out = strcat(out, "\n");  // n
+        else if (v == 114) out = strcat(out, "\r");  // r
+        else if (v == 116) out = strcat(out, "\t");  // t
+        else if (v == 98)  out = strcat(out, chr2str(8));   // b
+        else if (v == 102) out = strcat(out, chr2str(12));  // f
+        else if (v == 117 && i + 5 < n)              // uXXXX
+        {
+            code = 0;
+            for (k = 0; k < 4; k = k + 1)
+            {
+                h = json__hexval(str2chr(s, i + 2 + k));
+                if (h < 0) { code = -1; break; }
+                code = code * 16 + h;
+            }
+            if (code < 0)               out = strcat(out, "u");   // malformed: keep text
+            else if (code > 0 && code < 256) out = strcat(out, chr2str(code));
+            else if (code >= 256)       out = strcat(out, "?");   // outside Quake charset
+            if (code >= 0) start = i + 6;
+        }
+        else out = strcat(out, chr2str(v));          // \" \\ \/ and anything else
+        i = strstrofs(s, "\\", start);
+    }
+    if (start < n) out = strcat(out, substring(s, start, n - start));
+    return out;
 }
 
 string json_trim(string s)
 {
     if (!s) return "";
     float a = 0, b = strlen(s);
-    string ch;
-    while (a < b)
-    {
-        ch = substring(s, a, 1);
-        if (ch == " " || ch == "\t" || ch == "\n" || ch == "\r") a = a + 1;
-        else break;
-    }
-    while (b > a)
-    {
-        ch = substring(s, b - 1, 1);
-        if (ch == " " || ch == "\t" || ch == "\n" || ch == "\r") b = b - 1;
-        else break;
-    }
+    while (a < b && json__is_ws(str2chr(s, a))) a = a + 1;
+    while (b > a && json__is_ws(str2chr(s, b - 1))) b = b - 1;
     return substring(s, a, b - a);
 }
 
-string json_obj_get_string(string obj, string key, string defval)
+string json_minify(string s)
 {
-    if (!obj) { return defval; }
-
-    // Clone into stable memory so tempstrings in this function can't corrupt it.
-    string OBJ = strzone(obj);
-
-    float n = strlen(OBJ);
-    float i = 0;
-    float depth = 0;
-    float in_str = 0;
-    float esc = 0;
-    float expect_key = 0; // at depth==1, are we positioned where a key should start?
-
+    if (!s) return "";
+    float i = 0, n = str_len(s), v, e;
+    string out = "";
     while (i < n)
     {
-        string c = substring(OBJ, i, 1);
-        float  v = str2chr(c, 0);
-
-        // Inside some string literal - skip with escape handling
-        if (in_str)
-        {
-            if (esc) { esc = 0; }
-            else if (v == 92) { esc = 1; }     // '\'
-            else if (v == 34) { in_str = 0; }  // closing '"'
-            i = i + 1;
-            continue;
-        }
-
-        // Track structural depth & key positions
-        if (v == 123) // '{'
-        {
-            depth = depth + 1;
-            if (depth == 1) expect_key = 1; // after '{' a key is expected
-            i = i + 1;
-            continue;
-        }
-        if (v == 125) // '}'
-        {
-            depth = depth - 1;
-            if (depth < 1) expect_key = 0;
-            i = i + 1;
-            continue;
-        }
-        if (v == 44) // ','
-        {
-            if (depth == 1) expect_key = 1;
-            i = i + 1;
-            continue;
-        }
-
-        // Start of a quoted thing
+        v = str2chr(s, i);
         if (v == 34)
         {
-            // Only treat as a KEY when we're exactly at depth==1 and expecting a key.
-            if (depth == 1 && expect_key)
-            {
-                // read key literal
-                float j = i + 1;
-                float esc2 = 0;
-                string keybuf = "";
-                while (j < n)
-                {
-                    string c2 = substring(OBJ, j, 1);
-                    float  v2 = str2chr(c2, 0);
-                    j = j + 1;
-
-                    if (esc2) { esc2 = 0; keybuf = strcat(keybuf, c2); continue; }
-                    if (v2 == 92) { esc2 = 1; continue; } // '\'
-                    if (v2 == 34) break;                  // closing '"'
-                    keybuf = strcat(keybuf, c2);
-                }
-                i = j; // after closing key quote
-
-                // skip whitespace
-                while (i < n)
-                {
-                    v = str2chr(substring(OBJ, i, 1), 0);
-                    if (v == 32 || v == 9 || v == 10 || v == 13) i = i + 1; else break;
-                }
-
-                // expect colon
-                if (i < n && str2chr(substring(OBJ, i, 1), 0) == 58) // ':'
-                {
-                    i = i + 1;
-                    expect_key = 0; // now a value is next
-
-                    // skip whitespace before value
-                    while (i < n)
-                    {
-                        v = str2chr(substring(OBJ, i, 1), 0);
-                        if (v == 32 || v == 9 || v == 10 || v == 13) i = i + 1; else break;
-                    }
-
-                    if (keybuf == key)
-                    {
-                        // Quoted value?
-                        if (i < n && str2chr(substring(OBJ, i, 1), 0) == 34)
-                        {
-                            i = i + 1;
-                            string out = "";
-                            float esc3 = 0;
-                            while (i < n)
-                            {
-                                string c3 = substring(OBJ, i, 1);
-                                float  v3 = str2chr(c3, 0);
-                                i = i + 1;
-
-                                if (esc3)
-                                {
-                                    esc3 = 0;
-                                    if (v3 == 34) out = strcat(out, "\"");
-                                    else if (v3 == 92) out = strcat(out, "\\");
-                                    else if (v3 == 110) out = strcat(out, "\n");
-                                    else if (v3 == 114) out = strcat(out, "\r");
-                                    else if (v3 == 116) out = strcat(out, "\t");
-                                    else out = strcat(out, c3);
-                                    continue;
-                                }
-                                if (v3 == 92) { esc3 = 1; continue; } // '\'
-                                if (v3 == 34) break;                   // closing '"'
-                                out = strcat(out, c3);
-                            }
-                            strunzone(OBJ);
-                            return out;
-                        }
-                        else
-                        {
-                            // Unquoted token: read until ',' or '}', return trimmed
-                            float start = i;
-                            while (i < n)
-                            {
-                                v = str2chr(substring(OBJ, i, 1), 0);
-                                if (v == 44 || v == 125) break; // ',' or '}'
-                                i = i + 1;
-                            }
-                            string raw = substring(OBJ, start, i - start);
-                            string trimmed = json_trim(raw);
-                            strunzone(OBJ);
-                            return trimmed;
-                        }
-                    }
-                    else
-                    {
-                        // Not our key - continue scanning; the value will be skipped by the flow above.
-                        continue;
-                    }
-                }
-                else
-                {
-                    // Not actually a key position (e.g., we hit a value string by mistake).
-                    expect_key = 0;
-                    continue;
-                }
-            }
-
-            // Quoted thing but not a key (value or nested): skip as string
-            in_str = 1;
-            i = i + 1;
-            continue;
+            e = json__skip_string(s, i, n);
+            out = strcat(out, substring(s, i, e - i));
+            i = e; continue;
         }
-
-        // Default advance
-        i = i + 1;
+        if (json__is_ws(v)) { i = i + 1; continue; }
+        out = strcat(out, substring(s, i, 1)); i = i + 1;
     }
+    return out;
+}
 
+// TRUE if s (ignoring surrounding whitespace) is one complete JSON object.
+float json_is_object(string s)
+{
+    if (!s) return FALSE;
+    float n = strlen(s);
+    float i = json__skip_ws(s, 0, n);
+    if (i >= n || str2chr(s, i) != 123) return FALSE;
+    float e = json__skip_value(s, i, n);
+    if (!json__skip_ok) return FALSE;
+    return json__skip_ws(s, e, n) >= n;
+}
+
+// TRUE if s (ignoring leading whitespace) begins a JSON object. Unlike
+// json_is_object this accepts input cut off before its closing brace, which
+// some engines do to long HTTP responses.
+float json_starts_object(string s)
+{
+    if (!s) return FALSE;
+    float n = strlen(s);
+    float i = json__skip_ws(s, 0, n);
+    return (i < n && str2chr(s, i) == 123);
+}
+
+// TRUE if obj has the top-level key (any value, including null).
+float json_obj_has(string obj, string key)
+{
+    if (!obj) return FALSE;
+    string OBJ = strzone(obj);
+    float found = json__find_key(OBJ, 0, strlen(OBJ), key);
     strunzone(OBJ);
-    return defval;
+    return found;
+}
+
+// Raw text of a top-level value (e.g. "[...]", "{...}", "12", "\"str\""), or "" if missing.
+string json_obj_get_raw(string obj, string key)
+{
+    if (!obj) return "";
+    string OBJ = strzone(obj);   // protect the input from tempstring recycling
+    string out = "";
+    if (json__find_key(OBJ, 0, strlen(OBJ), key))
+        out = substring(OBJ, json__vs, json__ve - json__vs);
+    strunzone(OBJ);
+    return out;
+}
+
+// String value of a top-level key, unescaped. Non-string values are returned
+// as their raw text (numbers, true/false, nested objects/arrays). A missing
+// key or a JSON null returns defval.
+string json_obj_get_string(string obj, string key, string defval)
+{
+    if (!obj) return defval;
+    string OBJ = strzone(obj);   // protect the input from tempstring recycling
+    string out = defval;
+    float vs, ve;
+
+    if (json__find_key(OBJ, 0, strlen(OBJ), key))
+    {
+        vs = json__vs; ve = json__ve;
+        if (str2chr(OBJ, vs) == 34)
+        {
+            // drop the quotes (the closing one is missing on truncated input)
+            float inner = ve - vs - 1;
+            if (json__skip_ok) inner = inner - 1;
+            out = json_unescape_span(OBJ, vs + 1, inner);
+        }
+        else if (!json__span_equals(OBJ, vs, ve - vs, "null"))
+            out = substring(OBJ, vs, ve - vs);
+    }
+    strunzone(OBJ);
+    return out;
 }
 
 float json_obj_get_float(string obj, string key, float defval)
 {
-    string tok = json_obj_get_string(obj, key, ""); if (!tok) return defval; return stof(tok);
+    string tok = json_obj_get_string(obj, key, "");
+    if (tok == "") return defval;
+    return stof(tok);
 }
 
 float json_obj_get_bool(string obj, string key, float defval)
 {
-    string tok = json_obj_get_string(obj, key, ""); if (!tok) return defval; string t = tok;
-    if (str_len(t) >= 2 && str_sub(t, 0, 1) == "\"" && str_sub(t, str_len(t)-1, 1) == "\"") t = str_sub(t, 1, str_len(t)-2);
-    if (t == "true" || t == "1") return 1; if (t == "false" || t == "0") return 0; return defval;
+    string t = json_obj_get_string(obj, key, "");
+    if (t == "true" || t == "1") return 1;
+    if (t == "false" || t == "0") return 0;
+    return defval;
 }
 
-float json_array_len(string arr)
+// Iterate objects in an array: pass pos = 0 for the first call (arr starts
+// with '['), then pos = json__it_next. Returns "" when there are no more.
+// Non-object elements are skipped.
+float json__it_next;
+string json_array_next_object(string arr, float pos)
 {
-    if (!arr) return 0; float n = str_len(arr); float i = 0, depth = 0, in_str = 0, esc = 0, count = 0;
+    json__it_next = -1;
+    if (!arr) return "";
+    float n = strlen(arr), i = pos, v, e;
+
+    if (pos <= 0)
+    {
+        i = json__skip_ws(arr, 0, n);
+        if (i < n && str2chr(arr, i) == 91) i = i + 1;   // step inside '['
+    }
+
     while (i < n)
     {
-        string c = str_sub(arr, i, 1); float v = str_chr(c);
-        if (in_str){ if (esc) esc = 0; else if (v == 92) esc = 1; else if (v == 34) in_str = 0; i = i + 1; continue; }
-        if (v == 34) { in_str = 1; i = i + 1; continue; }
-        if (v == 91) { depth = depth + 1; i = i + 1; continue; }
-        if (v == 93) { depth = depth - 1; i = i + 1; continue; }
-        if (depth == 1 && (v == 123 || (v != 44 && v != 32 && v != 9)))
+        i = json__skip_ws(arr, i, n);
+        if (i >= n) break;
+        v = str2chr(arr, i);
+        if (v == 93) break;                     // ']' end of array
+        if (v == 44) { i = i + 1; continue; }   // ','
+        e = json__skip_value(arr, i, n);
+        if (v == 123 && json__skip_ok)
         {
-            count = count + 1;
-            if (v != 123){ while (i < n){ v = str_chr(str_sub(arr, i, 1)); if (v == 44 || v == 93) break; i = i + 1; } }
+            json__it_next = e;
+            return substring(arr, i, e - i);
         }
-        i = i + 1;
+        if (e <= i) e = i + 1;
+        i = e;
+    }
+    return "";
+}
+
+// Number of elements in a top-level array.
+float json_array_len(string arr)
+{
+    if (!arr) return 0;
+    float n = strlen(arr), i, v, e, count = 0;
+    i = json__skip_ws(arr, 0, n);
+    if (i >= n || str2chr(arr, i) != 91) return 0;
+    i = i + 1;
+    while (i < n)
+    {
+        i = json__skip_ws(arr, i, n);
+        if (i >= n) break;
+        v = str2chr(arr, i);
+        if (v == 93) break;
+        if (v == 44) { i = i + 1; continue; }
+        e = json__skip_value(arr, i, n);
+        count = count + 1;
+        if (e <= i) e = i + 1;
+        i = e;
     }
     return count;
 }
 
+// Index of the bracket that closes the '{' or '[' at open_pos, or -1.
+float json_match_close(string s, float open_pos)
+{
+    float n = strlen(s), v;
+    if (open_pos < 0 || open_pos >= n) return -1;
+    v = str2chr(s, open_pos);
+    if (v != 123 && v != 91) return -1;
+    float e = json__skip_value(s, open_pos, n);
+    if (!json__skip_ok) return -1;
+    return e - 1;
+}
+
 
 // ============================================================================
-// 7) Streaming Reader Helpers (no long substrings)
+// 7) Span Reader Helpers (work on [start,end) offsets; no long substrings)
 // ============================================================================
 float js_it_next, js_obj_start, js_obj_end, js_val_start, js_val_len;
 
-// Iterate next {...} span in a top-level array
+// Find the next {...} span at or after pos (outside strings).
 float js_array_next_span(string s, float pos)
 {
-    float n = strlen(s), i = pos, in_str = 0, esc = 0;
-
-    // find '{' outside strings
-    for (; i < n; i = i + 1)
+    float n = strlen(s), i = pos, v;
+    while (i < n)
     {
-        string c = substring(s, i, 1);
-        if (in_str) { if (esc) { esc = 0; continue; } if (c == "\\") { esc = 1; continue; } if (c == "\"") { in_str = 0; } continue; }
-        if (c == "\"") { in_str = 1; continue; }
-        if (c == "{") break;
+        v = str2chr(s, i);
+        if (v == 34) { i = json__skip_string(s, i, n); continue; }
+        if (v == 123) break;
+        i = i + 1;
     }
     if (i >= n) return 0;
     js_obj_start = i;
-
-    // match '}'
-    float depth = 1; i = i + 1; in_str = 0; esc = 0;
-    for (; i < n; i = i + 1)
-    {
-        string c = substring(s, i, 1);
-        if (in_str) { if (esc) { esc = 0; continue; } if (c == "\\") { esc = 1; continue; } if (c == "\"") { in_str = 0; } continue; }
-        if (c == "\"") { in_str = 1; continue; }
-        if (c == "{") depth = depth + 1;
-        else if (c == "}") { depth = depth - 1; if (depth <= 0) { i = i + 1; break; } }
-    }
-    js_obj_end = i;
-    js_it_next = i;
+    js_obj_end = json__skip_value(s, i, n);
+    js_it_next = js_obj_end;
     return 1;
 }
 
-// Strict key:"value" scan inside [o0,o1)
+// key:"value" lookup inside the object [o0,o1). Sets js_val_start/js_val_len
+// to the string contents (without quotes).
 float js_obj_find_qstring_span(string s, float o0, float o1, string key)
 {
-    float i = o0, n = o1, in_str = 0, esc = 0;
+    if (!json__find_key(s, o0, o1, key)) return 0;
+    if (str2chr(s, json__vs) != 34) return 0;
+    js_val_start = json__vs + 1;
+    js_val_len   = json__ve - js_val_start;
+    if (json__skip_ok) js_val_len = js_val_len - 1;   // exclude closing quote
+    return 1;
+}
 
-    while (i < n)
+// VERY tolerant fallback for damaged objects: find "key" anywhere, then the
+// next ':' and opening quote, then the value.
+float js_obj_find_qstring_span_fallback(string s, float o0, float o1, string key)
+{
+    string pat = strcat("\"", key, "\"");
+    float plen = strlen(pat);
+    float i = o0, hit, k;
+
+    while (i < o1)
     {
-        string c = substring(s, i, 1);
-        if (in_str)
-        {
-            if (esc) { esc = 0; i = i + 1; continue; }
-            if (c == "\\") { esc = 1; i = i + 1; continue; }
-            if (c == "\"") { in_str = 0; i = i + 1; continue; }
-            i = i + 1; continue;
-        }
-        if (c == "\"")
-        {
-            // read key
-            float k0 = i + 1, j = k0, e2 = 0;
-            for (; j < n; j = j + 1)
-            {
-                string d = substring(s, j, 1);
-                if (e2) { e2 = 0; continue; }
-                if (d == "\\") { e2 = 1; continue; }
-                if (d == "\"") break;
-            }
-            string found = substring(s, k0, j - k0);
-            i = j + 1;
+        hit = strstrofs(s, pat, i);
+        if (hit < 0 || hit + plen > o1) return 0;
 
-            // skip to colon
-            for (; i < n; i = i + 1) { string x = substring(s,i,1); if (x == ":") { i = i + 1; break; } }
+        i = json__skip_ws(s, hit + plen, o1);
+        if (!(i < o1 && str2chr(s, i) == 58)) { i = hit + 1; continue; }   // ':'
+        i = json__skip_ws(s, i + 1, o1);
+        if (!(i < o1 && str2chr(s, i) == 34)) { i = hit + 1; continue; }   // '"'
 
-            // skip ws
-            while (i < n)
-            {
-                string ws = substring(s, i, 1);
-                if (ws == " " || ws == "\t" || ws == "\r" || ws == "\n") { i = i + 1; continue; }
-                break;
-            }
-
-            if (found == key && i < n && substring(s, i, 1) == "\"")
-            {
-                float v0 = i + 1, k = v0, esc3 = 0;
-                for (; k < n; k = k + 1)
-                {
-                    string ch = substring(s, k, 1);
-                    if (esc3) { esc3 = 0; continue; }
-                    if (ch == "\\") { esc3 = 1; continue; }
-                    if (ch == "\"") break;
-                }
-                js_val_start = v0;
-                js_val_len   = k - v0;
-                return 1;
-            }
-            continue;
-        }
-        i = i + 1;
+        json__skip_ok = TRUE;
+        k = json__skip_string(s, i, o1);
+        js_val_start = i + 1;
+        js_val_len   = k - js_val_start;
+        if (json__skip_ok) js_val_len = js_val_len - 1;   // exclude closing quote
+        return 1;
     }
     return 0;
 }
 
-// VERY tolerant fallback: find \"key\" then the next : and next opening quote, then value
-float js_obj_find_qstring_span_fallback(string s, float o0, float o1, string key)
-{
-    string pat = strcat("\"", key, "\"");
-    float n = strlen(s);
-    float i = o0;
-
-    // naive search for "key"
-    while (1)
-    {
-        // find first quote of the pattern
-        float p = i;
-        float hit = -1;
-        while (p < o1)
-        {
-            // quick check on first char
-            if (substring(s, p, 1) == "\"")
-            {
-                float ok = 1, t = 0;
-                for (t = 0; t < strlen(pat); t = t + 1)
-                {
-                    if (p + t >= o1) { ok = 0; break; }
-                    if (substring(s, p + t, 1) != substring(pat, t, 1)) { ok = 0; break; }
-                }
-                if (ok) { hit = p; break; }
-            }
-            p = p + 1;
-        }
-        if (hit < 0) return 0;
-
-        // move after pattern
-        i = hit + strlen(pat);
-
-        // skip spaces/tabs/newlines
-        while (i < o1)
-        {
-            string ch = substring(s, i, 1);
-            if (ch == " " || ch == "\t" || ch == "\r" || ch == "\n") { i = i + 1; continue; }
-            break;
-        }
-        // require colon
-        if (!(i < o1 && substring(s, i, 1) == ":")) { i = i + 1; continue; }
-        i = i + 1;
-
-        // skip ws
-        while (i < o1)
-        {
-            string ch2 = substring(s, i, 1);
-            if (ch2 == " " || ch2 == "\t" || ch2 == "\r" || ch2 == "\n") { i = i + 1; continue; }
-            break;
-        }
-
-        // require opening quote
-        if (!(i < o1 && substring(s, i, 1) == "\"")) { i = i + 1; continue; }
-
-        // read value until closing quote (respect escapes)
-        float v0 = i + 1, k = v0, esc = 0;
-        for (; k < o1; k = k + 1)
-        {
-            string ch3 = substring(s, k, 1);
-            if (esc) { esc = 0; continue; }
-            if (ch3 == "\\") { esc = 1; continue; }
-            if (ch3 == "\"") break;
-        }
-        js_val_start = v0;
-        js_val_len   = k - v0;
-        return 1;
-    }
-}
-
-// copy short quoted string (decode common escapes)
+// copy short quoted string (decode escapes) -> zoned
 string js_qstring_copy(string s, float v0, float vlen)
 {
-    float i = v0, n = v0 + vlen, esc = 0;
-    string out = "";
-    while (i < n)
-    {
-        string c = substring(s, i, 1);
-        if (!esc && c == "\\") { esc = 1; i = i + 1; continue; }
-        if (esc)
-        {
-            if (c == "n") out = strcat(out, "\n");
-            else if (c == "r") out = strcat(out, "\r");
-            else if (c == "t") out = strcat(out, "\t");
-            else if (c == "\"") out = strcat(out, "\"");
-            else if (c == "\\") out = strcat(out, "\\");
-            else out = strcat(out, c);
-            esc = 0; i = i + 1; continue;
-        }
-        out = strcat(out, c);
-        i = i + 1;
-    }
-    return strzone(out);
+    return strzone(json_unescape_span(s, v0, vlen));
+}
+
+// Look up a string field in the object [o0,o1) (strict, then tolerant).
+// Always returns a zoned string ("" when missing); caller must strunzone it.
+string js_obj_get_zoned(string s, float o0, float o1, string key)
+{
+    if (js_obj_find_qstring_span(s, o0, o1, key) || js_obj_find_qstring_span_fallback(s, o0, o1, key))
+        return js_qstring_copy(s, js_val_start, js_val_len);
+    return strzone("");
 }
 
 // stream-print long string (decode escapes) without building big temps
@@ -753,8 +779,6 @@ void js_qstring_bprint(string s, float v0, float vlen)
             if (c == "n") bprint("\n");
             else if (c == "r") bprint("\r");
             else if (c == "t") bprint("\t");
-            else if (c == "\"") bprint("\"");
-            else if (c == "\\") bprint("\\");
             else bprint(c);
             esc = 0; i = i + 1; continue;
         }
@@ -779,11 +803,7 @@ float json_is_blank(string s)
     if (!s) return TRUE;
     float n = strlen(s), i;
     for (i = 0; i < n; i = i + 1)
-    {
-        string ch = substring(s, i, 1);
-        if (ch != " " && ch != "\t" && ch != "\n" && ch != "\r")
-            return FALSE;
-    }
+        if (!json__is_ws(str2chr(s, i))) return FALSE;
     return TRUE;
 }
 
@@ -796,10 +816,7 @@ string json_safe_or(string s, string fb)
 float json_has_colon(string s)
 {
     if (!s) return FALSE;
-    float n = strlen(s), i;
-    for (i = 0; i < n; i = i + 1)
-        if (substring(s, i, 1) == ":") return TRUE;
-    return FALSE;
+    return strstrofs(s, ":", 0) >= 0;
 }
 
 string json_fix_minutes(string ds)
@@ -808,33 +825,26 @@ string json_fix_minutes(string ds)
     return ds;
 }
 
-string _hex_digit(float v) { return substring("0123456789abcdef", v & 15, 1); }
-
+// Stream an escaped string into an open file in small chunks, so long values
+// never have to fit in a single tempstring.
 void json_write_escaped_to_file(float wf, string s)
 {
-    float i = 0, L = strlen(s);
+    if (!s) return;
+    float i = 0, L = strlen(s), chunk;
     while (i < L)
     {
-        string c = substring(s, i, 1);
-        float  code = str2chr(c, 0);
-
-        if (c == "\"")       fputs(wf, "\\\"");
-        else if (c == "\\")  fputs(wf, "\\\\");
-        else if (code == 10) fputs(wf, "\\n");
-        else if (code == 13) fputs(wf, "\\r");
-        else if (code == 9)  fputs(wf, "\\t");
-        else if (code < 32)
-        {
-            float hi = floor(code / 16);
-            float lo = code - hi * 16;
-            fputs(wf, "\\u00"); fputs(wf, _hex_digit(hi)); fputs(wf, _hex_digit(lo));
-        }
-        else fputs(wf, c);
-
-        i = i + 1;
+        chunk = L - i; if (chunk > JSON_ESCAPE_CHUNK) chunk = JSON_ESCAPE_CHUNK;
+        fputs(wf, json_escape(substring(s, i, chunk)));
+        i = i + chunk;
     }
 }
 
+// Write "key":"value" (no separators) to an open file.
+void json_write_kv_string_to_file(float wf, string k, string v)
+{
+    fputs(wf, "\""); json_write_escaped_to_file(wf, k); fputs(wf, "\":\"");
+    json_write_escaped_to_file(wf, v); fputs(wf, "\"");
+}
 
 // ============================================================================
 // 9) Domain Helper: gametype/playmode
@@ -1295,20 +1305,14 @@ void(string entry) json_append_lastscores =
                             string zobj = strzone(obj);
                             o0 = 0; o1 = strlen(zobj);
 
-                            ttxt = ""; tmap = ""; tmode = ""; thost = ""; tdate = "";
+                            // always zoned ("" when missing); freed below or when rewritten
+                            ttxt  = js_obj_get_zoned(zobj, o0, o1, "text");
+                            tmap  = js_obj_get_zoned(zobj, o0, o1, "map");
+                            tmode = js_obj_get_zoned(zobj, o0, o1, "mode");
+                            thost = js_obj_get_zoned(zobj, o0, o1, "host");
+                            tdate = js_obj_get_zoned(zobj, o0, o1, "date");
 
-                            if (js_obj_find_qstring_span(zobj, o0, o1, "text") || js_obj_find_qstring_span_fallback(zobj, o0, o1, "text"))
-                                ttxt  = js_qstring_copy(zobj, js_val_start, js_val_len);
-                            if (js_obj_find_qstring_span(zobj, o0, o1, "map")  || js_obj_find_qstring_span_fallback(zobj, o0, o1, "map"))
-                                tmap  = js_qstring_copy(zobj, js_val_start, js_val_len);
-                            if (js_obj_find_qstring_span(zobj, o0, o1, "mode") || js_obj_find_qstring_span_fallback(zobj, o0, o1, "mode"))
-                                tmode = js_qstring_copy(zobj, js_val_start, js_val_len);
-                            if (js_obj_find_qstring_span(zobj, o0, o1, "host") || js_obj_find_qstring_span_fallback(zobj, o0, o1, "host"))
-                                thost = js_qstring_copy(zobj, js_val_start, js_val_len);
-                            if (js_obj_find_qstring_span(zobj, o0, o1, "date") || js_obj_find_qstring_span_fallback(zobj, o0, o1, "date"))
-                                tdate = js_qstring_copy(zobj, js_val_start, js_val_len);
-
-                            if (ttxt && ttxt != "")
+                            if (ttxt != "")
                             {
                                 if (keep < CAP_OLD)
                                 {
@@ -1339,11 +1343,11 @@ void(string entry) json_append_lastscores =
                             }
                             else
                             {
-                                if (ttxt)  strunzone(ttxt);
-                                if (tmap)  strunzone(tmap);
-                                if (tmode) strunzone(tmode);
-                                if (thost) strunzone(thost);
-                                if (tdate) strunzone(tdate);
+                                strunzone(ttxt);
+                                strunzone(tmap);
+                                strunzone(tmode);
+                                strunzone(thost);
+                                strunzone(tdate);
                             }
 
                             strunzone(zobj);
@@ -1400,11 +1404,13 @@ void(string entry) json_append_lastscores =
 
                 if (tail_trimmed)
                 {
-                    float fi = strstrofs(s, "{", 0);
-                    if (fi > 0) s = substring(s, fi, strlen(s) - fi);
-                    string s2 = strzone(s);
-                    strunzone(s);
-                    s = s2;
+                    // drop the partial object at the front of the tail
+                    float fi = strstrofs(zs, "{", 0);
+                    if (fi > 0)
+                    {
+                        s = strzone(substring(zs, fi, strlen(zs) - fi));
+                        strunzone(zs);
+                    }
                 }
 
                 float pos = 0;
@@ -1412,20 +1418,14 @@ void(string entry) json_append_lastscores =
                 {
                     o0 = js_obj_start; o1 = js_obj_end;
 
-                    ttxt = ""; tmap = ""; tmode = ""; thost = ""; tdate = "";
+                    // always zoned ("" when missing); freed below or when rewritten
+                    ttxt  = js_obj_get_zoned(s, o0, o1, "text");
+                    tmap  = js_obj_get_zoned(s, o0, o1, "map");
+                    tmode = js_obj_get_zoned(s, o0, o1, "mode");
+                    thost = js_obj_get_zoned(s, o0, o1, "host");
+                    tdate = js_obj_get_zoned(s, o0, o1, "date");
 
-                    if (js_obj_find_qstring_span(s, o0, o1, "text") || js_obj_find_qstring_span_fallback(s, o0, o1, "text"))
-                        ttxt  = js_qstring_copy(s, js_val_start, js_val_len);
-                    if (js_obj_find_qstring_span(s, o0, o1, "map")  || js_obj_find_qstring_span_fallback(s, o0, o1, "map"))
-                        tmap  = js_qstring_copy(s, js_val_start, js_val_len);
-                    if (js_obj_find_qstring_span(s, o0, o1, "mode") || js_obj_find_qstring_span_fallback(s, o0, o1, "mode"))
-                        tmode = js_qstring_copy(s, js_val_start, js_val_len);
-                    if (js_obj_find_qstring_span(s, o0, o1, "host") || js_obj_find_qstring_span_fallback(s, o0, o1, "host"))
-                        thost = js_qstring_copy(s, js_val_start, js_val_len);
-                    if (js_obj_find_qstring_span(s, o0, o1, "date") || js_obj_find_qstring_span_fallback(s, o0, o1, "date"))
-                        tdate = js_qstring_copy(s, js_val_start, js_val_len);
-
-                    if (ttxt && ttxt != "")
+                    if (ttxt != "")
                     {
                         if (keep < CAP_OLD)
                         {
@@ -1455,11 +1455,11 @@ void(string entry) json_append_lastscores =
                     }
                     else
                     {
-                        if (ttxt)  strunzone(ttxt);
-                        if (tmap)  strunzone(tmap);
-                        if (tmode) strunzone(tmode);
-                        if (thost) strunzone(thost);
-                        if (tdate) strunzone(tdate);
+                        strunzone(ttxt);
+                        strunzone(tmap);
+                        strunzone(tmode);
+                        strunzone(thost);
+                        strunzone(tdate);
                     }
 
                     pos = js_it_next;
@@ -1502,14 +1502,14 @@ void(string entry) json_append_lastscores =
 
         fputs(wf, "{");
 
-        if (p_date[idxw] && p_date[idxw] != "")
+        if (p_date[idxw] != "")
         {
-            fputs(wf, "\"date\":\""); json_write_escaped_to_file(wf, p_date[idxw]); fputs(wf, "\",");
+            json_write_kv_string_to_file(wf, "date", p_date[idxw]); fputs(wf, ",");
         }
-        fputs(wf, "\"map\":\"");  json_write_escaped_to_file(wf, p_map[idxw]);  fputs(wf, "\",");
-        fputs(wf, "\"mode\":\""); json_write_escaped_to_file(wf, p_mode[idxw]); fputs(wf, "\",");
-        fputs(wf, "\"host\":\""); json_write_escaped_to_file(wf, p_host[idxw]); fputs(wf, "\",");
-        fputs(wf, "\"text\":\""); json_write_escaped_to_file(wf, p_txt[idxw]);  fputs(wf, "\"}");
+        json_write_kv_string_to_file(wf, "map",  p_map[idxw]);  fputs(wf, ",");
+        json_write_kv_string_to_file(wf, "mode", p_mode[idxw]); fputs(wf, ",");
+        json_write_kv_string_to_file(wf, "host", p_host[idxw]); fputs(wf, ",");
+        json_write_kv_string_to_file(wf, "text", p_txt[idxw]);  fputs(wf, "}");
 
         // free as we go
         strunzone(p_txt[idxw]); strunzone(p_map[idxw]); strunzone(p_mode[idxw]);
@@ -1524,11 +1524,11 @@ void(string entry) json_append_lastscores =
         wrote_any = 1;
 
         fputs(wf, "{");
-        fputs(wf, "\"date\":\""); json_write_escaped_to_file(wf, z_date);  fputs(wf, "\",");
-        fputs(wf, "\"map\":\"");  json_write_escaped_to_file(wf, z_map);   fputs(wf, "\",");
-        fputs(wf, "\"mode\":\""); json_write_escaped_to_file(wf, z_mode);  fputs(wf, "\",");
-        fputs(wf, "\"host\":\""); json_write_escaped_to_file(wf, z_host);  fputs(wf, "\",");
-        fputs(wf, "\"text\":\""); json_write_escaped_to_file(wf, z_entry); fputs(wf, "\"}");
+        json_write_kv_string_to_file(wf, "date", z_date);  fputs(wf, ",");
+        json_write_kv_string_to_file(wf, "map",  z_map);   fputs(wf, ",");
+        json_write_kv_string_to_file(wf, "mode", z_mode);  fputs(wf, ",");
+        json_write_kv_string_to_file(wf, "host", z_host);  fputs(wf, ",");
+        json_write_kv_string_to_file(wf, "text", z_entry); fputs(wf, "}");
     }
 
     fputs(wf, "\n]");
@@ -1562,8 +1562,8 @@ void(string path, float pretty) json_export_match_to_file =
 
     bprint(sprintf("[matchpost] save-json: writing '%s' (stream)\n", path));
 
-    // IMPORTANT: (f, pretty) - put the file handle first, not the pretty flag.
-    json_begin_pretty_to_file(f, 0);  // stream compact JSON directly into 'f'
+    // Stream the document straight into 'f' (avoids the QC string cap).
+    json_begin_pretty_to_file(f, pretty);
     json_emit_match_document();
 
     // We streamed everything to 'f'; just detach the sink before closing.
@@ -1771,30 +1771,18 @@ void () utils_show_last_scores =
                         o0 = 0; o1 = strlen(zobj);
 
                         // ---- Find spans inside this single object ----
-                        float d_found = 0, d0 = 0, dl = 0;
-                        if (js_obj_find_qstring_span(zobj, o0, o1, "date")) { d_found = 1; d0 = js_val_start; dl = js_val_len; }
-                        else if (js_obj_find_qstring_span_fallback(zobj, o0, o1, "date")) { d_found = 1; d0 = js_val_start; dl = js_val_len; }
-
-                        float m_found = 0, m0 = 0, ml = 0;
-                        if (js_obj_find_qstring_span(zobj, o0, o1, "map")) { m_found = 1; m0 = js_val_start; ml = js_val_len; }
-                        else if (js_obj_find_qstring_span_fallback(zobj, o0, o1, "map")) { m_found = 1; m0 = js_val_start; ml = js_val_len; }
-
-                        float mo_found = 0, mo0 = 0, mol = 0;
-                        if (js_obj_find_qstring_span(zobj, o0, o1, "mode")) { mo_found = 1; mo0 = js_val_start; mol = js_val_len; }
-                        else if (js_obj_find_qstring_span_fallback(zobj, o0, o1, "mode")) { mo_found = 1; mo0 = js_val_start; mol = js_val_len; }
-
                         float t_found = 0, t0 = 0, tl = 0;
                         if (js_obj_find_qstring_span(zobj, o0, o1, "text")) { t_found = 1; t0 = js_val_start; tl = js_val_len; }
                         else if (js_obj_find_qstring_span_fallback(zobj, o0, o1, "text")) { t_found = 1; t0 = js_val_start; tl = js_val_len; }
 
-                        // ---- Copy short values (decoded) ----
-                        string tdate = ""; if (d_found)  tdate = js_qstring_copy(zobj, d0, dl);
-                        string tmap  = ""; if (m_found)  tmap  = js_qstring_copy(zobj, m0, ml);
-                        string tmode = ""; if (mo_found) tmode = js_qstring_copy(zobj, mo0, mol);
+                        // ---- Copy short values (decoded, always zoned) ----
+                        string tdate = js_obj_get_zoned(zobj, o0, o1, "date");
+                        string tmap  = js_obj_get_zoned(zobj, o0, o1, "map");
+                        string tmode = js_obj_get_zoned(zobj, o0, o1, "mode");
 
                         // ---- Friendly "when" label ----
                         string when = "Unknown Date";
-                        if (tdate && strlen(tdate) >= 10)
+                        if (strlen(tdate) >= 10)
                         {
                             string dpart = substring(tdate, 0, 10);
                             float y = stof(substring(dpart, 6, 4));
@@ -1869,7 +1857,6 @@ void () utils_show_last_scores =
                             sprint(self, "Score: ");
 
                             string ttext = js_qstring_copy(zobj, t0, tl);
-                            if (ttext)
                             {
                                 // chunked sprint to avoid long-string truncation
                                 float off = 0, L = strlen(ttext);
@@ -1887,9 +1874,9 @@ void () utils_show_last_scores =
 
                         sprint(self, "\n"); // blank line between entries
 
-                        if (tdate) strunzone(tdate);
-                        if (tmap)  strunzone(tmap);
-                        if (tmode) strunzone(tmode);
+                        strunzone(tdate);
+                        strunzone(tmap);
+                        strunzone(tmode);
 
                         strunzone(zobj);
                     }

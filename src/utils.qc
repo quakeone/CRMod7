@@ -3102,7 +3102,6 @@ void() utils_load_disconnect_log =
 // Discord webhook helper
 // ------------------------------------------------------------
 
-string json_escape(string s);                 // from json.qc
 float (entity p) Q1_PER_Calc_Eff;            // PER helper
 float(entity p) PER_HasNontrivialActivity;   // from stats.qc
 float(entity p) stats_has_nontrivial_activity; // from stats.qc
@@ -3165,32 +3164,14 @@ void() webhook_stats_buf_end =
     webhook_stats_max = 0;
 };
 
-// JSON-escape into a *zoned* string (uses strreplace for efficiency)
-string(string s) json_escape_zoned_simple =
-{
-    local string out;
-    if (!s) return strzone("");
-    
-    // Use strreplace for efficiency - only 4 operations instead of N iterations
-    // Order matters: escape backslashes FIRST to avoid double-escaping
-    out = strreplace("\\", "\\\\", s);
-    out = strreplace("\"", "\\\"", out);
-    out = strreplace("\n", "\\n", out);
-    out = strreplace("\t", "\\t", out);
-    
-    return strzone(out);
-};
-
 // Build {"content":"..."} as a *zoned* JSON payload
 string(string body) Webhook_MakeContentPayloadZ =
 {
-    local string out, esc;
-    out = strzone("{\"content\":\"");
-    esc = json_escape_zoned_simple(body);  // returns zoned
-    out = zcat(out, esc);
-    strunzone(esc);
-    out = zcat(out, "\"}");
-    return out; // zoned
+    json_begin_compact();
+    json_begin_object();
+        json_kv_string("content", body);
+    json_end_object();
+    return strzone(json_result());
 };
 
 
@@ -3888,15 +3869,13 @@ void(string label, float kind) wst_award =
 // uri_post's "@file" body, so a message is not limited by the engine's
 // 1024-byte tempstrings and can use Discord's full message length.
 
-string(string s) wst_json_esc =
+// Discord text cleanup (JSON escaping is done by the json.qc writer).
+// strreplace always copies into a 1024-byte tempstring, so only call it when
+// there is something to replace; a long segment then passes through untouched.
+string(string s) wst_discord_text =
 {
-    if (!wst_esc) wst_esc = strzone(chr2str(27));
-    s = strreplace("\\", "\\\\", s);
-    s = strreplace("\"", "\\\"", s);
-    s = strreplace("\r", "", s);
-    s = strreplace("\n", "\\n", s);
-    s = strreplace("\t", "    ", s);
-    s = strreplace(wst_esc, "\\u001b", s);
+    if (strstrofs(s, "\r", 0) >= 0) s = strreplace("\r", "", s);
+    if (strstrofs(s, "\t", 0) >= 0) s = strreplace("\t", "    ", s);
     return s;
 };
 
@@ -3922,12 +3901,22 @@ void(entity ev, float a, float b, float reopen, float closefence) wst_write_part
         strunzone(path);
         return;
     }
-    fputs(f, "{\"allowed_mentions\":{\"parse\":[]},\"content\":\"");
-    if (reopen) fputs(f, "```ansi\\n");
-    for (j = a; j < b; j++)
-        fputs(f, wst_json_esc(bufstr_get(webhook_stats_buf, j)));
-    if (closefence) fputs(f, "```");
-    fputs(f, "\"}");
+    // {"allowed_mentions":{"parse":[]},"content":"..."}, streamed into the file
+    json_begin_compact_to_file(f);
+    json_begin_object();
+        json_key("allowed_mentions");
+        json_begin_object();
+            json_key("parse"); json_begin_array(); json_end_array();
+        json_end_object();
+        json_key("content");
+        json_string_open();
+            if (reopen) json_string_part("```ansi\n");
+            for (j = a; j < b; j++)
+                json_string_part(wst_discord_text(bufstr_get(webhook_stats_buf, j)));
+            if (closefence) json_string_part("```");
+        json_string_close();
+    json_end_object();
+    json_clear_sink();
     fclose(f);
 
     // fopen wrote <gamedir>/data/<path>; uri_post's "@" lookup tries that.
@@ -4825,8 +4814,8 @@ void(string data) mp_save_payload_for_debug =
 float(string body) mp_body_looks_ok =
 {
     if (!body) return 0;
-    if (strstrofs(body, "\"ok\":true", 0) >= 0) return 1;
-    if (strstrofs(body, "\"status\":\"ok\"", 0) >= 0) return 1;
+    if (json_obj_get_bool(body, "ok", 0)) return 1;
+    if (json_obj_get_string(body, "status", "") == "ok") return 1;
     return 0;
 };
 
@@ -4835,16 +4824,15 @@ float(string body) mp_body_looks_ok =
 float(string body) webhook_body_looks_ok =
 {
     if (!body) return 0;
-    if (strstrofs(body, "id", 0) >= 0 && strstrofs(body, "content", 0) >= 0) return 1;
-    return 0;
+    // a Discord message object has top-level "id" and "content"
+    return json_obj_has(body, "id") && json_obj_has(body, "content");
 };
 
 // Discord error JSON usually contains "message" and "code"
 float(string body) webhook_body_looks_error =
 {
     if (!body) return 0;
-    if (strstrofs(body, "message", 0) >= 0 && strstrofs(body, "code", 0) >= 0) return 1;
-    return 0;
+    return json_obj_has(body, "message") && json_obj_has(body, "code");
 };
 
 // DP-style 3-arg callback. Normalize+forward into the canonical handler only.

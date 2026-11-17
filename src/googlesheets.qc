@@ -56,35 +56,6 @@ float() gsheets_config_signature =
 };
 
 //
-// Sanitize a string for JSON (preserve Quake colors, strip control/JSON breakers)
-//
-string(string s) gsheets_json_sanitize =
-{
-	if (s == "" || s == string_null)
-		return "";
-	
-	string src = strzone(s);
-	string result = "";
-	float i, len, c;
-	len = strlen(src);
-	
-	for (i = 0; i < len; i++)
-	{
-		c = str2chr(src, i);
-		if (c < 0)
-			c = c + 256;
-		// Skip control characters (0-31) and backslash; preserve high-bit Quake colors.
-		if (c >= 32 && c != 34 && c != 92)
-			result = strcat(result, chr2str(c));
-		else if (c == 34) // quote -> avoid breaking JSON
-			result = strcat(result, "'");
-	}
-	
-	strunzone(src);
-	return result;
-};
-
-//
 // Encode a string into lowercase hex bytes (preserve Quake chars)
 //
 string(string s) gsheets_hex_encode =
@@ -382,17 +353,7 @@ void(float is_match, float rank, string player, float teamcolor,
 	if (hostname_url != "") hostname_url = strzone(hostname_url);
 	string player_qhex = gsheets_hex_encode(player);
 	if (player_qhex != "") player_qhex = strzone(player_qhex);
-	string map_safe = gsheets_json_sanitize(mapname);
-	if (map_safe != "") map_safe = strzone(map_safe);
-	string player_safe = gsheets_json_sanitize(utils_dequake_for_discord(player));
-	if (player_safe != "") player_safe = strzone(player_safe);
-	string rec_date_safe = gsheets_json_sanitize(rec_date);
-	if (rec_date_safe != "") rec_date_safe = strzone(rec_date_safe);
-	string mt_str_safe = gsheets_json_sanitize(mt_str ? mt_str : "");
-	if (mt_str_safe != "") mt_str_safe = strzone(mt_str_safe);
-	string hostname_safe = gsheets_json_sanitize(utils_dequake_for_discord(hostname_z ? hostname_z : ""));
-	if (hostname_safe != "") hostname_safe = strzone(hostname_safe);
-	string date_url = uri_escape(rec_date_safe ? rec_date_safe : "");
+	string date_url = uri_escape(rec_date ? rec_date : "");
 	if (date_url != "") date_url = strzone(date_url);
 	
 	string url = sprintf("%s?action=write&key=%s%s%s%s%s",
@@ -403,26 +364,23 @@ void(float is_match, float rank, string player, float teamcolor,
 		date_url != "" ? "&date=" : "",
 		date_url != "" ? date_url : "");
 	if (url != "") url = strzone(url);
-	string json = sprintf(
-		"{\"map\":\"%s\",\"is_match\":%s,\"rank\":%g,\"player\":\"%s\",\"player_qhex\":\"%s\",\"teamcolor\":%g,\"time\":%g",
-		map_safe,
-		is_match ? "true" : "false",
-		rank,
-		player_safe,
-		player_qhex ? player_qhex : "",
-		teamcolor,
-		captime
-	);
-	if (ping > 0)
-		json = strcat(json, sprintf(",\"ping\":%g", floor(ping + 0.5)));
-	json = strcat(json, sprintf(",\"date\":\"%s\",\"mt_str\":\"%s\",\"server\":\"%s\"}", rec_date_safe, mt_str_safe, hostname_safe));
-	if (json != "") json = strzone(json);
+	json_begin_compact();
+	json_begin_object();
+		json_kv_string("map", mapname);
+		json_kv_bool("is_match", is_match);
+		json_kv_number("rank", rank);
+		json_kv_string("player", utils_dequake_for_discord(player));
+		json_kv_string("player_qhex", player_qhex);
+		json_kv_number("teamcolor", teamcolor);
+		json_kv_number("time", captime);
+		if (ping > 0)
+			json_kv_number("ping", floor(ping + 0.5));
+		json_kv_string("date", rec_date);
+		json_kv_string("mt_str", mt_str);
+		json_kv_string("server", utils_dequake_for_discord(hostname_z));
+	json_end_object();
+	string json = strzone(json_result());
 	
-	if (map_safe != "") strunzone(map_safe);
-	if (player_safe != "") strunzone(player_safe);
-	if (rec_date_safe != "") strunzone(rec_date_safe);
-	if (mt_str_safe != "") strunzone(mt_str_safe);
-	if (hostname_safe != "") strunzone(hostname_safe);
 	if (hostname_z != "") strunzone(hostname_z);
 	if (hostname_url != "") strunzone(hostname_url);
 	if (player_qhex != "") strunzone(player_qhex);
@@ -431,112 +389,21 @@ void(float is_match, float rank, string player, float teamcolor,
 	float reqid = is_match ? GSHEETS_REQ_WRITE_MATCH : GSHEETS_REQ_WRITE_TRIAL;
 	uri_get(url, reqid, "application/json", json);
 	
-	if (json != "") strunzone(json);
+	strunzone(json);
 	if (url != "") strunzone(url);
 };
 
 //
-// Find the matching close bracket ']' for an already-opened '[',
-// skipping nested brackets and quoted strings.
-// 'start' should point to the first char inside the '['.
-// Returns the index of the matching ']', or -1 if not found.
-//
-float(string body, float start) gsheets_find_array_end =
-{
-	float depth = 1;
-	float i = start;
-	float len = strlen(body);
-	float cc;
-
-	while (i < len && depth > 0)
-	{
-		cc = str2chr(body, i);
-		if (cc == 34) // '"'
-		{
-			// Skip quoted string
-			i = i + 1;
-			while (i < len)
-			{
-				cc = str2chr(body, i);
-				if (cc == 92) { i = i + 2; continue; } // backslash
-				if (cc == 34) break; // '"'
-				i = i + 1;
-			}
-		}
-		else if (cc == 91) // '['
-			depth = depth + 1;
-		else if (cc == 93) // ']'
-			depth = depth - 1;
-		if (depth > 0)
-			i = i + 1;
-	}
-
-	if (depth == 0)
-		return i;
-	return -1;
-};
-
-//
-// Find the matching close brace '}' for an already-opened '{',
-// skipping nested braces and quoted strings.
-// 'start' should point to the first char inside the '{'.
-// Returns the index of the matching '}', or -1 if not found.
-//
-float(string body, float start) gsheets_find_object_end =
-{
-	float depth = 1;
-	float i = start;
-	float len = strlen(body);
-	float cc;
-
-	while (i < len && depth > 0)
-	{
-		cc = str2chr(body, i);
-		if (cc == 34) // '"'
-		{
-			// Skip quoted string
-			i = i + 1;
-			while (i < len)
-			{
-				cc = str2chr(body, i);
-				if (cc == 92) { i = i + 2; continue; } // backslash
-				if (cc == 34) break; // '"'
-				i = i + 1;
-			}
-		}
-		else if (cc == 123) // '{'
-			depth = depth + 1;
-		else if (cc == 125) // '}'
-			depth = depth - 1;
-		if (depth > 0)
-			i = i + 1;
-	}
-
-	if (depth == 0)
-		return i;
-	return -1;
-};
-
-//
-// Whitespace helper for lightweight JSON parsing
-//
-float(float cc) gsheets_is_json_ws =
-{
-	if (cc == 32 || cc == 10 || cc == 13 || cc == 9) // space, \n, \r, \t
-		return TRUE;
-	return FALSE;
-};
-
-//
-// Quick error detector for Apps Script JSON responses
+// Error detector for Apps Script responses: anything that doesn't start as a
+// JSON object, or an object with a top-level "error" key ({error: "..."}).
+// The object may be incomplete: QSS-family engines can clip long responses,
+// and the record readers still use every complete record before the cut.
 //
 float(string body) gsheets_body_has_error =
 {
-	if (body == "" || body == string_null)
+	if (!json_starts_object(body))
 		return TRUE;
-	if (strstrofs(body, "\"error\"", 0) >= 0)
-		return TRUE;
-	return FALSE;
+	return json_obj_has(body, "error");
 };
 
 //
@@ -545,42 +412,17 @@ float(string body) gsheets_body_has_error =
 //
 void(string body) gsheets_parse_records =
 {
-	float pos, end;
 	string chunk;
 
 	// Parse trial records
-	pos = strstrofs(body, "\"trial\"", 0);
-	if (pos >= 0)
-	{
-		pos = strstrofs(body, "[", pos);
-		if (pos >= 0)
-		{
-			pos += 1; // first char inside '['
-			end = gsheets_find_array_end(body, pos);
-			if (end > pos)
-			{
-				chunk = substring(body, pos, end - pos);
-				gsheets_parse_record_array(chunk, 0); // recordset 0 = trial
-			}
-		}
-	}
+	chunk = json_obj_get_raw(body, "trial");
+	if (chunk != "")
+		gsheets_parse_record_array(chunk, 0); // recordset 0 = trial
 
 	// Parse match records
-	pos = strstrofs(body, "\"match\"", 0);
-	if (pos >= 0)
-	{
-		pos = strstrofs(body, "[", pos);
-		if (pos >= 0)
-		{
-			pos += 1; // first char inside '['
-			end = gsheets_find_array_end(body, pos);
-			if (end > pos)
-			{
-				chunk = substring(body, pos, end - pos);
-				gsheets_parse_record_array(chunk, 2); // recordset 2 = match
-			}
-		}
-	}
+	chunk = json_obj_get_raw(body, "match");
+	if (chunk != "")
+		gsheets_parse_record_array(chunk, 2); // recordset 2 = match
 };
 
 //
@@ -591,7 +433,6 @@ string(string arr, float include_mt, string empty_msg) gsheets_format_top3_from_
 	arr = strzone(arr); // protect from tempstring recycling
 
 	float pos = 0;
-	float obj_start, obj_end;
 	float count = 0;
 	string out = "";
 	string obj, player_qhex, player_json, player, decoded;
@@ -600,18 +441,14 @@ string(string arr, float include_mt, string empty_msg) gsheets_format_top3_from_
 
 	while (count < 3)
 	{
-		obj_start = strstrofs(arr, "{", pos);
-		if (obj_start < 0)
+		obj = json_array_next_object(arr, pos);
+		if (obj == "")
 			break;
+		pos = json__it_next;
+		obj = strzone(obj);
 
-		obj_end = gsheets_find_object_end(arr, obj_start + 1);
-		if (obj_end < 0)
-			break;
-
-		obj = strzone(substring(arr, obj_start, obj_end - obj_start + 1));
-
-		player_qhex = gsheets_json_get_string(obj, "player_qhex");
-		player_json = gsheets_json_get_string(obj, "player");
+		player_qhex = json_obj_get_string(obj, "player_qhex", "");
+		player_json = json_obj_get_string(obj, "player", "");
 		player = "";
 		if (player_qhex != "")
 		{
@@ -621,11 +458,11 @@ string(string arr, float include_mt, string empty_msg) gsheets_format_top3_from_
 		}
 		if (player == "")
 			player = player_json;
-		teamcolor = gsheets_json_get_number(obj, "teamcolor");
-		captime = gsheets_json_get_number(obj, "time");
-		rec_date = gsheets_json_get_string(obj, "date");
-		mt_str = gsheets_json_get_string(obj, "mt_str");
-		ping = gsheets_json_get_number(obj, "ping");
+		teamcolor = json_obj_get_float(obj, "teamcolor", 0);
+		captime = json_obj_get_float(obj, "time", 0);
+		rec_date = json_obj_get_string(obj, "date", "");
+		mt_str = json_obj_get_string(obj, "mt_str", "");
+		ping = json_obj_get_float(obj, "ping", 0);
 
 		strunzone(obj);
 
@@ -642,8 +479,6 @@ string(string arr, float include_mt, string empty_msg) gsheets_format_top3_from_
 			out = strcat(out, line, "\n");
 			count = count + 1;
 		}
-
-		pos = obj_end + 1;
 	}
 
 	strunzone(arr);
@@ -658,21 +493,11 @@ string(string arr, float include_mt, string empty_msg) gsheets_format_top3_from_
 //
 string(string body, string key, float include_mt, string empty_msg) gsheets_format_top3_from_body =
 {
-	float pos, end;
 	string chunk;
 
-	pos = strstrofs(body, sprintf("\"%s\"", key), 0);
-	if (pos < 0)
+	chunk = json_obj_get_raw(body, key);
+	if (chunk == "")
 		return strcat(empty_msg, "\n");
-	pos = strstrofs(body, "[", pos);
-	if (pos < 0)
-		return strcat(empty_msg, "\n");
-	pos = pos + 1;
-	end = gsheets_find_array_end(body, pos);
-	if (end <= pos)
-		return strcat(empty_msg, "\n");
-
-	chunk = substring(body, pos, end - pos);
 	return gsheets_format_top3_from_array(chunk, include_mt, empty_msg);
 };
 
@@ -686,24 +511,20 @@ void(string arr, float recordset) gsheets_parse_record_array =
 
 	// Parse each object in the array
 	float pos = 0;
-	float obj_start, obj_end;
 	float rank = 0;
+	string obj;
 
 	while (TRUE)
 	{
-		obj_start = strstrofs(arr, "{", pos);
-		if (obj_start < 0)
+		obj = json_array_next_object(arr, pos);
+		if (obj == "")
 			break;
-
-		obj_end = gsheets_find_object_end(arr, obj_start + 1);
-		if (obj_end < 0)
-			break;
-
-		string obj = strzone(substring(arr, obj_start, obj_end - obj_start + 1));
+		pos = json__it_next;
+		obj = strzone(obj);
 
 		// Extract fields from object
-		string player_qhex = gsheets_json_get_string(obj, "player_qhex");
-		string player_json = gsheets_json_get_string(obj, "player");
+		string player_qhex = json_obj_get_string(obj, "player_qhex", "");
+		string player_json = json_obj_get_string(obj, "player", "");
 		string player = "";
 		if (player_qhex != "")
 		{
@@ -714,11 +535,11 @@ void(string arr, float recordset) gsheets_parse_record_array =
 		}
 		if (player == "")
 			player = player_json;
-		float teamcolor = gsheets_json_get_number(obj, "teamcolor");
-		float captime = gsheets_json_get_number(obj, "time");
-		string rec_date = gsheets_json_get_string(obj, "date");
-		string mt_str = gsheets_json_get_string(obj, "mt_str");
-		float ping = gsheets_json_get_number(obj, "ping");
+		float teamcolor = json_obj_get_float(obj, "teamcolor", 0);
+		float captime = json_obj_get_float(obj, "time", 0);
+		string rec_date = json_obj_get_string(obj, "date", "");
+		string mt_str = json_obj_get_string(obj, "mt_str", "");
+		float ping = json_obj_get_float(obj, "ping", 0);
 
 		strunzone(obj);
 
@@ -741,93 +562,12 @@ void(string arr, float recordset) gsheets_parse_record_array =
 				check_player_low_record(captime, teamcolor, player);
 		}
 
-		pos = obj_end + 1;
 		rank++;
 		if (rank >= PLAYER_RECORDS_MAX_COUNT)
 			break;
 	}
 
 	strunzone(arr);
-};
-
-//
-// JSON helper: extract string value for a key
-//
-string(string json, string key) gsheets_json_get_string =
-{
-	string pattern = sprintf("\"%s\"", key);
-	float pos = strstrofs(json, pattern, 0);
-	if (pos < 0)
-		return "";
-
-	pos += strlen(pattern);
-
-	// Skip whitespace before colon
-	while (pos < strlen(json) && gsheets_is_json_ws(str2chr(json, pos)))
-		pos++;
-	if (str2chr(json, pos) != 58) // ':'
-		return "";
-	pos++;
-
-	// Skip whitespace after colon
-	while (pos < strlen(json) && gsheets_is_json_ws(str2chr(json, pos)))
-		pos++;
-	if (str2chr(json, pos) != 34) // '"'
-		return "";
-	pos++;
-
-	float end = strstrofs(json, "\"", pos);
-	if (end < 0)
-		return "";
-
-	return substring(json, pos, end - pos);
-};
-
-//
-// JSON helper: extract number value for a key
-//
-float(string json, string key) gsheets_json_get_number =
-{
-	string pattern = sprintf("\"%s\"", key);
-	float pos = strstrofs(json, pattern, 0);
-	if (pos < 0)
-		return 0;
-
-	pos += strlen(pattern);
-
-	// Skip whitespace before colon
-	while (pos < strlen(json) && gsheets_is_json_ws(str2chr(json, pos)))
-		pos++;
-	if (str2chr(json, pos) != 58) // ':'
-		return 0;
-	pos++;
-
-	// Skip whitespace after colon
-	while (pos < strlen(json) && gsheets_is_json_ws(str2chr(json, pos)))
-		pos++;
-
-	// Accept quoted numbers too, e.g. "time":"2.56"
-	if (str2chr(json, pos) == 34) // '"'
-	{
-		pos++;
-		float endq = strstrofs(json, "\"", pos);
-		if (endq < 0)
-			return 0;
-		return stof(substring(json, pos, endq - pos));
-	}
-
-	// Find end of number (next comma, brace, or bracket)
-	float end = pos;
-	float cc;
-	while (end < strlen(json))
-	{
-		cc = str2chr(json, end);
-		if (cc == 44 || cc == 125 || cc == 93) // ',', '}', ']'
-			break;
-		end++;
-	}
-
-	return stof(substring(json, pos, end - pos));
 };
 
 //
@@ -841,7 +581,7 @@ float(string body, string wanted_map) gsheets_response_matches_map =
 	if (wanted_map == "" || wanted_map == string_null)
 		return TRUE;
 
-	body_map = gsheets_json_get_string(body, "map");
+	body_map = json_obj_get_string(body, "map", "");
 	if (body_map == "" || body_map == string_null)
 		return TRUE; // Cannot verify; accept.
 
@@ -862,7 +602,7 @@ void(float reqid, float status, string body) gsheets_callback =
 	{
 		case GSHEETS_REQ_VALIDATE:
 		{
-			if (status == 200 && strstrofs(body, "\"status\":\"ok\"", 0) >= 0)
+			if (status == 200 && json_obj_get_string(body, "status", "") == "ok")
 			{
 				clanring_googlesheets_valid = TRUE;
 				cvar_set("cr_gsheets_validated_sig", ftos(gsheets_config_signature()));
