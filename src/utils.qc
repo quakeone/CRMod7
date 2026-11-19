@@ -3375,6 +3375,37 @@ string(string s) Webhook_TruncateForDiscord =
 // ------------------------------------------------------------
 // PREP functions
 // ------------------------------------------------------------
+string() Webhook_DiscordTimestamp =
+{
+    local string utc;
+    local float year, days, day_groups, seconds, high, low;
+
+    // Read one UTC snapshot using portable strftime specifiers.
+    utc = strftime(FALSE, "%Y%j%H%M%S");
+    if (strlen(utc) != 13 || stof(substring(utc, 0, 4)) < 1970)
+        return strftime(FALSE, "%Y-%m-%d %H:%M UTC");
+
+    // Count days since 1970, including leap days in completed years.
+    year = stof(substring(utc, 0, 4)) - 1;
+    days = (year - 1969) * 365
+         + floor(year / 4) - floor(year / 100) + floor(year / 400) - 477
+         + stof(substring(utc, 4, 3)) - 1;
+
+    // Each 125-day group adds 108 * 100000 seconds. The remaining
+    // seconds fit within QuakeC's exact single-precision integer range.
+    day_groups = floor(days / 125);
+    seconds = (days - day_groups * 125) * 86400
+            + stof(substring(utc, 7, 2)) * 3600
+            + stof(substring(utc, 9, 2)) * 60
+            + stof(substring(utc, 11, 2));
+    high = floor(seconds / 100000);
+    low = seconds - high * 100000;
+    high = day_groups * 108 + high;
+    if (high == 0)
+        return sprintf("<t:%d:f>", low);
+    return sprintf("<t:%d%05d:f>", high, low);
+};
+
 void(entity ev) webhook_captime_info =
 {
     local string urls, content;
@@ -3386,8 +3417,9 @@ void(entity ev) webhook_captime_info =
     Webhook_SetEventURLsMax3(ev, urls);
     if (ev.hook_url == "") return;
 
-    if (strstrofs(content, "```", 0) < 0) content = strcat("```text\n", content, "```");
     content = Webhook_TruncateForDiscord(content);
+    if (strstrofs(content, "```", 0) < 0) content = strcat("```text\n", content, "\n```");
+    content = strcat(content, "\n-# ", Webhook_DiscordTimestamp());
 
     if (ev.hook_payload) strunzone(ev.hook_payload);
     ev.hook_payload = Webhook_MakeContentPayloadZ(content);
@@ -4069,7 +4101,6 @@ void(entity ev) webhook_stats_info =
         local entity pteam;
         local float num_teams, i;
         local string hdr_time, time_str, map_z, line;
-        local float hourpos;
 
         num_teams = wst_nteams;
 
@@ -4174,13 +4205,7 @@ void(entity ev) webhook_stats_info =
                 else                                                 modes = "DM FFA";
             }
 
-            hdr_time = utils_dequake_for_discord(strftime(TRUE, "%m-%d-%Y %I:%M %p"));
-            if (substring(hdr_time, 0, 1) == "0")
-                hdr_time = substring(hdr_time, 1, strlen(hdr_time) - 1);
-            hourpos = strstrofs(hdr_time, " ", 0);
-            if (hourpos >= 0 && substring(hdr_time, hourpos + 1, 1) == "0")
-                hdr_time = strcat(substring(hdr_time, 0, hourpos + 1), substring(hdr_time, hourpos + 2, strlen(hdr_time) - (hourpos + 2)));
-            hdr_time = strzone(hdr_time);
+            hdr_time = strzone(Webhook_DiscordTimestamp());
 
             map_z = strzone(wst_md(utils_dequake_for_discord(clanring_current_mapname())));
             line = strzone(strcat("-# ", map_z, " \xC2\xB7 ", time_str));

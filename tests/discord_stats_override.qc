@@ -248,6 +248,12 @@ void() worldspawn =
         dst_ctf_match();
         dst_clear_players();
         dst_ctf_match();
+
+        entity ev = spawn();
+        ev.message = "New Time Trial #1 Record";
+        clanring_captimesdiscordurl = clanring_statsdiscordurl;
+        webhook_captime_info(ev);
+        print("DISCORD CAPTIME ", ev.hook_payload, "\n");
     }
     print("DISCORD TEST DONE\n");
     localcmd("quit\n");

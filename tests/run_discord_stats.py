@@ -12,6 +12,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import time
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 GOLD, RED = "\x1b[1;33m", "\x1b[1;31m"
@@ -66,6 +67,7 @@ def run_case(root, mod, engine, pak0, case):
     (mod / "server.cfg").write_text(f"set dst_case {case}\nhostname \"test*host_\"\nmap bastard\n")
     for logfile in root.rglob("qconsole.log"):
         logfile.unlink()
+    started = int(time.time())
     try:
         result = subprocess.run(
             [str(engine), "-nolauncher", "-basedir", str(root), "-nohome",
@@ -76,6 +78,7 @@ def run_case(root, mod, engine, pak0, case):
         log = "".join(f.read_text(encoding="latin1") for f in root.rglob("qconsole.log"))
         raise AssertionError(f"engine timed out:\n{(timeout.stdout or b'').decode('latin1')}\n{log}")
     output = (result.stdout + result.stderr).decode("latin1")
+    finished = int(time.time())
     for logfile in root.rglob("qconsole.log"):
         output += logfile.read_text(encoding="latin1")
     assert result.returncode == 0 and "DISCORD TEST DONE" in output, f"Engine exit {result.returncode}:\n{output}"
@@ -89,6 +92,15 @@ def run_case(root, mod, engine, pak0, case):
         document = json.loads(raw.decode("utf-8"))   # escaping must produce valid JSON
         assert document["allowed_mentions"] == {"parse": []}
         messages.append(document["content"])
+
+    stamp = re.search(r"(?m)^-# .* · <t:(\d+):f>$", messages[0])
+    assert stamp and started <= int(stamp[1]) <= finished, messages[0]
+    if case == 1:
+        captime = re.search(r"(?m)^DISCORD CAPTIME (\{.*\})$", output)
+        assert captime, output
+        content = json.loads(captime[1])["content"]
+        stamp = re.fullmatch(r"```text\nNew Time Trial #1 Record\n```\n-# <t:(\d+):f>", content)
+        assert stamp and started <= int(stamp[1]) <= finished, content
     return messages
 
 
